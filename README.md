@@ -347,7 +347,7 @@ src/job_scraper/
   cli.py               # job-scraper CLI entry point
   config.py            # YAML config loader + scraper builder
   company_boards.py    # company → board database (load/save/merge)
-  discover.py          # Board discovery: probe and TheirStack methods
+  discover.py          # Board discovery: direct probing via requests
   skip_list.py         # Permanent failure registry
   _maps.py             # CLI string → API value maps
   scrapers/
