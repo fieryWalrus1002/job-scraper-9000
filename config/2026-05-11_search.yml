@@ -1,0 +1,56 @@
+# job-scraper-9000 search config
+
+global:
+  default_max_results: 50
+  hours_old: 48
+  linkedin_time: week
+  salary_floor_k: 120
+
+linkedin:
+  experience: "2,3,4,5"
+  workplace: remote
+  job_type: fulltime
+
+  searches:
+    - keywords: "data engineer"
+    - keywords: "AI engineer"
+    - keywords: "machine learning engineer"
+    - keywords: "software engineer"
+    - keywords: "computer vision engineer"
+    - keywords: "MLOps engineer"
+    - keywords: "geospatial data engineer"
+
+jobspy:
+  # we covered linked in with the linkedin scraper, so no need to duplicate those results here
+  sites: indeed,zip_recruiter
+  no_remote: false
+
+  searches:
+    # Pullman/onsite — broad terms, small market
+    - search_term: "data engineer"
+      location: "Pullman, WA"
+    - search_term: "software engineer"
+      location: "Pullman, WA"
+    - search_term: "machine learning engineer"
+      location: "Pullman, WA"
+    - search_term: "AI engineer"
+      location: "Pullman, WA"
+
+    # Remote — mirrors LinkedIn core terms to get Indeed/ZipRecruiter coverage
+    - search_term: "data engineer"
+    - search_term: "AI engineer"
+    - search_term: "machine learning engineer"
+    - search_term: "software engineer"
+    - search_term: "MLOps engineer"
+    - search_term: "computer vision engineer"
+
+greenhouse:
+  boards:
+    - anthropic
+    - openai
+    - microsoft
+    - amazon
+    - palantir
+    - planet-labs
+    - descartes-labs
+    - scale-ai

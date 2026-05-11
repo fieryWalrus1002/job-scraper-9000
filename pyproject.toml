@@ -5,5 +5,24 @@ description = "Job scraper for LinkedIn and other sources"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "python-jobspy>=1.1.82",
+    "pyyaml>=6.0.3",
     "requests>=2.33.1",
+]
+
+[project.scripts]
+job-scraper = "job_scraper.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/job_scraper"]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0.0",
+    "pytest>=9.0.3",
+    "ruff>=0.11.0",
 ]

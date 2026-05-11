@@ -1,0 +1,453 @@
+"""
+Tests for the CLI layer.
+
+Strategy:
+- Utility functions (_slug, _auto_path, _resolve_dest, _output) tested directly.
+- Argument parsing tested by patching sys.argv and catching the parsed args
+  before any scraper is invoked.
+- Command handlers (_cmd_linkedin, _cmd_jobspy, _cmd_greenhouse) tested by
+  passing a fake Namespace and mocking the scraper classes — network is
+  never touched.
+"""
+import argparse
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from job_scraper.cli import (
+    DATA_DIR,
+    _auto_path,
+    _output,
+    _resolve_dest,
+    _slug,
+    main,
+)
+from job_scraper.models import JobPosting
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_job(**overrides) -> JobPosting:
+    defaults = dict(
+        source="linkedin", source_job_id="1", source_url="http://x.com",
+        title="Engineer", company="Acme", location="Remote",
+        posted_at=None, description="", scraped_at="2024-01-01T00:00:00+00:00",
+    )
+    return JobPosting(**{**defaults, **overrides})
+
+
+def _fake_args(**kwargs) -> argparse.Namespace:
+    defaults = dict(output=None, save=False)
+    return argparse.Namespace(**{**defaults, **kwargs})
+
+
+# ---------------------------------------------------------------------------
+# _slug
+# ---------------------------------------------------------------------------
+
+def test_slug_lowercases():
+    assert _slug("LLM Ops") == "llm-ops"
+
+
+def test_slug_collapses_special_chars():
+    assert _slug("data  engineer!!") == "data-engineer"
+
+
+def test_slug_strips_leading_trailing_dashes():
+    assert _slug("  -python-  ") == "python"
+
+
+def test_slug_preserves_numbers():
+    assert _slug("Python 3.11") == "python-3-11"
+
+
+# ---------------------------------------------------------------------------
+# _auto_path
+# ---------------------------------------------------------------------------
+
+def test_auto_path_format():
+    with patch("job_scraper.cli.datetime") as mock_dt:
+        mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
+        p = _auto_path("linkedin", "LLM Ops")
+
+    assert p == DATA_DIR / "2026-05-11_10-30_linkedin_llm-ops.jsonl"
+
+
+def test_auto_path_slugifies_keywords():
+    with patch("job_scraper.cli.datetime") as mock_dt:
+        mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
+        p = _auto_path("jobspy", "Data Engineer (Senior)")
+
+    assert p.name == "2026-05-11_10-30_jobspy_data-engineer-senior.jsonl"
+
+
+# ---------------------------------------------------------------------------
+# _resolve_dest
+# ---------------------------------------------------------------------------
+
+def test_resolve_dest_no_flags_returns_none():
+    args = _fake_args(output=None, save=False)
+    assert _resolve_dest(args, "linkedin", "Python") is None
+
+
+def test_resolve_dest_output_flag_returns_path():
+    args = _fake_args(output="my_jobs.jsonl", save=False)
+    assert _resolve_dest(args, "linkedin", "Python") == Path("my_jobs.jsonl")
+
+
+def test_resolve_dest_save_flag_returns_auto_path(tmp_path):
+    args = _fake_args(output=None, save=True)
+    with patch("job_scraper.cli.DATA_DIR", tmp_path):
+        with patch("job_scraper.cli.datetime") as mock_dt:
+            mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
+            result = _resolve_dest(args, "linkedin", "Python")
+
+    assert result == tmp_path / "2026-05-11_10-30_linkedin_python.jsonl"
+    assert result.parent.exists()
+
+
+# ---------------------------------------------------------------------------
+# _output
+# ---------------------------------------------------------------------------
+
+def test_output_to_stdout_writes_jsonl(capsys):
+    jobs = [_make_job(title="Dev A"), _make_job(title="Dev B")]
+    _output(jobs, dest=None)
+    captured = capsys.readouterr().out
+    lines = [ln for ln in captured.strip().splitlines() if ln]
+    assert len(lines) == 2
+    assert json.loads(lines[0])["title"] == "Dev A"
+    assert json.loads(lines[1])["title"] == "Dev B"
+
+
+def test_output_to_file_writes_jsonl(tmp_path):
+    dest = tmp_path / "out.jsonl"
+    jobs = [_make_job(title="Dev A"), _make_job(source_job_id="2", title="Dev B")]
+    _output(jobs, dest=dest)
+    lines = dest.read_text().strip().splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["title"] == "Dev A"
+
+
+def test_output_empty_list_to_stdout(capsys):
+    _output([], dest=None)
+    assert capsys.readouterr().out.strip() == ""
+
+
+# ---------------------------------------------------------------------------
+# Argument parsing — invoke main() with patched sys.argv, intercept the
+# parsed Namespace before any scraper runs.
+# ---------------------------------------------------------------------------
+
+def _parse_args(*argv):
+    """Call main() with given argv, capture the Namespace via the func hook."""
+    captured = {}
+
+    def capture(args):
+        captured["args"] = args
+
+    with patch("sys.argv", ["job-scraper", *argv]):
+        with patch("job_scraper.cli._cmd_linkedin", side_effect=capture):
+            with patch("job_scraper.cli._cmd_jobspy", side_effect=capture):
+                with patch("job_scraper.cli._cmd_greenhouse", side_effect=capture):
+                    with patch("job_scraper.cli._cmd_run_config", side_effect=capture):
+                        main()
+
+    return captured["args"]
+
+
+def test_linkedin_defaults():
+    args = _parse_args("linkedin", "LLM Ops")
+    assert args.keywords == "LLM Ops"
+    assert args.time == "day"
+    assert args.workplace == "remote"
+    assert args.job_type == "fulltime"
+    assert args.experience == "2,3,4,5"
+    assert args.salary is None
+    assert args.max_results == 25
+    assert args.no_descriptions is False
+    assert args.output is None
+    assert args.save is False
+
+
+def test_linkedin_salary_and_time():
+    args = _parse_args("linkedin", "Python", "--salary", "120", "--time", "week")
+    assert args.salary == 120
+    assert args.time == "week"
+
+
+def test_linkedin_no_descriptions_flag():
+    args = _parse_args("linkedin", "Python", "--no-descriptions")
+    assert args.no_descriptions is True
+
+
+def test_linkedin_save_flag():
+    args = _parse_args("linkedin", "Python", "--save")
+    assert args.save is True
+    assert args.output is None
+
+
+def test_linkedin_output_flag():
+    args = _parse_args("linkedin", "Python", "--output", "jobs.jsonl")
+    assert args.output == "jobs.jsonl"
+    assert args.save is False
+
+
+def test_linkedin_save_and_output_mutually_exclusive():
+    with patch("sys.argv", ["job-scraper", "linkedin", "Python", "--save", "-o", "x.jsonl"]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+def test_jobspy_defaults():
+    args = _parse_args("jobspy", "LLM Ops")
+    assert args.keywords == "LLM Ops"
+    assert args.sites == "linkedin,indeed,zip_recruiter"
+    assert args.hours_old == 24
+    assert args.remote is True
+    assert args.max_results == 25
+
+
+def test_jobspy_custom_sites():
+    args = _parse_args("jobspy", "Python", "--sites", "linkedin,glassdoor")
+    assert args.sites == "linkedin,glassdoor"
+
+
+def test_jobspy_no_remote_flag():
+    args = _parse_args("jobspy", "Python", "--no-remote")
+    assert args.remote is False
+
+
+def test_greenhouse_board_positional():
+    args = _parse_args("greenhouse", "anthropic")
+    assert args.board == "anthropic"
+    assert args.no_descriptions is False
+
+
+def test_greenhouse_no_descriptions():
+    args = _parse_args("greenhouse", "anthropic", "--no-descriptions")
+    assert args.no_descriptions is True
+
+
+def test_missing_subcommand_exits():
+    with patch("sys.argv", ["job-scraper"]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+# ---------------------------------------------------------------------------
+# Command handlers — mock the scraper, verify the query is built correctly
+# ---------------------------------------------------------------------------
+
+def _run_linkedin_cmd(**arg_overrides):
+    from job_scraper.cli import _cmd_linkedin
+
+    defaults = dict(
+        keywords="LLM Ops", time="day", workplace="remote", job_type="fulltime",
+        experience="2,3,4,5", salary=None, max_results=10,
+        no_descriptions=False, output=None, save=False,
+    )
+    args = _fake_args(**{**defaults, **arg_overrides})
+
+    mock_jobs = [_make_job()]
+    # Scrapers are deferred imports inside the command functions, so patch at source.
+    with patch("job_scraper.scrapers.linkedin.LinkedInJobScraper") as MockScraper:
+        MockScraper.return_value.scrape.return_value = mock_jobs
+        with patch("job_scraper.cli._output"):
+            _cmd_linkedin(args)
+        return MockScraper.call_args[0][0]  # the LinkedInSearchQuery passed to __init__
+
+
+def test_linkedin_cmd_maps_time_to_param():
+    query = _run_linkedin_cmd(time="week")
+    assert query.time_posted == "r604800"
+
+
+def test_linkedin_cmd_maps_workplace_to_param():
+    query = _run_linkedin_cmd(workplace="hybrid")
+    assert query.workplace == "3"
+
+
+def test_linkedin_cmd_maps_job_type_to_param():
+    query = _run_linkedin_cmd(job_type="contract")
+    assert query.job_type == "C"
+
+
+def test_linkedin_cmd_salary_floor_converted_to_int():
+    query = _run_linkedin_cmd(salary=120)
+    assert query.salary_floor == 120_000
+
+
+def test_linkedin_cmd_no_salary_is_none():
+    query = _run_linkedin_cmd(salary=None)
+    assert query.salary_floor is None
+
+
+def test_linkedin_cmd_no_descriptions_sets_flag():
+    query = _run_linkedin_cmd(no_descriptions=True)
+    assert query.fetch_descriptions is False
+
+
+def _run_jobspy_cmd(**arg_overrides):
+    from job_scraper.cli import _cmd_jobspy
+
+    defaults = dict(
+        keywords="LLM Ops", sites="linkedin,indeed", location="USA",
+        hours_old=24, remote=True, enforce_annual_salary=False,
+        max_results=10, output=None, save=False,
+    )
+    args = _fake_args(**{**defaults, **arg_overrides})
+
+    mock_jobs = [_make_job()]
+    with patch("job_scraper.scrapers.jobspy.JobSpyScraper") as MockScraper:
+        MockScraper.return_value.scrape.return_value = mock_jobs
+        with patch("job_scraper.cli._output"):
+            _cmd_jobspy(args)
+        return MockScraper.call_args[0][0]  # the JobSpyQuery
+
+
+def test_jobspy_cmd_splits_sites():
+    query = _run_jobspy_cmd(sites="linkedin,glassdoor,indeed")
+    assert query.site_name == ["linkedin", "glassdoor", "indeed"]
+
+
+def test_jobspy_cmd_passes_hours_old():
+    query = _run_jobspy_cmd(hours_old=48)
+    assert query.hours_old == 48
+
+
+def test_jobspy_cmd_remote_flag():
+    query = _run_jobspy_cmd(remote=False)
+    assert query.is_remote is False
+
+
+def _run_greenhouse_cmd(**arg_overrides):
+    from job_scraper.cli import _cmd_greenhouse
+
+    defaults = dict(board="anthropic", no_descriptions=False, output=None, save=False)
+    args = _fake_args(**{**defaults, **arg_overrides})
+
+    mock_jobs = [_make_job()]
+    with patch("job_scraper.scrapers.greenhouse.GreenhouseScraper") as MockScraper:
+        MockScraper.return_value.scrape.return_value = mock_jobs
+        with patch("job_scraper.cli._output"):
+            _cmd_greenhouse(args)
+        return MockScraper.call_args[0][0]  # the GreenhouseQuery
+
+
+def test_greenhouse_cmd_passes_board_token():
+    query = _run_greenhouse_cmd(board="stripe")
+    assert query.board_token == "stripe"
+
+
+def test_greenhouse_cmd_no_descriptions_flag():
+    query = _run_greenhouse_cmd(no_descriptions=True)
+    assert query.fetch_descriptions is False
+
+
+# ---------------------------------------------------------------------------
+# run-config — argument parsing
+# ---------------------------------------------------------------------------
+
+def test_run_config_defaults():
+    args = _parse_args("run-config", "config.yml")
+    assert args.config == "config.yml"
+    assert args.dry_run is False
+    assert args.save is False
+
+
+def test_run_config_dry_run_flag():
+    args = _parse_args("run-config", "config.yml", "--dry-run")
+    assert args.dry_run is True
+
+
+def test_run_config_save_flag():
+    args = _parse_args("run-config", "config.yml", "--save")
+    assert args.save is True
+
+
+def test_run_config_output_flag_rejected():
+    with patch("sys.argv", ["job-scraper", "run-config", "config.yml", "-o", "out.jsonl"]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+# ---------------------------------------------------------------------------
+# run-config — command handler
+# ---------------------------------------------------------------------------
+
+def _make_mock_scraper(source_name, describe_extra, jobs=None):
+    s = MagicMock()
+    s.source_name = source_name
+    s.describe.return_value = {"source": source_name, **describe_extra}
+    s.scrape.return_value = jobs if jobs is not None else [_make_job()]
+    return s
+
+
+def test_run_config_cmd_calls_output_per_scraper():
+    from job_scraper.cli import _cmd_run_config
+
+    scrapers = [
+        _make_mock_scraper("linkedin", {"keywords": "Python"}),
+        _make_mock_scraper("greenhouse:stripe", {"board_token": "stripe"}),
+    ]
+    args = _fake_args(config="config.yml", dry_run=False, save=False)
+
+    with patch("job_scraper.config.load_config", return_value=scrapers):
+        with patch("job_scraper.cli._output") as mock_output:
+            _cmd_run_config(args)
+
+    assert mock_output.call_count == 2
+
+
+def test_run_config_cmd_save_uses_auto_path():
+    from job_scraper.cli import _cmd_run_config
+
+    scrapers = [
+        _make_mock_scraper("linkedin", {"keywords": "Python"}),
+        _make_mock_scraper("greenhouse:stripe", {"board_token": "stripe"}),
+    ]
+    args = _fake_args(config="config.yml", dry_run=False, save=True)
+
+    with patch("job_scraper.config.load_config", return_value=scrapers):
+        with patch("job_scraper.cli._output") as mock_output:
+            with patch("pathlib.Path.mkdir"):
+                _cmd_run_config(args)
+
+    dests = [call.args[1] for call in mock_output.call_args_list]
+    assert all(d is not None for d in dests)
+    assert any("linkedin" in str(d) for d in dests)
+    assert any("stripe" in str(d) for d in dests)
+
+
+def test_run_config_cmd_isolates_scraper_failure():
+    from job_scraper.cli import _cmd_run_config
+
+    failing = _make_mock_scraper("linkedin", {"keywords": "Python"})
+    failing.scrape.side_effect = Exception("rate limited")
+    succeeding = _make_mock_scraper("greenhouse:stripe", {"board_token": "stripe"})
+
+    args = _fake_args(config="config.yml", dry_run=False, save=False)
+
+    with patch("job_scraper.config.load_config", return_value=[failing, succeeding]):
+        with patch("job_scraper.cli._output") as mock_output:
+            _cmd_run_config(args)
+
+    assert mock_output.call_count == 1
+
+
+def test_run_config_cmd_dry_run_skips_scrape(capsys):
+    from job_scraper.cli import _cmd_run_config
+
+    s = _make_mock_scraper("linkedin", {"keywords": "Python"})
+    args = _fake_args(config="config.yml", dry_run=True, save=False)
+
+    with patch("job_scraper.config.load_config", return_value=[s]):
+        _cmd_run_config(args)
+
+    s.scrape.assert_not_called()
+    assert "linkedin" in capsys.readouterr().out
