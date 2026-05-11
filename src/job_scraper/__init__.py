@@ -23,6 +23,8 @@ from .scrapers import (
     GreenhouseScraper,
     LeverScraper,
     LeverQuery,
+    AshbyScraper,
+    AshbyQuery,
 )
 
 __all__ = [
@@ -47,6 +49,8 @@ __all__ = [
     "GreenhouseScraper",
     "LeverScraper",
     "LeverQuery",
+    "AshbyScraper",
+    "AshbyQuery",
     "load_config",
     "ConfigError",
 ]
