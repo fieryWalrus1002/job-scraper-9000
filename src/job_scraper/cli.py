@@ -234,6 +234,44 @@ def _add_ashby(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
+# discover subcommand
+# ---------------------------------------------------------------------------
+
+def _cmd_discover(args) -> None:
+    from job_scraper.discover import run as discover_run
+    from job_scraper.company_boards import load as load_boards, DEFAULT_PATH as BOARDS_PATH
+
+    companies = args.companies
+    log.info("Probing %d companies...", len(companies))
+    discover_run(companies)
+
+    db = load_boards(BOARDS_PATH)
+
+    found = {c: db[c] for c in companies if db.get(c)}
+    not_found = [c for c in companies if not db.get(c)]
+
+    print(f"\n{'Company':<30} {'Boards'}")
+    print("-" * 50)
+    for company in companies:
+        boards = db.get(company, [])
+        print(f"  {company:<28} {', '.join(boards) if boards else '(not found)'}")
+
+    print("\n# --- paste into config yml ---")
+    print("companies:")
+    for company in found:
+        print(f"  - {company}")
+    for company in not_found:
+        print(f"  # - {company}  (not found)")
+
+
+def _add_discover(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser("discover", help="Find which ATS boards a list of companies use")
+    p.add_argument("companies", nargs="+", metavar="COMPANY",
+                   help="Company slugs to probe (e.g. anthropic mistral stripe)")
+    p.set_defaults(func=_cmd_discover)
+
+
+# ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
 
@@ -330,6 +368,7 @@ def main() -> None:
     _add_greenhouse(sub)
     _add_lever(sub)
     _add_ashby(sub)
+    _add_discover(sub)
     _add_run_config(sub)
 
     args = parser.parse_args()

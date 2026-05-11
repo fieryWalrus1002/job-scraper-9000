@@ -12,21 +12,22 @@ global:
 # (not just those matching specific keywords).
 # In our workflow, we'll filter through these in the next step to match the ones we actually want to apply to.
 
-ashby:
-  companies:
-    - mistral
-    - cohere
-    - harvey
-    - perplexity
+# uv run job-scraper discover mistral cohere harvey perplexity deepmind meta nvidia ai21 replit scale-ai figma notion stripe  
 
-lever:
-  companies:
-    - deepmind
-    - meta
-    - nvidia
-    - ai21
-    - replit
-    - scale-ai
-    - figma
-    - notion
-    - stripe
+companies:
+  - mistral
+  - cohere
+  - harvey
+  - perplexity
+  - deepmind
+  - replit
+  - figma
+  - notion
+  - stripe
+  # - meta  (not found)
+  # - nvidia  (not found)
+  # - ai21  (not found)
+  # - scale-ai  (not found)
+
+  # Then run:
+  # uv run job-scraper run-config config/test_ashby_and_lever.yml --save
