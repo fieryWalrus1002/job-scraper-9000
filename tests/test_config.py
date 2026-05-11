@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from job_scraper.config import ConfigError, load_config
+from job_scraper.scrapers.ashby import AshbyScraper
 from job_scraper.scrapers.greenhouse import GreenhouseScraper
 from job_scraper.scrapers.jobspy import JobSpyScraper
 from job_scraper.scrapers.lever import LeverScraper
@@ -537,4 +538,60 @@ def test_no_scraper_sections_includes_lever_in_error(tmp_path):
           default_max_results: 10
     """)
     with pytest.raises(ConfigError, match="lever"):
+        load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Ashby section
+# ---------------------------------------------------------------------------
+
+def test_ashby_section_creates_ashby_scrapers(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        ashby:
+          companies:
+            - mistral
+            - cohere
+    """)
+    scrapers = load_config(cfg)
+    assert len(scrapers) == 2
+    assert all(isinstance(s, AshbyScraper) for s in scrapers)
+
+
+def test_ashby_company_tokens_set(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        ashby:
+          companies:
+            - mistral
+            - cohere
+    """)
+    scrapers = load_config(cfg)
+    assert {s.query.company for s in scrapers} == {"mistral", "cohere"}
+
+
+def test_ashby_source_name(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        ashby:
+          companies:
+            - mistral
+    """)
+    scrapers = load_config(cfg)
+    assert scrapers[0].source_name == "ashby:mistral"
+
+
+def test_missing_ashby_section_skips_ashby(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        greenhouse:
+          boards:
+            - anthropic
+    """)
+    scrapers = load_config(cfg)
+    assert not any(isinstance(s, AshbyScraper) for s in scrapers)
+
+
+def test_no_scraper_sections_includes_ashby_in_error(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        global:
+          default_max_results: 10
+    """)
+    with pytest.raises(ConfigError, match="ashby"):
         load_config(cfg)

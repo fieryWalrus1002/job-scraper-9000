@@ -9,6 +9,7 @@ import yaml
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
 from .query import LinkedInSearchQuery, SALARY_FLOOR
 from .scrapers.base import BaseScraper
+from .scrapers.ashby import AshbyScraper, AshbyQuery
 from .scrapers.greenhouse import GreenhouseScraper, GreenhouseQuery
 from .scrapers.jobspy import JobSpyScraper, JobSpyQuery, JOBSPY_SITES
 from .scrapers.lever import LeverScraper, LeverQuery
@@ -57,6 +58,11 @@ class _GreenhouseSection:
 
 @dataclass
 class _LeverSection:
+    companies: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _AshbySection:
     companies: list[str] = field(default_factory=list)
 
 
@@ -164,6 +170,13 @@ def _parse_lever_section(raw: dict) -> _LeverSection | None:
     return _LeverSection(companies=[str(c) for c in (sec.get("companies") or [])])
 
 
+def _parse_ashby_section(raw: dict) -> _AshbySection | None:
+    sec = raw.get("ashby")
+    if sec is None:
+        return None
+    return _AshbySection(companies=[str(c) for c in (sec.get("companies") or [])])
+
+
 # ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
@@ -174,9 +187,10 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     js = _parse_jobspy_section(raw)
     gh = _parse_greenhouse_section(raw)
     lv = _parse_lever_section(raw)
+    ab = _parse_ashby_section(raw)
 
-    if li is None and js is None and gh is None and lv is None:
-        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse, lever)")
+    if li is None and js is None and gh is None and lv is None and ab is None:
+        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse, lever, ashby)")
 
     scrapers: list[BaseScraper] = []
 
@@ -243,5 +257,9 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     if lv:
         for company in lv.companies:
             scrapers.append(LeverScraper(LeverQuery(company=company)))
+
+    if ab:
+        for company in ab.companies:
+            scrapers.append(AshbyScraper(AshbyQuery(company=company)))
 
     return scrapers

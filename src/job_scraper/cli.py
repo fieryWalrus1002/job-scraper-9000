@@ -206,6 +206,34 @@ def _add_lever(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
+# ashby subcommand
+# ---------------------------------------------------------------------------
+
+def _cmd_ashby(args) -> None:
+    from job_scraper.scrapers.ashby import AshbyScraper, AshbyQuery
+
+    query = AshbyQuery(
+        company=args.company,
+        fetch_descriptions=not args.no_descriptions,
+    )
+
+    log.info("Ashby: company=%s | descriptions=%s", args.company, not args.no_descriptions)
+
+    jobs = AshbyScraper(query).scrape()
+    _summary(jobs)
+    _output(jobs, _resolve_dest(args, f"ashby-{args.company}", args.company))
+
+
+def _add_ashby(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser("ashby", help="Ashby ATS public JSON API")
+    p.add_argument("company", help="Company slug — e.g. 'mistral' for jobs.ashbyhq.com/mistral")
+    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions",
+                   help="Skip fetching descriptions")
+    _add_save_output(p)
+    p.set_defaults(func=_cmd_ashby)
+
+
+# ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
 
@@ -227,16 +255,25 @@ def _cmd_run_config(args) -> None:
             print(f"  [{info['source']}]  {details}")
         return
 
+    from job_scraper.skip_list import load as load_skip, record as record_skip, is_permanent
+
+    skip = load_skip()
+
     total = 0
     total_scrubbed = 0
     for s in scrapers:
+        if s.source_name in skip:
+            entry = skip[s.source_name]
+            log.warning("Skipping %s — known failure recorded %s: %s",
+                        s.source_name, entry["failed_at"][:10], entry["error"])
+            continue
         try:
             jobs = s.scrape()
             log.info("%s → %d jobs", s.source_name, len(jobs))
             if args.save:
                 info = s.describe()
-                label = info.get("keywords") or info.get("search_term") or info.get("board_token") or s.source_name
-                dest = _auto_path(s.source_name, label)
+                label = info.get("keywords") or info.get("search_term") or info.get("company") or info.get("board_token") or s.source_name
+                dest = _auto_path(_slug(s.source_name), label)
                 dest.parent.mkdir(parents=True, exist_ok=True)
             else:
                 dest = None
@@ -248,6 +285,8 @@ def _cmd_run_config(args) -> None:
             )
         except Exception as exc:
             log.error("%s failed — skipping: %s", s.source_name, exc)
+            if is_permanent(exc):
+                record_skip(s.source_name, exc)
 
     log.info("Total: %d jobs | PII items redacted: %d", total, total_scrubbed)
 
@@ -279,6 +318,7 @@ def main() -> None:
     _add_jobspy(sub)
     _add_greenhouse(sub)
     _add_lever(sub)
+    _add_ashby(sub)
     _add_run_config(sub)
 
     args = parser.parse_args()

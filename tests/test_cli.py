@@ -155,8 +155,9 @@ def _parse_args(*argv):
             with patch("job_scraper.cli._cmd_jobspy", side_effect=capture):
                 with patch("job_scraper.cli._cmd_greenhouse", side_effect=capture):
                     with patch("job_scraper.cli._cmd_lever", side_effect=capture):
-                        with patch("job_scraper.cli._cmd_run_config", side_effect=capture):
-                            main()
+                        with patch("job_scraper.cli._cmd_ashby", side_effect=capture):
+                            with patch("job_scraper.cli._cmd_run_config", side_effect=capture):
+                                main()
 
     return captured["args"]
 
@@ -393,6 +394,52 @@ def test_lever_cmd_passes_company():
 
 def test_lever_cmd_no_descriptions_flag():
     query = _run_lever_cmd(no_descriptions=True)
+    assert query.fetch_descriptions is False
+
+
+# ---------------------------------------------------------------------------
+# ashby — argument parsing and command handler
+# ---------------------------------------------------------------------------
+
+def test_ashby_defaults():
+    args = _parse_args("ashby", "mistral")
+    assert args.company == "mistral"
+    assert args.no_descriptions is False
+    assert args.save is False
+    assert args.output is None
+
+
+def test_ashby_no_descriptions_flag():
+    args = _parse_args("ashby", "mistral", "--no-descriptions")
+    assert args.no_descriptions is True
+
+
+def test_ashby_save_flag():
+    args = _parse_args("ashby", "mistral", "--save")
+    assert args.save is True
+
+
+def _run_ashby_cmd(**arg_overrides):
+    from job_scraper.cli import _cmd_ashby
+
+    defaults = dict(company="mistral", no_descriptions=False, output=None, save=False)
+    args = _fake_args(**{**defaults, **arg_overrides})
+
+    mock_jobs = [_make_job()]
+    with patch("job_scraper.scrapers.ashby.AshbyScraper") as MockScraper:
+        MockScraper.return_value.scrape.return_value = mock_jobs
+        with patch("job_scraper.cli._output"):
+            _cmd_ashby(args)
+        return MockScraper.call_args[0][0]  # the AshbyQuery
+
+
+def test_ashby_cmd_passes_company():
+    query = _run_ashby_cmd(company="cohere")
+    assert query.company == "cohere"
+
+
+def test_ashby_cmd_no_descriptions_flag():
+    query = _run_ashby_cmd(no_descriptions=True)
     assert query.fetch_descriptions is False
 
 
