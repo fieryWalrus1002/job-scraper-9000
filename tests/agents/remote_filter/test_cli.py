@@ -5,6 +5,7 @@ Coverage:
 - passes_remote_filter: pure filter logic
 - analyze_remote: LLM call with mocked OpenAI client
 - _load_raw_jobs / _load_eval_records: file I/O helpers
+- _highlight_phrases: ANSI highlight helper
 - _cmd_export: converts eval suite to OpenAI fine-tuning JSONL
 - _cmd_review: interactive review with mocked input()
 """
@@ -18,6 +19,7 @@ import pytest
 from agents.remote_filter.cli import (
     _cmd_export,
     _cmd_review,
+    _highlight_phrases,
     _load_eval_records,
     _load_raw_jobs,
 )
@@ -57,6 +59,7 @@ def _make_eval_record(**overrides) -> dict:
         expected_classification="fully_remote",
         expected_should_pass_filter=True,
         expected_travel_days_range=None,
+        key_phrases=[],
         notes="",
     )
     return {**defaults, **overrides}
@@ -80,6 +83,7 @@ def _make_filtered_job(**overrides) -> dict:
             "requires_relocation": False,
             "requires_local_presence": False,
             "reasoning": "Hybrid role.",
+            "key_phrases": [],
         },
     )
     return {**defaults, **overrides}
@@ -471,7 +475,7 @@ def test_review_quit_stops_early(tmp_path):
 def test_review_flip_writes_eval_record(tmp_path):
     eval_path = _run_review(
         tmp_path, [_make_filtered_job(id="job-flip")],
-        input_sequence=["f", "", ""],  # flip → keep agent cls (enter) → empty notes
+        input_sequence=["f", "", "", ""],  # flip → cls (enter) → phrases (blank) → notes
     )
     assert eval_path.exists()
     record = json.loads(eval_path.read_text().strip())
@@ -481,7 +485,7 @@ def test_review_flip_writes_eval_record(tmp_path):
 def test_review_flip_trash_sets_should_pass_true(tmp_path):
     eval_path = _run_review(
         tmp_path, [_make_filtered_job(_filter_result="trash")],
-        input_sequence=["f", "", ""],
+        input_sequence=["f", "", "", ""],
     )
     record = json.loads(eval_path.read_text().strip())
     assert record["expected_should_pass_filter"] is True
@@ -490,7 +494,7 @@ def test_review_flip_trash_sets_should_pass_true(tmp_path):
 def test_review_flip_pass_sets_should_pass_false(tmp_path):
     eval_path = _run_review(
         tmp_path, [_make_filtered_job(id="job-pass", _filter_result="pass")],
-        input_sequence=["f", "", ""],
+        input_sequence=["f", "", "", ""],
         bucket="pass",
     )
     record = json.loads(eval_path.read_text().strip())
@@ -501,7 +505,7 @@ def test_review_flip_custom_classification(tmp_path):
     # _CLASSIFICATIONS[0] is "fully_remote"; user types "1"
     eval_path = _run_review(
         tmp_path, [_make_filtered_job()],
-        input_sequence=["f", "1", ""],
+        input_sequence=["f", "1", "", ""],
     )
     record = json.loads(eval_path.read_text().strip())
     assert record["expected_classification"] == "fully_remote"
@@ -510,7 +514,7 @@ def test_review_flip_custom_classification(tmp_path):
 def test_review_flip_enter_keeps_agent_classification(tmp_path):
     eval_path = _run_review(
         tmp_path, [_make_filtered_job()],
-        input_sequence=["f", "", ""],  # agent said "hybrid"
+        input_sequence=["f", "", "", ""],  # agent said "hybrid"
     )
     record = json.loads(eval_path.read_text().strip())
     assert record["expected_classification"] == "hybrid"
@@ -519,10 +523,28 @@ def test_review_flip_enter_keeps_agent_classification(tmp_path):
 def test_review_flip_notes_saved(tmp_path):
     eval_path = _run_review(
         tmp_path, [_make_filtered_job()],
-        input_sequence=["f", "", "wrong timezone check"],
+        input_sequence=["f", "", "", "wrong timezone check"],
     )
     record = json.loads(eval_path.read_text().strip())
     assert record["notes"] == "wrong timezone check"
+
+
+def test_review_flip_key_phrases_saved(tmp_path):
+    eval_path = _run_review(
+        tmp_path, [_make_filtered_job()],
+        input_sequence=["f", "", "must be in office 3 days, hybrid schedule", ""],
+    )
+    record = json.loads(eval_path.read_text().strip())
+    assert record["key_phrases"] == ["must be in office 3 days", "hybrid schedule"]
+
+
+def test_review_flip_blank_phrases_saves_empty_list(tmp_path):
+    eval_path = _run_review(
+        tmp_path, [_make_filtered_job()],
+        input_sequence=["f", "", "", ""],
+    )
+    record = json.loads(eval_path.read_text().strip())
+    assert record["key_phrases"] == []
 
 
 def test_review_d_prints_description_then_continues(tmp_path, capsys):
@@ -552,3 +574,65 @@ def test_review_invalid_key_reprompts(tmp_path):
         tmp_path, [_make_filtered_job()],
         input_sequence=["x", "k"],
     )
+
+
+# ---------------------------------------------------------------------------
+# _highlight_phrases
+# ---------------------------------------------------------------------------
+
+def test_highlight_phrases_wraps_match():
+    result = _highlight_phrases("This is a fully remote role.", ["fully remote"])
+    assert "fully remote" in result
+    assert "\033[" in result  # ANSI escape present
+
+
+def test_highlight_phrases_multiple_phrases():
+    text = "Remote role. No travel required."
+    result = _highlight_phrases(text, ["Remote role", "No travel"])
+    assert result.count("\033[") >= 2
+
+
+def test_highlight_phrases_no_match_returns_unchanged():
+    text = "Some job description."
+    result = _highlight_phrases(text, ["office required"])
+    assert result == text
+
+
+def test_highlight_phrases_empty_list_returns_unchanged():
+    text = "Some job description."
+    assert _highlight_phrases(text, []) == text
+
+
+def test_highlight_phrases_skips_empty_string_phrase():
+    text = "Some job description."
+    assert _highlight_phrases(text, [""]) == text
+
+
+# ---------------------------------------------------------------------------
+# _cmd_export — key_phrases passthrough
+# ---------------------------------------------------------------------------
+
+def test_export_key_phrases_included_in_assistant_content(tmp_path):
+    rec = _make_eval_record(key_phrases=["fully remote", "no travel required"])
+    eval_path = tmp_path / "eval" / "remote_filter_eval.jsonl"
+    _write_jsonl(eval_path, [rec])
+
+    with patch("agents.remote_filter.cli.DATA_EVAL", tmp_path / "eval"):
+        _cmd_export(_fake_args())
+
+    out_path = tmp_path / "eval" / "remote_filter_finetune.jsonl"
+    assistant = json.loads(json.loads(out_path.read_text().strip())["messages"][2]["content"])
+    assert assistant["key_phrases"] == ["fully remote", "no travel required"]
+
+
+def test_export_key_phrases_defaults_to_empty_list(tmp_path):
+    rec = _make_eval_record()  # key_phrases=[]
+    eval_path = tmp_path / "eval" / "remote_filter_eval.jsonl"
+    _write_jsonl(eval_path, [rec])
+
+    with patch("agents.remote_filter.cli.DATA_EVAL", tmp_path / "eval"):
+        _cmd_export(_fake_args())
+
+    out_path = tmp_path / "eval" / "remote_filter_finetune.jsonl"
+    assistant = json.loads(json.loads(out_path.read_text().strip())["messages"][2]["content"])
+    assert assistant["key_phrases"] == []

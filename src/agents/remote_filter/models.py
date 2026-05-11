@@ -48,6 +48,11 @@ class RemoteAnalysis(BaseModel):
         description="2-3 sentence explanation of the classification, citing specific text from the posting.",
     )
 
+    key_phrases: list[str] = Field(
+        default_factory=list,
+        description="2-5 verbatim excerpts from the posting that directly support the classification.",
+    )
+
 
 class UserPreferences(BaseModel):
     """Filter policy — what the user will tolerate."""
@@ -68,4 +73,5 @@ class EvalRecord(BaseModel):
     expected_classification: str
     expected_should_pass_filter: bool
     expected_travel_days_range: tuple[int, int] | None
+    key_phrases: list[str] = []
     notes: str

@@ -138,6 +138,9 @@ def _cmd_label(args) -> None:
             else:
                 travel_range = None
 
+            phrases_input = input("Key phrases — verbatim excerpts, comma-separated (or blank): ").strip()
+            key_phrases = [p.strip() for p in phrases_input.split(",") if p.strip()] if phrases_input else []
+
             notes = input("Notes (optional): ").strip()
 
             record = {
@@ -148,6 +151,7 @@ def _cmd_label(args) -> None:
                 "expected_classification": classification,
                 "expected_should_pass_filter": should_pass,
                 "expected_travel_days_range": list(travel_range) if travel_range else None,
+                "key_phrases": key_phrases,
                 "notes": notes,
             }
             out.write(json.dumps(record) + "\n")
@@ -247,6 +251,14 @@ def _c(text: str, *codes: str) -> str:
     return f"{prefix}{text}{_ANSI['reset']}"
 
 
+def _highlight_phrases(text: str, phrases: list[str]) -> str:
+    """Wrap each key phrase with yellow+bold ANSI codes (exact, case-sensitive match)."""
+    for phrase in phrases:
+        if phrase and phrase in text:
+            text = text.replace(phrase, _c(phrase, "yellow", "bold"))
+    return text
+
+
 def _print_job(job: dict, index: int, total: int) -> None:
     analysis = job.get("_remote_analysis", {})
     result = job.get("_filter_result", "?")
@@ -327,8 +339,9 @@ def _cmd_review(args) -> None:
                 key = input("\n  → ").strip().lower()
                 if key == "d":
                     desc = job.get("description", "(no description)")
+                    phrases = job.get("_remote_analysis", {}).get("key_phrases", [])
                     print(f"\n{_c('Full description:', 'bold')}\n")
-                    print(desc)
+                    print(_highlight_phrases(desc, phrases))
                     print()
                     continue
                 if key in ("k", "f", "s", "q"):
@@ -367,6 +380,9 @@ def _cmd_review(args) -> None:
                             break
                         print("  Enter a number 1-8 or press enter to keep the agent's classification.")
 
+                    phrases_input = input("  Key phrases — verbatim excerpts, comma-separated (or blank): ").strip()
+                    key_phrases = [p.strip() for p in phrases_input.split(",") if p.strip()] if phrases_input else []
+
                     notes = input("  Notes (optional): ").strip()
                     record = {
                         "sample_id": job_id,
@@ -376,6 +392,7 @@ def _cmd_review(args) -> None:
                         "expected_classification": correct_cls,
                         "expected_should_pass_filter": correct_pass,
                         "expected_travel_days_range": None,
+                        "key_phrases": key_phrases,
                         "notes": notes or f"[review flip] agent said {current_result} / {agent_cls}",
                     }
                     eval_f.write(json.dumps(record) + "\n")
@@ -443,6 +460,7 @@ def _cmd_export(args) -> None:
                 "requires_local_presence": not rec["expected_should_pass_filter"] and rec["expected_classification"] in ("onsite_disguised", "hybrid"),
                 "confidence": "high",
                 "reasoning": reasoning,
+                "key_phrases": rec.get("key_phrases", []),
             }
 
             example = {
