@@ -1,8 +1,11 @@
 import logging
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
 from .query import LinkedInSearchQuery, SALARY_FLOOR
@@ -56,8 +59,20 @@ class _GreenhouseSection:
 # Public API
 # ---------------------------------------------------------------------------
 
+def _expand(value: str) -> str:
+    """Replace ${VAR_NAME} references with environment variable values."""
+    def _sub(m: re.Match) -> str:
+        name = m.group(1)
+        val = os.environ.get(name)
+        if val is None:
+            raise ConfigError(f"Environment variable ${{{name}}} is not set")
+        return val
+    return re.sub(r"\$\{([^}]+)\}", _sub, value)
+
+
 def load_config(path: str | Path) -> list[BaseScraper]:
     """Parse a YAML search config and return a flat list of configured scrapers."""
+    load_dotenv()
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict):
         raise ConfigError(f"Config must be a YAML mapping, got {type(raw).__name__}")
@@ -177,7 +192,7 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                     raise ConfigError(f"linkedin.searches[{i}] invalid salary_floor_k {sfk}")
 
             query = LinkedInSearchQuery(
-                keywords=str(entry["keywords"]),
+                keywords=_expand(str(entry["keywords"])),
                 time_posted=TIME_MAP[time_key],
                 workplace=WORKPLACE_MAP[workplace],
                 job_type=JOBTYPE_MAP[job_type],
@@ -200,8 +215,8 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                     raise ConfigError(f"jobspy.searches[{i}] unknown site {site!r}")
 
             query = JobSpyQuery(
-                search_term=str(entry["search_term"]),
-                location=str(entry.get("location", "USA")),
+                search_term=_expand(str(entry["search_term"])),
+                location=_expand(str(entry.get("location", "USA"))),
                 site_name=sites,
                 is_remote=not js.no_remote,
                 hours_old=int(entry.get("hours_old", glob.hours_old)),

@@ -415,3 +415,53 @@ def test_non_mapping_yaml_raises(tmp_path):
     cfg.write_text("- just\n- a\n- list\n")
     with pytest.raises(ConfigError, match="must be a YAML mapping"):
         load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Environment variable expansion
+# ---------------------------------------------------------------------------
+
+def test_env_var_expanded_in_jobspy_location(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME_LOCATION", "Pullman, WA")
+    cfg = _write_config(tmp_path, """\
+        jobspy:
+          searches:
+            - search_term: "data engineer"
+              location: "${HOME_LOCATION}"
+    """)
+    scrapers = load_config(cfg)
+    assert scrapers[0].query.location == "Pullman, WA"
+
+
+def test_env_var_expanded_in_linkedin_keywords(tmp_path, monkeypatch):
+    monkeypatch.setenv("SEARCH_TERM", "LLM Ops")
+    cfg = _write_config(tmp_path, """\
+        linkedin:
+          searches:
+            - keywords: "${SEARCH_TERM}"
+    """)
+    scrapers = load_config(cfg)
+    assert scrapers[0].query.keywords == "LLM Ops"
+
+
+def test_missing_env_var_raises(tmp_path, monkeypatch):
+    monkeypatch.delenv("HOME_LOCATION", raising=False)
+    cfg = _write_config(tmp_path, """\
+        jobspy:
+          searches:
+            - search_term: "data engineer"
+              location: "${HOME_LOCATION}"
+    """)
+    with pytest.raises(ConfigError, match="HOME_LOCATION"):
+        load_config(cfg)
+
+
+def test_plain_string_unchanged(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        jobspy:
+          searches:
+            - search_term: "data engineer"
+              location: "Seattle, WA"
+    """)
+    scrapers = load_config(cfg)
+    assert scrapers[0].query.location == "Seattle, WA"
