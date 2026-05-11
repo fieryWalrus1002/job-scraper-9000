@@ -290,7 +290,14 @@ def _cmd_run_config(args) -> None:
         except Exception as exc:
             log.error("%s failed — skipping: %s", s.source_name, exc)
             if is_permanent(exc):
-                record_skip(s.source_name, exc)
+                try:
+                    record_skip(s.source_name, exc)
+                except Exception as record_exc:
+                    log.error(
+                        "Failed to record permanent skip for %s: %s",
+                        s.source_name,
+                        record_exc,
+                    )
 
     log.info("Total: %d jobs | PII items redacted: %d", total, total_scrubbed)
 
