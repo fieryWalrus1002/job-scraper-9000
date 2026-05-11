@@ -14,5 +14,6 @@ data/raw/*.jsonl
 .deprecated/
 .notes/
 .logs/
+.docs/
 # known failures don't need to be tracked in git
 config/known_failures.json
