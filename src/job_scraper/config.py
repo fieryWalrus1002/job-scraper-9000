@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
+from .company_boards import DEFAULT_PATH as BOARDS_DB_PATH, load as load_boards
 from .query import LinkedInSearchQuery, SALARY_FLOOR
 from .scrapers.base import BaseScraper
 from .scrapers.ashby import AshbyScraper, AshbyQuery
@@ -63,6 +64,11 @@ class _LeverSection:
 
 @dataclass
 class _AshbySection:
+    companies: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _CompaniesSection:
     companies: list[str] = field(default_factory=list)
 
 
@@ -177,6 +183,13 @@ def _parse_ashby_section(raw: dict) -> _AshbySection | None:
     return _AshbySection(companies=[str(c) for c in (sec.get("companies") or [])])
 
 
+def _parse_companies_section(raw: dict) -> _CompaniesSection | None:
+    companies = raw.get("companies")
+    if not companies:
+        return None
+    return _CompaniesSection(companies=[str(c) for c in companies])
+
+
 # ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
@@ -188,9 +201,10 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     gh = _parse_greenhouse_section(raw)
     lv = _parse_lever_section(raw)
     ab = _parse_ashby_section(raw)
+    co = _parse_companies_section(raw)
 
-    if li is None and js is None and gh is None and lv is None and ab is None:
-        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse, lever, ashby)")
+    if li is None and js is None and gh is None and lv is None and ab is None and co is None:
+        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse, lever, ashby, companies)")
 
     scrapers: list[BaseScraper] = []
 
@@ -261,5 +275,26 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     if ab:
         for company in ab.companies:
             scrapers.append(AshbyScraper(AshbyQuery(company=company)))
+
+    if co:
+        db = load_boards(BOARDS_DB_PATH)
+        unknown = []
+        for company in co.companies:
+            boards = db.get(company, [])
+            if not boards:
+                unknown.append(company)
+                continue
+            for board in boards:
+                if board == "greenhouse":
+                    scrapers.append(GreenhouseScraper(GreenhouseQuery(board_token=company)))
+                elif board == "lever":
+                    scrapers.append(LeverScraper(LeverQuery(company=company)))
+                elif board == "ashby":
+                    scrapers.append(AshbyScraper(AshbyQuery(company=company)))
+        if unknown:
+            log.warning(
+                "%d companies not in company_boards.json — run 'discover' first: %s",
+                len(unknown), unknown,
+            )
 
     return scrapers

@@ -6,6 +6,17 @@ global:
   linkedin_time: week
   salary_floor_k: 120
 
+companies:
+  - mistral
+  - cohere
+  - harvey
+  - perplexity
+  - deepmind
+  - replit
+  - figma
+  - notion
+  - stripe
+
 linkedin:
   experience: "2,3,4,5"
   workplace: remote
