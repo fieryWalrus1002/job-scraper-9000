@@ -264,8 +264,12 @@ def _cmd_run_config(args) -> None:
     for s in scrapers:
         if s.source_name in skip:
             entry = skip[s.source_name]
+            failed_at = entry.get("failed_at") if isinstance(entry, dict) else None
+            failed_at_display = failed_at[:10] if isinstance(failed_at, str) else "unknown-date"
+            error = entry.get("error") if isinstance(entry, dict) else None
+            error_display = error if error is not None else "unknown error"
             log.warning("Skipping %s — known failure recorded %s: %s",
-                        s.source_name, entry["failed_at"][:10], entry["error"])
+                        s.source_name, failed_at_display, error_display)
             continue
         try:
             jobs = s.scrape()
