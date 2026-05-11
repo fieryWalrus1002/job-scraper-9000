@@ -7,6 +7,8 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -237,6 +239,7 @@ def _add_run_config(sub: argparse._SubParsersAction) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    load_dotenv()
     parser = argparse.ArgumentParser(
         prog="job-scraper",
         description="Scrape job postings from LinkedIn, multi-board (JobSpy), or Greenhouse ATS.",

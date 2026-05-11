@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
-from dotenv import load_dotenv
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
 from .query import LinkedInSearchQuery, SALARY_FLOOR
@@ -72,7 +71,6 @@ def _expand(value: str) -> str:
 
 def load_config(path: str | Path) -> list[BaseScraper]:
     """Parse a YAML search config and return a flat list of configured scrapers."""
-    load_dotenv()
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict):
         raise ConfigError(f"Config must be a YAML mapping, got {type(raw).__name__}")

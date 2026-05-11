@@ -26,7 +26,8 @@ jobspy:
   no_remote: false
 
   searches:
-    # Pullman/onsite — broad terms, small market
+    # Hometown/onsite — broad terms, small market
+    # Set this in the .env file to avoid hardcoding your location in the config
     - search_term: "data engineer"
       location: "${HOME_LOCATION}"
     - search_term: "software engineer"
