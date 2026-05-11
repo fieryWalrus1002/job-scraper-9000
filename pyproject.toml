@@ -1,0 +1,9 @@
+[project]
+name = "job-scraper-9000"
+version = "0.1.0"
+description = "Job scraper for LinkedIn and other sources"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "requests>=2.33.1",
+]
