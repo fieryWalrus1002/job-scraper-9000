@@ -28,13 +28,13 @@ jobspy:
   searches:
     # Pullman/onsite — broad terms, small market
     - search_term: "data engineer"
-      location: "Pullman, WA"
+      location: "${HOME_LOCATION}"
     - search_term: "software engineer"
-      location: "Pullman, WA"
+      location: "${HOME_LOCATION}"
     - search_term: "machine learning engineer"
-      location: "Pullman, WA"
+      location: "${HOME_LOCATION}"
     - search_term: "AI engineer"
-      location: "Pullman, WA"
+      location: "${HOME_LOCATION}"
 
     # Remote — mirrors LinkedIn core terms to get Indeed/ZipRecruiter coverage
     - search_term: "data engineer"
