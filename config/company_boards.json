@@ -1,0 +1,37 @@
+{
+  "ai21": [],
+  "anthropic": [
+    "greenhouse"
+  ],
+  "cohere": [
+    "ashby"
+  ],
+  "deepmind": [
+    "greenhouse"
+  ],
+  "figma": [
+    "greenhouse"
+  ],
+  "harvey": [
+    "ashby"
+  ],
+  "meta": [],
+  "mistral": [
+    "ashby",
+    "lever"
+  ],
+  "notion": [
+    "ashby"
+  ],
+  "nvidia": [],
+  "perplexity": [
+    "ashby"
+  ],
+  "replit": [
+    "ashby"
+  ],
+  "scale-ai": [],
+  "stripe": [
+    "greenhouse"
+  ]
+}
