@@ -24,7 +24,7 @@ _USER_AGENTS = [
 ]
 
 
-class LinkedInJobScraper(BaseScraper):
+class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
     def __init__(self, query: LinkedInSearchQuery, min_delay: float = 2.0, max_delay: float = 5.0):
         self.query = query
         self.session = requests.Session()

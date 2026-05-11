@@ -178,6 +178,34 @@ def _add_greenhouse(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
+# lever subcommand
+# ---------------------------------------------------------------------------
+
+def _cmd_lever(args) -> None:
+    from job_scraper.scrapers.lever import LeverScraper, LeverQuery
+
+    query = LeverQuery(
+        company=args.company,
+        fetch_descriptions=not args.no_descriptions,
+    )
+
+    log.info("Lever: company=%s | descriptions=%s", args.company, not args.no_descriptions)
+
+    jobs = LeverScraper(query).scrape()
+    _summary(jobs)
+    _output(jobs, _resolve_dest(args, f"lever-{args.company}", args.company))
+
+
+def _add_lever(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser("lever", help="Lever ATS public JSON API")
+    p.add_argument("company", help="Company slug — e.g. 'netflix' for jobs.lever.co/netflix")
+    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions",
+                   help="Skip fetching descriptions")
+    _add_save_output(p)
+    p.set_defaults(func=_cmd_lever)
+
+
+# ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
 
@@ -250,6 +278,7 @@ def main() -> None:
     _add_linkedin(sub)
     _add_jobspy(sub)
     _add_greenhouse(sub)
+    _add_lever(sub)
     _add_run_config(sub)
 
     args = parser.parse_args()

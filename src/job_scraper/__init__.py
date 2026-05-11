@@ -21,6 +21,8 @@ from .scrapers import (
     JobSpyScraper,
     JobSpyQuery,
     GreenhouseScraper,
+    LeverScraper,
+    LeverQuery,
 )
 
 __all__ = [
@@ -43,6 +45,8 @@ __all__ = [
     "JobSpyScraper",
     "JobSpyQuery",
     "GreenhouseScraper",
+    "LeverScraper",
+    "LeverQuery",
     "load_config",
     "ConfigError",
 ]
