@@ -154,8 +154,9 @@ def _parse_args(*argv):
         with patch("job_scraper.cli._cmd_linkedin", side_effect=capture):
             with patch("job_scraper.cli._cmd_jobspy", side_effect=capture):
                 with patch("job_scraper.cli._cmd_greenhouse", side_effect=capture):
-                    with patch("job_scraper.cli._cmd_run_config", side_effect=capture):
-                        main()
+                    with patch("job_scraper.cli._cmd_lever", side_effect=capture):
+                        with patch("job_scraper.cli._cmd_run_config", side_effect=capture):
+                            main()
 
     return captured["args"]
 
@@ -346,6 +347,52 @@ def test_greenhouse_cmd_passes_board_token():
 
 def test_greenhouse_cmd_no_descriptions_flag():
     query = _run_greenhouse_cmd(no_descriptions=True)
+    assert query.fetch_descriptions is False
+
+
+# ---------------------------------------------------------------------------
+# lever — argument parsing and command handler
+# ---------------------------------------------------------------------------
+
+def test_lever_defaults():
+    args = _parse_args("lever", "netflix")
+    assert args.company == "netflix"
+    assert args.no_descriptions is False
+    assert args.save is False
+    assert args.output is None
+
+
+def test_lever_no_descriptions_flag():
+    args = _parse_args("lever", "netflix", "--no-descriptions")
+    assert args.no_descriptions is True
+
+
+def test_lever_save_flag():
+    args = _parse_args("lever", "netflix", "--save")
+    assert args.save is True
+
+
+def _run_lever_cmd(**arg_overrides):
+    from job_scraper.cli import _cmd_lever
+
+    defaults = dict(company="netflix", no_descriptions=False, output=None, save=False)
+    args = _fake_args(**{**defaults, **arg_overrides})
+
+    mock_jobs = [_make_job()]
+    with patch("job_scraper.scrapers.lever.LeverScraper") as MockScraper:
+        MockScraper.return_value.scrape.return_value = mock_jobs
+        with patch("job_scraper.cli._output"):
+            _cmd_lever(args)
+        return MockScraper.call_args[0][0]  # the LeverQuery
+
+
+def test_lever_cmd_passes_company():
+    query = _run_lever_cmd(company="stripe")
+    assert query.company == "stripe"
+
+
+def test_lever_cmd_no_descriptions_flag():
+    query = _run_lever_cmd(no_descriptions=True)
     assert query.fetch_descriptions is False
 
 

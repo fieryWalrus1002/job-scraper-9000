@@ -1,9 +1,14 @@
 from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
 
 from ..models import JobPosting
 
+Q = TypeVar("Q")
 
-class BaseScraper(ABC):
+
+class BaseScraper(ABC, Generic[Q]):
+    query: Q
+
     @property
     @abstractmethod
     def source_name(self) -> str: ...
