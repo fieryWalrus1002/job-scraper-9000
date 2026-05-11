@@ -39,6 +39,8 @@ For estimated_travel_days_per_year:
 - "Occasional travel" → 6
 - If unspecified, leave null
 
+For key_phrases: extract 2-5 verbatim phrases copied exactly from the posting that directly support your classification. These are the snippets a human reviewer would want highlighted — the sentences or clauses about remote policy, travel, location requirements, or relocation. Prefer exact quotes over paraphrases.
+
 Return ONLY valid JSON matching the schema. No commentary outside the JSON."""
 
 
