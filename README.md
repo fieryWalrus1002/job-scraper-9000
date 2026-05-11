@@ -361,7 +361,7 @@ src/job_scraper/
 config/
   example-search-config.yml   # Annotated config reference
   company_boards.json         # Company → ATS board mapping (committed)
-  known_failures.json         # Permanent failure registry (committed)
+  known_failures.json         # Permanent failure registry (local state, gitignored)
 
 data/raw/              # Scraped JSONL files land here (gitignored)
 tests/                 # 219 tests, all scrapers mocked at the HTTP layer
