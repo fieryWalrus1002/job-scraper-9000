@@ -45,6 +45,14 @@ jobspy:
     - search_term: "MLOps engineer"
     - search_term: "computer vision engineer"
 
+
+### ------- Board-based scrapers -------
+# These scrapers pull all jobs from a given company's job board, then filter by recency/salary.
+# They are best for companies you know you want to work for, since they will pull all roles 
+# (not just those matching specific keywords).
+# In our workflow, we'll filter through these in the next step to match the ones we actually want to apply to.
+
+
 greenhouse:
   boards:
     - anthropic
@@ -55,3 +63,19 @@ greenhouse:
     - planet-labs
     - descartes-labs
     - scale-ai
+
+ashby:
+  companies:
+    - mistral
+    - cohere
+    - harvey
+    - perplexity
+
+lever:
+  companies:
+    - deepmind
+    - google
+    - meta
+    - nvidia
+    - apple
+    - ai21
