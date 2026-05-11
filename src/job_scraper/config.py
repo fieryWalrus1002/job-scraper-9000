@@ -293,7 +293,7 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                     scrapers.append(AshbyScraper(AshbyQuery(company=company)))
         if unknown:
             log.warning(
-                "%d companies not in company_boards.json — run 'discover' first: %s",
+                "%d companies have no boards recorded in company_boards.json — run 'discover' first: %s",
                 len(unknown), unknown,
             )
 
