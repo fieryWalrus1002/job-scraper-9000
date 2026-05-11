@@ -291,6 +291,13 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                     scrapers.append(LeverScraper(LeverQuery(company=company)))
                 elif board == "ashby":
                     scrapers.append(AshbyScraper(AshbyQuery(company=company)))
+                else:
+                    log.warning(
+                        "Company %r has unsupported board %r in company_boards.json",
+                        company, board,
+                    )
+                    if company not in unknown:
+                        unknown.append(company)
         if unknown:
             log.warning(
                 "%d companies have no boards recorded in company_boards.json — run 'discover' first: %s",
