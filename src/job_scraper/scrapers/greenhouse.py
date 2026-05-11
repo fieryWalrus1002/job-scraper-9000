@@ -21,7 +21,7 @@ class GreenhouseQuery:
     fetch_descriptions: bool = True
 
 
-class GreenhouseScraper(BaseScraper):
+class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
     def __init__(self, query: GreenhouseQuery):
         self.query = query
         self.session = requests.Session()

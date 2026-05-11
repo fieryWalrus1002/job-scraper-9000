@@ -27,7 +27,7 @@ class JobSpyQuery:
     country_indeed: str = "USA"
 
 
-class JobSpyScraper(BaseScraper):
+class JobSpyScraper(BaseScraper["JobSpyQuery"]):
     def __init__(self, query: JobSpyQuery):
         self.query = query
 

@@ -11,6 +11,7 @@ from .query import LinkedInSearchQuery, SALARY_FLOOR
 from .scrapers.base import BaseScraper
 from .scrapers.greenhouse import GreenhouseScraper, GreenhouseQuery
 from .scrapers.jobspy import JobSpyScraper, JobSpyQuery, JOBSPY_SITES
+from .scrapers.lever import LeverScraper, LeverQuery
 from .scrapers.linkedin import LinkedInJobScraper
 
 log = logging.getLogger(__name__)
@@ -52,6 +53,11 @@ class _JobSpySection:
 @dataclass
 class _GreenhouseSection:
     boards: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _LeverSection:
+    companies: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +157,13 @@ def _parse_greenhouse_section(raw: dict) -> _GreenhouseSection | None:
     return _GreenhouseSection(boards=[str(b) for b in (sec.get("boards") or [])])
 
 
+def _parse_lever_section(raw: dict) -> _LeverSection | None:
+    sec = raw.get("lever")
+    if sec is None:
+        return None
+    return _LeverSection(companies=[str(c) for c in (sec.get("companies") or [])])
+
+
 # ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
@@ -160,9 +173,10 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     li = _parse_linkedin_section(raw)
     js = _parse_jobspy_section(raw)
     gh = _parse_greenhouse_section(raw)
+    lv = _parse_lever_section(raw)
 
-    if li is None and js is None and gh is None:
-        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse)")
+    if li is None and js is None and gh is None and lv is None:
+        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse, lever)")
 
     scrapers: list[BaseScraper] = []
 
@@ -225,5 +239,9 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     if gh:
         for token in gh.boards:
             scrapers.append(GreenhouseScraper(GreenhouseQuery(board_token=token)))
+
+    if lv:
+        for company in lv.companies:
+            scrapers.append(LeverScraper(LeverQuery(company=company)))
 
     return scrapers

@@ -10,6 +10,7 @@ import pytest
 from job_scraper.config import ConfigError, load_config
 from job_scraper.scrapers.greenhouse import GreenhouseScraper
 from job_scraper.scrapers.jobspy import JobSpyScraper
+from job_scraper.scrapers.lever import LeverScraper
 from job_scraper.scrapers.linkedin import LinkedInJobScraper
 
 
@@ -465,3 +466,75 @@ def test_plain_string_unchanged(tmp_path):
     """)
     scrapers = load_config(cfg)
     assert scrapers[0].query.location == "Seattle, WA"
+
+
+# ---------------------------------------------------------------------------
+# Lever section
+# ---------------------------------------------------------------------------
+
+def test_lever_section_creates_lever_scrapers(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        lever:
+          companies:
+            - netflix
+            - stripe
+    """)
+    scrapers = load_config(cfg)
+    assert len(scrapers) == 2
+    assert all(isinstance(s, LeverScraper) for s in scrapers)
+
+
+def test_lever_company_tokens_set(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        lever:
+          companies:
+            - netflix
+            - stripe
+    """)
+    scrapers = load_config(cfg)
+    companies = {s.query.company for s in scrapers}
+    assert companies == {"netflix", "stripe"}
+
+
+def test_lever_source_name(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        lever:
+          companies:
+            - netflix
+    """)
+    scrapers = load_config(cfg)
+    assert scrapers[0].source_name == "lever:netflix"
+
+
+def test_missing_lever_section_skips_lever(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        greenhouse:
+          boards:
+            - anthropic
+    """)
+    scrapers = load_config(cfg)
+    assert not any(isinstance(s, LeverScraper) for s in scrapers)
+
+
+def test_lever_counts_in_full_config(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        greenhouse:
+          boards:
+            - anthropic
+        lever:
+          companies:
+            - netflix
+            - stripe
+    """)
+    scrapers = load_config(cfg)
+    lever = [s for s in scrapers if isinstance(s, LeverScraper)]
+    assert len(lever) == 2
+
+
+def test_no_scraper_sections_includes_lever_in_error(tmp_path):
+    cfg = _write_config(tmp_path, """\
+        global:
+          default_max_results: 10
+    """)
+    with pytest.raises(ConfigError, match="lever"):
+        load_config(cfg)
