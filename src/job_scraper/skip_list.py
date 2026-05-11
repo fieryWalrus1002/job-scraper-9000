@@ -18,7 +18,11 @@ def load(path: Path = DEFAULT_PATH) -> dict:
     """Return {source_name: record} for all known permanent failures."""
     if not path.exists():
         return {}
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        log.warning("Failed to load skip list from %s: %s", path, exc)
+        return {}
 
 
 def record(source_name: str, exc: Exception, path: Path = DEFAULT_PATH) -> None:
