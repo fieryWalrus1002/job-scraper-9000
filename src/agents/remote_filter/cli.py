@@ -166,23 +166,29 @@ def _cmd_label(args) -> None:
 # ---------------------------------------------------------------------------
 
 def _cmd_run(args) -> None:
+    import os
+    import yaml
     from dotenv import load_dotenv
     load_dotenv()
 
     from agents.remote_filter.utils import analyze_remote, passes_remote_filter
     from agents.remote_filter.models import UserPreferences
 
+    config_path = Path(args.config)
+    if not config_path.exists():
+        log.error("Config file not found: %s", config_path)
+        sys.exit(1)
+    with open(config_path) as f:
+        config = yaml.safe_load(os.path.expandvars(f.read()))
+
+    prefs = UserPreferences(user_location=args.location)
+
     DATA_FILTERED.mkdir(parents=True, exist_ok=True)
     DATA_TRASH.mkdir(parents=True, exist_ok=True)
 
-    prefs = UserPreferences(
-        max_travel=args.max_travel,
-        unclear_routing=args.unclear_routing,
-        user_location=args.location,
-    )
-
     raw_dir = Path(args.input)
     jobs = _load_raw_jobs(raw_dir)
+
     if not jobs:
         log.error("No jobs found in %s", raw_dir)
         sys.exit(1)
@@ -192,6 +198,7 @@ def _cmd_run(args) -> None:
     passed = failed = skipped = 0
     pass_path = DATA_FILTERED / "remote_filter_pass.jsonl"
     trash_path = DATA_TRASH / "remote_filter_trash.jsonl"
+
 
     with open(pass_path, "w") as pass_f, open(trash_path, "w") as trash_f:
         for job in jobs:
@@ -209,8 +216,10 @@ def _cmd_run(args) -> None:
                 log.warning("Agent failed on %s @ %s — skipping", title, company)
                 skipped += 1
                 continue
+            
+            # must accept config overrides!
+            ok, reason = passes_remote_filter(analysis, config, prefs)
 
-            ok, reason = passes_remote_filter(analysis, prefs)
             enriched = {
                 **job,
                 "_remote_analysis": analysis.model_dump(),
@@ -485,9 +494,22 @@ def _cmd_export(args) -> None:
 # ---------------------------------------------------------------------------
 
 def add_subcommands(sub: argparse._SubParsersAction) -> None:
+    # Note: We NO LONGER pass config here during registration.
+    # agents/cli.py handles loading the config only when the command is actually run.
+    
     p = sub.add_parser("remote-filter", help="Analyze job postings for remote work policy")
     agent_sub = p.add_subparsers(dest="agent_command", metavar="COMMAND")
     agent_sub.required = True
+
+    # run
+    run_p = agent_sub.add_parser("run", help="Run the remote-filter agent on raw job data")
+    run_p.add_argument("--input", default=str(DATA_RAW), metavar="DIR",
+                       help=f"Directory of JSONL files to process (default: {DATA_RAW})")
+    run_p.add_argument("--config", default="config/agent/remote_agent.yml", metavar="FILE",
+                       help="Agent config YAML (default: config/agent/remote_agent.yml)")
+    run_p.add_argument("--location", default="USA",
+                       help="Your location for restriction checks (default: USA)")
+    run_p.set_defaults(func=_cmd_run)
 
     # label
     label_p = agent_sub.add_parser("label", help="Interactively label jobs from data/raw/ for the eval suite")
@@ -502,15 +524,3 @@ def add_subcommands(sub: argparse._SubParsersAction) -> None:
     review_p.add_argument("--bucket", default="trash", choices=["pass", "trash", "all"],
                           help="Which bucket to review (default: trash — most likely to have errors)")
     review_p.set_defaults(func=_cmd_review)
-
-    # run
-    run_p = agent_sub.add_parser("run", help="Run the remote-filter agent on raw job data")
-    run_p.add_argument("--input", default=str(DATA_RAW), metavar="DIR",
-                       help=f"Directory of JSONL files to process (default: {DATA_RAW})")
-    run_p.add_argument("--max-travel", default="quarterly",
-                       choices=["none", "quarterly", "monthly"], dest="max_travel")
-    run_p.add_argument("--unclear-routing", default="pass",
-                       choices=["pass", "reject"], dest="unclear_routing")
-    run_p.add_argument("--location", default="USA",
-                       help="Your location for restriction checks (default: USA)")
-    run_p.set_defaults(func=_cmd_run)
