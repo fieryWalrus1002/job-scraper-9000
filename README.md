@@ -12,7 +12,7 @@ The full pipeline has five phases:
 4. **Cloud scoring (API)** — Batch-send surviving postings to a cloud LLM (OpenAI / Anthropic). Score each against the candidate profile — Python, C++, data/AI engineering, LLMOps, infra-as-code, legacy refactoring, computer vision/UAV/GIS. Returns a weighted score 1–100.
 5. **Dispatch** — Query for scores above 60, sort, and send a daily hotlist to Discord or Slack.
 
-**Current state:** Phase 1 (scraper library) is built and tested. The rest of the pipeline is coming.
+**Current state:** Phase 1 (scraper library) and Phase 2 (remote-filter agent) are built and tested. Phases 3–5 are coming.
 
 ---
 
@@ -28,6 +28,11 @@ cp .env.example .env   # then fill in any API keys
 | Variable | Used by |
 | --- | --- |
 | `HOME_LOCATION` | Available for `${HOME_LOCATION}` expansion in YAML configs |
+| `OPENAI_API_KEY` | remote_filter agent (default provider) |
+| `LLM_PROVIDER` | `openai` (default) or `ollama` |
+| `LLM_MODEL` | Model override — defaults to `gpt-4o-mini` (OpenAI) or `qwen2.5:14b` (Ollama) |
+| `OLLAMA_BASE_URL` | Ollama endpoint — defaults to `http://localhost:11434/v1` |
+| `USER_LOCATION` | User location for restriction checks in remote_filter — defaults to `USA` |
 
 ---
 
@@ -337,34 +342,121 @@ jobs = AshbyScraper(AshbyQuery(company="mistral")).scrape()
 
 ---
 
+## Agents
+
+### remote_filter
+
+Analyzes job descriptions for remote work policy and filters postings against a configurable policy.
+
+**What it produces:**
+
+- `data/filtered/remote_filter_pass.jsonl` — postings that passed the policy
+- `data/trash/remote_filter_trash.jsonl` — rejected postings with a rejection reason
+
+Each output record is the original job JSON enriched with three fields:
+
+```json
+"_remote_analysis": { "remote_classification": "fully_remote", "confidence": "high", ... },
+"_filter_result":   "pass",
+"_filter_reason":   "passed"
+```
+
+**Run it locally:**
+
+```bash
+# Reads from data/raw/, writes to data/filtered/ and data/trash/
+python scripts/run_remote_filter.py
+```
+
+**Configure the policy** in [config/agent/remote_agent.yml](config/agent/remote_agent.yml):
+
+```yaml
+policy_thresholds:
+  disallowed_classifications:
+    - "onsite_disguised"
+    - "hybrid"
+    - "location_restricted"
+  travel:
+    max_estimated_days_per_year: 15
+    prohibited_categories:
+      - "remote_with_frequent_travel"
+  relocation:
+    allow_required_relocation: false
+    allow_local_presence_required: false
+  uncertainty:
+    on_unclear_classification: "reject"   # or "pass"
+```
+
+**Remote classifications** the agent produces:
+
+| Classification | Meaning |
+| --- | --- |
+| `fully_remote` | No office requirement, no material travel |
+| `remote_with_quarterly_travel` | Remote, up to ~4 days/year on-site |
+| `remote_with_monthly_travel` | Remote, up to ~12 days/year on-site |
+| `remote_with_frequent_travel` | Remote but substantial travel required |
+| `hybrid` | Scheduled office days per week |
+| `onsite_disguised` | Listed as "remote" but requires local presence |
+| `location_restricted` | Remote only within a restricted geography |
+| `unclear` | Posting doesn't provide enough signal |
+
+**System prompt** lives in [prompts/remote_agent/system_prompt_v1.txt](prompts/remote_agent/system_prompt_v1.txt) — edit there to tune extraction behavior.
+
+**Python API** (for use in an orchestrator):
+
+```python
+from agents.remote_filter.utils import analyze_remote, passes_remote_filter, load_raw_jobs
+
+analysis = analyze_remote(job_description)   # returns RemoteAnalysis | None
+ok, reason = passes_remote_filter(analysis, config)
+```
+
+---
+
 ## Project structure
 
 ```text
-src/job_scraper/
-  models.py            # JobPosting dataclass + dedup hash
-  pii.py               # Email/phone redaction (scrub())
-  query.py             # LinkedInSearchQuery + time/salary/experience constants
-  cli.py               # job-scraper CLI entry point
-  config.py            # YAML config loader + scraper builder
-  company_boards.py    # company → board database (load/save/merge)
-  discover.py          # Board discovery: direct probing via requests
-  skip_list.py         # Permanent failure registry
-  _maps.py             # CLI string → API value maps
-  scrapers/
-    base.py            # BaseScraper ABC (Generic[Q])
-    linkedin.py        # Guest API — no login, no Selenium
-    jobspy.py          # python-jobspy wrapper (LinkedIn/Indeed/ZipRecruiter/Glassdoor/Google)
-    greenhouse.py      # Greenhouse ATS public JSON API
-    lever.py           # Lever ATS public JSON API
-    ashby.py           # Ashby ATS public JSON API
+src/
+  job_scraper/
+    models.py            # JobPosting dataclass + dedup hash
+    pii.py               # Email/phone redaction (scrub())
+    query.py             # LinkedInSearchQuery + time/salary/experience constants
+    cli.py               # job-scraper CLI entry point
+    config.py            # YAML config loader + scraper builder
+    company_boards.py    # company → board database (load/save/merge)
+    discover.py          # Board discovery: direct probing via requests
+    skip_list.py         # Permanent failure registry
+    _maps.py             # CLI string → API value maps
+    scrapers/
+      base.py            # BaseScraper ABC (Generic[Q])
+      linkedin.py        # Guest API — no login, no Selenium
+      jobspy.py          # python-jobspy wrapper (LinkedIn/Indeed/ZipRecruiter/Glassdoor/Google)
+      greenhouse.py      # Greenhouse ATS public JSON API
+      lever.py           # Lever ATS public JSON API
+      ashby.py           # Ashby ATS public JSON API
+  agents/
+    remote_filter/
+      models.py          # RemoteAnalysis Pydantic model
+      utils.py           # analyze_remote(), passes_remote_filter(), load_raw_jobs()
+
+prompts/
+  remote_agent/
+    system_prompt_v1.txt   # Extraction prompt for remote_filter
 
 config/
-  example-search-config.yml   # Annotated config reference
-  company_boards.json         # Company → ATS board mapping (committed)
-  known_failures.json         # Permanent failure registry (local state, gitignored)
+  example-search-config.yml      # Annotated scraper config reference
+  company_boards.json            # Company → ATS board mapping (committed)
+  known_failures.json            # Permanent failure registry (local state, gitignored)
+  agent/
+    remote_agent.yml             # remote_filter policy thresholds
+
+scripts/
+  run_remote_filter.py           # Local test runner for the remote_filter agent
 
 data/raw/              # Scraped JSONL files land here (gitignored)
-tests/                 # 219 tests, all scrapers mocked at the HTTP layer
+data/filtered/         # remote_filter pass results (gitignored)
+data/trash/            # remote_filter rejected results (gitignored)
+tests/                 # Scrapers mocked at HTTP layer; agents mocked at OpenAI client layer
 ```
 
 ---

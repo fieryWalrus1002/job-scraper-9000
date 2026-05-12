@@ -1,76 +1,42 @@
+import json
 import logging
 import os
+from pathlib import Path
 
 from openai import OpenAI
 from pydantic import ValidationError
 
-from .models import RemoteAnalysis, UserPreferences
+from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)
 
-_PROMPT = """You are analyzing a job posting to extract its remote work policy.
-You will produce a structured analysis in JSON format.
-
-Read the posting carefully. Look for:
-
-1. Explicit statements about remote vs. onsite vs. hybrid work
-2. Location requirements ("must reside in X", "within commuting distance of Y")
-3. Travel expectations (frequency, purpose, percentage of time)
-4. Relocation requirements (immediate or future)
-5. Time zone or geographic restrictions
-
-When the posting is ambiguous, prefer "unclear" over guessing.
-Confidence should be "low" if you're making inferences rather than quoting explicit statements.
-
-Common patterns to recognize:
-- "Remote" in the title but "must be located in [city]" in the body → onsite_disguised, requires_local_presence=true
-- "Remote with quarterly all-hands" → remote_with_quarterly_travel
-- "Hybrid" or "X days per week in office" → hybrid
-- "US-based remote" → fully_remote, location_restrictions=["US-only"]
-- "Open to remote candidates in [list of states]" → location_restricted
-- "Quarterly on-site meetings" → remote_with_quarterly_travel, NOT hybrid
-
-For travel_description, quote or paraphrase the relevant phrase from the posting. Don't editorialize.
-
-For estimated_travel_days_per_year:
-- "Quarterly meetings" → 4
-- "Monthly meetings" → 12
-- "10% travel" → 25
-- "Occasional travel" → 6
-- If unspecified, leave null
-
-For key_phrases: extract 2-5 verbatim phrases copied exactly from the posting that directly support your classification. These are the snippets a human reviewer would want highlighted — the sentences or clauses about remote policy, travel, location requirements, or relocation. Prefer exact quotes over paraphrases.
-
-Return ONLY valid JSON matching the schema. No commentary outside the JSON."""
+_PROMPT_PATH = Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+_PROMPT = _PROMPT_PATH.read_text()
 
 
-def _get_client() -> tuple[OpenAI, str]:
-    """Return (client, model) configured for the active provider."""
-    provider = os.environ.get("LLM_PROVIDER", "openai").lower()
-
+def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
+    cfg = llm_config or {}
+    provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
     if provider == "ollama":
         client = OpenAI(
-            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+            base_url=cfg.get("base_url", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")),
             api_key="ollama",
         )
-        model = os.environ.get("LLM_MODEL", "qwen2.5:14b")
+        model = cfg.get("model", os.environ.get("LLM_MODEL", "qwen2.5:14b"))
     else:
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
-
+        model = cfg.get("model", os.environ.get("LLM_MODEL", "gpt-4o-mini"))
     return client, model
 
 
 def analyze_remote(
     job_description: str,
     *,
+    llm_config: dict | None = None,
     max_retries: int = 2,
 ) -> RemoteAnalysis | None:
-    """
-    Analyze a job description's remote work policy.
-    Returns None if the agent fails after retries — caller decides what to do.
-    """
-    client, model = _get_client()
+    """Returns None if the agent fails after retries — caller decides what to do."""
+    client, model = _get_client(llm_config)
 
     for attempt in range(max_retries + 1):
         try:
@@ -81,7 +47,7 @@ def analyze_remote(
                     {"role": "user", "content": job_description},
                 ],
                 response_format=RemoteAnalysis,
-                temperature=0.1,
+                temperature=(llm_config or {}).get("temperature", 0.1),
             )
             return response.choices[0].message.parsed
         except ValidationError as exc:
@@ -93,32 +59,19 @@ def analyze_remote(
     return None
 
 
-def _location_compatible(restrictions: list[str], user_location: str) -> bool:
-    loc = user_location.upper()
-    for r in restrictions:
-        r_upper = r.upper()
-        if "US-ONLY" in r_upper or "UNITED STATES" in r_upper or "US ONLY" in r_upper:
-            if "US" not in loc and "UNITED STATES" not in loc and "USA" not in loc:
-                return False
-    return True
-
-
-def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_prefs: UserPreferences) -> tuple[bool, str]:
-    """Returns (passes, reason). Reason is stored for debugging and eval review."""
+def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_location: str = "USA") -> tuple[bool, str]:
+    """Returns (passes, reason)."""
     policy = config["policy_thresholds"]
 
-    # Relocation / local presence checked first — strongest signal
     if not policy["relocation"]["allow_required_relocation"] and analysis.requires_relocation:
         return False, "requires_relocation"
 
     if not policy["relocation"]["allow_local_presence_required"] and analysis.requires_local_presence:
         return False, "requires_local_presence"
 
-    # Classification blacklist
     if analysis.remote_classification in policy["disallowed_classifications"]:
         return False, f"classification:{analysis.remote_classification}"
 
-    # Travel policy — prohibited categories cover tier logic (e.g. monthly forbidden when max=quarterly)
     if analysis.remote_classification in policy["travel"]["prohibited_categories"]:
         return False, "travel_too_frequent"
 
@@ -128,15 +81,28 @@ def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_prefs: Use
     ):
         return False, f"travel_days_exceeded:{analysis.estimated_travel_days_per_year}"
 
-    # Unclear classification
     if analysis.remote_classification == "unclear":
         if policy["uncertainty"]["on_unclear_classification"] == "reject":
             return False, "agent_uncertain"
 
-    # Location restrictions (user-specific — comes from user_prefs, not policy)
     if analysis.location_restrictions:
-        if not _location_compatible(analysis.location_restrictions, user_prefs.user_location):
-            return False, "location_restrictions_mismatch"
+        loc = user_location.upper()
+        for r in analysis.location_restrictions:
+            r_upper = r.upper()
+            if "US-ONLY" in r_upper or "UNITED STATES" in r_upper or "US ONLY" in r_upper:
+                if "US" not in loc and "UNITED STATES" not in loc and "USA" not in loc:
+                    return False, "location_restrictions_mismatch"
 
     return True, "passed"
 
+
+def load_raw_jobs(path: Path) -> list[dict]:
+    paths = [path] if path.is_file() else sorted(path.glob("*.jsonl"))
+    jobs = []
+    for p in paths:
+        with open(p) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    jobs.append(json.loads(line))
+    return jobs
