@@ -44,6 +44,33 @@ def _make_analysis(**overrides) -> RemoteAnalysis:
     )
     return RemoteAnalysis(**{**defaults, **overrides})
 
+def _make_config(
+    disallowed_classifications=None,
+    prohibited_travel_categories=None,
+    max_days=15,
+    allow_relocation=False,
+    allow_local_presence=False,
+    on_unclear="pass",
+) -> dict:
+    return {
+        "policy_thresholds": {
+            "disallowed_classifications": disallowed_classifications or ["hybrid", "onsite_disguised"],
+            "travel": {
+                "prohibited_categories": prohibited_travel_categories or [
+                    "remote_with_frequent_travel",
+                    "remote_with_monthly_travel",
+                ],
+                "max_estimated_days_per_year": max_days,
+            },
+            "relocation": {
+                "allow_required_relocation": allow_relocation,
+                "allow_local_presence_required": allow_local_presence,
+            },
+            "uncertainty": {
+                "on_unclear_classification": on_unclear,
+            },
+        }
+    }
 
 def _make_prefs(**overrides) -> UserPreferences:
     defaults = dict(max_travel="quarterly", unclear_routing="pass", user_location="USA")
@@ -138,14 +165,14 @@ def _run_review(tmp_path, jobs, input_sequence, bucket="trash", existing_eval=No
 # ---------------------------------------------------------------------------
 
 def test_fully_remote_passes():
-    ok, reason = passes_remote_filter(_make_analysis(), _make_prefs())
+    ok, reason = passes_remote_filter(_make_analysis(), _make_config(),_make_prefs())
     assert ok
     assert reason == "passed"
 
 
 def test_hybrid_fails():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="hybrid"), _make_prefs()
+        _make_analysis(remote_classification="hybrid"), _make_config(), _make_prefs()
     )
     assert not ok
     assert "hybrid" in reason
@@ -153,27 +180,27 @@ def test_hybrid_fails():
 
 def test_onsite_disguised_fails():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="onsite_disguised"), _make_prefs()
+        _make_analysis(remote_classification="onsite_disguised"), _make_config(), _make_prefs()
     )
     assert not ok
     assert "onsite_disguised" in reason
 
 
 def test_requires_relocation_fails():
-    ok, reason = passes_remote_filter(_make_analysis(requires_relocation=True), _make_prefs())
+    ok, reason = passes_remote_filter(_make_analysis(requires_relocation=True), _make_config(), _make_prefs())
     assert not ok
     assert reason == "requires_relocation"
 
 
 def test_requires_local_presence_fails():
-    ok, reason = passes_remote_filter(_make_analysis(requires_local_presence=True), _make_prefs())
+    ok, reason = passes_remote_filter(_make_analysis(requires_local_presence=True), _make_config(), _make_prefs())
     assert not ok
     assert reason == "requires_local_presence"
 
 
 def test_frequent_travel_always_fails():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="remote_with_frequent_travel"), _make_prefs()
+        _make_analysis(remote_classification="remote_with_frequent_travel"), _make_config(), _make_prefs()
     )
     assert not ok
     assert reason == "travel_too_frequent"
@@ -182,16 +209,18 @@ def test_frequent_travel_always_fails():
 def test_monthly_travel_fails_when_max_quarterly():
     ok, reason = passes_remote_filter(
         _make_analysis(remote_classification="remote_with_monthly_travel"),
-        _make_prefs(max_travel="quarterly"),
+        _make_config(),  # default prohibited_categories includes remote_with_monthly_travel
+        _make_prefs(),
     )
     assert not ok
-    assert reason == "travel_more_than_quarterly"
+    assert reason == "travel_too_frequent"
 
 
 def test_monthly_travel_passes_when_max_monthly():
     ok, _ = passes_remote_filter(
         _make_analysis(remote_classification="remote_with_monthly_travel"),
-        _make_prefs(max_travel="monthly"),
+        _make_config(prohibited_travel_categories=["remote_with_frequent_travel"]),
+        _make_prefs(),
     )
     assert ok
 
@@ -199,20 +228,26 @@ def test_monthly_travel_passes_when_max_monthly():
 def test_quarterly_travel_passes_when_max_quarterly():
     ok, _ = passes_remote_filter(
         _make_analysis(remote_classification="remote_with_quarterly_travel"),
-        _make_prefs(max_travel="quarterly"),
+        _make_config(),
+        _make_prefs(),
     )
     assert ok
 
 
 def test_unclear_passes_by_default():
-    ok, _ = passes_remote_filter(_make_analysis(remote_classification="unclear"), _make_prefs())
+    ok, _ = passes_remote_filter(
+        _make_analysis(remote_classification="unclear"),
+        _make_config(on_unclear="pass"),
+        _make_prefs(),
+    )
     assert ok
 
 
 def test_unclear_fails_when_routing_reject():
     ok, reason = passes_remote_filter(
         _make_analysis(remote_classification="unclear"),
-        _make_prefs(unclear_routing="reject"),
+        _make_config(on_unclear="reject"),
+        _make_prefs(),
     )
     assert not ok
     assert reason == "agent_uncertain"
@@ -221,7 +256,8 @@ def test_unclear_fails_when_routing_reject():
 def test_us_only_restriction_passes_for_usa():
     ok, _ = passes_remote_filter(
         _make_analysis(location_restrictions=["US-only"]),
-        _make_prefs(user_location="USA"),
+        _make_config(),
+        _make_prefs(user_location="USA"),   
     )
     assert ok
 
@@ -229,6 +265,7 @@ def test_us_only_restriction_passes_for_usa():
 def test_us_only_restriction_fails_for_non_us():
     ok, reason = passes_remote_filter(
         _make_analysis(location_restrictions=["US-only"]),
+        _make_config(),
         _make_prefs(user_location="Canada"),
     )
     assert not ok
@@ -238,6 +275,7 @@ def test_us_only_restriction_fails_for_non_us():
 def test_relocation_check_takes_priority_over_classification():
     ok, reason = passes_remote_filter(
         _make_analysis(remote_classification="fully_remote", requires_relocation=True),
+        _make_config(), 
         _make_prefs(),
     )
     assert not ok

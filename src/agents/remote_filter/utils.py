@@ -103,29 +103,40 @@ def _location_compatible(restrictions: list[str], user_location: str) -> bool:
     return True
 
 
-def passes_remote_filter(analysis: RemoteAnalysis, prefs: UserPreferences) -> tuple[bool, str]:
+def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_prefs: UserPreferences) -> tuple[bool, str]:
     """Returns (passes, reason). Reason is stored for debugging and eval review."""
+    policy = config["policy_thresholds"]
 
-    if analysis.requires_relocation:
+    # Relocation / local presence checked first — strongest signal
+    if not policy["relocation"]["allow_required_relocation"] and analysis.requires_relocation:
         return False, "requires_relocation"
 
-    if analysis.requires_local_presence:
+    if not policy["relocation"]["allow_local_presence_required"] and analysis.requires_local_presence:
         return False, "requires_local_presence"
 
-    if analysis.remote_classification in ("onsite_disguised", "hybrid"):
+    # Classification blacklist
+    if analysis.remote_classification in policy["disallowed_classifications"]:
         return False, f"classification:{analysis.remote_classification}"
 
-    if analysis.remote_classification == "remote_with_frequent_travel":
+    # Travel policy — prohibited categories cover tier logic (e.g. monthly forbidden when max=quarterly)
+    if analysis.remote_classification in policy["travel"]["prohibited_categories"]:
         return False, "travel_too_frequent"
 
-    if analysis.remote_classification == "remote_with_monthly_travel" and prefs.max_travel == "quarterly":
-        return False, "travel_more_than_quarterly"
+    if (
+        analysis.estimated_travel_days_per_year is not None
+        and analysis.estimated_travel_days_per_year > policy["travel"]["max_estimated_days_per_year"]
+    ):
+        return False, f"travel_days_exceeded:{analysis.estimated_travel_days_per_year}"
 
-    if analysis.remote_classification == "unclear" and prefs.unclear_routing == "reject":
-        return False, "agent_uncertain"
+    # Unclear classification
+    if analysis.remote_classification == "unclear":
+        if policy["uncertainty"]["on_unclear_classification"] == "reject":
+            return False, "agent_uncertain"
 
+    # Location restrictions (user-specific — comes from user_prefs, not policy)
     if analysis.location_restrictions:
-        if not _location_compatible(analysis.location_restrictions, prefs.user_location):
+        if not _location_compatible(analysis.location_restrictions, user_prefs.user_location):
             return False, "location_restrictions_mismatch"
 
     return True, "passed"
+
