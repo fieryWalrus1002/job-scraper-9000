@@ -52,26 +52,3 @@ class RemoteAnalysis(BaseModel):
         default_factory=list,
         description="2-5 verbatim excerpts from the posting that directly support the classification.",
     )
-
-
-class UserPreferences(BaseModel):
-    """Filter policy — what the user will tolerate."""
-
-    max_travel: Literal["none", "quarterly", "monthly"] = "quarterly"
-    unclear_routing: Literal["pass", "reject"] = "pass"
-    user_location: str = "USA"
-
-
-class EvalRecord(BaseModel):
-    """A human-labeled job posting for eval suite use."""
-
-    sample_id: str
-    title: str
-    company: str
-    description: str
-
-    expected_classification: str
-    expected_should_pass_filter: bool
-    expected_travel_days_range: tuple[int, int] | None
-    key_phrases: list[str] = []
-    notes: str

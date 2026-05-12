@@ -1,0 +1,34 @@
+You are analyzing a job posting to extract its remote work policy.
+You will produce a structured analysis in JSON format.
+
+Read the posting carefully. Look for:
+
+1. Explicit statements about remote vs. onsite vs. hybrid work
+2. Location requirements ("must reside in X", "within commuting distance of Y")
+3. Travel expectations (frequency, purpose, percentage of time)
+4. Relocation requirements (immediate or future)
+5. Time zone or geographic restrictions
+
+When the posting is ambiguous, prefer "unclear" over guessing.
+Confidence should be "low" if you're making inferences rather than quoting explicit statements.
+
+Common patterns to recognize:
+- "Remote" in the title but "must be located in [city]" in the body → onsite_disguised, requires_local_presence=true
+- "Remote with quarterly all-hands" → remote_with_quarterly_travel
+- "Hybrid" or "X days per week in office" → hybrid
+- "US-based remote" → fully_remote, location_restrictions=["US-only"]
+- "Open to remote candidates in [list of states]" → location_restricted
+- "Quarterly on-site meetings" → remote_with_quarterly_travel, NOT hybrid
+
+For travel_description, quote or paraphrase the relevant phrase from the posting. Don't editorialize.
+
+For estimated_travel_days_per_year:
+- "Quarterly meetings" → 4
+- "Monthly meetings" → 12
+- "10% travel" → 25
+- "Occasional travel" → 6
+- If unspecified, leave null
+
+For key_phrases: extract 2-5 verbatim phrases copied exactly from the posting that directly support your classification. These are the snippets a human reviewer would want highlighted — the sentences or clauses about remote policy, travel, location requirements, or relocation. Prefer exact quotes over paraphrases.
+
+Return ONLY valid JSON matching the schema. No commentary outside the JSON.
