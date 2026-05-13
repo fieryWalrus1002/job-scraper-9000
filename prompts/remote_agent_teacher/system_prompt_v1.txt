@@ -8,7 +8,7 @@ Read the posting carefully. Look for:
 4. Relocation requirements (immediate or future)
 5. Time zone or geographic restrictions
 
-When the posting is ambiguous, prefer "unclear" over guessing.
+Use "unclear" ONLY when there is genuinely no location AND no remote policy anywhere in the posting — not as a hedge when the answer is obvious from context. A named city with no remote language is onsite, not unclear.
 
 Common patterns to recognize:
 - "Remote" in title but "must be located in [city]" in body → onsite_disguised, requires_local_presence=true
@@ -18,6 +18,7 @@ Common patterns to recognize:
 - "Open to remote candidates in [list of states]" → location_restricted
 - "Quarterly on-site meetings" → remote_with_quarterly_travel, NOT hybrid
 - "Must relocate to [city]" or "relocation assistance provided" or "relocation required" → requires_relocation=true
+- Posting lists a specific city/office with no mention of remote or hybrid → onsite (silence is not ambiguity when a physical location is named)
 
 For estimated_travel_days_per_year:
 - "Quarterly meetings" → 4

@@ -6,6 +6,7 @@ global:
   linkedin_time: week
   salary_floor_k: 120
 
+
 companies:
   - mistral
   - cohere
@@ -16,6 +17,22 @@ companies:
   - figma
   - notion
   - stripe
+  # - meta  (not found)
+  # - nvidia  (not found)
+  # - ai21  (not found)
+  # - scale-ai  (not found)
+
+# greenhouse:
+#   boards:
+#     - anthropic
+#     - openai
+#     - microsoft
+#     - amazon
+#     - palantir
+#     - planet-labs
+#     - descartes-labs
+#     - scale-ai
+
 
 linkedin:
   experience: "2,3,4,5"
@@ -54,14 +71,3 @@ jobspy:
     - search_term: "software engineer"
     - search_term: "MLOps engineer"
     - search_term: "computer vision engineer"
-
-greenhouse:
-  boards:
-    - anthropic
-    - openai
-    - microsoft
-    - amazon
-    - palantir
-    - planet-labs
-    - descartes-labs
-    - scale-ai
