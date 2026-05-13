@@ -28,7 +28,7 @@ if "git_meta" not in st.session_state:
 if "prompt_hash" not in st.session_state:
     st.session_state.prompt_hash = get_prompt_hash(_PROMPT_FILE) if _PROMPT_FILE.exists() else "unknown"
 if "skipped_idx" not in st.session_state:
-    st.session_state.skipped_idx: set[int] = set()
+    st.session_state.skipped_idx = set()  # type: set[int]
 
 git_meta = st.session_state.git_meta
 prompt_hash = st.session_state.prompt_hash
@@ -64,7 +64,7 @@ def load_reviewed() -> dict[str, dict]:
 
 
 if "reviewed" not in st.session_state:
-    st.session_state.reviewed: dict[str, dict] = load_reviewed()
+    st.session_state.reviewed = load_reviewed()  # type: dict[str, dict]
     st.session_state._resuming = True  # flag to auto-advance on first render
 
 # ── Build / save ──────────────────────────────────────────────────────────────
