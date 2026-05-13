@@ -29,34 +29,42 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
     return client, model
 
 
-def _build_user_message(description: str, search_context: dict | None) -> str:
-    """Prepend search context so the model can factor source-level filters into its reasoning."""
-    if not search_context:
-        return description
+def _build_user_message(description: str, search_context: dict | None, location: str | None = None, title: str | None = None) -> str:
+    """Prepend title, location, and search context so the model can factor them into its reasoning."""
     parts = []
-    if kw := search_context.get("keywords"):
-        parts.append(f'keywords="{kw}"')
-    if wp := search_context.get("workplace"):
-        parts.append(f"workplace_filter={wp}")
-    if jt := search_context.get("job_type"):
-        parts.append(f"job_type={jt}")
-    if tz := search_context.get("user_timezone"):
-        parts.append(f"candidate_timezone={tz}")
+    if title:
+        parts.append(f"Job title: {title}")
+    if location:
+        parts.append(f"Location field: {location}")
+    if search_context:
+        ctx = []
+        if kw := search_context.get("keywords"):
+            ctx.append(f'keywords="{kw}"')
+        if wp := search_context.get("workplace"):
+            ctx.append(f"workplace_filter={wp}")
+        if jt := search_context.get("job_type"):
+            ctx.append(f"job_type={jt}")
+        if tz := search_context.get("user_timezone"):
+            ctx.append(f"candidate_timezone={tz}")
+        if ctx:
+            parts.append(f"Search context: {', '.join(ctx)}")
     if not parts:
         return description
-    return f"[Search context: {', '.join(parts)}]\n\n---\n\n{description}"
+    return "\n".join(f"[{p}]" for p in parts) + "\n\n---\n\n" + description
 
 
 def analyze_remote(
     job_description: str,
     *,
+    title: str | None = None,
+    location: str | None = None,
     search_context: dict | None = None,
     llm_config: dict | None = None,
     max_retries: int = 2,
 ) -> RemoteAnalysis | None:
     """Returns None if the agent fails after retries — caller decides what to do."""
     client, model = _get_client(llm_config)
-    user_message = _build_user_message(job_description, search_context)
+    user_message = _build_user_message(job_description, search_context, location, title)
 
     for attempt in range(max_retries + 1):
         try:

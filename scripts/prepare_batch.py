@@ -55,6 +55,18 @@ def load_all_jobs(input_path: Path) -> list[dict]:
     return jobs
 
 
+def _build_user_content(job: dict) -> str:
+    parts = []
+    if title := job.get("title"):
+        parts.append(f"[Job title: {title}]")
+    if location := job.get("location"):
+        parts.append(f"[Location field: {location}]")
+    description = job.get("description", "")
+    if parts:
+        return "\n".join(parts) + "\n\n---\n\n" + description
+    return description
+
+
 def generate_batch(input_path: Path, run_dir: Path, sample: int | None) -> None:
     if not PROMPT_FILE.exists():
         raise FileNotFoundError(f"Prompt file not found: {PROMPT_FILE}")
@@ -88,7 +100,7 @@ def generate_batch(input_path: Path, run_dir: Path, sample: int | None) -> None:
                     "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": job.get("description", "")},
+                        {"role": "user", "content": _build_user_content(job)},
                     ],
                 },
             }

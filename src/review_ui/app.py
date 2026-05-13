@@ -65,6 +65,7 @@ def load_reviewed() -> dict[str, dict]:
 
 if "reviewed" not in st.session_state:
     st.session_state.reviewed: dict[str, dict] = load_reviewed()
+    st.session_state._resuming = True  # flag to auto-advance on first render
 
 # ── Build / save ──────────────────────────────────────────────────────────────
 
@@ -113,8 +114,10 @@ def status_dot(i: int, job: dict, idx: int, reviewed: dict, skipped: set[int]) -
     return "⬜"
 
 
-def status_grid(jobs: list, idx: int, reviewed: dict, skipped: set[int]) -> str:
-    return "".join(status_dot(i, j, idx, reviewed, skipped) for i, j in enumerate(jobs))
+def status_grid(jobs: list, idx: int, reviewed: dict, skipped: set[int], per_row: int = 20) -> str:
+    dots = [status_dot(i, j, idx, reviewed, skipped) for i, j in enumerate(jobs)]
+    rows = ["".join(dots[i:i + per_row]) for i in range(0, len(dots), per_row)]
+    return "<br/>".join(rows)
 
 # ── Load staging ──────────────────────────────────────────────────────────────
 
@@ -124,6 +127,14 @@ total = len(jobs)
 if total == 0:
     st.warning(f"No records found in `{STAGING}`. Run `merge_batch_results.py` first.")
     st.stop()
+
+# On first load after a restart, jump to the first unreviewed record.
+if st.session_state.get("_resuming"):
+    st.session_state._resuming = False
+    for i, j in enumerate(jobs):
+        if j.get("dedup_hash", "") not in st.session_state.reviewed:
+            st.session_state.idx = i
+            break
 
 # ── Dirty warning ─────────────────────────────────────────────────────────────
 
@@ -158,9 +169,12 @@ with nav_mid:
         f"⬜ {pending_count} pending"
     )
     st.markdown(
-        status_grid(jobs, display_idx, st.session_state.reviewed, st.session_state.skipped_idx),
-        help="🔵 current  🟢 confirmed  🟣 corrected  🟡 skipped  ⬜ pending",
+        "<div style=\"white-space: nowrap;\">"
+        + status_grid(jobs, display_idx, st.session_state.reviewed, st.session_state.skipped_idx, per_row=20)
+        + "</div>",
+        unsafe_allow_html=True,
     )
+    st.caption("🔵 current  🟢 confirmed  🟣 corrected  🟡 skipped  ⬜ pending")
 
 with nav_r:
     fwd_disabled = st.session_state.idx >= total - 1
