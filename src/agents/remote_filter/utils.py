@@ -29,14 +29,34 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
     return client, model
 
 
+def _build_user_message(description: str, search_context: dict | None) -> str:
+    """Prepend search context so the model can factor source-level filters into its reasoning."""
+    if not search_context:
+        return description
+    parts = []
+    if kw := search_context.get("keywords"):
+        parts.append(f'keywords="{kw}"')
+    if wp := search_context.get("workplace"):
+        parts.append(f"workplace_filter={wp}")
+    if jt := search_context.get("job_type"):
+        parts.append(f"job_type={jt}")
+    if tz := search_context.get("user_timezone"):
+        parts.append(f"candidate_timezone={tz}")
+    if not parts:
+        return description
+    return f"[Search context: {', '.join(parts)}]\n\n---\n\n{description}"
+
+
 def analyze_remote(
     job_description: str,
     *,
+    search_context: dict | None = None,
     llm_config: dict | None = None,
     max_retries: int = 2,
 ) -> RemoteAnalysis | None:
     """Returns None if the agent fails after retries — caller decides what to do."""
     client, model = _get_client(llm_config)
+    user_message = _build_user_message(job_description, search_context)
 
     for attempt in range(max_retries + 1):
         try:
@@ -44,7 +64,7 @@ def analyze_remote(
                 model=model,
                 messages=[
                     {"role": "system", "content": _PROMPT},
-                    {"role": "user", "content": job_description},
+                    {"role": "user", "content": user_message},
                 ],
                 response_format=RemoteAnalysis,
                 temperature=(llm_config or {}).get("temperature", 0.1),
@@ -92,6 +112,15 @@ def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_location: 
             if "US-ONLY" in r_upper or "UNITED STATES" in r_upper or "US ONLY" in r_upper:
                 if "US" not in loc and "UNITED STATES" not in loc and "USA" not in loc:
                     return False, "location_restrictions_mismatch"
+
+    if analysis.timezone_requirements:
+        tz_policy = policy.get("timezone", {})
+        rejected_keywords = [k.upper() for k in tz_policy.get("rejected_timezone_keywords", [])]
+        if rejected_keywords:
+            for req in analysis.timezone_requirements:
+                req_upper = req.upper()
+                if any(kw in req_upper for kw in rejected_keywords):
+                    return False, f"timezone_mismatch:{req}"
 
     return True, "passed"
 

@@ -35,39 +35,21 @@ policy_thresholds:
 
 To allow more travel, remove categories from `prohibited_categories`. To let through uncertain postings for manual review, set `on_unclear_classification: "pass"`.
 
-## Commands
+## Running the agent
 
-### run
-
-Run the agent against job data and split into pass/trash.
+The unified CLI was removed in favour of modularity. Use the script directly:
 
 ```bash
-# Run on all files in data/raw/ with default config
-uv run agents remote-filter run
-
-# Specify your location (used for geographic restriction checks)
-uv run agents remote-filter run --location "Pullman, WA"
-
-# Run on a single file
-uv run agents remote-filter run --input data/raw/2026-05-11_linkedin_ai-engineer.jsonl
-
-# Use a different config (e.g. a more permissive one for testing)
-uv run agents remote-filter run --config config/agent/permissive.yml
+python scripts/run_remote_filter.py
 ```
 
-Options:
+Reads all JSONL files from `data/raw/`, applies the filter policy, and writes:
 
-| Flag | Default | Notes |
-| --- | --- | --- |
-| `--input PATH` | `data/raw/` | Directory of JSONL files, or a single JSONL file |
-| `--config FILE` | `config/agent/remote_agent.yml` | Policy config YAML |
-| `--location` | `USA` | Your location, used to check geographic restrictions |
-
-Output:
 - `data/filtered/remote_filter_pass.jsonl` — postings that passed
 - `data/trash/remote_filter_trash.jsonl` — postings that were rejected, with reason
 
 Each output record contains all original job fields plus:
+
 ```json
 {
   "_remote_analysis": {
@@ -81,54 +63,7 @@ Each output record contains all original job fields plus:
 }
 ```
 
-### review
-
-Interactively review agent decisions. Shows each job with the agent's full reasoning and lets you confirm or override.
-
-```bash
-uv run agents remote-filter review              # review trash (default — catch false negatives)
-uv run agents remote-filter review --bucket pass   # review pass (catch false positives)
-uv run agents remote-filter review --bucket all    # review everything
-```
-
-For each job you'll see: title, company, URL, classification, confidence, the agent's reasoning, travel details, and any location/relocation flags.
-
-Keys:
-
-- `k` — keep (agent was correct, no action)
-- `f` — flip (agent was wrong — prompts for correct classification, key phrases, and notes, then adds to eval suite)
-- `d` — show full description with key phrases highlighted in yellow
-- `s` — skip
-- `q` — quit
-
-Start with `--bucket trash` — that's where false negatives hide (real remote jobs the agent wrongly killed). Jobs you flip are written to `data/eval/remote_filter_eval.jsonl` as labeled eval records.
-
-### label
-
-Interactively label raw jobs from `data/raw/` to build the eval suite from scratch. Use this if you want to label jobs before running the agent.
-
-```bash
-uv run agents remote-filter label
-```
-
-For each unlabeled posting you'll be prompted for:
-- **Classification** — which remote category best fits (1-8)
-- **Should pass filter** — `y` or `n`
-- **Travel days range** — e.g. `0-4`, `12-24`, or blank
-- **Key phrases** — comma-separated verbatim excerpts from the posting that support the label
-- **Notes** — anything worth remembering
-
-Labels are saved to `data/eval/remote_filter_eval.jsonl`. Already-labeled jobs are skipped on subsequent runs, so you can label in batches.
-
-### export
-
-Export the eval suite as an OpenAI fine-tuning JSONL.
-
-```bash
-uv run agents remote-filter export
-```
-
-Reads `data/eval/remote_filter_eval.jsonl` and writes `data/eval/remote_filter_finetune.jsonl` — one training example per record in OpenAI's `{"messages": [...]}` format, ready to upload for fine-tuning.
+See [scripts/README.md](../../scripts/README.md) for the full pipeline (teacher batch, HITL review).
 
 ## Classification schema
 

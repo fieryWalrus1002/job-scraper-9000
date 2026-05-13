@@ -15,14 +15,13 @@ from agents.remote_filter.utils import analyze_remote, load_raw_jobs, passes_rem
 
 def _make_analysis(**overrides) -> RemoteAnalysis:
     defaults = dict(
+        reasoning_trace="Explicitly states fully remote.",
         remote_classification="fully_remote",
         estimated_travel_days_per_year=None,
-        travel_description=None,
         location_restrictions=[],
         requires_relocation=False,
         requires_local_presence=False,
-        confidence="high",
-        reasoning="Explicitly states fully remote.",
+        timezone_requirements=[],
     )
     return RemoteAnalysis(**{**defaults, **overrides})
 
@@ -34,6 +33,7 @@ def _make_config(
     allow_relocation=False,
     allow_local_presence=False,
     on_unclear="pass",
+    rejected_timezone_keywords=None,
 ) -> dict:
     return {
         "policy_thresholds": {
@@ -51,6 +51,10 @@ def _make_config(
             },
             "uncertainty": {
                 "on_unclear_classification": on_unclear,
+            },
+            "timezone": {
+                "user_timezone": "PST",
+                "rejected_timezone_keywords": rejected_timezone_keywords or ["EST", "ET", "Eastern"],
             },
         }
     }
@@ -166,6 +170,59 @@ def test_us_only_fails_for_non_us():
     assert reason == "location_restrictions_mismatch"
 
 
+def test_location_restricted_passes_for_matching_user_location():
+    ok, _ = passes_remote_filter(
+        _make_analysis(remote_classification="location_restricted", location_restrictions=["US-only"]),
+        _make_config(),
+        user_location="USA",
+    )
+    assert ok
+
+
+def test_location_restricted_fails_for_non_matching_user_location():
+    ok, reason = passes_remote_filter(
+        _make_analysis(remote_classification="location_restricted", location_restrictions=["US-only"]),
+        _make_config(),
+        user_location="Canada",
+    )
+    assert not ok
+    assert reason == "location_restrictions_mismatch"
+
+
+def test_eastern_timezone_requirement_fails():
+    ok, reason = passes_remote_filter(
+        _make_analysis(timezone_requirements=["EST"]),
+        _make_config(),
+    )
+    assert not ok
+    assert "timezone_mismatch" in reason
+
+
+def test_eastern_timezone_full_phrase_fails():
+    ok, reason = passes_remote_filter(
+        _make_analysis(timezone_requirements=["Eastern time zone"]),
+        _make_config(),
+    )
+    assert not ok
+    assert "timezone_mismatch" in reason
+
+
+def test_pacific_timezone_requirement_passes():
+    ok, _ = passes_remote_filter(
+        _make_analysis(timezone_requirements=["PST"]),
+        _make_config(),
+    )
+    assert ok
+
+
+def test_no_timezone_requirement_passes():
+    ok, _ = passes_remote_filter(
+        _make_analysis(timezone_requirements=[]),
+        _make_config(),
+    )
+    assert ok
+
+
 def test_relocation_check_takes_priority_over_classification():
     ok, reason = passes_remote_filter(
         _make_analysis(remote_classification="fully_remote", requires_relocation=True),
@@ -210,6 +267,39 @@ def test_analyze_remote_returns_none_after_all_retries_fail():
         result = analyze_remote("Some job description.", max_retries=0)
 
     assert result is None
+
+
+def test_analyze_remote_injects_search_context():
+    mock_analysis = _make_analysis()
+    mock_response = MagicMock()
+    mock_response.choices[0].message.parsed = mock_analysis
+    mock_client = MagicMock()
+    mock_client.beta.chat.completions.parse.return_value = mock_response
+
+    context = {"keywords": "AI engineer", "workplace": "remote", "job_type": "fulltime"}
+    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+        analyze_remote("Job description here.", search_context=context)
+
+    call_messages = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"]
+    user_content = call_messages[1]["content"]
+    assert "[Search context:" in user_content
+    assert 'keywords="AI engineer"' in user_content
+    assert "workplace_filter=remote" in user_content
+    assert "Job description here." in user_content
+
+
+def test_analyze_remote_no_context_sends_description_only():
+    mock_analysis = _make_analysis()
+    mock_response = MagicMock()
+    mock_response.choices[0].message.parsed = mock_analysis
+    mock_client = MagicMock()
+    mock_client.beta.chat.completions.parse.return_value = mock_response
+
+    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+        analyze_remote("Plain description.", search_context=None)
+
+    call_messages = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"]
+    assert call_messages[1]["content"] == "Plain description."
 
 
 def test_analyze_remote_retries_on_failure():

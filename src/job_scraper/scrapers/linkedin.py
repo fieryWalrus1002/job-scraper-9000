@@ -117,6 +117,7 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
                     description=description,
                     scraped_at=datetime.now(timezone.utc).isoformat(),
                     scrub_counts=scrub_counts,
+                    search_params=_search_params(self.query),
                 )
                 job.compute_hash()
                 all_jobs.append(job)
@@ -130,6 +131,20 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
             self._sleep()
 
         return all_jobs
+
+
+_WORKPLACE_LABEL = {"1": "onsite", "2": "remote", "3": "hybrid"}
+_JOBTYPE_LABEL   = {"F": "fulltime", "P": "parttime", "C": "contract"}
+
+
+def _search_params(query: LinkedInSearchQuery) -> dict:
+    return {
+        "keywords": query.keywords,
+        "workplace": _WORKPLACE_LABEL.get(query.workplace, query.workplace),
+        "job_type": _JOBTYPE_LABEL.get(query.job_type, query.job_type),
+        "experience": query.experience,
+        "salary_floor": query.salary_floor,
+    }
 
 
 def _parse_card(card) -> dict:

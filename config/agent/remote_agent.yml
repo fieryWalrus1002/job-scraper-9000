@@ -9,7 +9,8 @@ policy_thresholds:
     - "onsite_disguised"
     - "hybrid"
     - "onsite"
-    - "location_restricted"
+    # location_restricted is intentionally excluded — geographic and timezone
+    # checks below handle it with actual user location/timezone matching.
 
   travel:
     max_estimated_days_per_year: 15
@@ -21,5 +22,18 @@ policy_thresholds:
     allow_local_presence_required: false
 
   uncertainty:
-    # Options: "reject", "flag_for_review", "pass"
+    # Options: "reject", "pass"
     on_unclear_classification: "reject"
+
+  timezone:
+    # Your local timezone — injected as context so the model can reason about overlap.
+    # Overridden at runtime by USER_TIMEZONE env var if set.
+    user_timezone: "PST"
+    # Postings that require ONLY one of these timezones will be rejected.
+    # Timezones not listed here (PST, MST, CST, or unspecified) are acceptable.
+    rejected_timezone_keywords:
+      - "EST"
+      - "ET"
+      - "Eastern"
+      - "Eastern time"
+      - "Eastern Standard Time"
