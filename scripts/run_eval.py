@@ -46,13 +46,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_gold(path: str) -> list[dict]:
-    records = []
+    """Load ground truth, keeping only the last entry per dedup_hash (re-reviews override)."""
+    seen: dict[str, dict] = {}
     with open(path) as f:
         for line in f:
             line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
+            if not line:
+                continue
+            r = json.loads(line)
+            key = r.get("dedup_hash") or r.get("source_url") or id(r)
+            seen[key] = r
+    return list(seen.values())
 
 
 def run_eval(records: list[dict], config: dict) -> tuple[list[dict], dict]:
