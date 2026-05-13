@@ -129,8 +129,8 @@ if total == 0:
 
 if git_meta["dirty"]:
     st.warning(
-        f"Repo is dirty — uncommitted changes exist. "
-        f"Records saved now will be marked `dirty: true`.",
+        "Repo is dirty — uncommitted changes exist. "
+        "Records saved now will be marked `dirty: true`.",
         icon="⚠️",
     )
 

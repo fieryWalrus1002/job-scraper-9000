@@ -3,8 +3,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import analyze_remote, load_raw_jobs, passes_remote_filter
 

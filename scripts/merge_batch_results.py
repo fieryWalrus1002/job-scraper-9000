@@ -16,7 +16,6 @@ Usage:
 import argparse
 import json
 import logging
-import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -123,7 +122,7 @@ def main() -> None:
     log.info("Merging with jobs from %s", jobs_path)
     merge(jobs_path, results, args.output)
 
-    print(f"\nNext step: uv run streamlit run src/review_ui/app.py")
+    print("\nNext step: uv run streamlit run src/review_ui/app.py")
 
 
 if __name__ == "__main__":
