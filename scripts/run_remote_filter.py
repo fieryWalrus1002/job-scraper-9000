@@ -63,6 +63,7 @@ def main() -> None:
             description = job.get("description", "")
             title = job.get("title", "")
             company = job.get("company", "")
+            location = job.get("location") or None
 
             if not description:
                 log.warning("Skipping %s @ %s — no description", title, company)
@@ -75,6 +76,8 @@ def main() -> None:
             }
             analysis = analyze_remote(
                 description,
+                title=title,
+                location=location,
                 search_context=search_context or None,
                 llm_config=llm_config,
             )

@@ -77,6 +77,8 @@ def run_eval(records: list[dict], config: dict) -> tuple[list[dict], dict]:
             skipped += 1
             continue
 
+        location = job.get("location") or None
+        title = job.get("title") or None
         search_context = {
             **(job.get("search_params") or {}),
             **({"user_timezone": USER_TIMEZONE} if USER_TIMEZONE else {}),
@@ -84,6 +86,8 @@ def run_eval(records: list[dict], config: dict) -> tuple[list[dict], dict]:
 
         analysis = analyze_remote(
             description,
+            title=title,
+            location=location,
             search_context=search_context or None,
             llm_config=llm_config,
         )
