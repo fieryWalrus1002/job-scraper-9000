@@ -1,0 +1,68 @@
+# job-scraper-9000 search config
+# v1
+
+global:
+  default_max_results: 50
+  hours_old: 48
+  linkedin_time: week
+  salary_floor_k: 120
+
+companies:
+  - mistral
+  - cohere
+  - harvey
+  - perplexity
+  - deepmind
+  - replit
+  - figma
+  - notion
+  - stripe
+
+linkedin:
+  experience: "2,3,4,5"
+  workplace: remote
+  job_type: fulltime
+
+  searches:
+    - keywords: "data engineer"
+    - keywords: "AI engineer"
+    - keywords: "machine learning engineer"
+    - keywords: "software engineer"
+    - keywords: "computer vision engineer"
+    - keywords: "MLOps engineer"
+    - keywords: "geospatial data engineer"
+
+jobspy:
+  # we covered linked in with the linkedin scraper, so no need to duplicate those results here
+  sites: indeed,zip_recruiter
+  no_remote: false
+
+  searches:
+    # Pullman/onsite — broad terms, small market
+    - search_term: "data engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "software engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "machine learning engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "AI engineer"
+      location: "${HOME_LOCATION}"
+
+    # Remote — mirrors LinkedIn core terms to get Indeed/ZipRecruiter coverage
+    - search_term: "data engineer"
+    - search_term: "AI engineer"
+    - search_term: "machine learning engineer"
+    - search_term: "software engineer"
+    - search_term: "MLOps engineer"
+    - search_term: "computer vision engineer"
+
+greenhouse:
+  boards:
+    - anthropic
+    - openai
+    - microsoft
+    - amazon
+    - palantir
+    - planet-labs
+    - descartes-labs
+    - scale-ai

@@ -2,21 +2,23 @@
 """
 Merge an OpenAI Batch API results file back onto the original job records.
 
-Workflow:
-  1. prepare_batch.py   → data/raw/gpt_teacher_batch.jsonl   (upload to OpenAI)
-  2. [download results] → data/raw/gpt_teacher_results.jsonl
-  3. merge_batch_results.py → data/staging/to_review.jsonl   (what the UI reads)
+Reads from the run directory (default: data/batch/YYYY-MM-DD/) and always
+APPENDS to data/staging/to_review.jsonl so that unreviewed records from a
+prior batch are never clobbered.
 
-The batch request file uses custom_id = "job-{line_index}" to key each record
-back to the original jobs JSONL. This script inverts that mapping and emits one
-merged record per job, embedding the teacher's response under the "response" key
-(the shape the Streamlit review UI already expects).
+Workflow:
+    prepare_batch.py → submit_batch.py → merge_batch_results.py → Streamlit UI
+
+Usage:
+    python scripts/merge_batch_results.py                              # today's run dir
+    python scripts/merge_batch_results.py --run-dir data/batch/2026-05-11
 """
 import argparse
 import json
 import logging
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
@@ -26,22 +28,19 @@ from utils.git_info import get_git_metadata, get_prompt_hash  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-JOBS_INPUT = "data/raw"
-RESULTS_FILE = "data/batch/gpt_teacher_results.jsonl"
-OUTPUT_FILE = "data/staging/to_review.jsonl"
-PROMPT_FILE = Path(__file__).parents[1] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
+STAGING_FILE = "data/staging/to_review.jsonl"
+PROMPT_FILE = Path(__file__).parents[1] / "prompts" / "remote_agent_teacher" / "system_prompt_v1.txt"
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--jobs", default=JOBS_INPUT, help="JSONL file or directory of JSONL files used to build the batch (default: data/raw/)")
-    p.add_argument("--results", default=RESULTS_FILE, help="Downloaded OpenAI batch results JSONL")
-    p.add_argument("--output", default=OUTPUT_FILE, help="Merged staging output path")
-    p.add_argument("--append", action="store_true", help="Append to output instead of overwriting")
+    p.add_argument("--run-dir", default=DEFAULT_RUN_DIR, help=f"Batch run directory (default: {DEFAULT_RUN_DIR})")
+    p.add_argument("--output", default=STAGING_FILE, help=f"Staging file to append to (default: {STAGING_FILE})")
     return p.parse_args()
 
 
-def load_results(results_path: str) -> dict[str, dict]:
+def load_results(results_path: Path) -> dict[str, dict]:
     """Return {custom_id: result_object} for every non-error batch result."""
     results: dict[str, dict] = {}
     errors = 0
@@ -63,20 +62,15 @@ def load_results(results_path: str) -> dict[str, dict]:
 
 
 def iter_jobs(jobs_path: Path):
-    """Yield (idx, job_dict) from one file or all *.jsonl files in a directory (sorted)."""
-    files = sorted(jobs_path.glob("*.jsonl")) if jobs_path.is_dir() else [jobs_path]
-    idx = 0
-    for file in files:
-        with open(file) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
+    """Yield (idx, job_dict) from the sidecar file."""
+    with open(jobs_path) as f:
+        for idx, line in enumerate(f):
+            line = line.strip()
+            if line:
                 yield idx, json.loads(line)
-                idx += 1
 
 
-def merge(jobs_path: Path, results: dict[str, dict], output_path: str, append: bool) -> None:
+def merge(jobs_path: Path, results: dict[str, dict], output_path: str) -> None:
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     git_meta = get_git_metadata()
@@ -92,9 +86,8 @@ def merge(jobs_path: Path, results: dict[str, dict], output_path: str, append: b
     log.info("Batch metadata: schema=%s prompt=%s commit=%s dirty=%s", SCHEMA_VERSION, prompt_hash, git_meta["commit"][:12], git_meta["dirty"])
 
     matched = skipped = 0
-    mode = "a" if append else "w"
 
-    with open(output_path, mode) as out_f:
+    with open(output_path, "a") as out_f:
         for idx, job in iter_jobs(jobs_path):
             custom_id = f"job-{idx}"
             response = results.get(custom_id)
@@ -107,24 +100,30 @@ def merge(jobs_path: Path, results: dict[str, dict], output_path: str, append: b
             out_f.write(json.dumps(merged) + "\n")
             matched += 1
 
-    log.info("Done — %d merged | %d skipped (no batch result)", matched, skipped)
+    log.info("Done — %d appended to staging | %d skipped (no batch result)", matched, skipped)
     log.info("Output: %s", output_path)
 
 
 def main() -> None:
     args = parse_args()
+    run_dir = Path(args.run_dir)
 
-    for path, label in [(args.jobs, "--jobs"), (args.results, "--results")]:
-        if not os.path.exists(path):
-            log.error("%s file not found: %s", label, path)
+    jobs_path = run_dir / "gpt_teacher_jobs.jsonl"
+    results_path = run_dir / "gpt_teacher_results.jsonl"
+
+    for path, label in [(jobs_path, "jobs sidecar"), (results_path, "batch results")]:
+        if not path.exists():
+            log.error("%s not found: %s", label, path)
             sys.exit(1)
 
-    log.info("Loading batch results from %s", args.results)
-    results = load_results(args.results)
+    log.info("Loading batch results from %s", results_path)
+    results = load_results(results_path)
     log.info("Loaded %d successful results", len(results))
 
-    log.info("Merging with jobs from %s", args.jobs)
-    merge(Path(args.jobs), results, args.output, args.append)
+    log.info("Merging with jobs from %s", jobs_path)
+    merge(jobs_path, results, args.output)
+
+    print(f"\nNext step: uv run streamlit run src/review_ui/app.py")
 
 
 if __name__ == "__main__":

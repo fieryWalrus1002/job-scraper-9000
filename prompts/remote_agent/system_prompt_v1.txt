@@ -18,6 +18,7 @@ Common patterns to recognize:
 - "US-based remote" → fully_remote, location_restrictions=["US-only"]
 - "Open to remote candidates in [list of states]" → location_restricted
 - "Quarterly on-site meetings" → remote_with_quarterly_travel, NOT hybrid
+- "Must relocate to [city]" or "relocation assistance provided" or "relocation required" → requires_relocation=true
 
 For estimated_travel_days_per_year:
 - "Quarterly meetings" → 4

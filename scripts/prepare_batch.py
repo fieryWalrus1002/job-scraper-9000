@@ -2,33 +2,42 @@
 """
 Build an OpenAI Batch API request file from raw scraped job records.
 
-Accepts a single JSONL file or a directory of JSONL files. When given a
-directory, all *.jsonl files are read in sorted order — the same order
-merge_batch_results.py must use so that custom_id = "job-{idx}" maps back
-correctly.
+Always writes two files into the run directory (default: data/batch/YYYY-MM-DD/):
+  gpt_teacher_batch.jsonl  — the request file to upload to OpenAI
+  gpt_teacher_jobs.jsonl   — the exact jobs that went in, in order
+                              (merge_batch_results.py reads this)
+
+The sidecar eliminates the need to pass matching --input flags to both scripts.
 
 Usage:
-    python scripts/prepare_batch.py                          # reads data/raw/
-    python scripts/prepare_batch.py --input data/raw/2026-05-11_linkedin.jsonl
+    # random sample of 100 jobs from all of data/raw/ (recommended)
+    python scripts/prepare_batch.py --sample 100
+
+    # specific file, no sampling
+    python scripts/prepare_batch.py --input data/raw/2026-05-11_linkedin_ai-engineer.jsonl
+
+    # custom run directory (e.g. re-running yesterday's batch)
+    python scripts/prepare_batch.py --sample 100 --run-dir data/batch/2026-05-11
 """
 import argparse
 import json
-import os
+import random
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 from utils.git_info import get_prompt_hash  # noqa: E402
 
 INPUT_DIR = "data/raw"
-BATCH_FILE = "data/batch/gpt_teacher_batch.jsonl"
+DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
 MODEL = "gpt-4o"
 
 PROMPT_FILE = Path(__file__).parents[1] / "prompts" / "remote_agent_teacher" / "system_prompt_v1.txt"
 
 
-def iter_jobs(input_path: Path):
-    """Yield (idx, job_dict) across one file or all *.jsonl files in a directory."""
+def load_all_jobs(input_path: Path) -> list[dict]:
+    """Load every job from one file or all *.jsonl files in a directory."""
     if input_path.is_dir():
         files = sorted(input_path.glob("*.jsonl"))
         if not files:
@@ -36,29 +45,40 @@ def iter_jobs(input_path: Path):
     else:
         files = [input_path]
 
-    idx = 0
+    jobs = []
     for file in files:
         with open(file) as f:
             for line in f:
                 line = line.strip()
-                if not line:
-                    continue
-                yield idx, json.loads(line)
-                idx += 1
+                if line:
+                    jobs.append(json.loads(line))
+    return jobs
 
 
-def generate_batch(input_path: Path, output_path: Path) -> None:
+def generate_batch(input_path: Path, run_dir: Path, sample: int | None) -> None:
     if not PROMPT_FILE.exists():
         raise FileNotFoundError(f"Prompt file not found: {PROMPT_FILE}")
     system_prompt = PROMPT_FILE.read_text()
     prompt_hash = get_prompt_hash(PROMPT_FILE)
     print(f"Prompt: {PROMPT_FILE.name}  sha256:{prompt_hash}")
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    jobs = load_all_jobs(input_path)
+    print(f"Loaded {len(jobs)} jobs from {input_path}")
 
-    count = 0
-    with open(output_path, "w") as outfile:
-        for idx, job in iter_jobs(input_path):
+    if sample is not None:
+        if sample > len(jobs):
+            print(f"Warning: --sample {sample} > available {len(jobs)}, using all")
+            sample = len(jobs)
+        jobs = random.sample(jobs, sample)
+        print(f"Sampled {len(jobs)} jobs at random")
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    batch_path = run_dir / "gpt_teacher_batch.jsonl"
+    sidecar_path = run_dir / "gpt_teacher_jobs.jsonl"
+
+    with open(sidecar_path, "w") as sidecar_f, open(batch_path, "w") as batch_f:
+        for idx, job in enumerate(jobs):
+            sidecar_f.write(json.dumps(job) + "\n")
             request = {
                 "custom_id": f"job-{idx}",
                 "method": "POST",
@@ -72,17 +92,18 @@ def generate_batch(input_path: Path, output_path: Path) -> None:
                     ],
                 },
             }
-            outfile.write(json.dumps(request) + "\n")
-            count += 1
+            batch_f.write(json.dumps(request) + "\n")
 
-    print(f"Created {count} requests → {output_path}")
-    print("Upload this file to the OpenAI Batch API dashboard, then download the results.")
+    print(f"Wrote {len(jobs)} requests → {batch_path}")
+    print(f"Wrote {len(jobs)} jobs     → {sidecar_path}")
+    print(f"Next: uv run python scripts/submit_batch.py --run-dir {run_dir}")
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--input", default=INPUT_DIR, help="JSONL file or directory of JSONL files (default: data/raw/)")
-    p.add_argument("--output", default=BATCH_FILE, help="Batch request output path (default: data/batch/gpt_teacher_batch.jsonl)")
+    p.add_argument("--input", default=INPUT_DIR, help="JSONL file or directory (default: data/raw/)")
+    p.add_argument("--run-dir", default=DEFAULT_RUN_DIR, help=f"Output directory for this batch run (default: {DEFAULT_RUN_DIR})")
+    p.add_argument("--sample", type=int, default=None, metavar="N", help="Randomly sample N jobs instead of using all")
     return p.parse_args()
 
 
@@ -91,4 +112,4 @@ if __name__ == "__main__":
     input_path = Path(args.input)
     if not input_path.exists():
         raise FileNotFoundError(f"Input not found: {input_path}")
-    generate_batch(input_path, Path(args.output))
+    generate_batch(input_path, Path(args.run_dir), args.sample)
