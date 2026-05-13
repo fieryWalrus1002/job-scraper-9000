@@ -4,8 +4,10 @@ The processing pipeline for job-scraper-9000. Reads raw JSONL from `data/raw/`, 
 
 ## Entry point
 
+Agents are currently invoked via scripts rather than a unified CLI:
+
 ```bash
-uv run agents <agent> <command> [options]
+python scripts/run_remote_filter.py   # remote filter
 ```
 
 ## Agents

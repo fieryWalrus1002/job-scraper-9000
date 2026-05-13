@@ -6,11 +6,13 @@ requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "openai>=2.36.0",
+    "pandas>=2.3.3",
     "pydantic>=2.13.4",
     "python-dotenv>=1.0.0",
     "python-jobspy>=1.1.82",
     "pyyaml>=6.0.3",
     "requests>=2.33.1",
+    "streamlit>=1.57.0",
 ]
 
 [project.scripts]

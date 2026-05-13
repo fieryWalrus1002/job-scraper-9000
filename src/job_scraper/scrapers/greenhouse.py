@@ -67,6 +67,7 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
+                search_params={"board_token": self.query.board_token},
             )
             job.compute_hash()
             jobs.append(job)
