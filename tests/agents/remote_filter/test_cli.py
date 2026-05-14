@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import (
+    _build_user_message,
     analyze_remote,
     load_raw_jobs,
     passes_remote_filter,
@@ -391,3 +392,85 @@ def test_load_raw_jobs_directory_sorted(tmp_path):
     result = load_raw_jobs(tmp_path)
     assert result[0]["id"] == "a"
     assert result[1]["id"] == "b"
+
+
+# ---------------------------------------------------------------------------
+# _build_user_message — title and location injection
+# ---------------------------------------------------------------------------
+
+
+def test_build_user_message_no_extras_returns_description_only():
+    assert _build_user_message("Just a description.", None) == "Just a description."
+
+
+def test_build_user_message_title_prepended():
+    msg = _build_user_message("Job desc.", None, title="Personal Office Assistant")
+    assert "[Job title: Personal Office Assistant]" in msg
+    assert "Job desc." in msg
+
+
+def test_build_user_message_location_prepended():
+    msg = _build_user_message("Job desc.", None, location="US-Remote (35 miles+ outside an office)")
+    assert "[Location field: US-Remote (35 miles+ outside an office)]" in msg
+    assert "Job desc." in msg
+
+
+def test_build_user_message_title_before_location():
+    msg = _build_user_message("Desc.", None, title="Engineer", location="Remote")
+    title_pos = msg.index("[Job title:")
+    location_pos = msg.index("[Location field:")
+    assert title_pos < location_pos
+
+
+def test_build_user_message_all_fields_combined():
+    ctx = {"keywords": "AI engineer", "workplace": "remote"}
+    msg = _build_user_message("Desc.", ctx, title="AI Engineer", location="US-Remote")
+    assert "[Job title: AI Engineer]" in msg
+    assert "[Location field: US-Remote]" in msg
+    assert "[Search context:" in msg
+    assert "Desc." in msg
+
+
+def test_build_user_message_none_title_and_location_with_context():
+    ctx = {"keywords": "data engineer"}
+    msg = _build_user_message("Desc.", ctx, title=None, location=None)
+    assert "[Search context:" in msg
+    assert "Job title" not in msg
+    assert "Location field" not in msg
+
+
+# ---------------------------------------------------------------------------
+# analyze_remote — title and location threaded through
+# ---------------------------------------------------------------------------
+
+
+def _mock_client_returning(analysis: RemoteAnalysis):
+    mock_response = MagicMock()
+    mock_response.choices[0].message.parsed = analysis
+    mock_client = MagicMock()
+    mock_client.beta.chat.completions.parse.return_value = mock_response
+    return mock_client
+
+
+def test_analyze_remote_includes_title_in_user_message():
+    mock_client = _mock_client_returning(_make_analysis())
+    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+        analyze_remote("Job description.", title="Personal Office Assistant")
+    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][1]["content"]
+    assert "[Job title: Personal Office Assistant]" in user_content
+
+
+def test_analyze_remote_includes_location_in_user_message():
+    mock_client = _mock_client_returning(_make_analysis())
+    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+        analyze_remote("Job description.", location="US-Remote (35 miles+ outside an office)")
+    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][1]["content"]
+    assert "[Location field: US-Remote (35 miles+ outside an office)]" in user_content
+
+
+def test_analyze_remote_no_title_no_location_sends_description_only():
+    mock_client = _mock_client_returning(_make_analysis())
+    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+        analyze_remote("Plain description.", title=None, location=None, search_context=None)
+    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][1]["content"]
+    assert user_content == "Plain description."

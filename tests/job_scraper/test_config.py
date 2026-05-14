@@ -14,6 +14,7 @@ from job_scraper.scrapers.greenhouse import GreenhouseScraper
 from job_scraper.scrapers.jobspy import JobSpyScraper
 from job_scraper.scrapers.lever import LeverScraper
 from job_scraper.scrapers.linkedin import LinkedInJobScraper
+from job_scraper.scrapers.sel import SELJobScraper
 
 
 # ---------------------------------------------------------------------------
@@ -735,4 +736,68 @@ def test_no_scraper_sections_includes_ashby_in_error(tmp_path):
     """,
     )
     with pytest.raises(ConfigError, match="ashby"):
+        load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# SEL section
+# ---------------------------------------------------------------------------
+
+
+def test_sel_section_empty_body_creates_one_scraper(tmp_path):
+    cfg = _write_config(tmp_path, "sel:\n")
+    scrapers = load_config(cfg)
+    assert len(scrapers) == 1
+    assert isinstance(scrapers[0], SELJobScraper)
+
+
+def test_sel_section_source_name(tmp_path):
+    cfg = _write_config(tmp_path, "sel:\n")
+    scrapers = load_config(cfg)
+    assert scrapers[0].source_name == "sel"
+
+
+def test_sel_section_defaults(tmp_path):
+    cfg = _write_config(tmp_path, "sel:\n")
+    scrapers = load_config(cfg)
+    q = scrapers[0].query
+    assert q.location_key == "pullman_wa"
+    assert q.fetch_descriptions is True
+    assert "regular" in q.worker_sub_types
+
+
+def test_sel_fetch_descriptions_false(tmp_path):
+    cfg = _write_config(tmp_path, "sel:\n  fetch_descriptions: false\n")
+    scrapers = load_config(cfg)
+    assert scrapers[0].query.fetch_descriptions is False
+
+
+def test_sel_custom_job_type(tmp_path):
+    cfg = _write_config(tmp_path, "sel:\n  job_type: temporary\n")
+    scrapers = load_config(cfg)
+    assert "temporary" in scrapers[0].query.worker_sub_types
+
+
+def test_missing_sel_section_skips_sel(tmp_path):
+    cfg = _write_config(
+        tmp_path,
+        """\
+        greenhouse:
+          boards:
+            - anthropic
+    """,
+    )
+    scrapers = load_config(cfg)
+    assert not any(isinstance(s, SELJobScraper) for s in scrapers)
+
+
+def test_sel_only_config_does_not_raise(tmp_path):
+    cfg = _write_config(tmp_path, "sel:\n")
+    scrapers = load_config(cfg)
+    assert len(scrapers) == 1
+
+
+def test_no_scraper_sections_includes_sel_in_error(tmp_path):
+    cfg = _write_config(tmp_path, "global:\n  default_max_results: 10\n")
+    with pytest.raises(ConfigError, match="sel"):
         load_config(cfg)
