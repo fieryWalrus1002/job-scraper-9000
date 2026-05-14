@@ -57,7 +57,7 @@ already hardcoded in `SELSearchQuery`:
 | `workerSubType`   | Temporary  | `96e1096563ef1014e495069e83966e00` |
 | `timeType`        | Full Time  | `b0630d66f89e1013409e4b1a1a91c123` |
 | `timeType`        | Part Time  | `b0630d66f89e1013409e4ae8d2c9c122` |
-| `locationMainGroup` | (unknown, needs investigation) | `df72ee3ddefc1018ebf01de718624e22` |
+| `locations` | Washington - Pullman | `df72ee3ddefc1018ebf01de718624e22` |
 
 Note: the location facet parameter is `locationMainGroup`, not `locations` as currently
 used in `SELSearchQuery.to_params()`. Need to confirm the GUID maps correctly.
