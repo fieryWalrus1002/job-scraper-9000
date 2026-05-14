@@ -15,7 +15,7 @@ _POSTINGS_API = "https://api.ashbyhq.com/posting-api/job-board/{company}"
 
 @dataclass
 class AshbyQuery:
-    company: str              # slug from jobs.ashbyhq.com/<company>
+    company: str  # slug from jobs.ashbyhq.com/<company>
     fetch_descriptions: bool = True
 
 
@@ -30,7 +30,7 @@ class AshbyScraper(BaseScraper["AshbyQuery"]):
 
     def describe(self) -> dict:
         return {
-            "source":  self.source_name,
+            "source": self.source_name,
             "company": self.query.company,
         }
 
@@ -45,7 +45,9 @@ class AshbyScraper(BaseScraper["AshbyQuery"]):
         for item in data.get("jobs", []):
             raw_desc = ""
             if self.query.fetch_descriptions:
-                raw_desc = item.get("descriptionPlain") or item.get("descriptionHtml") or ""
+                raw_desc = (
+                    item.get("descriptionPlain") or item.get("descriptionHtml") or ""
+                )
             description, scrub_counts = scrub(raw_desc)
 
             job = JobPosting(

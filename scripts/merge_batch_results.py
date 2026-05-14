@@ -13,6 +13,7 @@ Usage:
     python scripts/merge_batch_results.py                              # today's run dir
     python scripts/merge_batch_results.py --run-dir data/batch/2026-05-11
 """
+
 import argparse
 import json
 import logging
@@ -29,13 +30,28 @@ log = logging.getLogger(__name__)
 
 DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
 STAGING_FILE = "data/staging/to_review.jsonl"
-PROMPT_FILE = Path(__file__).parents[1] / "prompts" / "remote_agent_teacher" / "system_prompt_v1.txt"
+PROMPT_FILE = (
+    Path(__file__).parents[1]
+    / "prompts"
+    / "remote_agent_teacher"
+    / "system_prompt_v1.txt"
+)
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--run-dir", default=DEFAULT_RUN_DIR, help=f"Batch run directory (default: {DEFAULT_RUN_DIR})")
-    p.add_argument("--output", default=STAGING_FILE, help=f"Staging file to append to (default: {STAGING_FILE})")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--run-dir",
+        default=DEFAULT_RUN_DIR,
+        help=f"Batch run directory (default: {DEFAULT_RUN_DIR})",
+    )
+    p.add_argument(
+        "--output",
+        default=STAGING_FILE,
+        help=f"Staging file to append to (default: {STAGING_FILE})",
+    )
     return p.parse_args()
 
 
@@ -82,7 +98,13 @@ def merge(jobs_path: Path, results: dict[str, dict], output_path: str) -> None:
         "dirty": git_meta["dirty"],
         "merged_at": git_meta["timestamp"],
     }
-    log.info("Batch metadata: schema=%s prompt=%s commit=%s dirty=%s", SCHEMA_VERSION, prompt_hash, git_meta["commit"][:12], git_meta["dirty"])
+    log.info(
+        "Batch metadata: schema=%s prompt=%s commit=%s dirty=%s",
+        SCHEMA_VERSION,
+        prompt_hash,
+        git_meta["commit"][:12],
+        git_meta["dirty"],
+    )
 
     matched = skipped = 0
 
@@ -91,15 +113,27 @@ def merge(jobs_path: Path, results: dict[str, dict], output_path: str) -> None:
             custom_id = f"job-{idx}"
             response = results.get(custom_id)
             if response is None:
-                log.warning("No result for %s (%s @ %s) — skipping", custom_id, job.get("title"), job.get("company"))
+                log.warning(
+                    "No result for %s (%s @ %s) — skipping",
+                    custom_id,
+                    job.get("title"),
+                    job.get("company"),
+                )
                 skipped += 1
                 continue
 
-            merged = {**job, "response": response, "_batch_custom_id": custom_id, "_batch_metadata": batch_meta}
+            merged = {
+                **job,
+                "response": response,
+                "_batch_custom_id": custom_id,
+                "_batch_metadata": batch_meta,
+            }
             out_f.write(json.dumps(merged) + "\n")
             matched += 1
 
-    log.info("Done — %d appended to staging | %d skipped (no batch result)", matched, skipped)
+    log.info(
+        "Done — %d appended to staging | %d skipped (no batch result)", matched, skipped
+    )
     log.info("Output: %s", output_path)
 
 

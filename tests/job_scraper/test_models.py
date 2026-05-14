@@ -33,8 +33,12 @@ def test_compute_hash_normalizes_case():
 
 
 def test_compute_hash_normalizes_whitespace():
-    stripped = _make_job(company="Acme Corp", title="Senior Engineer", location="Remote")
-    padded   = _make_job(company="  Acme Corp  ", title="  Senior Engineer  ", location="  Remote  ")
+    stripped = _make_job(
+        company="Acme Corp", title="Senior Engineer", location="Remote"
+    )
+    padded = _make_job(
+        company="  Acme Corp  ", title="  Senior Engineer  ", location="  Remote  "
+    )
     stripped.compute_hash()
     padded.compute_hash()
     assert stripped.dedup_hash == padded.dedup_hash

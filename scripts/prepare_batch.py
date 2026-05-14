@@ -19,6 +19,7 @@ Usage:
     # custom run directory (e.g. re-running yesterday's batch)
     python scripts/prepare_batch.py --sample 100 --run-dir data/batch/2026-05-11
 """
+
 import argparse
 import json
 import random
@@ -33,7 +34,12 @@ INPUT_DIR = "data/raw"
 DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
 MODEL = "gpt-4o"
 
-PROMPT_FILE = Path(__file__).parents[1] / "prompts" / "remote_agent_teacher" / "system_prompt_v1.txt"
+PROMPT_FILE = (
+    Path(__file__).parents[1]
+    / "prompts"
+    / "remote_agent_teacher"
+    / "system_prompt_v1.txt"
+)
 
 
 def load_all_jobs(input_path: Path) -> list[dict]:
@@ -112,10 +118,26 @@ def generate_batch(input_path: Path, run_dir: Path, sample: int | None) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--input", default=INPUT_DIR, help="JSONL file or directory (default: data/raw/)")
-    p.add_argument("--run-dir", default=DEFAULT_RUN_DIR, help=f"Output directory for this batch run (default: {DEFAULT_RUN_DIR})")
-    p.add_argument("--sample", type=int, default=None, metavar="N", help="Randomly sample N jobs instead of using all")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--input",
+        default=INPUT_DIR,
+        help="JSONL file or directory (default: data/raw/)",
+    )
+    p.add_argument(
+        "--run-dir",
+        default=DEFAULT_RUN_DIR,
+        help=f"Output directory for this batch run (default: {DEFAULT_RUN_DIR})",
+    )
+    p.add_argument(
+        "--sample",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Randomly sample N jobs instead of using all",
+    )
     return p.parse_args()
 
 

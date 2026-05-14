@@ -10,7 +10,9 @@ sys.path.insert(0, str(Path(__file__).parents[2]))
 from agents.remote_filter.models import SCHEMA_VERSION
 from utils.git_info import get_git_metadata, get_prompt_hash
 
-_PROMPT_FILE = Path(__file__).parents[2] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+_PROMPT_FILE = (
+    Path(__file__).parents[2] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+)
 
 STAGING = "data/staging/to_review.jsonl"
 EVAL = "data/eval/ground_truth.jsonl"
@@ -26,7 +28,9 @@ if "idx" not in st.session_state:
 if "git_meta" not in st.session_state:
     st.session_state.git_meta = get_git_metadata()
 if "prompt_hash" not in st.session_state:
-    st.session_state.prompt_hash = get_prompt_hash(_PROMPT_FILE) if _PROMPT_FILE.exists() else "unknown"
+    st.session_state.prompt_hash = (
+        get_prompt_hash(_PROMPT_FILE) if _PROMPT_FILE.exists() else "unknown"
+    )
 if "skipped_idx" not in st.session_state:
     st.session_state.skipped_idx = set()  # type: set[int]
 
@@ -34,6 +38,7 @@ git_meta = st.session_state.git_meta
 prompt_hash = st.session_state.prompt_hash
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
+
 
 def load_staging() -> list[dict]:
     if not os.path.exists(STAGING):
@@ -69,6 +74,7 @@ if "reviewed" not in st.session_state:
 
 # ── Build / save ──────────────────────────────────────────────────────────────
 
+
 def build_metadata() -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -80,7 +86,9 @@ def build_metadata() -> dict:
     }
 
 
-def save_record(job: dict, verdict: str, policy: str, corrected: bool, note: str = "") -> None:
+def save_record(
+    job: dict, verdict: str, policy: str, corrected: bool, note: str = ""
+) -> None:
     os.makedirs(os.path.dirname(EVAL), exist_ok=True)
     record = {
         **job,
@@ -101,7 +109,9 @@ def save_record(job: dict, verdict: str, policy: str, corrected: bool, note: str
             "corrected": corrected,
         }
 
+
 # ── Visual helpers ────────────────────────────────────────────────────────────
+
 
 def status_dot(i: int, job: dict, idx: int, reviewed: dict, skipped: set[int]) -> str:
     if i == idx:
@@ -114,10 +124,13 @@ def status_dot(i: int, job: dict, idx: int, reviewed: dict, skipped: set[int]) -
     return "⬜"
 
 
-def status_grid(jobs: list, idx: int, reviewed: dict, skipped: set[int], per_row: int = 20) -> str:
+def status_grid(
+    jobs: list, idx: int, reviewed: dict, skipped: set[int], per_row: int = 20
+) -> str:
     dots = [status_dot(i, j, idx, reviewed, skipped) for i, j in enumerate(jobs)]
-    rows = ["".join(dots[i:i + per_row]) for i in range(0, len(dots), per_row)]
+    rows = ["".join(dots[i : i + per_row]) for i in range(0, len(dots), per_row)]
     return "<br/>".join(rows)
+
 
 # ── Load staging ──────────────────────────────────────────────────────────────
 
@@ -147,7 +160,9 @@ if git_meta["dirty"]:
 
 # ── Navigation bar (always visible) ──────────────────────────────────────────
 
-reviewed_count = sum(1 for j in jobs if j.get("dedup_hash", "") in st.session_state.reviewed)
+reviewed_count = sum(
+    1 for j in jobs if j.get("dedup_hash", "") in st.session_state.reviewed
+)
 skipped_count = len(st.session_state.skipped_idx)
 pending_count = total - reviewed_count - skipped_count
 
@@ -169,8 +184,14 @@ with nav_mid:
         f"⬜ {pending_count} pending"
     )
     st.markdown(
-        "<div style=\"white-space: nowrap;\">"
-        + status_grid(jobs, display_idx, st.session_state.reviewed, st.session_state.skipped_idx, per_row=20)
+        '<div style="white-space: nowrap;">'
+        + status_grid(
+            jobs,
+            display_idx,
+            st.session_state.reviewed,
+            st.session_state.skipped_idx,
+            per_row=20,
+        )
         + "</div>",
         unsafe_allow_html=True,
     )
@@ -185,7 +206,9 @@ with nav_r:
 # ── Completion screen ─────────────────────────────────────────────────────────
 
 if st.session_state.idx >= total:
-    st.success(f"Batch complete! {total} records processed — {reviewed_count} reviewed, {skipped_count} skipped.")
+    st.success(
+        f"Batch complete! {total} records processed — {reviewed_count} reviewed, {skipped_count} skipped."
+    )
     if st.button("Start over"):
         st.session_state.idx = 0
         st.session_state.skipped_idx = set()
@@ -222,8 +245,10 @@ except (json.JSONDecodeError, TypeError):
     analysis = {}
 
 teacher_verdict = (
-    "pass" if analysis.get("remote_classification") == "fully_remote"
-    else "trash" if analysis.get("remote_classification")
+    "pass"
+    if analysis.get("remote_classification") == "fully_remote"
+    else "trash"
+    if analysis.get("remote_classification")
     else "unknown"
 )
 teacher_policy = analysis.get("remote_classification", "unknown")
@@ -258,17 +283,26 @@ with col2:
 
     st.subheader("Correct Label")
     corrected_policy = st.selectbox(
-        "Remote policy", LABELS,
+        "Remote policy",
+        LABELS,
         index=LABELS.index(teacher_policy) if teacher_policy in LABELS else 0,
     )
     corrected_verdict = st.radio(
-        "Pass or trash?", ["pass", "trash"], horizontal=True,
+        "Pass or trash?",
+        ["pass", "trash"],
+        horizontal=True,
         index=0 if teacher_verdict == "pass" else 1,
     )
     correction_note = st.text_input("Note (optional)")
 
     if st.button("Save Correction ❌", use_container_width=True):
-        save_record(job, corrected_verdict, corrected_policy, corrected=True, note=correction_note)
+        save_record(
+            job,
+            corrected_verdict,
+            corrected_policy,
+            corrected=True,
+            note=correction_note,
+        )
         st.session_state.idx += 1
         st.rerun()
 
