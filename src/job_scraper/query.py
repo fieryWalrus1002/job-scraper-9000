@@ -106,6 +106,29 @@ class SELSearchQuery:
 =======
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
 
+    def to_applied_facets(self) -> dict[str, list[str]]:
+        """Builds the appliedFacets dict for the Workday CXS POST API."""
+        loc_map = {"pullman_wa": "df72ee3ddefc1018ebf01de718624e22"}
+        worker_map = {
+            "regular": "96e1096563ef1014e495031ab61a6dff",
+            "temporary": "96e1096563ef1014e495069e83966e00",
+        }
+        time_map = {
+            "full_time": "b0630d66f89e1013409e4b1a1a91c123",
+            "part_time": "b0630d66f89e1013409e4ae8d2c9c122",
+        }
+
+        facets: dict[str, list[str]] = {}
+        if self.location_key in loc_map:
+            facets["locations"] = [loc_map[self.location_key]]
+        worker_ids = [worker_map[s] for s in self.worker_sub_types if s in worker_map]
+        if worker_ids:
+            facets["workerSubType"] = worker_ids
+        time_ids = [time_map[t] for t in self.time_types if t in time_map]
+        if time_ids:
+            facets["timeType"] = time_ids
+        return facets
+
 
 @dataclass
 class LinkedInSearchQuery:
