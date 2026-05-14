@@ -1,11 +1,13 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import logging
 import re
 from datetime import datetime, timedelta, timezone
 =======
 import json
+=======
+>>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
 import logging
-import re
 from datetime import datetime, timezone
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
 
@@ -20,11 +22,15 @@ from .base import BaseScraper
 log = logging.getLogger(__name__)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
 _JOBS_API = "https://selinc.wd1.myworkdayjobs.com/wday/cxs/selinc/SEL/jobs"
 _DETAIL_API = "https://selinc.wd1.myworkdayjobs.com/wday/cxs/selinc/SEL/job"
 _DOMAIN = "https://selinc.wd1.myworkdayjobs.com"
 _PAGE_SIZE = 20
 
+<<<<<<< HEAD
 _LOCATION_DISPLAY: dict[str, str] = {
     "pullman_wa": "Washington - Pullman",
 }
@@ -58,22 +64,28 @@ def _parse_posted_at(relative: str | None, ref_iso: str) -> str | None:
 
 =======
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
+=======
+>>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
 
 class SELJobScraper(BaseScraper["SELSearchQuery"]):
     def __init__(self, query: SELSearchQuery):
         self.query = query
         self.session = requests.Session()
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
         self.domain = "https://selinc.wd1.myworkdayjobs.com"
         self.base_url = f"{self.domain}/en-US/SEL"
         self.detail_api = f"{self.domain}/wday/cxs/selinc/SEL/job"
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
+=======
+>>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
 
     @property
     def source_name(self) -> str:
         return "sel"
 
+<<<<<<< HEAD
 <<<<<<< HEAD
     def _fetch_detail(self, job_path: str) -> dict:
         """Hits the Workday detail JSON API. Returns jobPostingInfo dict or empty dict."""
@@ -172,36 +184,62 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
     def fetch_description(self, job_path: str) -> str:
         """Hits the hidden JSON API for the full job spec."""
         api_url = f"{self.detail_api}{job_path.replace('/job', '')}"
+=======
+    def _fetch_detail(self, job_path: str) -> dict:
+        """Hits the Workday detail JSON API. Returns jobPostingInfo dict or empty dict."""
+        api_url = f"{_DETAIL_API}{job_path.replace('/job', '')}"
+>>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
         try:
             resp = self.session.get(api_url, timeout=10)
             if resp.status_code == 200:
-                return resp.json().get("jobDescription", "")
+                return resp.json().get("jobPostingInfo", {})
         except Exception as e:
-            log.warning("Failed enrichment for %s: %s", job_path, e)
-        return ""
+            log.warning("Failed detail fetch for %s: %s", job_path, e)
+        return {}
 
     def scrape(self) -> list[JobPosting]:
-        url = self.query.to_url(self.base_url)
-        log.info("Starting discovery at %s", url)
-        resp = self.session.get(url, timeout=15)
-        resp.raise_for_status()
+        applied_facets = self.query.to_applied_facets()
+        log.info("SEL: querying %s | facets=%s", _JOBS_API, applied_facets)
 
-        state = self._extract_json(resp.text)
-        postings = state.get("jobPostings", [])
+        all_jobs: list[JobPosting] = []
+        offset = 0
+        total: int | None = None
 
-        all_jobs = []
-        for item in postings:
-            path = item.get("externalPath")
+        while True:
+            payload = {
+                "limit": _PAGE_SIZE,
+                "offset": offset,
+                "searchText": "",
+                "appliedFacets": applied_facets,
+            }
+            resp = self.session.post(_JOBS_API, json=payload, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
 
-            description_raw = ""
-            if self.query.fetch_descriptions and path:
-                description_raw = self.fetch_description(path)
+            if total is None:
+                total = data.get("total", 0)
+
+            postings = data.get("jobPostings", [])
+            if not postings:
+                break
+
+            for item in postings:
+                path = item.get("externalPath", "")
+
+                detail: dict = {}
+                if self.query.fetch_descriptions and path:
+                    detail = self._fetch_detail(path)
+
+                description_html = detail.get("jobDescription", "")
                 description_raw = BeautifulSoup(
-                    description_raw, "html.parser"
-                ).get_text("\n", strip=True)
+                    description_html, "html.parser"
+                ).get_text("\n", strip=True) if description_html else ""
+                description, scrub_counts = scrub(description_raw)
 
-            description, scrub_counts = scrub(description_raw)
+                bullet_fields = item.get("bulletFields") or []
+                source_job_id = bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
 
+<<<<<<< HEAD
             job = JobPosting(
                 source=self.source_name,
                 source_job_id=item.get("bulletinId") or item.get("jobPostingId"),
@@ -217,6 +255,26 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
             job.compute_hash()
             all_jobs.append(job)
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
+=======
+                job = JobPosting(
+                    source=self.source_name,
+                    source_job_id=source_job_id,
+                    source_url=f"{_DOMAIN}{path}",
+                    title=item.get("title", ""),
+                    company="SEL",
+                    location=item.get("locationsText", ""),
+                    posted_at=detail.get("postedOn"),
+                    description=description,
+                    scraped_at=datetime.now(timezone.utc).isoformat(),
+                    scrub_counts=scrub_counts,
+                )
+                job.compute_hash()
+                all_jobs.append(job)
+
+            offset += len(postings)
+            if total is not None and offset >= total:
+                break
+>>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
 
         log.info("Ingested %d jobs from SEL.", len(all_jobs))
         return all_jobs
