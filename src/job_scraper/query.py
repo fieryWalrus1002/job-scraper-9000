@@ -79,6 +79,7 @@ class SELSearchQuery:
         doseq=True is critical for handling the lists of tuples.
         """
         return f"{base_url}?{urlencode(self.to_params(), doseq=True)}"
+<<<<<<< HEAD
 
     def to_applied_facets(self) -> dict[str, list[str]]:
         """Builds the appliedFacets dict for the Workday CXS POST API."""
@@ -102,6 +103,8 @@ class SELSearchQuery:
         if time_ids:
             facets["timeType"] = time_ids
         return facets
+=======
+>>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
 
 
 @dataclass
