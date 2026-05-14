@@ -65,7 +65,7 @@ def load_gold(path: str) -> list[dict]:
             if not line:
                 continue
             r = json.loads(line)
-            key = r.get("dedup_hash") or r.get("source_url") or id(r)
+            key = r.get("dedup_hash") or r.get("source_url") or str(id(r))
             seen[key] = r
     return list(seen.values())
 
