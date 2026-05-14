@@ -17,8 +17,12 @@ from job_scraper.scrapers.sel import SELJobScraper
 from unittest.mock import MagicMock, call
 
 from job_scraper.query import SELSearchQuery
+<<<<<<< HEAD
 from job_scraper.scrapers.sel import SELJobScraper, _JOBS_API, _PAGE_SIZE
 >>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
+=======
+from job_scraper.scrapers.sel import SELJobScraper, _JOBS_API, _PAGE_SIZE, _parse_posted_at
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)
 
 
 def _make_scraper(**kwargs) -> SELJobScraper:
@@ -420,6 +424,7 @@ def test_scrape_posted_at_parsed_from_relative_string():
     assert jobs[0].posted_at is not None
     assert "Posted" not in jobs[0].posted_at
     assert len(jobs[0].posted_at) == 10  # YYYY-MM-DD
+<<<<<<< HEAD
 =======
 def test_scrape_uses_to_url_not_bare_base_url():
     scraper = _make_scraper()
@@ -681,3 +686,5 @@ def test_to_applied_facets_multiple_worker_types():
     facets = q.to_applied_facets()
     assert len(facets["workerSubType"]) == 2
 >>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
+=======
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)

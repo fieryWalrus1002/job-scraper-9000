@@ -8,8 +8,13 @@ import json
 =======
 >>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
 import logging
+<<<<<<< HEAD
 from datetime import datetime, timezone
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
+=======
+import re
+from datetime import datetime, timedelta, timezone
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,6 +36,9 @@ _DOMAIN = "https://selinc.wd1.myworkdayjobs.com"
 _PAGE_SIZE = 20
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)
 _LOCATION_DISPLAY: dict[str, str] = {
     "pullman_wa": "Washington - Pullman",
 }
@@ -62,10 +70,13 @@ def _parse_posted_at(relative: str | None, ref_iso: str) -> str | None:
         return (ref - timedelta(days=int(m.group(1)))).isoformat()
     return s
 
+<<<<<<< HEAD
 =======
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
 =======
 >>>>>>> c272294 (bug(sel_scraper): fixed job description nesting)
+=======
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)
 
 class SELJobScraper(BaseScraper["SELSearchQuery"]):
     def __init__(self, query: SELSearchQuery):
@@ -105,6 +116,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
         fallback_location = _LOCATION_DISPLAY.get(self.query.location_key, "")
         scraped_at = datetime.now(timezone.utc).isoformat()
 
+<<<<<<< HEAD
         all_jobs: list[JobPosting] = []
         offset = 0
         total: int | None = None
@@ -201,6 +213,8 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
         applied_facets = self.query.to_applied_facets()
         log.info("SEL: querying %s | facets=%s", _JOBS_API, applied_facets)
 
+=======
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)
         all_jobs: list[JobPosting] = []
         offset = 0
         total: int | None = None
@@ -240,6 +254,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                 source_job_id = bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
 
 <<<<<<< HEAD
+<<<<<<< HEAD
             job = JobPosting(
                 source=self.source_name,
                 source_job_id=item.get("bulletinId") or item.get("jobPostingId"),
@@ -256,16 +271,27 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
             all_jobs.append(job)
 >>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
 =======
+=======
+                raw_location = item.get("locationsText", "")
+                location = (
+                    fallback_location
+                    if _MULTI_LOCATION_RE.match(raw_location) and fallback_location
+                    else raw_location
+                )
+
+                title = item.get("title", "").strip()
+
+>>>>>>> 277f42c (feat(sel_scraper): added handling for location, description, posted_at fields)
                 job = JobPosting(
                     source=self.source_name,
                     source_job_id=source_job_id,
                     source_url=f"{_DOMAIN}{path}",
-                    title=item.get("title", ""),
+                    title=title,
                     company="SEL",
-                    location=item.get("locationsText", ""),
-                    posted_at=detail.get("postedOn"),
+                    location=location,
+                    posted_at=_parse_posted_at(detail.get("postedOn"), scraped_at),
                     description=description,
-                    scraped_at=datetime.now(timezone.utc).isoformat(),
+                    scraped_at=scraped_at,
                     scrub_counts=scrub_counts,
                 )
                 job.compute_hash()
