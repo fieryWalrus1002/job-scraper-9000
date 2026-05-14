@@ -14,7 +14,7 @@ log = logging.getLogger("pr_summarizer_cli")
 def main():
     # 1. Define Paths (Relative to Repo Root)
     config_path = "config/ci/pr_summarizer.yml"
-    prompt_path = "prompts/gh-actions/system_prompt_pr.md"
+    prompt_path = "prompts/ci/system_prompt_pr.md"
     context_file = "context.md"
     output_file = "ai_response.txt"
 
