@@ -1,6 +1,7 @@
 # OPERATIONAL DATA ONLY, the prompt is in prompts/ci/system_prompt_pr.md
 llm:
-  provider: openai
+  provider: openai          # "openai" or "ollama"
   model: gpt-4o-mini
   temperature: 0.2
   max_tokens: 1024
+  ollama_base_url: http://localhost:11434/v1  # only used when provider=ollama

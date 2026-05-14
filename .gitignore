@@ -11,6 +11,9 @@ data/**/*.txt
 # stray jsonl at the repo root
 /*.jsonl
 
+# IDE config — local only
+.vscode/
+
 # local stuff I don't want to commit
 .deprecated/
 .notes/
