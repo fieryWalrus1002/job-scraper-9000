@@ -9,6 +9,7 @@ Strategy:
   passing a fake Namespace and mocking the scraper classes — network is
   never touched.
 """
+
 import argparse
 import json
 from pathlib import Path
@@ -31,11 +32,18 @@ from job_scraper.models import JobPosting
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_job(**overrides) -> JobPosting:
     defaults = dict(
-        source="linkedin", source_job_id="1", source_url="http://x.com",
-        title="Engineer", company="Acme", location="Remote",
-        posted_at=None, description="", scraped_at="2024-01-01T00:00:00+00:00",
+        source="linkedin",
+        source_job_id="1",
+        source_url="http://x.com",
+        title="Engineer",
+        company="Acme",
+        location="Remote",
+        posted_at=None,
+        description="",
+        scraped_at="2024-01-01T00:00:00+00:00",
     )
     return JobPosting(**{**defaults, **overrides})
 
@@ -48,6 +56,7 @@ def _fake_args(**kwargs) -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 # _slug
 # ---------------------------------------------------------------------------
+
 
 def test_slug_lowercases():
     assert _slug("LLM Ops") == "llm-ops"
@@ -69,6 +78,7 @@ def test_slug_preserves_numbers():
 # _auto_path
 # ---------------------------------------------------------------------------
 
+
 def test_auto_path_format():
     with patch("job_scraper.cli.datetime") as mock_dt:
         mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
@@ -88,6 +98,7 @@ def test_auto_path_slugifies_keywords():
 # ---------------------------------------------------------------------------
 # _resolve_dest
 # ---------------------------------------------------------------------------
+
 
 def test_resolve_dest_no_flags_returns_none():
     args = _fake_args(output=None, save=False)
@@ -113,6 +124,7 @@ def test_resolve_dest_save_flag_returns_auto_path(tmp_path):
 # ---------------------------------------------------------------------------
 # _output
 # ---------------------------------------------------------------------------
+
 
 def test_output_to_stdout_writes_jsonl(capsys):
     jobs = [_make_job(title="Dev A"), _make_job(title="Dev B")]
@@ -143,6 +155,7 @@ def test_output_empty_list_to_stdout(capsys):
 # parsed Namespace before any scraper runs.
 # ---------------------------------------------------------------------------
 
+
 def _parse_args(*argv):
     """Call main() with given argv, capture the Namespace via the func hook."""
     captured = {}
@@ -156,7 +169,9 @@ def _parse_args(*argv):
                 with patch("job_scraper.cli._cmd_greenhouse", side_effect=capture):
                     with patch("job_scraper.cli._cmd_lever", side_effect=capture):
                         with patch("job_scraper.cli._cmd_ashby", side_effect=capture):
-                            with patch("job_scraper.cli._cmd_run_config", side_effect=capture):
+                            with patch(
+                                "job_scraper.cli._cmd_run_config", side_effect=capture
+                            ):
                                 main()
 
     return captured["args"]
@@ -200,7 +215,9 @@ def test_linkedin_output_flag():
 
 
 def test_linkedin_save_and_output_mutually_exclusive():
-    with patch("sys.argv", ["job-scraper", "linkedin", "Python", "--save", "-o", "x.jsonl"]):
+    with patch(
+        "sys.argv", ["job-scraper", "linkedin", "Python", "--save", "-o", "x.jsonl"]
+    ):
         with pytest.raises(SystemExit):
             main()
 
@@ -245,13 +262,21 @@ def test_missing_subcommand_exits():
 # Command handlers — mock the scraper, verify the query is built correctly
 # ---------------------------------------------------------------------------
 
+
 def _run_linkedin_cmd(**arg_overrides):
     from job_scraper.cli import _cmd_linkedin
 
     defaults = dict(
-        keywords="LLM Ops", time="day", workplace="remote", job_type="fulltime",
-        experience="2,3,4,5", salary=None, max_results=10,
-        no_descriptions=False, output=None, save=False,
+        keywords="LLM Ops",
+        time="day",
+        workplace="remote",
+        job_type="fulltime",
+        experience="2,3,4,5",
+        salary=None,
+        max_results=10,
+        no_descriptions=False,
+        output=None,
+        save=False,
     )
     args = _fake_args(**{**defaults, **arg_overrides})
 
@@ -298,9 +323,15 @@ def _run_jobspy_cmd(**arg_overrides):
     from job_scraper.cli import _cmd_jobspy
 
     defaults = dict(
-        keywords="LLM Ops", sites="linkedin,indeed", location="USA",
-        hours_old=24, remote=True, enforce_annual_salary=False,
-        max_results=10, output=None, save=False,
+        keywords="LLM Ops",
+        sites="linkedin,indeed",
+        location="USA",
+        hours_old=24,
+        remote=True,
+        enforce_annual_salary=False,
+        max_results=10,
+        output=None,
+        save=False,
     )
     args = _fake_args(**{**defaults, **arg_overrides})
 
@@ -355,6 +386,7 @@ def test_greenhouse_cmd_no_descriptions_flag():
 # lever — argument parsing and command handler
 # ---------------------------------------------------------------------------
 
+
 def test_lever_defaults():
     args = _parse_args("lever", "netflix")
     assert args.company == "netflix"
@@ -400,6 +432,7 @@ def test_lever_cmd_no_descriptions_flag():
 # ---------------------------------------------------------------------------
 # ashby — argument parsing and command handler
 # ---------------------------------------------------------------------------
+
 
 def test_ashby_defaults():
     args = _parse_args("ashby", "mistral")
@@ -447,6 +480,7 @@ def test_ashby_cmd_no_descriptions_flag():
 # run-config — argument parsing
 # ---------------------------------------------------------------------------
 
+
 def test_run_config_defaults():
     args = _parse_args("run-config", "config.yml")
     assert args.config == "config.yml"
@@ -465,7 +499,9 @@ def test_run_config_save_flag():
 
 
 def test_run_config_output_flag_rejected():
-    with patch("sys.argv", ["job-scraper", "run-config", "config.yml", "-o", "out.jsonl"]):
+    with patch(
+        "sys.argv", ["job-scraper", "run-config", "config.yml", "-o", "out.jsonl"]
+    ):
         with pytest.raises(SystemExit):
             main()
 
@@ -473,6 +509,7 @@ def test_run_config_output_flag_rejected():
 # ---------------------------------------------------------------------------
 # run-config — command handler
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_scraper(source_name, describe_extra, jobs=None):
     s = MagicMock()

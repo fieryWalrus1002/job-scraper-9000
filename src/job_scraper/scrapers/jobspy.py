@@ -17,8 +17,10 @@ JOBSPY_SITES = ("linkedin", "indeed", "glassdoor", "zip_recruiter", "google")
 class JobSpyQuery:
     search_term: str
     location: str = "USA"
-    site_name: list[str] = field(default_factory=lambda: ["linkedin", "indeed", "zip_recruiter"])
-    job_type: str | None = "fulltime"   # fulltime, parttime, internship, contract
+    site_name: list[str] = field(
+        default_factory=lambda: ["linkedin", "indeed", "zip_recruiter"]
+    )
+    job_type: str | None = "fulltime"  # fulltime, parttime, internship, contract
     is_remote: bool = True
     hours_old: int = 24
     results_wanted: int = 100
@@ -37,18 +39,20 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
 
     def describe(self) -> dict:
         return {
-            "source":      self.source_name,
+            "source": self.source_name,
             "search_term": self.query.search_term,
-            "sites":       self.query.site_name,
-            "location":    self.query.location,
-            "hours_old":   self.query.hours_old,
-            "is_remote":   self.query.is_remote,
+            "sites": self.query.site_name,
+            "location": self.query.location,
+            "hours_old": self.query.hours_old,
+            "is_remote": self.query.is_remote,
         }
 
     def scrape(self) -> list[JobPosting]:
         from jobspy import scrape_jobs  # deferred: large import (pandas, numpy)
 
-        log.info("JobSpy scraping %s for %r", self.query.site_name, self.query.search_term)
+        log.info(
+            "JobSpy scraping %s for %r", self.query.site_name, self.query.search_term
+        )
         df = scrape_jobs(
             site_name=self.query.site_name,
             search_term=self.query.search_term,

@@ -17,7 +17,7 @@ _BOARDS_API = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 
 @dataclass
 class GreenhouseQuery:
-    board_token: str          # e.g. "anthropic" → boards.greenhouse.io/anthropic
+    board_token: str  # e.g. "anthropic" → boards.greenhouse.io/anthropic
     fetch_descriptions: bool = True
 
 
@@ -32,7 +32,7 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
 
     def describe(self) -> dict:
         return {
-            "source":      self.source_name,
+            "source": self.source_name,
             "board_token": self.query.board_token,
         }
 

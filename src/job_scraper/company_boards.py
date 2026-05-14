@@ -26,7 +26,9 @@ def save(db: dict[str, list[str]], path: Path = DEFAULT_PATH) -> None:
     path.write_text(json.dumps(db, indent=2, sort_keys=True) + "\n")
 
 
-def merge(db: dict[str, list[str]], discovered: dict[str, list[str]]) -> dict[str, list[str]]:
+def merge(
+    db: dict[str, list[str]], discovered: dict[str, list[str]]
+) -> dict[str, list[str]]:
     """Merge discovered boards into db, updating existing entries."""
     merged = dict(db)
     for company, boards in discovered.items():

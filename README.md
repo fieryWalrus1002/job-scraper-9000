@@ -110,6 +110,7 @@ streamlit run src/review_ui/app.py     # open the review UI
 | Topic | Doc |
 | --- | --- |
 | Project status — what's built, what's next | [project-status.md](project-status.md) |
+| Scraper module — how it works, backends, YAML config format | [src/job_scraper/README.md](src/job_scraper/README.md) |
 | Scraper CLI — all commands, flags, YAML config | [src/agents/README.md](src/agents/README.md) |
 | Remote filter agent — config, commands, classification schema | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md) |
 | Teacher-student distillation design | [specs/teacher-student.md](specs/teacher-student.md) |

@@ -1,8 +1,8 @@
 TIME_MAP: dict[str, str | None] = {
-    "day":   "r86400",
-    "week":  "r604800",
+    "day": "r86400",
+    "week": "r604800",
     "month": "r2592000",
-    "any":   None,
+    "any": None,
 }
 
 WORKPLACE_MAP: dict[str, str] = {

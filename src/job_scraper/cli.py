@@ -47,21 +47,31 @@ def _output(jobs, dest: Path | None) -> None:
 
 
 def _summary(jobs) -> None:
-    scrubbed = sum(j.scrub_counts.get("email", 0) + j.scrub_counts.get("phone", 0) for j in jobs)
+    scrubbed = sum(
+        j.scrub_counts.get("email", 0) + j.scrub_counts.get("phone", 0) for j in jobs
+    )
     log.info("Total: %d jobs | PII items redacted: %d", len(jobs), scrubbed)
 
 
 def _add_save_output(p: argparse.ArgumentParser) -> None:
     group = p.add_mutually_exclusive_group()
-    group.add_argument("--output", "-o", metavar="FILE",
-                       help="Write JSONL to a specific file (default: stdout)")
-    group.add_argument("--save", action="store_true",
-                       help=f"Write JSONL to {DATA_DIR}/YYYY-MM-DD_<source>_<keywords>.jsonl")
+    group.add_argument(
+        "--output",
+        "-o",
+        metavar="FILE",
+        help="Write JSONL to a specific file (default: stdout)",
+    )
+    group.add_argument(
+        "--save",
+        action="store_true",
+        help=f"Write JSONL to {DATA_DIR}/YYYY-MM-DD_<source>_<keywords>.jsonl",
+    )
 
 
 # ---------------------------------------------------------------------------
 # linkedin subcommand
 # ---------------------------------------------------------------------------
+
 
 def _cmd_linkedin(args) -> None:
     from job_scraper.scrapers.linkedin import LinkedInJobScraper
@@ -78,10 +88,14 @@ def _cmd_linkedin(args) -> None:
         fetch_descriptions=not args.no_descriptions,
     )
 
-    log.info("LinkedIn: %r | time=%s | workplace=%s | salary_floor=%s | max=%d",
-             args.keywords, args.time, args.workplace,
-             f"${args.salary}k" if args.salary else "any",
-             args.max_results)
+    log.info(
+        "LinkedIn: %r | time=%s | workplace=%s | salary_floor=%s | max=%d",
+        args.keywords,
+        args.time,
+        args.workplace,
+        f"${args.salary}k" if args.salary else "any",
+        args.max_results,
+    )
 
     jobs = LinkedInJobScraper(query).scrape()
     _summary(jobs)
@@ -91,18 +105,35 @@ def _cmd_linkedin(args) -> None:
 def _add_linkedin(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("linkedin", help="LinkedIn guest API — no login, no Selenium")
     p.add_argument("keywords", help='Search keywords, e.g. "LLM Ops"')
-    p.add_argument("--time", choices=list(TIME_MAP), default="day",
-                   help="How far back to look (default: day)")
+    p.add_argument(
+        "--time",
+        choices=list(TIME_MAP),
+        default="day",
+        help="How far back to look (default: day)",
+    )
     p.add_argument("--workplace", choices=list(WORKPLACE_MAP), default="remote")
-    p.add_argument("--job-type", choices=list(JOBTYPE_MAP), default="fulltime",
-                   dest="job_type")
-    p.add_argument("--experience", default="2,3,4,5",
-                   help="Comma-separated LinkedIn experience codes: 1=intern 2=entry 3=assoc 4=mid-senior 5=director 6=exec")
-    p.add_argument("--salary", type=int, choices=[40, 60, 80, 100, 120], metavar="FLOOR_K",
-                   help="Minimum salary floor in thousands (40, 60, 80, 100, 120)")
+    p.add_argument(
+        "--job-type", choices=list(JOBTYPE_MAP), default="fulltime", dest="job_type"
+    )
+    p.add_argument(
+        "--experience",
+        default="2,3,4,5",
+        help="Comma-separated LinkedIn experience codes: 1=intern 2=entry 3=assoc 4=mid-senior 5=director 6=exec",
+    )
+    p.add_argument(
+        "--salary",
+        type=int,
+        choices=[40, 60, 80, 100, 120],
+        metavar="FLOOR_K",
+        help="Minimum salary floor in thousands (40, 60, 80, 100, 120)",
+    )
     p.add_argument("--max-results", type=int, default=25, dest="max_results")
-    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions",
-                   help="Skip fetching full descriptions (faster, good for testing)")
+    p.add_argument(
+        "--no-descriptions",
+        action="store_true",
+        dest="no_descriptions",
+        help="Skip fetching full descriptions (faster, good for testing)",
+    )
     _add_save_output(p)
     p.set_defaults(func=_cmd_linkedin)
 
@@ -110,6 +141,7 @@ def _add_linkedin(sub: argparse._SubParsersAction) -> None:
 # ---------------------------------------------------------------------------
 # jobspy subcommand
 # ---------------------------------------------------------------------------
+
 
 def _cmd_jobspy(args) -> None:
     from job_scraper.scrapers.jobspy import JobSpyScraper, JobSpyQuery
@@ -125,8 +157,14 @@ def _cmd_jobspy(args) -> None:
         enforce_annual_salary=args.enforce_annual_salary,
     )
 
-    log.info("JobSpy: %r | sites=%s | hours_old=%d | remote=%s | max=%d",
-             args.keywords, sites, args.hours_old, args.remote, args.max_results)
+    log.info(
+        "JobSpy: %r | sites=%s | hours_old=%d | remote=%s | max=%d",
+        args.keywords,
+        sites,
+        args.hours_old,
+        args.remote,
+        args.max_results,
+    )
 
     jobs = JobSpyScraper(query).scrape()
     _summary(jobs)
@@ -134,16 +172,30 @@ def _cmd_jobspy(args) -> None:
 
 
 def _add_jobspy(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser("jobspy", help="Multi-board via python-jobspy (LinkedIn / Indeed / ZipRecruiter / Glassdoor / Google)")
+    p = sub.add_parser(
+        "jobspy",
+        help="Multi-board via python-jobspy (LinkedIn / Indeed / ZipRecruiter / Glassdoor / Google)",
+    )
     p.add_argument("keywords", help='Search keywords, e.g. "LLM Ops"')
-    p.add_argument("--sites", default="linkedin,indeed,zip_recruiter",
-                   help="Comma-separated site names (default: linkedin,indeed,zip_recruiter)")
+    p.add_argument(
+        "--sites",
+        default="linkedin,indeed,zip_recruiter",
+        help="Comma-separated site names (default: linkedin,indeed,zip_recruiter)",
+    )
     p.add_argument("--location", default="USA")
     p.add_argument("--hours-old", type=int, default=24, dest="hours_old")
-    p.add_argument("--no-remote", action="store_false", dest="remote",
-                   help="Don't filter for remote-only roles")
-    p.add_argument("--enforce-annual-salary", action="store_true", dest="enforce_annual_salary",
-                   help="Only include postings with an annual salary listed")
+    p.add_argument(
+        "--no-remote",
+        action="store_false",
+        dest="remote",
+        help="Don't filter for remote-only roles",
+    )
+    p.add_argument(
+        "--enforce-annual-salary",
+        action="store_true",
+        dest="enforce_annual_salary",
+        help="Only include postings with an annual salary listed",
+    )
     p.add_argument("--max-results", type=int, default=25, dest="max_results")
     _add_save_output(p)
     p.set_defaults(func=_cmd_jobspy, remote=True)
@@ -153,6 +205,7 @@ def _add_jobspy(sub: argparse._SubParsersAction) -> None:
 # greenhouse subcommand
 # ---------------------------------------------------------------------------
 
+
 def _cmd_greenhouse(args) -> None:
     from job_scraper.scrapers.greenhouse import GreenhouseScraper, GreenhouseQuery
 
@@ -161,7 +214,9 @@ def _cmd_greenhouse(args) -> None:
         fetch_descriptions=not args.no_descriptions,
     )
 
-    log.info("Greenhouse: board=%s | descriptions=%s", args.board, not args.no_descriptions)
+    log.info(
+        "Greenhouse: board=%s | descriptions=%s", args.board, not args.no_descriptions
+    )
 
     jobs = GreenhouseScraper(query).scrape()
     _summary(jobs)
@@ -170,9 +225,15 @@ def _cmd_greenhouse(args) -> None:
 
 def _add_greenhouse(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("greenhouse", help="Greenhouse ATS public JSON API")
-    p.add_argument("board", help="Board token — the slug in boards.greenhouse.io/<token>")
-    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions",
-                   help="Skip fetching full descriptions")
+    p.add_argument(
+        "board", help="Board token — the slug in boards.greenhouse.io/<token>"
+    )
+    p.add_argument(
+        "--no-descriptions",
+        action="store_true",
+        dest="no_descriptions",
+        help="Skip fetching full descriptions",
+    )
     _add_save_output(p)
     p.set_defaults(func=_cmd_greenhouse)
 
@@ -180,6 +241,7 @@ def _add_greenhouse(sub: argparse._SubParsersAction) -> None:
 # ---------------------------------------------------------------------------
 # lever subcommand
 # ---------------------------------------------------------------------------
+
 
 def _cmd_lever(args) -> None:
     from job_scraper.scrapers.lever import LeverScraper, LeverQuery
@@ -189,7 +251,9 @@ def _cmd_lever(args) -> None:
         fetch_descriptions=not args.no_descriptions,
     )
 
-    log.info("Lever: company=%s | descriptions=%s", args.company, not args.no_descriptions)
+    log.info(
+        "Lever: company=%s | descriptions=%s", args.company, not args.no_descriptions
+    )
 
     jobs = LeverScraper(query).scrape()
     _summary(jobs)
@@ -198,9 +262,15 @@ def _cmd_lever(args) -> None:
 
 def _add_lever(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("lever", help="Lever ATS public JSON API")
-    p.add_argument("company", help="Company slug — e.g. 'netflix' for jobs.lever.co/netflix")
-    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions",
-                   help="Skip fetching descriptions")
+    p.add_argument(
+        "company", help="Company slug — e.g. 'netflix' for jobs.lever.co/netflix"
+    )
+    p.add_argument(
+        "--no-descriptions",
+        action="store_true",
+        dest="no_descriptions",
+        help="Skip fetching descriptions",
+    )
     _add_save_output(p)
     p.set_defaults(func=_cmd_lever)
 
@@ -208,6 +278,7 @@ def _add_lever(sub: argparse._SubParsersAction) -> None:
 # ---------------------------------------------------------------------------
 # ashby subcommand
 # ---------------------------------------------------------------------------
+
 
 def _cmd_ashby(args) -> None:
     from job_scraper.scrapers.ashby import AshbyScraper, AshbyQuery
@@ -217,7 +288,9 @@ def _cmd_ashby(args) -> None:
         fetch_descriptions=not args.no_descriptions,
     )
 
-    log.info("Ashby: company=%s | descriptions=%s", args.company, not args.no_descriptions)
+    log.info(
+        "Ashby: company=%s | descriptions=%s", args.company, not args.no_descriptions
+    )
 
     jobs = AshbyScraper(query).scrape()
     _summary(jobs)
@@ -226,9 +299,15 @@ def _cmd_ashby(args) -> None:
 
 def _add_ashby(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("ashby", help="Ashby ATS public JSON API")
-    p.add_argument("company", help="Company slug — e.g. 'mistral' for jobs.ashbyhq.com/mistral")
-    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions",
-                   help="Skip fetching descriptions")
+    p.add_argument(
+        "company", help="Company slug — e.g. 'mistral' for jobs.ashbyhq.com/mistral"
+    )
+    p.add_argument(
+        "--no-descriptions",
+        action="store_true",
+        dest="no_descriptions",
+        help="Skip fetching descriptions",
+    )
     _add_save_output(p)
     p.set_defaults(func=_cmd_ashby)
 
@@ -237,9 +316,13 @@ def _add_ashby(sub: argparse._SubParsersAction) -> None:
 # discover subcommand
 # ---------------------------------------------------------------------------
 
+
 def _cmd_discover(args) -> None:
     from job_scraper.discover import run as discover_run
-    from job_scraper.company_boards import load as load_boards, DEFAULT_PATH as BOARDS_PATH
+    from job_scraper.company_boards import (
+        load as load_boards,
+        DEFAULT_PATH as BOARDS_PATH,
+    )
 
     companies = args.companies
     log.info("Probing %d companies...", len(companies))
@@ -266,14 +349,48 @@ def _cmd_discover(args) -> None:
 
 def _add_discover(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("discover", help="Find which ATS boards a list of companies use")
-    p.add_argument("companies", nargs="+", metavar="COMPANY",
-                   help="Company slugs to probe (e.g. anthropic mistral stripe)")
+    p.add_argument(
+        "companies",
+        nargs="+",
+        metavar="COMPANY",
+        help="Company slugs to probe (e.g. anthropic mistral stripe)",
+    )
     p.set_defaults(func=_cmd_discover)
+
+
+# ---------------------------------------------------------------------------
+# sel subcommand
+# ---------------------------------------------------------------------------
+
+
+def _cmd_sel(args) -> None:
+    from job_scraper.scrapers.sel import SELJobScraper
+    from job_scraper.query import SELSearchQuery
+
+    query = SELSearchQuery(
+        location_key=args.location,
+        worker_sub_types=[args.job_type],
+        fetch_descriptions=not args.no_descriptions,
+    )
+    log.info("SEL: location=%s | job_type=%s | descriptions=%s", args.location, args.job_type, not args.no_descriptions)
+    jobs = SELJobScraper(query).scrape()
+    _summary(jobs)
+    _output(jobs, _resolve_dest(args, "sel", "sel"))
+
+
+def _add_sel(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser("sel", help="Schweitzer Engineering Laboratories (Workday)")
+    p.add_argument("--location", default="pullman_wa", help="Location key (default: pullman_wa)")
+    p.add_argument("--job-type", default="regular", dest="job_type", choices=["regular", "temporary"], help="Worker sub-type filter (default: regular)")
+    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions", help="Skip fetching full descriptions")
+    _add_save_output(p)
+    p.set_defaults(func=_cmd_sel)
 
 
 # ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
+
 
 def _cmd_run_config(args) -> None:
     from job_scraper.config import load_config, ConfigError
@@ -293,7 +410,11 @@ def _cmd_run_config(args) -> None:
             print(f"  [{info['source']}]  {details}")
         return
 
-    from job_scraper.skip_list import load as load_skip, record as record_skip, is_permanent
+    from job_scraper.skip_list import (
+        load as load_skip,
+        record as record_skip,
+        is_permanent,
+    )
 
     skip = load_skip()
 
@@ -303,18 +424,30 @@ def _cmd_run_config(args) -> None:
         if s.source_name in skip:
             entry = skip[s.source_name]
             failed_at = entry.get("failed_at") if isinstance(entry, dict) else None
-            failed_at_display = failed_at[:10] if isinstance(failed_at, str) else "unknown-date"
+            failed_at_display = (
+                failed_at[:10] if isinstance(failed_at, str) else "unknown-date"
+            )
             error = entry.get("error") if isinstance(entry, dict) else None
             error_display = error if error is not None else "unknown error"
-            log.warning("Skipping %s — known failure recorded %s: %s",
-                        s.source_name, failed_at_display, error_display)
+            log.warning(
+                "Skipping %s — known failure recorded %s: %s",
+                s.source_name,
+                failed_at_display,
+                error_display,
+            )
             continue
         try:
             jobs = s.scrape()
             log.info("%s → %d jobs", s.source_name, len(jobs))
             if args.save:
                 info = s.describe()
-                label = info.get("keywords") or info.get("search_term") or info.get("company") or info.get("board_token") or s.source_name
+                label = (
+                    info.get("keywords")
+                    or info.get("search_term")
+                    or info.get("company")
+                    or info.get("board_token")
+                    or s.source_name
+                )
                 dest = _auto_path(_slug(s.source_name), label)
                 dest.parent.mkdir(parents=True, exist_ok=True)
             else:
@@ -341,18 +474,28 @@ def _cmd_run_config(args) -> None:
 
 
 def _add_run_config(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser("run-config", help="Run all searches defined in a YAML config file")
+    p = sub.add_parser(
+        "run-config", help="Run all searches defined in a YAML config file"
+    )
     p.add_argument("config", metavar="CONFIG", help="Path to YAML search config")
-    p.add_argument("--dry-run", action="store_true", dest="dry_run",
-                   help="Print scrapers that would run without making any network calls")
-    p.add_argument("--save", action="store_true",
-                   help=f"Write each scraper's results to {DATA_DIR}/YYYY-MM-DD_<source>_<keywords>.jsonl immediately on completion")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Print scrapers that would run without making any network calls",
+    )
+    p.add_argument(
+        "--save",
+        action="store_true",
+        help=f"Write each scraper's results to {DATA_DIR}/YYYY-MM-DD_<source>_<keywords>.jsonl immediately on completion",
+    )
     p.set_defaults(func=_cmd_run_config)
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     load_dotenv()
@@ -368,6 +511,7 @@ def main() -> None:
     _add_greenhouse(sub)
     _add_lever(sub)
     _add_ashby(sub)
+    _add_sel(sub)
     _add_discover(sub)
     _add_run_config(sub)
 

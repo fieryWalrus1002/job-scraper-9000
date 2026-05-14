@@ -10,7 +10,9 @@ from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)
 
-_PROMPT_PATH = Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+_PROMPT_PATH = (
+    Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+)
 _PROMPT = _PROMPT_PATH.read_text()
 
 
@@ -19,7 +21,10 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
     provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
     if provider == "ollama":
         client = OpenAI(
-            base_url=cfg.get("base_url", os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")),
+            base_url=cfg.get(
+                "base_url",
+                os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+            ),
             api_key="ollama",
         )
         model = cfg.get("model", os.environ.get("LLM_MODEL", "qwen2.5:14b"))
@@ -29,7 +34,12 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
     return client, model
 
 
-def _build_user_message(description: str, search_context: dict | None, location: str | None = None, title: str | None = None) -> str:
+def _build_user_message(
+    description: str,
+    search_context: dict | None,
+    location: str | None = None,
+    title: str | None = None,
+) -> str:
     """Prepend title, location, and search context so the model can factor them into its reasoning."""
     parts = []
     if title:
@@ -79,7 +89,9 @@ def analyze_remote(
             )
             return response.choices[0].message.parsed
         except ValidationError as exc:
-            log.warning("Attempt %d/%d failed validation: %s", attempt + 1, max_retries + 1, exc)
+            log.warning(
+                "Attempt %d/%d failed validation: %s", attempt + 1, max_retries + 1, exc
+            )
         except Exception as exc:
             log.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries + 1, exc)
 
@@ -87,14 +99,22 @@ def analyze_remote(
     return None
 
 
-def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_location: str = "USA") -> tuple[bool, str]:
+def passes_remote_filter(
+    analysis: RemoteAnalysis, config: dict, user_location: str = "USA"
+) -> tuple[bool, str]:
     """Returns (passes, reason)."""
     policy = config["policy_thresholds"]
 
-    if not policy["relocation"]["allow_required_relocation"] and analysis.requires_relocation:
+    if (
+        not policy["relocation"]["allow_required_relocation"]
+        and analysis.requires_relocation
+    ):
         return False, "requires_relocation"
 
-    if not policy["relocation"]["allow_local_presence_required"] and analysis.requires_local_presence:
+    if (
+        not policy["relocation"]["allow_local_presence_required"]
+        and analysis.requires_local_presence
+    ):
         return False, "requires_local_presence"
 
     if analysis.remote_classification in policy["disallowed_classifications"]:
@@ -105,7 +125,8 @@ def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_location: 
 
     if (
         analysis.estimated_travel_days_per_year is not None
-        and analysis.estimated_travel_days_per_year > policy["travel"]["max_estimated_days_per_year"]
+        and analysis.estimated_travel_days_per_year
+        > policy["travel"]["max_estimated_days_per_year"]
     ):
         return False, f"travel_days_exceeded:{analysis.estimated_travel_days_per_year}"
 
@@ -117,13 +138,19 @@ def passes_remote_filter(analysis: RemoteAnalysis, config: dict, user_location: 
         loc = user_location.upper()
         for r in analysis.location_restrictions:
             r_upper = r.upper()
-            if "US-ONLY" in r_upper or "UNITED STATES" in r_upper or "US ONLY" in r_upper:
+            if (
+                "US-ONLY" in r_upper
+                or "UNITED STATES" in r_upper
+                or "US ONLY" in r_upper
+            ):
                 if "US" not in loc and "UNITED STATES" not in loc and "USA" not in loc:
                     return False, "location_restrictions_mismatch"
 
     if analysis.timezone_requirements:
         tz_policy = policy.get("timezone", {})
-        rejected_keywords = [k.upper() for k in tz_policy.get("rejected_timezone_keywords", [])]
+        rejected_keywords = [
+            k.upper() for k in tz_policy.get("rejected_timezone_keywords", [])
+        ]
         if rejected_keywords:
             for req in analysis.timezone_requirements:
                 req_upper = req.upper()

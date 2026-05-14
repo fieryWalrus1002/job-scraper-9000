@@ -1,15 +1,21 @@
 """Tests for remote_filter core logic: analyze_remote and passes_remote_filter."""
+
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from agents.remote_filter.models import RemoteAnalysis
-from agents.remote_filter.utils import analyze_remote, load_raw_jobs, passes_remote_filter
+from agents.remote_filter.utils import (
+    analyze_remote,
+    load_raw_jobs,
+    passes_remote_filter,
+)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_analysis(**overrides) -> RemoteAnalysis:
     defaults = dict(
@@ -35,9 +41,11 @@ def _make_config(
 ) -> dict:
     return {
         "policy_thresholds": {
-            "disallowed_classifications": disallowed_classifications or ["hybrid", "onsite_disguised"],
+            "disallowed_classifications": disallowed_classifications
+            or ["hybrid", "onsite_disguised"],
             "travel": {
-                "prohibited_categories": prohibited_travel_categories or [
+                "prohibited_categories": prohibited_travel_categories
+                or [
                     "remote_with_frequent_travel",
                     "remote_with_monthly_travel",
                 ],
@@ -52,7 +60,8 @@ def _make_config(
             },
             "timezone": {
                 "user_timezone": "PST",
-                "rejected_timezone_keywords": rejected_timezone_keywords or ["EST", "ET", "Eastern"],
+                "rejected_timezone_keywords": rejected_timezone_keywords
+                or ["EST", "ET", "Eastern"],
             },
         }
     }
@@ -69,6 +78,7 @@ def _write_jsonl(path: Path, records: list[dict]) -> None:
 # passes_remote_filter
 # ---------------------------------------------------------------------------
 
+
 def test_fully_remote_passes():
     ok, reason = passes_remote_filter(_make_analysis(), _make_config())
     assert ok
@@ -76,32 +86,41 @@ def test_fully_remote_passes():
 
 
 def test_hybrid_fails():
-    ok, reason = passes_remote_filter(_make_analysis(remote_classification="hybrid"), _make_config())
+    ok, reason = passes_remote_filter(
+        _make_analysis(remote_classification="hybrid"), _make_config()
+    )
     assert not ok
     assert "hybrid" in reason
 
 
 def test_onsite_disguised_fails():
-    ok, reason = passes_remote_filter(_make_analysis(remote_classification="onsite_disguised"), _make_config())
+    ok, reason = passes_remote_filter(
+        _make_analysis(remote_classification="onsite_disguised"), _make_config()
+    )
     assert not ok
     assert "onsite_disguised" in reason
 
 
 def test_requires_relocation_fails():
-    ok, reason = passes_remote_filter(_make_analysis(requires_relocation=True), _make_config())
+    ok, reason = passes_remote_filter(
+        _make_analysis(requires_relocation=True), _make_config()
+    )
     assert not ok
     assert reason == "requires_relocation"
 
 
 def test_requires_local_presence_fails():
-    ok, reason = passes_remote_filter(_make_analysis(requires_local_presence=True), _make_config())
+    ok, reason = passes_remote_filter(
+        _make_analysis(requires_local_presence=True), _make_config()
+    )
     assert not ok
     assert reason == "requires_local_presence"
 
 
 def test_frequent_travel_always_fails():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="remote_with_frequent_travel"), _make_config()
+        _make_analysis(remote_classification="remote_with_frequent_travel"),
+        _make_config(),
     )
     assert not ok
     assert reason == "travel_too_frequent"
@@ -170,7 +189,10 @@ def test_us_only_fails_for_non_us():
 
 def test_location_restricted_passes_for_matching_user_location():
     ok, _ = passes_remote_filter(
-        _make_analysis(remote_classification="location_restricted", location_restrictions=["US-only"]),
+        _make_analysis(
+            remote_classification="location_restricted",
+            location_restrictions=["US-only"],
+        ),
         _make_config(),
         user_location="USA",
     )
@@ -179,7 +201,10 @@ def test_location_restricted_passes_for_matching_user_location():
 
 def test_location_restricted_fails_for_non_matching_user_location():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="location_restricted", location_restrictions=["US-only"]),
+        _make_analysis(
+            remote_classification="location_restricted",
+            location_restrictions=["US-only"],
+        ),
         _make_config(),
         user_location="Canada",
     )
@@ -243,6 +268,7 @@ def test_travel_days_exceeded():
 # analyze_remote
 # ---------------------------------------------------------------------------
 
+
 def test_analyze_remote_returns_analysis_on_success():
     mock_analysis = _make_analysis()
     mock_response = MagicMock()
@@ -250,7 +276,10 @@ def test_analyze_remote_returns_analysis_on_success():
     mock_client = MagicMock()
     mock_client.beta.chat.completions.parse.return_value = mock_response
 
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
         result = analyze_remote("We are a fully remote company.")
 
     assert result is not None
@@ -261,7 +290,10 @@ def test_analyze_remote_returns_none_after_all_retries_fail():
     mock_client = MagicMock()
     mock_client.beta.chat.completions.parse.side_effect = Exception("API error")
 
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
         result = analyze_remote("Some job description.", max_retries=0)
 
     assert result is None
@@ -275,7 +307,10 @@ def test_analyze_remote_injects_search_context():
     mock_client.beta.chat.completions.parse.return_value = mock_response
 
     context = {"keywords": "AI engineer", "workplace": "remote", "job_type": "fulltime"}
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
         analyze_remote("Job description here.", search_context=context)
 
     call_messages = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"]
@@ -293,7 +328,10 @@ def test_analyze_remote_no_context_sends_description_only():
     mock_client = MagicMock()
     mock_client.beta.chat.completions.parse.return_value = mock_response
 
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
         analyze_remote("Plain description.", search_context=None)
 
     call_messages = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"]
@@ -310,7 +348,10 @@ def test_analyze_remote_retries_on_failure():
         mock_response,
     ]
 
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
         result = analyze_remote("Some job description.", max_retries=1)
 
     assert result is not None
@@ -320,6 +361,7 @@ def test_analyze_remote_retries_on_failure():
 # ---------------------------------------------------------------------------
 # load_raw_jobs
 # ---------------------------------------------------------------------------
+
 
 def test_load_raw_jobs_from_file(tmp_path):
     f = tmp_path / "jobs.jsonl"

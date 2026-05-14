@@ -6,15 +6,18 @@ from pathlib import Path
 
 import yaml
 
+
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
 from .company_boards import DEFAULT_PATH as BOARDS_DB_PATH, load as load_boards
-from .query import LinkedInSearchQuery, SALARY_FLOOR
+from .query import LinkedInSearchQuery, SALARY_FLOOR, SELSearchQuery
 from .scrapers.base import BaseScraper
 from .scrapers.ashby import AshbyScraper, AshbyQuery
 from .scrapers.greenhouse import GreenhouseScraper, GreenhouseQuery
 from .scrapers.jobspy import JobSpyScraper, JobSpyQuery, JOBSPY_SITES
 from .scrapers.lever import LeverScraper, LeverQuery
 from .scrapers.linkedin import LinkedInJobScraper
+from .scrapers.sel import SELJobScraper
+
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +31,14 @@ class ConfigError(ValueError):
 # ---------------------------------------------------------------------------
 # Internal config dataclasses
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class _SELSection:
+    location: str = "pullman_wa"
+    job_type: str = "regular"
+    fetch_descriptions: bool = True
+
 
 @dataclass
 class _GlobalDefaults:
@@ -76,14 +87,17 @@ class _CompaniesSection:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def _expand(value: str) -> str:
     """Replace ${VAR_NAME} references with environment variable values."""
+
     def _sub(m: re.Match) -> str:
         name = m.group(1)
         val = os.environ.get(name)
         if val is None:
             raise ConfigError(f"Environment variable ${{{name}}} is not set")
         return val
+
     return re.sub(r"\$\{([^}]+)\}", _sub, value)
 
 
@@ -99,6 +113,7 @@ def load_config(path: str | Path) -> list[BaseScraper]:
 # Parsers
 # ---------------------------------------------------------------------------
 
+
 def _parse_global(raw: dict) -> _GlobalDefaults:
     g = raw.get("global") or {}
     defaults = _GlobalDefaults()
@@ -112,16 +127,31 @@ def _parse_global(raw: dict) -> _GlobalDefaults:
     if "linkedin_time" in g:
         t = str(g["linkedin_time"])
         if t not in TIME_MAP:
-            raise ConfigError(f"Invalid linkedin_time {t!r} — must be one of: {list(TIME_MAP)}")
+            raise ConfigError(
+                f"Invalid linkedin_time {t!r} — must be one of: {list(TIME_MAP)}"
+            )
         defaults.linkedin_time = t
 
     if "salary_floor_k" in g:
         sfk = int(g["salary_floor_k"])
         if sfk not in _VALID_SALARY_K:
-            raise ConfigError(f"Invalid salary_floor_k {sfk} — must be one of: {sorted(_VALID_SALARY_K)}")
+            raise ConfigError(
+                f"Invalid salary_floor_k {sfk} — must be one of: {sorted(_VALID_SALARY_K)}"
+            )
         defaults.salary_floor_k = sfk
 
     return defaults
+
+
+def _parse_sel_section(raw: dict) -> _SELSection | None:
+    if "sel" not in raw:
+        return None
+    sec = raw.get("sel") or {}
+    return _SELSection(
+        location=str(sec.get("location", "pullman_wa")),
+        job_type=str(sec.get("job_type", "regular")),
+        fetch_descriptions=bool(sec.get("fetch_descriptions", True)),
+    )
 
 
 def _parse_linkedin_section(raw: dict) -> _LinkedInSection | None:
@@ -131,11 +161,15 @@ def _parse_linkedin_section(raw: dict) -> _LinkedInSection | None:
 
     workplace = str(sec.get("workplace", "remote"))
     if workplace not in WORKPLACE_MAP:
-        raise ConfigError(f"Invalid linkedin.workplace {workplace!r} — must be one of: {list(WORKPLACE_MAP)}")
+        raise ConfigError(
+            f"Invalid linkedin.workplace {workplace!r} — must be one of: {list(WORKPLACE_MAP)}"
+        )
 
     job_type = str(sec.get("job_type", "fulltime"))
     if job_type not in JOBTYPE_MAP:
-        raise ConfigError(f"Invalid linkedin.job_type {job_type!r} — must be one of: {list(JOBTYPE_MAP)}")
+        raise ConfigError(
+            f"Invalid linkedin.job_type {job_type!r} — must be one of: {list(JOBTYPE_MAP)}"
+        )
 
     return _LinkedInSection(
         experience=str(sec.get("experience", "2,3,4,5")),
@@ -153,7 +187,9 @@ def _parse_jobspy_section(raw: dict) -> _JobSpySection | None:
     sites_str = str(sec.get("sites", "linkedin,indeed,zip_recruiter"))
     for site in (s.strip() for s in sites_str.split(",")):
         if site not in JOBSPY_SITES:
-            raise ConfigError(f"Unknown jobspy site {site!r} — valid sites: {JOBSPY_SITES}")
+            raise ConfigError(
+                f"Unknown jobspy site {site!r} — valid sites: {JOBSPY_SITES}"
+            )
 
     return _JobSpySection(
         sites=sites_str,
@@ -194,8 +230,10 @@ def _parse_companies_section(raw: dict) -> _CompaniesSection | None:
 # Builder
 # ---------------------------------------------------------------------------
 
+
 def _build_scrapers(raw: dict) -> list[BaseScraper]:
     glob = _parse_global(raw)
+    sl = _parse_sel_section(raw)
     li = _parse_linkedin_section(raw)
     js = _parse_jobspy_section(raw)
     gh = _parse_greenhouse_section(raw)
@@ -203,10 +241,29 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
     ab = _parse_ashby_section(raw)
     co = _parse_companies_section(raw)
 
-    if li is None and js is None and gh is None and lv is None and ab is None and co is None:
-        raise ConfigError("Config has no scraper sections (linkedin, jobspy, greenhouse, lever, ashby, companies)")
+    if (
+        sl is None
+        and li is None
+        and js is None
+        and gh is None
+        and lv is None
+        and ab is None
+        and co is None
+    ):
+        raise ConfigError(
+            "Config has no scraper sections (sel, linkedin, jobspy, greenhouse, lever, ashby, companies)"
+        )
 
     scrapers: list[BaseScraper] = []
+
+    if sl:
+        # Map the YAML strings to the Query object expected by the Scraper
+        query = SELSearchQuery(
+            location_key=sl.location,
+            worker_sub_types=[sl.job_type],
+            fetch_descriptions=sl.fetch_descriptions,
+        )
+        scrapers.append(SELJobScraper(query))
 
     if li:
         for i, entry in enumerate(li.searches):
@@ -215,11 +272,15 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
 
             workplace = str(entry.get("workplace", li.workplace))
             if workplace not in WORKPLACE_MAP:
-                raise ConfigError(f"linkedin.searches[{i}] invalid workplace {workplace!r}")
+                raise ConfigError(
+                    f"linkedin.searches[{i}] invalid workplace {workplace!r}"
+                )
 
             job_type = str(entry.get("job_type", li.job_type))
             if job_type not in JOBTYPE_MAP:
-                raise ConfigError(f"linkedin.searches[{i}] invalid job_type {job_type!r}")
+                raise ConfigError(
+                    f"linkedin.searches[{i}] invalid job_type {job_type!r}"
+                )
 
             time_key = str(entry.get("time", glob.linkedin_time))
             if time_key not in TIME_MAP:
@@ -229,7 +290,9 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
             if sfk is not None:
                 sfk = int(sfk)
                 if sfk not in _VALID_SALARY_K:
-                    raise ConfigError(f"linkedin.searches[{i}] invalid salary_floor_k {sfk}")
+                    raise ConfigError(
+                        f"linkedin.searches[{i}] invalid salary_floor_k {sfk}"
+                    )
 
             query = LinkedInSearchQuery(
                 keywords=_expand(str(entry["keywords"])),
@@ -286,7 +349,9 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                 continue
             for board in boards:
                 if board == "greenhouse":
-                    scrapers.append(GreenhouseScraper(GreenhouseQuery(board_token=company)))
+                    scrapers.append(
+                        GreenhouseScraper(GreenhouseQuery(board_token=company))
+                    )
                 elif board == "lever":
                     scrapers.append(LeverScraper(LeverQuery(company=company)))
                 elif board == "ashby":
@@ -294,14 +359,16 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                 else:
                     log.warning(
                         "Company %r has unsupported board %r in company_boards.json",
-                        company, board,
+                        company,
+                        board,
                     )
                     if company not in unknown:
                         unknown.append(company)
         if unknown:
             log.warning(
                 "%d companies have no boards recorded in company_boards.json — run 'discover' first: %s",
-                len(unknown), unknown,
+                len(unknown),
+                unknown,
             )
 
     return scrapers
