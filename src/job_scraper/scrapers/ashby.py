@@ -59,6 +59,7 @@ class AshbyScraper(BaseScraper["AshbyQuery"]):
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
+                search_params={"company": self.query.company},
             )
             job.compute_hash()
             jobs.append(job)

@@ -5,14 +5,16 @@ __pycache__/
 dist/
 .env
 
-# scraped data — keep the directory, ignore the files
-data/raw/*.jsonl
-# ignore any stray jsonl files at the root (e.g. from simple-scrape.py)
+# Data files — keep directory placeholders (.gitkeep) but ignore all content
+data/**/*.jsonl
+data/**/*.txt
+# stray jsonl at the repo root
 /*.jsonl
 
 # local stuff I don't want to commit
 .deprecated/
 .notes/
 .logs/
+.docs/
 # known failures don't need to be tracked in git
 config/known_failures.json

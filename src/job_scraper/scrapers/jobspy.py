@@ -80,6 +80,13 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
+                search_params={
+                    "search_term": self.query.search_term,
+                    "sites": self.query.site_name,
+                    "location": self.query.location,
+                    "is_remote": self.query.is_remote,
+                    "job_type": self.query.job_type,
+                },
             )
             job.compute_hash()
             jobs.append(job)
