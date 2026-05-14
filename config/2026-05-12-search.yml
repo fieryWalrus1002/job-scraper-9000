@@ -8,19 +8,15 @@ global:
   salary_floor_k: 120
 
 companies:
+  - mistral
+  - cohere
+  - harvey
+  - perplexity
+  - deepmind
+  - replit
+  - figma
   - notion
-  # - mistral
-  # - cohere
-  # - harvey
-  # - perplexity
-  # - deepmind
-  # - replit
-  # - figma
-  # - notion
-  # - stripe
-
-sel:
-  # for now, just use the default settings for everything, but we can customize these later if we want
+  - stripe
 
 linkedin:
   experience: "2,3,4,5"
@@ -60,13 +56,13 @@ jobspy:
     - search_term: "MLOps engineer"
     - search_term: "computer vision engineer"
 
-# greenhouse:
-  # boards:
-    # - anthropic
-    # - openai
-    # - microsoft
-    # - amazon
-    # - palantir
-    # - planet-labs
-    # - descartes-labs
-    # - scale-ai
+greenhouse:
+  boards:
+    - anthropic
+    - openai
+    - microsoft
+    - amazon
+    - palantir
+    - planet-labs
+    - descartes-labs
+    - scale-ai

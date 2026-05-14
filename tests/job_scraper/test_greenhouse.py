@@ -34,7 +34,9 @@ def test_source_name():
 def test_scrape_returns_job_postings():
     scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
 
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(3))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(3))
+    ):
         jobs = scraper.scrape()
 
     assert len(jobs) == 3
@@ -44,7 +46,9 @@ def test_scrape_returns_job_postings():
 def test_scrape_maps_fields_correctly():
     scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
 
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(1))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
+    ):
         jobs = scraper.scrape()
 
     job = jobs[0]
@@ -58,7 +62,9 @@ def test_scrape_maps_fields_correctly():
 def test_scrape_empty_board():
     scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
 
-    with patch.object(scraper.session, "get", return_value=_mock_response({"jobs": []})):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response({"jobs": []})
+    ):
         jobs = scraper.scrape()
 
     assert jobs == []
@@ -67,7 +73,9 @@ def test_scrape_empty_board():
 def test_scrape_computes_dedup_hash():
     scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
 
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(1))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
+    ):
         jobs = scraper.scrape()
 
     assert jobs[0].dedup_hash != ""

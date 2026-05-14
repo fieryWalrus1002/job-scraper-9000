@@ -4,6 +4,7 @@ Company → board discovery.
 Probes each ATS API endpoint directly and records 200 responses.
 Results are written to company_boards.json.
 """
+
 import logging
 
 import requests
@@ -14,8 +15,8 @@ log = logging.getLogger(__name__)
 
 # Probe endpoints — same URLs the scrapers use, just checking status codes
 _PROBE_URLS = {
-    "lever":      "https://api.lever.co/v0/postings/{slug}?mode=json",
-    "ashby":      "https://api.ashbyhq.com/posting-api/job-board/{slug}",
+    "lever": "https://api.lever.co/v0/postings/{slug}?mode=json",
+    "ashby": "https://api.ashbyhq.com/posting-api/job-board/{slug}",
     "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs",
 }
 

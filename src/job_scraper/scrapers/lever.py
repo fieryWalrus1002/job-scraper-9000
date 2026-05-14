@@ -15,7 +15,7 @@ _POSTINGS_API = "https://api.lever.co/v0/postings/{company}?mode=json"
 
 @dataclass
 class LeverQuery:
-    company: str              # slug from jobs.lever.co/<company>
+    company: str  # slug from jobs.lever.co/<company>
     fetch_descriptions: bool = True
 
 
@@ -30,7 +30,7 @@ class LeverScraper(BaseScraper["LeverQuery"]):
 
     def describe(self) -> dict:
         return {
-            "source":  self.source_name,
+            "source": self.source_name,
             "company": self.query.company,
         }
 
@@ -53,7 +53,8 @@ class LeverScraper(BaseScraper["LeverQuery"]):
             created_ms = item.get("createdAt")
             posted_at = (
                 datetime.fromtimestamp(created_ms / 1000, tz=timezone.utc).isoformat()
-                if created_ms else None
+                if created_ms
+                else None
             )
 
             job = JobPosting(

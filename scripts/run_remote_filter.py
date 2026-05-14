@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Local test runner for the remote_filter agent."""
+
 import json
 import logging
 import os
@@ -12,7 +13,11 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agents.remote_filter.models import SCHEMA_VERSION
-from agents.remote_filter.utils import analyze_remote, load_raw_jobs, passes_remote_filter
+from agents.remote_filter.utils import (
+    analyze_remote,
+    load_raw_jobs,
+    passes_remote_filter,
+)
 from utils.git_info import get_git_metadata, get_prompt_hash
 
 load_dotenv()
@@ -26,7 +31,9 @@ CONFIG_PATH = Path("config/agent/remote_agent.yml")
 USER_LOCATION = os.environ.get("USER_LOCATION", "USA")
 USER_TIMEZONE = os.environ.get("USER_TIMEZONE", None)
 
-_PROMPT_FILE = Path(__file__).parents[1] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+_PROMPT_FILE = (
+    Path(__file__).parents[1] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+)
 
 
 def main() -> None:
@@ -51,7 +58,13 @@ def main() -> None:
         "dirty": git_meta["dirty"],
         "filtered_at": git_meta["timestamp"],
     }
-    log.info("Filter metadata: schema=%s prompt=%s commit=%s dirty=%s", SCHEMA_VERSION, prompt_hash, git_meta["commit"][:12], git_meta["dirty"])
+    log.info(
+        "Filter metadata: schema=%s prompt=%s commit=%s dirty=%s",
+        SCHEMA_VERSION,
+        prompt_hash,
+        git_meta["commit"][:12],
+        git_meta["dirty"],
+    )
 
     PASS_PATH.parent.mkdir(parents=True, exist_ok=True)
     TRASH_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -99,7 +112,9 @@ def main() -> None:
             if ok:
                 pass_f.write(json.dumps(enriched) + "\n")
                 passed += 1
-                log.info("PASS  %s @ %s (%s)", title, company, analysis.remote_classification)
+                log.info(
+                    "PASS  %s @ %s (%s)", title, company, analysis.remote_classification
+                )
             else:
                 trash_f.write(json.dumps(enriched) + "\n")
                 failed += 1

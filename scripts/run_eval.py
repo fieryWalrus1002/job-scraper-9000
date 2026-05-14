@@ -12,6 +12,7 @@ Usage:
     python scripts/run_eval.py --gold data/eval/051126/ground_truth.jsonl
     python scripts/run_eval.py --no-mismatches   # skip mismatch file output
 """
+
 import argparse
 import json
 import logging
@@ -38,10 +39,20 @@ USER_TIMEZONE = os.environ.get("USER_TIMEZONE", None)
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--gold", default=GOLD_FILE, help=f"Ground truth JSONL (default: {GOLD_FILE})")
-    p.add_argument("--config", default=CONFIG_PATH, help=f"Agent config YAML (default: {CONFIG_PATH})")
-    p.add_argument("--no-mismatches", action="store_true", help="Skip writing mismatch file")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--gold", default=GOLD_FILE, help=f"Ground truth JSONL (default: {GOLD_FILE})"
+    )
+    p.add_argument(
+        "--config",
+        default=CONFIG_PATH,
+        help=f"Agent config YAML (default: {CONFIG_PATH})",
+    )
+    p.add_argument(
+        "--no-mismatches", action="store_true", help="Skip writing mismatch file"
+    )
     return p.parse_args()
 
 
@@ -67,13 +78,19 @@ def run_eval(records: list[dict], config: dict) -> tuple[list[dict], dict]:
     for i, job in enumerate(records):
         human_verdict = job.get("_human_verdict")
         if human_verdict not in ("pass", "trash"):
-            log.warning("Record %d (%s) has no valid _human_verdict — skipping", i, job.get("title"))
+            log.warning(
+                "Record %d (%s) has no valid _human_verdict — skipping",
+                i,
+                job.get("title"),
+            )
             skipped += 1
             continue
 
         description = job.get("description", "")
         if not description:
-            log.warning("Record %d (%s) has no description — skipping", i, job.get("title"))
+            log.warning(
+                "Record %d (%s) has no description — skipping", i, job.get("title")
+            )
             skipped += 1
             continue
 
@@ -93,7 +110,12 @@ def run_eval(records: list[dict], config: dict) -> tuple[list[dict], dict]:
         )
 
         if analysis is None:
-            log.warning("Record %d (%s @ %s) — student agent failed, skipping", i, job.get("title"), job.get("company"))
+            log.warning(
+                "Record %d (%s @ %s) — student agent failed, skipping",
+                i,
+                job.get("title"),
+                job.get("company"),
+            )
             skipped += 1
             continue
 
@@ -110,18 +132,20 @@ def run_eval(records: list[dict], config: dict) -> tuple[list[dict], dict]:
             fn += 1
 
         if student_verdict != human_verdict:
-            mismatches.append({
-                "title": job.get("title"),
-                "company": job.get("company"),
-                "human_verdict": human_verdict,
-                "human_policy": job.get("_human_policy"),
-                "corrected": job.get("_corrected", False),
-                "student_verdict": student_verdict,
-                "student_classification": analysis.remote_classification,
-                "student_filter_reason": reason,
-                "student_reasoning": analysis.reasoning_trace,
-                "url": job.get("source_url", ""),
-            })
+            mismatches.append(
+                {
+                    "title": job.get("title"),
+                    "company": job.get("company"),
+                    "human_verdict": human_verdict,
+                    "human_policy": job.get("_human_policy"),
+                    "corrected": job.get("_corrected", False),
+                    "student_verdict": student_verdict,
+                    "student_classification": analysis.remote_classification,
+                    "student_filter_reason": reason,
+                    "student_reasoning": analysis.reasoning_trace,
+                    "url": job.get("source_url", ""),
+                }
+            )
 
         log.info(
             "[%3d] %-8s → %-8s  %s @ %s",
@@ -140,10 +164,10 @@ def print_report(counts: dict, mismatches: list[dict]) -> None:
     tp, fp, tn, fn = counts["tp"], counts["fp"], counts["tn"], counts["fn"]
     total = tp + fp + tn + fn
 
-    accuracy  = (tp + tn) / total if total else 0
-    precision = tp / (tp + fp)    if (tp + fp) else 0
-    recall    = tp / (tp + fn)    if (tp + fn) else 0
-    f1        = 2 * precision * recall / (precision + recall) if (precision + recall) else 0
+    accuracy = (tp + tn) / total if total else 0
+    precision = tp / (tp + fp) if (tp + fp) else 0
+    recall = tp / (tp + fn) if (tp + fn) else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0
 
     print()
     print("=" * 44)
@@ -163,7 +187,9 @@ def print_report(counts: dict, mismatches: list[dict]) -> None:
         for m in mismatches:
             tag = "FP" if m["student_verdict"] == "pass" else "FN"
             print(f"  [{tag}] {m['title']} @ {m['company']}")
-            print(f"        human={m['human_policy']}  student={m['student_classification']}  reason={m['student_filter_reason']}")
+            print(
+                f"        human={m['human_policy']}  student={m['student_classification']}  reason={m['student_filter_reason']}"
+            )
     print()
 
 

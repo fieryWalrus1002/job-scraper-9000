@@ -14,7 +14,9 @@ from .base import BaseScraper
 
 log = logging.getLogger(__name__)
 
-GUEST_SEARCH_URL = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+GUEST_SEARCH_URL = (
+    "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+)
 GUEST_DETAIL_URL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting"
 
 _USER_AGENTS = [
@@ -25,7 +27,9 @@ _USER_AGENTS = [
 
 
 class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
-    def __init__(self, query: LinkedInSearchQuery, min_delay: float = 2.0, max_delay: float = 5.0):
+    def __init__(
+        self, query: LinkedInSearchQuery, min_delay: float = 2.0, max_delay: float = 5.0
+    ):
         self.query = query
         self.session = requests.Session()
         self.min_delay = min_delay
@@ -37,12 +41,12 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
 
     def describe(self) -> dict:
         return {
-            "source":       self.source_name,
-            "keywords":     self.query.keywords,
-            "time_posted":  self.query.time_posted,
-            "workplace":    self.query.workplace,
+            "source": self.source_name,
+            "keywords": self.query.keywords,
+            "time_posted": self.query.time_posted,
+            "workplace": self.query.workplace,
             "salary_floor": self.query.salary_floor,
-            "max_results":  self.query.max_results,
+            "max_results": self.query.max_results,
         }
 
     def _headers(self) -> dict:
@@ -124,7 +128,12 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
                 if len(all_jobs) >= self.query.max_results:
                     break
 
-            log.info("Page start=%d: %d new jobs (total: %d)", start, new_count, len(all_jobs))
+            log.info(
+                "Page start=%d: %d new jobs (total: %d)",
+                start,
+                new_count,
+                len(all_jobs),
+            )
             if new_count == 0:
                 break
             start += 25
@@ -134,7 +143,7 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
 
 
 _WORKPLACE_LABEL = {"1": "onsite", "2": "remote", "3": "hybrid"}
-_JOBTYPE_LABEL   = {"F": "fulltime", "P": "parttime", "C": "contract"}
+_JOBTYPE_LABEL = {"F": "fulltime", "P": "parttime", "C": "contract"}
 
 
 def _search_params(query: LinkedInSearchQuery) -> dict:
@@ -148,20 +157,20 @@ def _search_params(query: LinkedInSearchQuery) -> dict:
 
 
 def _parse_card(card) -> dict:
-    link_tag     = card.find("a", class_="base-card__full-link")
-    title_tag    = card.find("h3", class_="base-search-card__title")
-    company_tag  = card.find("h4", class_="base-search-card__subtitle")
+    link_tag = card.find("a", class_="base-card__full-link")
+    title_tag = card.find("h3", class_="base-search-card__title")
+    company_tag = card.find("h4", class_="base-search-card__subtitle")
     location_tag = card.find("span", class_="job-search-card__location")
-    time_tag     = card.find("time")
+    time_tag = card.find("time")
 
     url = link_tag["href"].split("?")[0] if link_tag else ""
     match = re.search(r"-(\d+)$", url)
 
     return {
-        "source_url":    url,
+        "source_url": url,
         "source_job_id": match.group(1) if match else "",
-        "title":         title_tag.get_text(strip=True) if title_tag else "",
-        "company":       company_tag.get_text(strip=True) if company_tag else "",
-        "location":      location_tag.get_text(strip=True) if location_tag else "",
-        "posted_at":     time_tag.get("datetime") if time_tag else None,
+        "title": title_tag.get_text(strip=True) if title_tag else "",
+        "company": company_tag.get_text(strip=True) if company_tag else "",
+        "location": location_tag.get_text(strip=True) if location_tag else "",
+        "posted_at": time_tag.get("datetime") if time_tag else None,
     }
