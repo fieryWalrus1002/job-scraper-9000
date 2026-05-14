@@ -14,6 +14,7 @@ class JobPosting:
     description: str | None
     scraped_at: str
     scrub_counts: dict = field(default_factory=dict)
+    search_params: dict = field(default_factory=dict)
     dedup_hash: str = ""
 
     def compute_hash(self) -> None:
