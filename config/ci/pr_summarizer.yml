@@ -1,0 +1,6 @@
+# OPERATIONAL DATA ONLY, the prompt is in prompts/ci/system_prompt_pr.md
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.2
+  max_tokens: 1024
