@@ -6,10 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import (
-<<<<<<< HEAD
     _build_user_message,
-=======
->>>>>>> 474aac5 (feat(sel_scraper): Added a new scraper in the wrong branch)
     analyze_remote,
     load_raw_jobs,
     passes_remote_filter,
