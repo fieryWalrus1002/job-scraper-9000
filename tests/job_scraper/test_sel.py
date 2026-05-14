@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, call
 
 from job_scraper.query import SELSearchQuery
-from job_scraper.scrapers.sel import SELJobScraper, _JOBS_API, _PAGE_SIZE
+from job_scraper.scrapers.sel import SELJobScraper, _JOBS_API, _PAGE_SIZE, _parse_posted_at
 
 
 def _make_scraper(**kwargs) -> SELJobScraper:
@@ -271,3 +271,98 @@ def test_to_applied_facets_multiple_worker_types():
     q = SELSearchQuery(worker_sub_types=["regular", "temporary"])
     facets = q.to_applied_facets()
     assert len(facets["workerSubType"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# _parse_posted_at — relative date → ISO date
+# ---------------------------------------------------------------------------
+
+_REF = "2026-05-14T15:00:00+00:00"
+
+
+def test_parse_posted_at_today():
+    assert _parse_posted_at("Posted Today", _REF) == "2026-05-14"
+
+
+def test_parse_posted_at_yesterday():
+    assert _parse_posted_at("Posted Yesterday", _REF) == "2026-05-13"
+
+
+def test_parse_posted_at_n_days_ago():
+    assert _parse_posted_at("Posted 8 Days Ago", _REF) == "2026-05-06"
+
+
+def test_parse_posted_at_30plus_days_ago():
+    assert _parse_posted_at("Posted 30+ Days Ago", _REF) == "2026-04-14"
+
+
+def test_parse_posted_at_unrecognised_passthrough():
+    assert _parse_posted_at("Some weird string", _REF) == "Some weird string"
+
+
+def test_parse_posted_at_none_returns_none():
+    assert _parse_posted_at(None, _REF) is None
+
+
+def test_parse_posted_at_already_iso_passthrough():
+    assert _parse_posted_at("2026-05-01", _REF) == "2026-05-01"
+
+
+# ---------------------------------------------------------------------------
+# Multi-location fallback
+# ---------------------------------------------------------------------------
+
+
+def _multi_location_posting(n: int = 1) -> dict:
+    p = _posting(n)
+    p["locationsText"] = "2 Locations"
+    return p
+
+
+def test_scrape_replaces_multi_location_with_query_location():
+    scraper = _make_scraper(fetch_descriptions=False, location_key="pullman_wa")
+    scraper.session = MagicMock()
+    scraper.session.post.return_value = _api_response([_multi_location_posting(1)])
+
+    jobs = scraper.scrape()
+
+    assert jobs[0].location == "Washington - Pullman"
+
+
+def test_scrape_preserves_single_location():
+    scraper = _make_scraper(fetch_descriptions=False, location_key="pullman_wa")
+    scraper.session = MagicMock()
+    scraper.session.post.return_value = _api_response([_posting(1)])
+
+    jobs = scraper.scrape()
+
+    assert jobs[0].location == "Washington - Pullman"
+
+
+def test_scrape_strips_title_whitespace():
+    scraper = _make_scraper(fetch_descriptions=False)
+    scraper.session = MagicMock()
+    posting = _posting(1)
+    posting["title"] = "Engineer 1 "
+    scraper.session.post.return_value = _api_response([posting])
+
+    jobs = scraper.scrape()
+
+    assert jobs[0].title == "Engineer 1"
+
+
+def test_scrape_posted_at_parsed_from_relative_string():
+    scraper = _make_scraper(fetch_descriptions=True)
+    scraper.session = MagicMock()
+    scraper.session.post.return_value = _api_response([_posting(1)])
+    detail_resp = MagicMock()
+    detail_resp.status_code = 200
+    detail_resp.json.return_value = {"jobPostingInfo": {"jobDescription": "<p>ok</p>", "postedOn": "Posted Yesterday"}}
+    scraper.session.get.return_value = detail_resp
+
+    jobs = scraper.scrape()
+
+    # posted_at should be an ISO date, not the raw relative string
+    assert jobs[0].posted_at is not None
+    assert "Posted" not in jobs[0].posted_at
+    assert len(jobs[0].posted_at) == 10  # YYYY-MM-DD
