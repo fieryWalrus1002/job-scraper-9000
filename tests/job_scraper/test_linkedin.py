@@ -7,6 +7,7 @@ from job_scraper.query import LinkedInSearchQuery, TIME_ANY
 
 # --- HTML fixtures -----------------------------------------------------------
 
+
 def _card_html(
     url="https://www.linkedin.com/jobs/view/senior-engineer-at-acme-1234567890",
     title="Senior Engineer",
@@ -48,6 +49,7 @@ def _mock_response(text: str, status_code: int = 200) -> MagicMock:
 
 # --- _parse_card tests -------------------------------------------------------
 
+
 def test_parse_card_extracts_all_fields():
     card = _soup_card(_card_html())
     result = _parse_card(card)
@@ -58,14 +60,18 @@ def test_parse_card_extracts_all_fields():
 
 
 def test_parse_card_strips_tracking_params_from_url():
-    card = _soup_card(_card_html(url="https://linkedin.com/jobs/view/engineer-at-x-999?trk=abc"))
+    card = _soup_card(
+        _card_html(url="https://linkedin.com/jobs/view/engineer-at-x-999?trk=abc")
+    )
     result = _parse_card(card)
     assert "?" not in result["source_url"]
     assert result["source_url"] == "https://linkedin.com/jobs/view/engineer-at-x-999"
 
 
 def test_parse_card_extracts_job_id():
-    card = _soup_card(_card_html(url="https://linkedin.com/jobs/view/engineer-at-acme-1234567890"))
+    card = _soup_card(
+        _card_html(url="https://linkedin.com/jobs/view/engineer-at-acme-1234567890")
+    )
     result = _parse_card(card)
     assert result["source_job_id"] == "1234567890"
 
@@ -90,6 +96,7 @@ def test_parse_card_no_id_in_url():
 
 # --- LinkedInJobScraper tests ------------------------------------------------
 
+
 def test_source_name():
     scraper = LinkedInJobScraper(_make_query())
     assert scraper.source_name == "linkedin"
@@ -100,7 +107,9 @@ def test_fetch_search_page_returns_parsed_cards():
     scraper = LinkedInJobScraper(query)
     card = _card_html(url="https://linkedin.com/jobs/view/eng-at-acme-111", title="Dev")
 
-    with patch.object(scraper.session, "get", return_value=_mock_response(_make_search_html(card))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_make_search_html(card))
+    ):
         results = scraper.fetch_search_page(start=0)
 
     assert len(results) == 1
@@ -111,7 +120,9 @@ def test_fetch_search_page_returns_parsed_cards():
 def test_fetch_search_page_rate_limit_returns_empty():
     scraper = LinkedInJobScraper(_make_query())
 
-    with patch.object(scraper.session, "get", return_value=_mock_response("", status_code=429)):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response("", status_code=429)
+    ):
         with patch("time.sleep"):
             results = scraper.fetch_search_page()
 
@@ -131,7 +142,9 @@ def test_fetch_description_returns_text():
 def test_fetch_description_bad_status_returns_empty():
     scraper = LinkedInJobScraper(_make_query())
 
-    with patch.object(scraper.session, "get", return_value=_mock_response("", status_code=404)):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response("", status_code=404)
+    ):
         desc = scraper.fetch_description("999")
 
     assert desc == ""
@@ -156,7 +169,9 @@ def test_scrape_respects_max_results():
     )
     scraper = LinkedInJobScraper(_make_query(max_results=3))
 
-    with patch.object(scraper.session, "get", return_value=_mock_response(_make_search_html(cards))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_make_search_html(cards))
+    ):
         with patch.object(scraper, "_sleep"):
             jobs = scraper.scrape()
 

@@ -18,9 +18,11 @@ class JobPosting:
     dedup_hash: str = ""
 
     def compute_hash(self) -> None:
-        key = "|".join([
-            (self.company or "").lower().strip(),
-            (self.title or "").lower().strip(),
-            (self.location or "").lower().strip(),
-        ])
+        key = "|".join(
+            [
+                (self.company or "").lower().strip(),
+                (self.title or "").lower().strip(),
+                (self.location or "").lower().strip(),
+            ]
+        )
         self.dedup_hash = hashlib.sha256(key.encode()).hexdigest()

@@ -17,7 +17,11 @@ def _sample_api_response(n: int = 2) -> list:
             "id": f"uuid-{i}",
             "text": f"Engineer {i}",
             "hostedUrl": f"https://jobs.lever.co/acme/uuid-{i}",
-            "categories": {"location": "Remote", "team": "Engineering", "commitment": "Full-time"},
+            "categories": {
+                "location": "Remote",
+                "team": "Engineering",
+                "commitment": "Full-time",
+            },
             "descriptionPlain": f"Plain description for role {i}.",
             "description": f"<p>HTML description for role {i}.</p>",
             "createdAt": 1_700_000_000_000 + i * 1000,
@@ -29,6 +33,7 @@ def _sample_api_response(n: int = 2) -> list:
 # ---------------------------------------------------------------------------
 # Basic properties
 # ---------------------------------------------------------------------------
+
 
 def test_source_name():
     scraper = LeverScraper(LeverQuery(company="acme"))
@@ -46,9 +51,12 @@ def test_describe():
 # scrape()
 # ---------------------------------------------------------------------------
 
+
 def test_scrape_returns_job_postings():
     scraper = LeverScraper(LeverQuery(company="acme"))
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(3))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(3))
+    ):
         jobs = scraper.scrape()
     assert len(jobs) == 3
     assert all(j.source == "lever:acme" for j in jobs)
@@ -56,7 +64,9 @@ def test_scrape_returns_job_postings():
 
 def test_scrape_maps_fields_correctly():
     scraper = LeverScraper(LeverQuery(company="acme"))
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(1))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
+    ):
         jobs = scraper.scrape()
     job = jobs[0]
     assert job.title == "Engineer 0"
@@ -88,7 +98,9 @@ def test_scrape_falls_back_to_html_description():
 
 def test_scrape_created_at_converted_to_iso():
     scraper = LeverScraper(LeverQuery(company="acme"))
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(1))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
+    ):
         jobs = scraper.scrape()
     assert jobs[0].posted_at is not None
     assert "T" in jobs[0].posted_at
@@ -105,7 +117,9 @@ def test_scrape_missing_created_at_is_none():
 
 def test_scrape_no_descriptions():
     scraper = LeverScraper(LeverQuery(company="acme", fetch_descriptions=False))
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(2))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(2))
+    ):
         jobs = scraper.scrape()
     assert all(j.description == "" for j in jobs)
 
@@ -119,7 +133,9 @@ def test_scrape_empty_board():
 
 def test_scrape_computes_dedup_hash():
     scraper = LeverScraper(LeverQuery(company="acme"))
-    with patch.object(scraper.session, "get", return_value=_mock_response(_sample_api_response(1))):
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
+    ):
         jobs = scraper.scrape()
     assert jobs[0].dedup_hash != ""
 

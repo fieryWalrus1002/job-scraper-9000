@@ -21,13 +21,18 @@ def _http_error(status_code: int) -> requests.HTTPError:
 # load()
 # ---------------------------------------------------------------------------
 
+
 def test_load_returns_empty_dict_when_file_missing(tmp_path):
     assert load(tmp_path / "missing.json") == {}
 
 
 def test_load_returns_existing_records(tmp_path):
     p = tmp_path / "failures.json"
-    p.write_text(json.dumps({"lever:apple": {"error": "404", "url": "", "failed_at": "2026-01-01"}}))
+    p.write_text(
+        json.dumps(
+            {"lever:apple": {"error": "404", "url": "", "failed_at": "2026-01-01"}}
+        )
+    )
     result = load(p)
     assert "lever:apple" in result
 
@@ -35,6 +40,7 @@ def test_load_returns_existing_records(tmp_path):
 # ---------------------------------------------------------------------------
 # record()
 # ---------------------------------------------------------------------------
+
 
 def test_record_creates_file(tmp_path):
     p = tmp_path / "sub" / "failures.json"
@@ -83,6 +89,7 @@ def test_record_updates_existing_entry(tmp_path):
 # ---------------------------------------------------------------------------
 # is_permanent()
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("code", [403, 404, 410])
 def test_is_permanent_true_for_permanent_codes(code):

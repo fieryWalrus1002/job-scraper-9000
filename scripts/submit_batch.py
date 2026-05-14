@@ -13,6 +13,7 @@ Usage:
     python scripts/submit_batch.py --no-wait                     # upload only, print ID
     python scripts/submit_batch.py --run-dir data/batch/2026-05-11  # cross-day resume
 """
+
 import argparse
 import logging
 import os
@@ -35,11 +36,28 @@ TERMINAL_STATUSES = {"completed", "failed", "expired", "cancelled"}
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--run-dir", default=DEFAULT_RUN_DIR, help=f"Batch run directory (default: {DEFAULT_RUN_DIR})")
-    p.add_argument("--batch-id", help="Skip upload and resume polling an existing batch ID")
-    p.add_argument("--no-wait", action="store_true", help="Upload only — print batch ID and exit without polling")
-    p.add_argument("--poll-interval", type=int, default=POLL_INTERVAL, help=f"Seconds between status checks (default: {POLL_INTERVAL})")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--run-dir",
+        default=DEFAULT_RUN_DIR,
+        help=f"Batch run directory (default: {DEFAULT_RUN_DIR})",
+    )
+    p.add_argument(
+        "--batch-id", help="Skip upload and resume polling an existing batch ID"
+    )
+    p.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Upload only — print batch ID and exit without polling",
+    )
+    p.add_argument(
+        "--poll-interval",
+        type=int,
+        default=POLL_INTERVAL,
+        help=f"Seconds between status checks (default: {POLL_INTERVAL})",
+    )
     return p.parse_args()
 
 
@@ -100,9 +118,17 @@ def download_results(client: OpenAI, batch, results_path: Path) -> None:
     log.info("Results written to %s", results_path)
 
     counts = batch.request_counts
-    log.info("Final counts: %d completed | %d failed | %d total", counts.completed, counts.failed, counts.total)
+    log.info(
+        "Final counts: %d completed | %d failed | %d total",
+        counts.completed,
+        counts.failed,
+        counts.total,
+    )
     if counts.failed:
-        log.warning("%d requests failed — merge_batch_results.py will skip those records", counts.failed)
+        log.warning(
+            "%d requests failed — merge_batch_results.py will skip those records",
+            counts.failed,
+        )
 
 
 def main() -> None:
@@ -125,19 +151,25 @@ def main() -> None:
         log.info("Resuming existing batch: %s", batch_id)
     else:
         if not batch_path.exists():
-            log.error("Batch file not found: %s  (run prepare_batch.py first)", batch_path)
+            log.error(
+                "Batch file not found: %s  (run prepare_batch.py first)", batch_path
+            )
             sys.exit(1)
         batch_id = upload_batch(client, batch_path, batch_id_path)
 
     if args.no_wait:
         print(f"\nBatch ID: {batch_id}")
-        print(f"Resume with: uv run python scripts/submit_batch.py --run-dir {run_dir} --batch-id {batch_id}")
+        print(
+            f"Resume with: uv run python scripts/submit_batch.py --run-dir {run_dir} --batch-id {batch_id}"
+        )
         return
 
     batch = poll_until_done(client, batch_id, args.poll_interval)
     download_results(client, batch, results_path)
 
-    print(f"\nNext step: uv run python scripts/merge_batch_results.py --run-dir {run_dir}")
+    print(
+        f"\nNext step: uv run python scripts/merge_batch_results.py --run-dir {run_dir}"
+    )
 
 
 if __name__ == "__main__":
