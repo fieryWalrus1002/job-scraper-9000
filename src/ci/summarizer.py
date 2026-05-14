@@ -5,28 +5,30 @@ import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Peer Review: Standardizing logging in the module
 log = logging.getLogger(__name__)
+
 
 class PRSummarizer:
     def __init__(self, config_path: str, prompt_path: str):
-        # 1. Attempt to load .env for local dev. 
-        # If it's missing (like in GitHub Actions), this simply does nothing.
-        load_dotenv() 
+        load_dotenv()
 
         self.config = self._load_config(config_path)
         self.system_prompt = self._load_and_strip_prompt(prompt_path)
-        
-        # 2. Grab from environment. 
-        # In GH Actions, this is populated by 'env:' in your workflow YAML.
-        api_key = os.environ.get("OPENAI_API_KEY")
-        
-        if not api_key:
-            # We raise a ValueError instead of sys.exit(1) inside a class.
-            # This allows the calling script or a test suite to catch the error.
-            raise ValueError("OPENAI_API_KEY environment variable is required.")
 
-        self.client = OpenAI(api_key=api_key)
+        # Allow LLM_MODEL env var to override the model in config
+        model_override = os.environ.get("LLM_MODEL")
+        if model_override:
+            self.config["llm"]["model"] = model_override
+
+        provider = os.environ.get("LLM_PROVIDER", "openai").lower()
+        if provider == "ollama":
+            base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+            self.client = OpenAI(base_url=base_url, api_key="ollama")
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable is required.")
+            self.client = OpenAI(api_key=api_key)
         
     def _load_config(self, path: str) -> dict:
         """Loads operational parameters from YAML."""
