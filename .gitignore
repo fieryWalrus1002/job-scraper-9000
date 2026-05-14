@@ -17,6 +17,7 @@ data/**/*.txt
 # local stuff I don't want to commit
 .deprecated/
 .notes/
+notes/
 .logs/
 .docs/
 # known failures don't need to be tracked in git
