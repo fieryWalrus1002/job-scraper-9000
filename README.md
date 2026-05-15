@@ -115,6 +115,7 @@ streamlit run src/review_ui/app.py     # open the review UI
 | Remote filter agent — config, commands, classification schema | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md) |
 | Teacher-student distillation design | [specs/teacher-student.md](specs/teacher-student.md) |
 | Batch pipeline scripts — prepare, merge, sample | [scripts/README.md](scripts/README.md) |
+| Eval scripts — running evals, CLI flags, comparing runs | [scripts/README.md#eval](scripts/README.md#eval) |
 | HITL review UI — how it works, input format, gold layer output | [src/review_ui/README.md](src/review_ui/README.md) |
 
 ---

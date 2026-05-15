@@ -11,7 +11,7 @@ from .models import RemoteAnalysis
 log = logging.getLogger(__name__)
 
 _PROMPT_PATH = (
-    Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+    Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v2.txt"
 )
 _PROMPT = _PROMPT_PATH.read_text()
 

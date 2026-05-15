@@ -7,7 +7,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 
-from agents.remote_filter.models import SCHEMA_VERSION
+from agents.remote_filter.models import LEGACY_CLASSIFICATIONS, REMOTE_CLASSIFICATIONS, SCHEMA_VERSION
 from utils.git_info import get_git_metadata, get_prompt_hash
 
 _PROMPT_FILE = (
@@ -17,7 +17,7 @@ _PROMPT_FILE = (
 STAGING = "data/staging/to_review.jsonl"
 EVAL = "data/eval/ground_truth.jsonl"
 
-LABELS = ["fully_remote", "hybrid", "onsite", "onsite_disguised", "unclear"]
+LABELS = REMOTE_CLASSIFICATIONS + LEGACY_CLASSIFICATIONS
 
 st.set_page_config(layout="wide", page_title="HITL Reviewer")
 
@@ -257,7 +257,10 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader(f"{job.get('title', 'Untitled')} — {job.get('company', '')}")
-    st.caption(f"{job.get('location', '')}  ·  {job.get('source', '')}")
+    sp = job.get("search_params") or {}
+    sp_parts = [f"{k}={v}" for k, v in sp.items() if k in ("keywords", "workplace", "job_type")]
+    search_ctx = f"  ·  search: {', '.join(sp_parts)}" if sp_parts else ""
+    st.caption(f"{job.get('location', '')}  ·  {job.get('source', '')}{search_ctx}")
     st.divider()
     st.write(job.get("description", "_No description_"))
 

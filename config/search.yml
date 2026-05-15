@@ -7,8 +7,8 @@ global:
   linkedin_time: week
   salary_floor_k: 120
 
-companies:
-  - notion
+# companies:
+  # - notion
   # - mistral
   # - cohere
   # - harvey
@@ -19,7 +19,7 @@ companies:
   # - notion
   # - stripe
 
-sel:
+# sel:
   # for now, just use the default settings for everything, but we can customize these later if we want
 
 linkedin:

@@ -38,7 +38,7 @@ PROMPT_FILE = (
     Path(__file__).parents[1]
     / "prompts"
     / "remote_agent_teacher"
-    / "system_prompt_v1.txt"
+    / "system_prompt_v2.txt"
 )
 
 
@@ -64,12 +64,22 @@ def load_all_jobs(input_path: Path) -> list[dict]:
 def _build_user_content(job: dict) -> str:
     parts = []
     if title := job.get("title"):
-        parts.append(f"[Job title: {title}]")
+        parts.append(f"Job title: {title}")
     if location := job.get("location"):
-        parts.append(f"[Location field: {location}]")
+        parts.append(f"Location field: {location}")
+    search_params = job.get("search_params") or {}
+    ctx = []
+    if kw := search_params.get("keywords"):
+        ctx.append(f'keywords="{kw}"')
+    if wp := search_params.get("workplace"):
+        ctx.append(f"workplace_filter={wp}")
+    if jt := search_params.get("job_type"):
+        ctx.append(f"job_type={jt}")
+    if ctx:
+        parts.append(f"Search context: {', '.join(ctx)}")
     description = job.get("description", "")
     if parts:
-        return "\n".join(parts) + "\n\n---\n\n" + description
+        return "\n".join(f"[{p}]" for p in parts) + "\n\n---\n\n" + description
     return description
 
 
