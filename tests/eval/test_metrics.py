@@ -8,7 +8,6 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
 def test_accuracy_denominator_is_evaluated_not_total():
     # Skipped records must not deflate accuracy
     from eval.metrics import compute_metrics
@@ -19,7 +18,7 @@ def test_accuracy_denominator_is_evaluated_not_total():
     assert m["metrics"]["accuracy"] == pytest.approx(45 / 48)
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_perfect_classifier():
     from eval.metrics import compute_metrics
     m = compute_metrics(tp=10, fp=0, tn=40, fn=0, skipped=0)
@@ -29,7 +28,7 @@ def test_perfect_classifier():
     assert m["metrics"]["f1"] == pytest.approx(1.0)
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_all_negative_correct():
     # No positive examples in set — tp=fn=0
     from eval.metrics import compute_metrics
@@ -43,7 +42,7 @@ def test_all_negative_correct():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_precision_zero_denominator_returns_zero():
     # tp=0, fp=0 → precision denominator is zero
     from eval.metrics import compute_metrics
@@ -51,7 +50,7 @@ def test_precision_zero_denominator_returns_zero():
     assert m["metrics"]["precision"] == 0.0
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_recall_zero_denominator_returns_zero():
     # tp=0, fn=0 → no positive examples
     from eval.metrics import compute_metrics
@@ -59,7 +58,7 @@ def test_recall_zero_denominator_returns_zero():
     assert m["metrics"]["recall"] == 0.0
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_f1_zero_denominator_returns_zero():
     # precision=0 and recall=0 → f1 denominator is zero
     from eval.metrics import compute_metrics
@@ -67,7 +66,7 @@ def test_f1_zero_denominator_returns_zero():
     assert m["metrics"]["f1"] == 0.0
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_evaluated_zero_raises_or_returns_zero():
     # No evaluated records at all — should not divide by zero
     from eval.metrics import compute_metrics
@@ -81,7 +80,7 @@ def test_evaluated_zero_raises_or_returns_zero():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_prevalence_is_positive_class_rate():
     # prevalence = (tp + fn) / evaluated
     from eval.metrics import compute_metrics
@@ -94,7 +93,7 @@ def test_prevalence_is_positive_class_rate():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_output_contains_all_required_metric_keys():
     from eval.metrics import compute_metrics
     m = compute_metrics(tp=5, fp=1, tn=40, fn=4, skipped=0)

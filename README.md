@@ -37,7 +37,7 @@ The full pipeline has four phases:
 
 ---
 
-**Current state:** Phases 1 and 2 are production-ready. Phase 3 (scoring) and Phase 4 (dispatch) are coming.
+**Current state:** Phase 1 done, Phase 2 in progress. See [specs/project_impl_status.md](specs/project_impl_status.md) for the full tracker.
 
 The remote filter agent is being improved via a teacher-student distillation pattern — a cloud teacher model builds a labeled dataset that trains a faster local student model. See [specs/teacher-student.md](specs/teacher-student.md) for the design.
 
@@ -109,7 +109,7 @@ streamlit run src/review_ui/app.py     # open the review UI
 
 | Topic | Doc |
 | --- | --- |
-| Project status — what's built, what's next | [project-status.md](project-status.md) |
+| Project status — what's built, what's next | [specs/project_impl_status.md](specs/project_impl_status.md) |
 | Scraper module — how it works, backends, YAML config format | [src/job_scraper/README.md](src/job_scraper/README.md) |
 | Scraper CLI — all commands, flags, YAML config | [src/agents/README.md](src/agents/README.md) |
 | Remote filter agent — config, commands, classification schema | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md) |

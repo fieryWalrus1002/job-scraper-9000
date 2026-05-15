@@ -9,7 +9,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_sanitize_strips_api_key():
     # config block containing "api_key" must be redacted
     from eval.logger import JsonlRunLogger
@@ -20,7 +20,7 @@ def test_sanitize_strips_api_key():
     assert result["config"]["provider"] == "openai"
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_sanitize_strips_token():
     from eval.logger import JsonlRunLogger
     logger = JsonlRunLogger.__new__(JsonlRunLogger)
@@ -30,7 +30,7 @@ def test_sanitize_strips_token():
     assert result["config"]["model"] == "gpt-4o-mini"
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_sanitize_does_not_mutate_original():
     # _sanitize must deep-copy — original record must be unchanged
     from eval.logger import JsonlRunLogger
@@ -40,7 +40,7 @@ def test_sanitize_does_not_mutate_original():
     assert original["config"]["api_key"] == "sk-secret"
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_sanitize_leaves_safe_fields_intact():
     from eval.logger import JsonlRunLogger
     logger = JsonlRunLogger.__new__(JsonlRunLogger)
@@ -54,7 +54,7 @@ def test_sanitize_leaves_safe_fields_intact():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_log_run_writes_valid_json_line(tmp_path):
     from eval.logger import JsonlRunLogger
     log_file = tmp_path / "runs.jsonl"
@@ -65,7 +65,7 @@ def test_log_run_writes_valid_json_line(tmp_path):
     assert json.loads(lines[0])["run_id"] == "test_001"
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_log_run_appends_not_overwrites(tmp_path):
     from eval.logger import JsonlRunLogger
     log_file = tmp_path / "runs.jsonl"
@@ -78,7 +78,7 @@ def test_log_run_appends_not_overwrites(tmp_path):
     assert json.loads(lines[1])["run_id"] == "second"
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_log_run_creates_parent_directory(tmp_path):
     from eval.logger import JsonlRunLogger
     log_file = tmp_path / "nested" / "dir" / "runs.jsonl"
@@ -87,7 +87,7 @@ def test_log_run_creates_parent_directory(tmp_path):
     assert log_file.exists()
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_log_run_non_fatal_on_unwritable_path(tmp_path, caplog):
     # A bad path must emit a warning and not raise — SC-1
     import logging
@@ -98,7 +98,7 @@ def test_log_run_non_fatal_on_unwritable_path(tmp_path, caplog):
     assert any("Failed" in r.message for r in caplog.records)
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_log_run_rejects_duplicate_run_id(tmp_path):
     # SC-2: custom run_id must be unique within runs.jsonl
     from eval.logger import JsonlRunLogger
@@ -114,7 +114,7 @@ def test_log_run_rejects_duplicate_run_id(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="not yet implemented")
+
 def test_arbitrary_class_satisfies_protocol():
     # Any class with log_run(record: dict) -> None satisfies RunLogger at runtime
 
