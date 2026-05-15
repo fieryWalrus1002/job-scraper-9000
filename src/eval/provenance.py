@@ -39,9 +39,12 @@ def hash_file(path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_run_id() -> str:
+def generate_run_id(prefix: str | None = None) -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    return f"{ts}_{uuid.uuid4().hex[:4]}"
+    suffix = uuid.uuid4().hex[:4]
+    if prefix:
+        return f"{prefix}_{ts}_{suffix}"
+    return f"{ts}_{suffix}"
 
 
 # ---------------------------------------------------------------------------
