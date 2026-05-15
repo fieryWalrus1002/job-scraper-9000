@@ -38,8 +38,6 @@ class MLFlowRunLogger:
 class JsonlRunLogger:
     def __init__(self, log_path: str | Path = "data/eval/runs.jsonl"):
         self.log_path = Path(log_path)
-        # Ensure directory exists (infrastructure idempotency)
-        self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _sanitize(self, record: dict[str, Any]) -> dict[str, Any]:
         """
@@ -58,20 +56,24 @@ class JsonlRunLogger:
         return safe_record
 
     def _existing_run_ids(self) -> set[str]:
-        if not self.log_path.exists():
+        try:
+            if not self.log_path.exists():
+                return set()
+            ids = set()
+            for line in self.log_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    ids.add(json.loads(line).get("run_id", ""))
+            return ids
+        except OSError:
             return set()
-        ids = set()
-        for line in self.log_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                ids.add(json.loads(line).get("run_id", ""))
-        return ids
 
     def log_run(self, record: dict[str, Any]) -> None:
         run_id = record.get("run_id")
         if run_id and run_id in self._existing_run_ids():
             raise ValueError(f"run_id '{run_id}' already exists in {self.log_path}")
         try:
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
             safe_record = self._sanitize(record)
             with self.log_path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(safe_record) + "\n")
