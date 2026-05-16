@@ -31,7 +31,7 @@ _Last updated: 2026-05-15_
   - [x] OpenAI Batch eval scripts for lower-cost regression runs
   - [x] Parallel eval smoke test passed — `smoke_parallel_20260516_045209_a6da`: accuracy 0.8654, precision 0.7073, recall 0.9355, F1 0.8056
   - [ ] Future sprint: eval-driven data quality and policy/prompt tuning — see [specs/remote_filter_eval_tuning.md](specs/remote_filter_eval_tuning.md)
-  - [ ] `uv run agents remote-filter` CLI not wired into `pyproject.toml` — currently run via `scripts/run_remote_filter.py`
+  - [x] Remote-filter CLI wired as `uv run job-scraper remote-filter`
 
 - [ ] **Phase 3 — Skills Fit Scoring Agent:** Designed, not started.
   - [ ] Pydantic schema for scoring output (`fit_score`, `top_matches`, `gaps`, `verdict`)

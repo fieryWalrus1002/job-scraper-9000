@@ -70,9 +70,15 @@ Edit `create_sample_batch()` arguments directly to change the source file or sam
 
 ---
 
-### `run_remote_filter.py`
+### `job-scraper remote-filter`
 
-Runs the local student agent (`remote_filter`) over all raw jobs and splits them into pass/trash. This is the production inference path — no cloud API calls.
+Runs the remote-filter agent over all raw jobs and splits them into pass/trash.
+
+```bash
+uv run job-scraper remote-filter
+```
+
+The legacy script entry point still works:
 
 ```bash
 python scripts/run_remote_filter.py
