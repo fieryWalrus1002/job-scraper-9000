@@ -25,7 +25,7 @@ _Last updated: 2026-05-15_
   - [x] Streamlit HITL review UI — confirm or correct teacher verdicts, writes to gold layer
   - [x] Eval framework basics — run logging, provenance, metrics, mismatch files, and run comparison CLI
   - [x] Fix prompt provenance mismatch between agent runtime and eval/batch metadata paths
-  - [ ] Package/install cleanup — include `src/eval`, `src/utils`, and review UI support modules as needed
+  - [x] Package/install cleanup — renamed generic eval package to `agent_eval` and included support packages in wheel config
   - [ ] Golden dataset expansion/balancing — especially more true-pass remote roles
   - [ ] Eval throughput work — parallel synchronous eval (`--workers`) and OpenAI Batch eval scripts
   - [ ] `uv run agents remote-filter` CLI not wired into `pyproject.toml` — currently run via `scripts/run_remote_filter.py`

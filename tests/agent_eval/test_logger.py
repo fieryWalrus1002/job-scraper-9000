@@ -12,7 +12,7 @@ import pytest
 
 def test_sanitize_strips_api_key():
     # config block containing "api_key" must be redacted
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     logger = JsonlRunLogger.__new__(JsonlRunLogger)
     record = {"config": {"provider": "openai", "api_key": "sk-secret"}}
     result = logger._sanitize(record)
@@ -22,7 +22,7 @@ def test_sanitize_strips_api_key():
 
 
 def test_sanitize_strips_token():
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     logger = JsonlRunLogger.__new__(JsonlRunLogger)
     record = {"config": {"access_token": "tok-secret", "model": "gpt-4o-mini"}}
     result = logger._sanitize(record)
@@ -33,7 +33,7 @@ def test_sanitize_strips_token():
 
 def test_sanitize_does_not_mutate_original():
     # _sanitize must deep-copy — original record must be unchanged
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     logger = JsonlRunLogger.__new__(JsonlRunLogger)
     original = {"config": {"api_key": "sk-secret"}}
     logger._sanitize(original)
@@ -42,7 +42,7 @@ def test_sanitize_does_not_mutate_original():
 
 
 def test_sanitize_leaves_safe_fields_intact():
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     logger = JsonlRunLogger.__new__(JsonlRunLogger)
     record = {"config": {"provider": "openai", "model": "gpt-4o-mini", "temperature": 0.1}}
     result = logger._sanitize(record)
@@ -56,7 +56,7 @@ def test_sanitize_leaves_safe_fields_intact():
 
 
 def test_log_run_writes_valid_json_line(tmp_path):
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     log_file = tmp_path / "runs.jsonl"
     logger = JsonlRunLogger(log_file)
     logger.log_run({"run_id": "test_001", "metrics": {"f1": 0.9}})
@@ -67,7 +67,7 @@ def test_log_run_writes_valid_json_line(tmp_path):
 
 
 def test_log_run_appends_not_overwrites(tmp_path):
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     log_file = tmp_path / "runs.jsonl"
     logger = JsonlRunLogger(log_file)
     logger.log_run({"run_id": "first"})
@@ -80,7 +80,7 @@ def test_log_run_appends_not_overwrites(tmp_path):
 
 
 def test_log_run_creates_parent_directory(tmp_path):
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     log_file = tmp_path / "nested" / "dir" / "runs.jsonl"
     logger = JsonlRunLogger(log_file)
     logger.log_run({"run_id": "x"})
@@ -91,7 +91,7 @@ def test_log_run_creates_parent_directory(tmp_path):
 def test_log_run_non_fatal_on_unwritable_path(tmp_path, caplog):
     # A bad path must emit a warning and not raise — SC-1
     import logging
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     logger = JsonlRunLogger("/root/no_permission/runs.jsonl")
     with caplog.at_level(logging.WARNING):
         logger.log_run({"run_id": "x"})  # must not raise
@@ -101,7 +101,7 @@ def test_log_run_non_fatal_on_unwritable_path(tmp_path, caplog):
 
 def test_log_run_rejects_duplicate_run_id(tmp_path):
     # SC-2: custom run_id must be unique within runs.jsonl
-    from eval.logger import JsonlRunLogger
+    from agent_eval.logger import JsonlRunLogger
     log_file = tmp_path / "runs.jsonl"
     logger = JsonlRunLogger(log_file)
     logger.log_run({"run_id": "my_label"})

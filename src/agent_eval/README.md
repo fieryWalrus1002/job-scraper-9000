@@ -1,4 +1,4 @@
-# eval
+# agent_eval
 
 The agent eval pipeline for job-scraper-9000. We aim for an extensible, professional-grade evaluation pipeline that meets with LLMOps standards.
 
@@ -9,7 +9,7 @@ Dataset design goals are in [[../../specs/remote_filter_golden_dataset_requireme
 Files:
 
 ``` bash
-src/eval/
+src/agent_eval/
 ├── __init__.py                     # exports RunLogger, JsonlRunLogger
 ├── logger.py                       # RunLogger Protocol + JsonlRunLogger
 ├── provenance.py                   # build_run_record() — git, env, hashes
