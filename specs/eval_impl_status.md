@@ -84,10 +84,10 @@
 
 | Task | Status | Location |
 | --- | --- | --- |
-| `--workers N` flag added to argument parser | ⬜ pending | `scripts/run_remote_filter_eval.py` |
-| `ThreadPoolExecutor` dispatch with in-order result collection | ⬜ pending | `scripts/run_remote_filter_eval.py` |
-| `--workers` excluded from run provenance record | ⬜ pending | `scripts/run_remote_filter_eval.py` |
-| Clean Ctrl+C exit preserved under parallel execution | ⬜ pending | `scripts/run_remote_filter_eval.py` |
+| `--workers N` flag added to argument parser | ✅ done | `scripts/run_remote_filter_eval.py` |
+| `ThreadPoolExecutor` dispatch with in-order result collection | ✅ done | `scripts/run_remote_filter_eval.py` |
+| `--workers` excluded from run provenance record | ✅ done | `scripts/run_remote_filter_eval.py` |
+| Clean Ctrl+C exit preserved under parallel execution | ✅ done | `scripts/run_remote_filter_eval.py` |
 
 ---
 
@@ -111,9 +111,10 @@
 | `tests/agent_eval/` directory + stubs (19 tests) | ✅ done | `tests/agent_eval/` |
 | `test_logger.py` — implement all 10 stubs | ✅ done | `tests/agent_eval/test_logger.py` |
 | `test_metrics.py` — implement all 9 stubs | ✅ done | `tests/agent_eval/test_metrics.py` |
+| Parallel eval order/count tests | ✅ done | `tests/test_run_remote_filter_eval.py` |
 
 ---
 
-## SC-1 through SC-5 complete — 314/314 tests passing
+## SC-1 through SC-6 complete — 316/316 tests passing
 
-## Immediate cleanup, SC-6, and SC-7 pending implementation
+## Docs cleanup and SC-7 pending implementation

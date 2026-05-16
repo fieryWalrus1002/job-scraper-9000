@@ -19,6 +19,8 @@ import logging
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -27,7 +29,11 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH, analyze_remote, passes_remote_filter
+from agents.remote_filter.utils import (
+    REMOTE_FILTER_PROMPT_PATH,
+    analyze_remote,
+    passes_remote_filter,
+)
 from agent_eval.logger import JsonlRunLogger, RunLogger
 from agent_eval.metrics import compute_metrics
 from agent_eval.provenance import build_run_record, generate_run_id
@@ -54,28 +60,71 @@ class MismatchRecord(BaseModel):
     reason: str
 
 
+@dataclass(frozen=True)
+class RecordEvalResult:
+    index: int
+    job: dict
+    human_verdict: str | None
+    pred: str | None
+    reason: str | None
+    elapsed: float
+    skipped: bool = False
+    skip_reason: str | None = None
+    mismatch: MismatchRecord | None = None
+
+    @property
+    def counts(self) -> dict[str, int]:
+        if self.skipped:
+            return {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "skipped": 1}
+        if self.pred == "pass" and self.human_verdict == "pass":
+            return {"tp": 1, "fp": 0, "tn": 0, "fn": 0, "skipped": 0}
+        if self.pred == "pass" and self.human_verdict == "trash":
+            return {"tp": 0, "fp": 1, "tn": 0, "fn": 0, "skipped": 0}
+        if self.pred == "trash" and self.human_verdict == "trash":
+            return {"tp": 0, "fp": 0, "tn": 1, "fn": 0, "skipped": 0}
+        return {"tp": 0, "fp": 0, "tn": 0, "fn": 1, "skipped": 0}
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument(
-        "--gold", default=GOLD_FILE,
+        "--gold",
+        default=GOLD_FILE,
         help=f"Ground truth JSONL (default: {GOLD_FILE})",
     )
     p.add_argument(
-        "--config", default=CONFIG_PATH,
+        "--config",
+        default=CONFIG_PATH,
         help=f"Agent config YAML (default: {CONFIG_PATH})",
     )
     p.add_argument(
-        "--runs-file", default=RUNS_FILE,
+        "--runs-file",
+        default=RUNS_FILE,
         help=f"Run log JSONL (default: {RUNS_FILE})",
     )
     p.add_argument("--model", help="Override llm.model in-memory (SC-3)")
-    p.add_argument("--temperature", type=float, help="Override llm.temperature in-memory (SC-3)")
+    p.add_argument(
+        "--temperature", type=float, help="Override llm.temperature in-memory (SC-3)"
+    )
     p.add_argument("--provider", help="Override llm.provider in-memory (SC-3)")
-    p.add_argument("--run-id", dest="run_id", help="Custom run label (auto-generated if omitted)")
-    p.add_argument("--no-mismatches", action="store_true", help="Skip writing mismatch file")
-    return p.parse_args()
+    p.add_argument(
+        "--run-id", dest="run_id", help="Custom run label (auto-generated if omitted)"
+    )
+    p.add_argument(
+        "--no-mismatches", action="store_true", help="Skip writing mismatch file"
+    )
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of concurrent inference workers (default: 1). Performance only; not recorded in provenance.",
+    )
+    args = p.parse_args()
+    if args.workers < 1:
+        p.error("--workers must be >= 1")
+    return args
 
 
 def load_gold(path: str) -> list[dict]:
@@ -92,91 +141,165 @@ def load_gold(path: str) -> list[dict]:
     return list(seen.values())
 
 
+def _evaluate_record(
+    i: int,
+    job: dict,
+    config: dict,
+    run_id: str,
+) -> RecordEvalResult:
+    llm_config = config.get("llm")
+    human_verdict = job.get("_human_verdict")
+    if human_verdict not in ("pass", "trash"):
+        return RecordEvalResult(
+            index=i,
+            job=job,
+            human_verdict=None,
+            pred=None,
+            reason=None,
+            elapsed=0.0,
+            skipped=True,
+            skip_reason="invalid_human_verdict",
+        )
+
+    description = job.get("description", "")
+    if not description:
+        return RecordEvalResult(
+            index=i,
+            job=job,
+            human_verdict=human_verdict,
+            pred=None,
+            reason=None,
+            elapsed=0.0,
+            skipped=True,
+            skip_reason="missing_description",
+        )
+
+    location = job.get("location") or None
+    title = job.get("title") or None
+    search_context = {
+        **(job.get("search_params") or {}),
+        **({"user_timezone": USER_TIMEZONE} if USER_TIMEZONE else {}),
+    }
+
+    t0 = time.monotonic()
+    analysis = analyze_remote(
+        description,
+        title=title,
+        location=location,
+        search_context=search_context or None,
+        llm_config=llm_config,
+    )
+    elapsed = time.monotonic() - t0
+
+    if analysis is None:
+        return RecordEvalResult(
+            index=i,
+            job=job,
+            human_verdict=human_verdict,
+            pred=None,
+            reason=None,
+            elapsed=elapsed,
+            skipped=True,
+            skip_reason="agent_failed",
+        )
+
+    ok, reason = passes_remote_filter(analysis, config, USER_LOCATION)
+    pred = "pass" if ok else "trash"
+
+    mismatch = None
+    if pred != human_verdict:
+        dedup_hash = job.get("dedup_hash", "")
+        mismatch = MismatchRecord(
+            run_id=run_id,
+            record_id=dedup_hash[:8],
+            gold=human_verdict,
+            pred=pred,
+            human_policy=job.get("_human_policy"),
+            reason=reason,
+        )
+
+    return RecordEvalResult(
+        index=i,
+        job=job,
+        human_verdict=human_verdict,
+        pred=pred,
+        reason=reason,
+        elapsed=elapsed,
+        mismatch=mismatch,
+    )
+
+
+def _log_record_result(result: RecordEvalResult) -> None:
+    job = result.job
+    if result.skipped:
+        if result.skip_reason == "invalid_human_verdict":
+            log.warning(
+                "Record %d (%s) has no valid _human_verdict — skipping",
+                result.index,
+                job.get("title"),
+            )
+        elif result.skip_reason == "missing_description":
+            log.warning(
+                "Record %d (%s) has no description — skipping",
+                result.index,
+                job.get("title"),
+            )
+        else:
+            log.warning(
+                "Record %d (%s @ %s) — agent failed, skipping",
+                result.index,
+                job.get("title"),
+                job.get("company"),
+            )
+        return
+
+    log.info(
+        "[%3d] %-8s → %-8s  %-40s @ %-20s  %.1fs",
+        result.index,
+        result.human_verdict,
+        result.pred,
+        (job.get("title") or "?")[:40],
+        job.get("company", "?")[:20],
+        result.elapsed,
+    )
+
+
 def run_eval(
     records: list[dict],
     config: dict,
     run_id: str,
+    workers: int = 1,
 ) -> tuple[list[MismatchRecord], dict[str, int]]:
-    llm_config = config.get("llm")
-    tp = fp = tn = fn = skipped = 0
+    counts = {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "skipped": 0}
     mismatches: list[MismatchRecord] = []
 
-    for i, job in enumerate(records):
-        human_verdict = job.get("_human_verdict")
-        if human_verdict not in ("pass", "trash"):
-            log.warning(
-                "Record %d (%s) has no valid _human_verdict — skipping",
-                i, job.get("title"),
+    if workers == 1:
+        results = [
+            _evaluate_record(i, job, config, run_id) for i, job in enumerate(records)
+        ]
+    else:
+        executor = ThreadPoolExecutor(max_workers=workers)
+        try:
+            results = list(
+                executor.map(
+                    lambda item: _evaluate_record(item[0], item[1], config, run_id),
+                    enumerate(records),
+                )
             )
-            skipped += 1
-            continue
-
-        description = job.get("description", "")
-        if not description:
-            log.warning(
-                "Record %d (%s) has no description — skipping",
-                i, job.get("title"),
-            )
-            skipped += 1
-            continue
-
-        location = job.get("location") or None
-        title = job.get("title") or None
-        search_context = {
-            **(job.get("search_params") or {}),
-            **({"user_timezone": USER_TIMEZONE} if USER_TIMEZONE else {}),
-        }
-
-        t0 = time.monotonic()
-        analysis = analyze_remote(
-            description,
-            title=title,
-            location=location,
-            search_context=search_context or None,
-            llm_config=llm_config,
-        )
-        elapsed = time.monotonic() - t0
-
-        if analysis is None:
-            log.warning(
-                "Record %d (%s @ %s) — agent failed, skipping",
-                i, job.get("title"), job.get("company"),
-            )
-            skipped += 1
-            continue
-
-        ok, reason = passes_remote_filter(analysis, config, USER_LOCATION)
-        pred = "pass" if ok else "trash"
-
-        if pred == "pass" and human_verdict == "pass":
-            tp += 1
-        elif pred == "pass" and human_verdict == "trash":
-            fp += 1
-        elif pred == "trash" and human_verdict == "trash":
-            tn += 1
+        except KeyboardInterrupt:
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
         else:
-            fn += 1
+            executor.shutdown()
 
-        if pred != human_verdict:
-            dedup_hash = job.get("dedup_hash", "")
-            mismatches.append(MismatchRecord(
-                run_id=run_id,
-                record_id=dedup_hash[:8],
-                gold=human_verdict,
-                pred=pred,
-                human_policy=job.get("_human_policy"),
-                reason=reason,
-            ))
+    for result in results:
+        _log_record_result(result)
+        for key, value in result.counts.items():
+            counts[key] += value
+        if result.mismatch is not None:
+            mismatches.append(result.mismatch)
 
-        log.info(
-            "[%3d] %-8s → %-8s  %-40s @ %-20s  %.1fs",
-            i, human_verdict, pred,
-            (job.get("title") or "?")[:40],
-            job.get("company", "?")[:20],
-            elapsed,
-        )
-
-    return mismatches, {"tp": tp, "fp": fp, "tn": tn, "fn": fn, "skipped": skipped}
+    return mismatches, counts
 
 
 def print_report(metrics: dict, mismatches: list[MismatchRecord], run_id: str) -> None:
@@ -233,7 +356,7 @@ def main(run_logger: RunLogger | None = None) -> None:
     records = load_gold(args.gold)
     log.info("Loaded %d gold records from %s", len(records), args.gold)
 
-    mismatches, counts = run_eval(records, config, run_id)
+    mismatches, counts = run_eval(records, config, run_id, workers=args.workers)
 
     metrics = compute_metrics(**counts)
     print_report(metrics, mismatches, run_id)

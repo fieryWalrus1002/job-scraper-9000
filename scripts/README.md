@@ -110,6 +110,7 @@ uv run scripts/run_remote_filter_eval.py
 | `--provider` | _(from config)_ | Override `llm.provider` in-memory (`openai` or `ollama`) |
 | `--run-id` | _(auto-generated)_ | Human-readable label for this run; rejected if already in `runs.jsonl` |
 | `--no-mismatches` | off | Skip writing the mismatch file |
+| `--workers` | `1` | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
 
 The default provider is `openai` (model: `gpt-4o-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
@@ -125,6 +126,9 @@ uv run scripts/run_remote_filter_eval.py --provider ollama --model qwen25-14b --
 
 # Try a stronger OpenAI model without editing the YAML
 uv run scripts/run_remote_filter_eval.py --model gpt-4o --temperature 0.0 --run-id gpt4o_baseline
+
+# Run synchronous eval with four concurrent workers
+uv run scripts/run_remote_filter_eval.py --workers 4 --run-id gpt4o_mini_parallel
 
 # Compare OpenAI vs Ollama results
 uv run scripts/compare_evals.py --diff gpt4o_mini_baseline qwen_14b
