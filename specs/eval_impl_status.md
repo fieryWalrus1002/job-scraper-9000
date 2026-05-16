@@ -5,6 +5,17 @@
 
 ---
 
+## Immediate Cleanup / Next Progress
+
+| Task | Status | Location |
+| --- | --- | --- |
+| Align prompt provenance paths — `analyze_remote()` currently loads `system_prompt_v2.txt` while eval/filter metadata points at `system_prompt_v1.txt` | ⬜ pending | `src/agents/remote_filter/utils.py`, `scripts/run_remote_filter.py`, `scripts/run_remote_filter_eval.py`, `scripts/merge_batch_results.py` |
+| Update docs that lag implementation status | ⬜ pending | `README.md`, `scripts/README.md`, `src/review_ui/README.md`, `project-status.md`, `specs/project_impl_status.md` |
+| Package install cleanup — include reusable support packages beyond `job_scraper`, `agents`, and `ci` | ⬜ pending | `pyproject.toml` (`src/eval`, `src/utils`, possibly `src/review_ui`) |
+| Keep Phase 2 status focused on eval/data quality before starting skills-fit scorer | ⬜ pending | `project-status.md`, `specs/project_impl_status.md` |
+
+---
+
 ## SC-1 — Pluggable Logging Architecture
 
 | Task | Status | Location |
@@ -69,6 +80,30 @@
 
 ---
 
+## SC-6 — Parallel Evaluation (fast experimentation)
+
+| Task | Status | Location |
+| --- | --- | --- |
+| `--workers N` flag added to argument parser | ⬜ pending | `scripts/run_remote_filter_eval.py` |
+| `ThreadPoolExecutor` dispatch with in-order result collection | ⬜ pending | `scripts/run_remote_filter_eval.py` |
+| `--workers` excluded from run provenance record | ⬜ pending | `scripts/run_remote_filter_eval.py` |
+| Clean Ctrl+C exit preserved under parallel execution | ⬜ pending | `scripts/run_remote_filter_eval.py` |
+
+---
+
+## SC-7 — Batch Evaluation (regression testing)
+
+| Task | Status | Location |
+| --- | --- | --- |
+| `submit_eval_batch.py` — build + submit batch, write sidecar | ⬜ pending | `scripts/submit_eval_batch.py` |
+| `poll_eval_batch.py` — check status, download, compute metrics, log run record | ⬜ pending | `scripts/poll_eval_batch.py` |
+| Sidecar schema `{batch_id, run_id, submitted_at, gold_file, gold_hash, config, prompt_hash}` | ⬜ pending | `scripts/submit_eval_batch.py` |
+| `--sidecar <path>` override; defaults to most recent sidecar | ⬜ pending | `scripts/poll_eval_batch.py` |
+| Clear error if `--provider ollama` passed to submit script | ⬜ pending | `scripts/submit_eval_batch.py` |
+| Run record written by poll script is SC-2 compliant | ⬜ pending | `scripts/poll_eval_batch.py` |
+
+---
+
 ## Tests
 
 | Task | Status | Location |
@@ -79,4 +114,6 @@
 
 ---
 
-## All SCs complete — 314/314 tests passing
+## SC-1 through SC-5 complete — 314/314 tests passing
+
+## Immediate cleanup, SC-6, and SC-7 pending implementation
