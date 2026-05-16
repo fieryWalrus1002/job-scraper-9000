@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 from dataclasses import asdict
@@ -372,7 +373,12 @@ def _cmd_sel(args) -> None:
         worker_sub_types=[args.job_type],
         fetch_descriptions=not args.no_descriptions,
     )
-    log.info("SEL: location=%s | job_type=%s | descriptions=%s", args.location, args.job_type, not args.no_descriptions)
+    log.info(
+        "SEL: location=%s | job_type=%s | descriptions=%s",
+        args.location,
+        args.job_type,
+        not args.no_descriptions,
+    )
     jobs = SELJobScraper(query).scrape()
     _summary(jobs)
     _output(jobs, _resolve_dest(args, "sel", "sel"))
@@ -380,11 +386,84 @@ def _cmd_sel(args) -> None:
 
 def _add_sel(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser("sel", help="Schweitzer Engineering Laboratories (Workday)")
-    p.add_argument("--location", default="pullman_wa", help="Location key (default: pullman_wa)")
-    p.add_argument("--job-type", default="regular", dest="job_type", choices=["regular", "temporary"], help="Worker sub-type filter (default: regular)")
-    p.add_argument("--no-descriptions", action="store_true", dest="no_descriptions", help="Skip fetching full descriptions")
+    p.add_argument(
+        "--location", default="pullman_wa", help="Location key (default: pullman_wa)"
+    )
+    p.add_argument(
+        "--job-type",
+        default="regular",
+        dest="job_type",
+        choices=["regular", "temporary"],
+        help="Worker sub-type filter (default: regular)",
+    )
+    p.add_argument(
+        "--no-descriptions",
+        action="store_true",
+        dest="no_descriptions",
+        help="Skip fetching full descriptions",
+    )
     _add_save_output(p)
     p.set_defaults(func=_cmd_sel)
+
+
+# ---------------------------------------------------------------------------
+# remote-filter subcommand
+# ---------------------------------------------------------------------------
+
+
+def _cmd_remote_filter(args) -> None:
+    from agents.remote_filter.runner import run_remote_filter
+
+    try:
+        run_remote_filter(
+            input_path=args.input,
+            pass_path=args.pass_output,
+            trash_path=args.trash_output,
+            config_path=args.config,
+            user_location=args.user_location,
+            user_timezone=args.user_timezone,
+        )
+    except FileNotFoundError as exc:
+        log.error(str(exc))
+        sys.exit(1)
+
+
+def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser(
+        "remote-filter",
+        help="Run the remote-filter agent over raw jobs and split pass/trash outputs",
+    )
+    p.add_argument(
+        "--input",
+        default="data/raw",
+        help="Raw JSONL file or directory to read (default: data/raw)",
+    )
+    p.add_argument(
+        "--pass-output",
+        default="data/filtered/remote_filter_pass.jsonl",
+        help="JSONL path for jobs that pass the filter",
+    )
+    p.add_argument(
+        "--trash-output",
+        default="data/trash/remote_filter_trash.jsonl",
+        help="JSONL path for rejected jobs",
+    )
+    p.add_argument(
+        "--config",
+        default="config/agent/remote_agent.yml",
+        help="Remote-filter config YAML",
+    )
+    p.add_argument(
+        "--user-location",
+        default=os.environ.get("USER_LOCATION", "USA"),
+        help="Candidate location for geographic restriction checks",
+    )
+    p.add_argument(
+        "--user-timezone",
+        default=os.environ.get("USER_TIMEZONE"),
+        help="Candidate timezone context for the model",
+    )
+    p.set_defaults(func=_cmd_remote_filter)
 
 
 # ---------------------------------------------------------------------------
@@ -513,6 +592,7 @@ def main() -> None:
     _add_ashby(sub)
     _add_sel(sub)
     _add_discover(sub)
+    _add_remote_filter(sub)
     _add_run_config(sub)
 
     args = parser.parse_args()

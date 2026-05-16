@@ -76,7 +76,7 @@ uv run job-scraper run-config config/search.yml --save
 **Run the remote filter:**
 
 ```bash
-python scripts/run_remote_filter.py
+uv run job-scraper remote-filter
 ```
 
 **Run evals:**
