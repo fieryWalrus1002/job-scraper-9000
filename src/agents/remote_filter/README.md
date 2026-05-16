@@ -63,7 +63,7 @@ To retune behavior, adjust `policy_thresholds` or the prompt and rerun evals.
 
 ## Running the agent
 
-The CLI reads all JSONL files from `data/raw/`, applies the remote filter, and writes pass/trash outputs:
+The CLI reads the routed candidate JSONL from `data/prefiltered/remote_filter_input.jsonl` by default, applies the remote filter, and writes pass/trash outputs:
 
 ```bash
 uv run job-scraper remote-filter
@@ -79,6 +79,8 @@ Outputs:
 
 - `data/filtered/remote_filter_pass.jsonl`
 - `data/trash/remote_filter_trash.jsonl`
+
+Override `--input data/raw` if you want to run the filter directly on raw scraped jobs.
 
 Each enriched output record contains all original job fields plus:
 

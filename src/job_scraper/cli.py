@@ -407,6 +407,66 @@ def _add_sel(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
+# prefilter subcommand
+# ---------------------------------------------------------------------------
+
+
+def _cmd_prefilter(args) -> None:
+    from prefilter.router import run_prefilter
+
+    try:
+        run_prefilter(
+            input_path=args.input,
+            remote_out=args.remote_out,
+            local_out=args.local_out,
+            trash_out=args.trash_out,
+            config_path=args.config,
+            dry_run=args.dry_run,
+        )
+    except FileNotFoundError as exc:
+        log.error(str(exc))
+        sys.exit(1)
+
+
+def _add_prefilter(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser(
+        "prefilter",
+        help="Deterministically route raw jobs before the remote-filter agent",
+    )
+    p.add_argument(
+        "--input",
+        default="data/raw",
+        help="Raw JSONL file or directory to read (default: data/raw)",
+    )
+    p.add_argument(
+        "--config",
+        default="config/agent/prefilter.yml",
+        help="Prefilter config YAML",
+    )
+    p.add_argument(
+        "--remote-out",
+        default="data/prefiltered/remote_filter_input.jsonl",
+        help="JSONL path for jobs routed to the remote filter",
+    )
+    p.add_argument(
+        "--local-out",
+        default="data/local/local_jobs.jsonl",
+        help="JSONL path for local jobs",
+    )
+    p.add_argument(
+        "--trash-out",
+        default="data/trash/prefilter_trash.jsonl",
+        help="JSONL path for rejected jobs",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Route jobs in memory and print summary without writing files",
+    )
+    p.set_defaults(func=_cmd_prefilter)
+
+
+# ---------------------------------------------------------------------------
 # remote-filter subcommand
 # ---------------------------------------------------------------------------
 
@@ -431,12 +491,12 @@ def _cmd_remote_filter(args) -> None:
 def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "remote-filter",
-        help="Run the remote-filter agent over raw jobs and split pass/trash outputs",
+        help="Run the remote-filter agent over routed candidates and split pass/trash outputs",
     )
     p.add_argument(
         "--input",
-        default="data/raw",
-        help="Raw JSONL file or directory to read (default: data/raw)",
+        default="data/prefiltered/remote_filter_input.jsonl",
+        help="JSONL file or directory to read (default: data/prefiltered/remote_filter_input.jsonl)",
     )
     p.add_argument(
         "--pass-output",
@@ -592,6 +652,7 @@ def main() -> None:
     _add_ashby(sub)
     _add_sel(sub)
     _add_discover(sub)
+    _add_prefilter(sub)
     _add_remote_filter(sub)
     _add_run_config(sub)
 
