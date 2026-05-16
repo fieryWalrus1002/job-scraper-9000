@@ -114,6 +114,14 @@ uv run scripts/run_remote_filter_eval.py
 
 The default provider is `openai` (model: `gpt-4o-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
+Recent smoke-test baseline on the 104-record gold set:
+
+| run_id | model | workers | accuracy | precision | recall | f1 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `smoke_parallel_20260516_045209_a6da` | `gpt-4o-mini` | 4 | 0.8654 | 0.7073 | 0.9355 | 0.8056 |
+
+The current tuning target is reducing false positives: onsite or location-restricted jobs being predicted as pass.
+
 **Examples:**
 
 ```bash
