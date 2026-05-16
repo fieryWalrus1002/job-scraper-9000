@@ -61,7 +61,7 @@ CLI parameter overrides must not modify base YAML files.
 
 - `--model`, `--temperature`, `--provider` override the loaded config in memory only
 - The run record's `config.*` fields must reflect the resolved (post-override) values, not the YAML defaults
-- `--run-id <label>` allows a human-readable label to replace the auto-generated timestamp ID
+- `--run-id <label>` accepts a human-readable prefix that is prepended to the auto-generated timestamp+suffix (e.g. `gpt4o_baseline` → `gpt4o_baseline_20260515_235901_a3f2`); the timestamp is always appended so every run ID is unique and sortable
 
 ### SC-4 — Artifact Isolation & Hygiene
 
@@ -82,6 +82,28 @@ CLI parameter overrides must not modify base YAML files.
 - Support `--sort-by <metric>` (valid values: `timestamp`, `accuracy`, `precision`, `recall`, `f1`; default: `timestamp`)
 - Support `--diff <run_id_a> <run_id_b>` to print side-by-side metrics for two runs with directional indicators (`↑`/`↓`/`=`)
 - Exit 0 and print a clear message when `runs.jsonl` does not exist yet
+
+### SC-6 — Parallel Evaluation (fast experimentation)
+
+For interactive experimentation, wall-clock time matters. Sequential calls at ~5s/record make a 100-record eval take ~8 minutes.
+
+- `run_remote_filter_eval.py` must accept `--workers N` (default: 1, i.e. sequential)
+- When `N > 1`, requests are dispatched concurrently using a `ThreadPoolExecutor` with at most N threads
+- Results are collected in gold-record order — log lines and mismatch records must appear in the same order as sequential mode
+- The run record and all metrics are identical to a sequential run with the same inputs; `--workers` is a performance knob only and must not appear in the provenance record
+- Must work with any provider (OpenAI, Ollama, etc.)
+- Interrupt handling (Ctrl+C) must still produce a clean exit message and no partial run record
+
+### SC-7 — Batch Evaluation (regression testing)
+
+For scheduled regression testing where 24h turnaround is acceptable, the OpenAI Batch API cuts costs by 50% and decouples submission from result processing.
+
+- `scripts/submit_eval_batch.py` — reads `ground_truth.jsonl`, builds an OpenAI Batch API request file, submits it, and writes a sidecar `eval_batch_{run_id}.json` containing `{batch_id, run_id, submitted_at, gold_file, gold_hash, config, prompt_hash}`
+- `scripts/poll_eval_batch.py` — reads the sidecar, checks batch status via the OpenAI API; if complete, downloads results, computes metrics, and appends a full SC-2 provenance record to `runs.jsonl`; if not complete, exits 0 with a status message (safe to call from cron)
+- The sidecar path is `data/eval/eval_batch_{run_id}.json`; `--run-id` follows the same prefix+timestamp convention as SC-3
+- Poll script must accept `--sidecar <path>` to target a specific batch; defaults to the most recently written sidecar in `data/eval/`
+- OpenAI Batch API only — Ollama does not support batch submission; `submit_eval_batch.py` must exit with a clear error if `--provider ollama` is passed
+- The resulting `runs.jsonl` record is structurally identical to a synchronous eval run; downstream tools (`compare_evals.py`) require no changes
 
 ---
 

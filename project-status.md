@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-05-12_
+_Last updated: 2026-05-15_
 
 ---
 
@@ -15,7 +15,7 @@ _Last updated: 2026-05-12_
   - [x] GitHub Actions CI (ruff lint + pytest on push and PR)
   - [x] Comprehensive test suite — 12 test files, ~1,700 lines covering all scrapers, CLI, config, PII, discovery
 
-- [ ] **Phase 2 — Remote Filter Agent:** Core complete, pipeline partially assembled.
+- [ ] **Phase 2 — Remote Filter Agent:** Core complete, eval/provenance loop in progress.
   - [x] Pydantic v2 validation schema (`RemoteAnalysis`) with 8-category classification
   - [x] Agent functional — `analyze_remote()` + `passes_remote_filter()` with structured output
   - [x] Policy fully config-driven via `config/agent/remote_agent.yml` (no code changes needed to retune)
@@ -23,9 +23,12 @@ _Last updated: 2026-05-12_
   - [x] Batch preparation script (`prepare_batch.py`) — builds OpenAI Batch API request file
   - [x] Batch merge script (`merge_batch_results.py`) — joins teacher results back to original jobs
   - [x] Streamlit HITL review UI — confirm or correct teacher verdicts, writes to gold layer
+  - [x] Eval framework basics — run logging, provenance, metrics, mismatch files, and run comparison CLI
+  - [ ] Fix prompt provenance mismatch between agent runtime and eval/batch metadata paths
+  - [ ] Package/install cleanup — include `src/eval`, `src/utils`, and review UI support modules as needed
+  - [ ] Golden dataset expansion/balancing — especially more true-pass remote roles
+  - [ ] Eval throughput work — parallel synchronous eval (`--workers`) and OpenAI Batch eval scripts
   - [ ] `uv run agents remote-filter` CLI not wired into `pyproject.toml` — currently run via `scripts/run_remote_filter.py`
-  - [ ] Golden dataset not yet assembled — silver layer empty, 1 hand-labeled eval record exists
-  - [ ] Evaluation framework not implemented — no accuracy metrics, drift detection, or model comparison
 
 - [ ] **Phase 3 — Skills Fit Scoring Agent:** Designed, not started.
   - [ ] Pydantic schema for scoring output (`fit_score`, `top_matches`, `gaps`, `verdict`)
