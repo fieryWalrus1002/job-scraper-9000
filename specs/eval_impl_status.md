@@ -118,4 +118,23 @@
 
 ## SC-1 through SC-7 complete — 319/319 tests passing
 
+## Smoke Test Results
+
+Latest real synchronous eval smoke test:
+
+```text
+run_id:    smoke_parallel_20260516_045209_a6da
+command:   uv run scripts/run_remote_filter_eval.py --workers 4 --run-id smoke_parallel
+records:   104 evaluated, 0 skipped
+model:     gpt-4o-mini
+temp:      0.1
+TP/FP/TN/FN: 29 / 12 / 61 / 2
+accuracy:  0.8654
+precision: 0.7073
+recall:    0.9355
+f1:        0.8056
+```
+
+Interpretation: recall is strong, but precision needs work. The current main tuning target is reducing false positives where onsite/location-restricted jobs are allowed through as pass.
+
 ## Broader docs cleanup and gold dataset balancing still pending
