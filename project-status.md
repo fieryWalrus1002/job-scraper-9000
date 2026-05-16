@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-05-15_
+_Last updated: 2026-05-16_
 
 ---
 
@@ -14,6 +14,13 @@ _Last updated: 2026-05-15_
   - [x] Pre-commit hooks (ruff check + format, trailing whitespace, YAML validation)
   - [x] GitHub Actions CI (ruff lint + pytest on push and PR)
   - [x] Comprehensive test suite — 12 test files, ~1,700 lines covering all scrapers, CLI, config, PII, discovery
+
+- [x] **Phase 1.5 — Prefilter Router:** Complete and production-ready.
+  - [x] Design spec drafted (`specs/prefilter_design.md`)
+  - [x] Implementation plan drafted (`specs/prefilter_implementation_plan.md`)
+  - [x] Router implementation
+  - [x] CLI/script wiring
+  - [x] Fixture-based routing tests
 
 - [ ] **Phase 2 — Remote Filter Agent:** Core complete, eval/provenance loop complete; dataset/policy tuning in progress.
   - [x] Pydantic v2 validation schema (`RemoteAnalysis`) with 8-category classification

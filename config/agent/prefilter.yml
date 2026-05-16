@@ -1,0 +1,35 @@
+# Deterministic prefilter policy
+#
+# Keep this simple: the scraper decides what to fetch, and the prefilter decides
+# how to route the scraped records before the paid remote filter runs.
+
+country: USA
+
+country_detection:
+  enabled: true
+  sources:
+    - location
+    - description
+  aliases:
+    USA:
+      - US
+      - U.S.
+      - United States
+      - United States of America
+      - America
+      - United States (US)
+  unknown_policy: continue
+
+local_area:
+  # Add the exact local area strings that should bypass the remote filter.
+  # HOME_LOCATION is already used elsewhere in this repo and expands from .env.
+  allowed_locations:
+    - ${HOME_LOCATION}
+    - Pullman, WA
+  home_location: ${HOME_LOCATION}
+
+routing:
+  route_local_jobs: true
+  route_remote_candidates: true
+  reject_non_us: true
+  prefer_search_params_as_weak_signal: true
