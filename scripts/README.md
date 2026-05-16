@@ -136,6 +136,27 @@ uv run scripts/compare_evals.py --diff gpt4o_mini_baseline qwen_14b
 
 ---
 
+### Batch eval — `submit_eval_batch.py` + `poll_eval_batch.py`
+
+For lower-cost regression testing, submit the same gold dataset through the OpenAI Batch API and process it later. Batch eval writes the same `runs.jsonl` schema as synchronous eval, so `compare_evals.py` works unchanged.
+
+```bash
+# Submit a batch eval run
+uv run python scripts/submit_eval_batch.py --run-id gpt4o_mini_batch
+
+# Later, poll the newest sidecar; exits 0 if the batch is still running
+uv run python scripts/poll_eval_batch.py
+
+# Or poll a specific sidecar
+uv run python scripts/poll_eval_batch.py --sidecar data/eval/eval_batch_<run_id>.json
+```
+
+`submit_eval_batch.py` uses `provider=openai` only. It exits with a clear error for `--provider ollama` because Ollama does not support the OpenAI Batch API.
+
+`poll_eval_batch.py` verifies the gold-file hash before scoring, downloads completed batch results into `data/eval/batch/`, writes mismatch records if needed, and appends the normal eval run record to `data/eval/runs.jsonl`.
+
+---
+
 ### `compare_evals.py`
 
 Reads `data/eval/runs.jsonl` and prints a comparison table. Exits cleanly if no runs have been recorded yet.
