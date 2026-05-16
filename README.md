@@ -8,16 +8,24 @@ Built as a personal job-hunting tool and as a learning project to experiment wit
 
 ## Pipeline
 
-The full pipeline has four phases:
+The full pipeline has four phases, plus a deterministic routing step between ingestion and remote filtering:
 
 ### 1. Ingestion
 
 - Scrape LinkedIn, Indeed, ZipRecruiter, Glassdoor, and direct ATS boards (Greenhouse, Lever, Ashby) for target keyword searches.
 - Deduplicate across sources using a composite hash of company + title + location.
+- Preserve `data/raw/` as the immutable source-truth scrape output.
+
+### 1.5 Prefilter Router
+
+- Deterministically route raw jobs before spending LLM calls.
+- Send obvious remote-ish / ambiguous jobs to the Remote Filter Agent.
+- Route clearly local jobs to a separate local lane.
+- Reject obvious non-US or clearly non-viable jobs early.
 
 ### 2. Remote Filter Agent
 
-- Send each description to the Remote Filter Agent (OpenAI Agents Framework).
+- Send routed candidates to the Remote Filter Agent (OpenAI Agents Framework).
 - Distinguish genuine remote-flexible roles from deceptive hybrid listings. Returns a binary PASS/TRASH decision with a short rationale.
 - Runs on local hardware (RTX 4090).
 
@@ -37,7 +45,7 @@ The full pipeline has four phases:
 
 ---
 
-**Current state:** Phase 1 done. Phase 2 remote-filter implementation and eval framework are complete; dataset balancing and policy/prompt tuning are in progress. See [specs/project_impl_status.md](specs/project_impl_status.md) for the full tracker.
+**Current state:** Phase 1 done. The deterministic prefilter router is implemented and sits between raw ingestion and the paid remote filter. Phase 2 remote-filter implementation and eval framework are complete; dataset balancing and policy/prompt tuning are in progress. See [specs/project_impl_status.md](specs/project_impl_status.md) for the full tracker.
 
 The remote filter agent is evaluated against a human-verified gold dataset built through a teacher/HITL workflow: a stronger cloud model proposes remote-policy labels, then the Streamlit review UI confirms or corrects them. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly. The current 104-record gold eval set has a `gpt-4o-mini` smoke baseline of accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056. Future local-model distillation can build on this gold layer; see [specs/teacher-student.md](specs/teacher-student.md) for the design.
 
@@ -71,6 +79,12 @@ cp .env.example .env   # fill in API keys
 
 ```bash
 uv run job-scraper run-config config/search.yml --save
+```
+
+**Run the prefilter router:**
+
+```bash
+uv run job-scraper prefilter
 ```
 
 **Run the remote filter:**
@@ -114,7 +128,7 @@ streamlit run src/review_ui/app.py     # open the review UI
 | Local inference | Ollama — Qwen 2.5 14B, Llama 3.1 8B (RTX 4090) |
 | Cloud inference | OpenAI API (gpt-4o-mini default; gpt-4o for teacher) |
 | Review UI | Streamlit |
-| Data | Append-only JSONL, medallion layout (raw → staging → eval) |
+| Data | Append-only JSONL, medallion layout (raw → prefiltered/local/trash → staging → eval) |
 | Runtime | Python 3.13, `uv`, Pydantic v2 |
 
 ---
@@ -124,6 +138,9 @@ streamlit run src/review_ui/app.py     # open the review UI
 | Topic | Doc |
 | --- | --- |
 | Project status — what's built, what's next | [specs/project_impl_status.md](specs/project_impl_status.md) |
+| Prefilter router — deterministic routing layer, config, CLI | [src/prefilter/README.md](src/prefilter/README.md) |
+| Prefilter router design — deterministic routing layer before remote filter | [specs/prefilter_design.md](specs/prefilter_design.md) |
+| Prefilter implementation plan — branch-ready build plan | [specs/prefilter_implementation_plan.md](specs/prefilter_implementation_plan.md) |
 | Scraper module — how it works, backends, YAML config format | [src/job_scraper/README.md](src/job_scraper/README.md) |
 | Scraper CLI — all commands, flags, YAML config | [src/agents/README.md](src/agents/README.md) |
 | Remote filter agent — config, commands, classification schema | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md) |
@@ -156,9 +173,11 @@ config/               # search configs, agent policy, company board database
 specs/                # design docs
 
 data/
-  raw/                # scraped JSONL (Bronze)
+  raw/                # scraped JSONL (Bronze, source truth)
+  prefiltered/        # jobs routed onward to remote_filter
+  local/              # local jobs held aside from remote_filter
   staging/            # teacher-annotated, awaiting review (Silver)
   eval/               # human-verified golden dataset (Gold)
   filtered/           # remote_filter pass results
-  trash/              # remote_filter rejected results
+  trash/              # prefilter and remote_filter rejects
 ```

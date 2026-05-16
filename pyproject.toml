@@ -25,6 +25,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = [
     "src/job_scraper",
+    "src/prefilter",
     "src/agents",
     "src/agent_eval",
     "src/ci",

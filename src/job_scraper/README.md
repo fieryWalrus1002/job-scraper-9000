@@ -9,12 +9,14 @@ This is the ingestion layer — it talks to job boards, normalises every posting
 ```
 job_scraper (this module)
     ↓  data/raw/*.jsonl
+prefilter router
+    ↓  data/prefiltered/remote_filter_input.jsonl
 remote_filter agent
     ↓  data/filtered/ or data/trash/
 skills scorer  →  dispatch
 ```
 
-You run the scraper, it dumps raw JSONL, and downstream agents pick it up from there. Nothing is coupled — you can rerun any phase independently.
+You run the scraper, it dumps raw JSONL, and downstream routing/agent stages pick it up from there. Nothing is coupled — you can rerun any phase independently.
 
 ---
 

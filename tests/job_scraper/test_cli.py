@@ -174,14 +174,18 @@ def _parse_args(*argv):
                                     "job_scraper.cli._cmd_discover", side_effect=capture
                                 ):
                                     with patch(
-                                        "job_scraper.cli._cmd_remote_filter",
+                                        "job_scraper.cli._cmd_prefilter",
                                         side_effect=capture,
                                     ):
                                         with patch(
-                                            "job_scraper.cli._cmd_run_config",
+                                            "job_scraper.cli._cmd_remote_filter",
                                             side_effect=capture,
                                         ):
-                                            main()
+                                            with patch(
+                                                "job_scraper.cli._cmd_run_config",
+                                                side_effect=capture,
+                                            ):
+                                                main()
 
     return captured["args"]
 
@@ -491,6 +495,69 @@ def test_ashby_cmd_no_descriptions_flag():
 
 
 # ---------------------------------------------------------------------------
+# prefilter — argument parsing and command handler
+# ---------------------------------------------------------------------------
+
+
+def test_prefilter_defaults():
+    args = _parse_args("prefilter")
+    assert args.input == "data/raw"
+    assert args.config == "config/agent/prefilter.yml"
+    assert args.remote_out == "data/prefiltered/remote_filter_input.jsonl"
+    assert args.local_out == "data/local/local_jobs.jsonl"
+    assert args.trash_out == "data/trash/prefilter_trash.jsonl"
+    assert args.dry_run is False
+
+
+def test_prefilter_custom_paths():
+    args = _parse_args(
+        "prefilter",
+        "--input",
+        "raw.jsonl",
+        "--config",
+        "prefilter.yml",
+        "--remote-out",
+        "remote.jsonl",
+        "--local-out",
+        "local.jsonl",
+        "--trash-out",
+        "trash.jsonl",
+        "--dry-run",
+    )
+    assert args.input == "raw.jsonl"
+    assert args.config == "prefilter.yml"
+    assert args.remote_out == "remote.jsonl"
+    assert args.local_out == "local.jsonl"
+    assert args.trash_out == "trash.jsonl"
+    assert args.dry_run is True
+
+
+def test_prefilter_cmd_calls_runner():
+    from job_scraper.cli import _cmd_prefilter
+
+    args = _fake_args(
+        input="raw.jsonl",
+        config="prefilter.yml",
+        remote_out="remote.jsonl",
+        local_out="local.jsonl",
+        trash_out="trash.jsonl",
+        dry_run=True,
+    )
+
+    with patch("prefilter.router.run_prefilter") as mock_run:
+        _cmd_prefilter(args)
+
+    mock_run.assert_called_once_with(
+        input_path="raw.jsonl",
+        remote_out="remote.jsonl",
+        local_out="local.jsonl",
+        trash_out="trash.jsonl",
+        config_path="prefilter.yml",
+        dry_run=True,
+    )
+
+
+# ---------------------------------------------------------------------------
 # remote-filter — argument parsing and command handler
 # ---------------------------------------------------------------------------
 
@@ -499,7 +566,7 @@ def test_remote_filter_defaults():
     with patch.dict("os.environ", {}, clear=True):
         with patch("job_scraper.cli.load_dotenv"):
             args = _parse_args("remote-filter")
-    assert args.input == "data/raw"
+    assert args.input == "data/prefiltered/remote_filter_input.jsonl"
     assert args.pass_output == "data/filtered/remote_filter_pass.jsonl"
     assert args.trash_output == "data/trash/remote_filter_trash.jsonl"
     assert args.config == "config/agent/remote_agent.yml"
