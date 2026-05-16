@@ -28,9 +28,9 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH, analyze_remote, passes_remote_filter
-from eval.logger import JsonlRunLogger, RunLogger
-from eval.metrics import compute_metrics
-from eval.provenance import build_run_record, generate_run_id
+from agent_eval.logger import JsonlRunLogger, RunLogger
+from agent_eval.metrics import compute_metrics
+from agent_eval.provenance import build_run_record, generate_run_id
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(message)s")

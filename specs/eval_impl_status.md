@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | Align prompt provenance paths — canonical `system_prompt.txt` files now drive runtime, eval, and batch metadata | ✅ done | `prompts/remote_agent/system_prompt.txt`, `prompts/remote_agent_teacher/system_prompt.txt`, `src/agents/remote_filter/utils.py`, `scripts/run_remote_filter.py`, `scripts/run_remote_filter_eval.py`, `scripts/prepare_batch.py`, `scripts/merge_batch_results.py` |
 | Update docs that lag implementation status | ⬜ pending | `README.md`, `scripts/README.md`, `src/review_ui/README.md`, `project-status.md`, `specs/project_impl_status.md` |
-| Package install cleanup — include reusable support packages beyond `job_scraper`, `agents`, and `ci` | ⬜ pending | `pyproject.toml` (`src/eval`, `src/utils`, possibly `src/review_ui`) |
+| Package install cleanup — rename generic eval package to `agent_eval` and include reusable support packages beyond `job_scraper`, `agents`, and `ci` | ✅ done | `pyproject.toml` (`src/agent_eval`, `src/utils`, `src/review_ui`) |
 | Keep Phase 2 status focused on eval/data quality before starting skills-fit scorer | ⬜ pending | `project-status.md`, `specs/project_impl_status.md` |
 
 ---
@@ -20,11 +20,11 @@
 
 | Task | Status | Location |
 | --- | --- | --- |
-| `RunLogger` Protocol defined | ✅ done | `src/eval/logger.py` |
-| `JsonlRunLogger` implemented | ✅ done | `src/eval/logger.py` |
-| `MLFlowRunLogger` stub (Protocol proof) | ✅ done | `src/eval/logger.py` |
-| Non-fatal I/O failure → warning | ✅ done | `src/eval/logger.py` |
-| Duplicate `run_id` → `ValueError` | ✅ done | `src/eval/logger.py` |
+| `RunLogger` Protocol defined | ✅ done | `src/agent_eval/logger.py` |
+| `JsonlRunLogger` implemented | ✅ done | `src/agent_eval/logger.py` |
+| `MLFlowRunLogger` stub (Protocol proof) | ✅ done | `src/agent_eval/logger.py` |
+| Non-fatal I/O failure → warning | ✅ done | `src/agent_eval/logger.py` |
+| Duplicate `run_id` → `ValueError` | ✅ done | `src/agent_eval/logger.py` |
 | Driver accepts `RunLogger` via DI | ✅ done | `scripts/run_remote_filter_eval.py` |
 
 ---
@@ -33,12 +33,12 @@
 
 | Task | Status | Location |
 | --- | --- | --- |
-| `hash_bytes` / `hash_string` / `hash_file` primitives | ✅ done | `src/eval/provenance.py` |
-| `generate_run_id()` | ✅ done | `src/eval/provenance.py` |
-| `_collect_env()` — python, platform, uv version + lock hash | ✅ done | `src/eval/provenance.py` |
-| `build_run_record()` — full SC-2 schema | ✅ done | `src/eval/provenance.py` |
-| Git short SHA (7 chars, via `git_info`) | ✅ done | `src/eval/provenance.py` |
-| `compute_metrics()` — confusion matrix → metric dict | ✅ done | `src/eval/metrics.py` |
+| `hash_bytes` / `hash_string` / `hash_file` primitives | ✅ done | `src/agent_eval/provenance.py` |
+| `generate_run_id()` | ✅ done | `src/agent_eval/provenance.py` |
+| `_collect_env()` — python, platform, uv version + lock hash | ✅ done | `src/agent_eval/provenance.py` |
+| `build_run_record()` — full SC-2 schema | ✅ done | `src/agent_eval/provenance.py` |
+| Git short SHA (7 chars, via `git_info`) | ✅ done | `src/agent_eval/provenance.py` |
+| `compute_metrics()` — confusion matrix → metric dict | ✅ done | `src/agent_eval/metrics.py` |
 | Driver calls `build_run_record()` and `log_run()` | ✅ done | `scripts/run_remote_filter_eval.py` |
 | Mismatch file renamed `mismatches_{run_id}.jsonl` | ✅ done | `scripts/run_remote_filter_eval.py` |
 
@@ -61,8 +61,8 @@
 | Task | Status | Location |
 | --- | --- | --- |
 | `data/eval/*.jsonl` excluded from git | ✅ done | `.gitignore` (`data/**/*.jsonl`) |
-| `runs.jsonl` append-only enforced | ✅ done | `src/eval/logger.py` |
-| Secret redaction in `_sanitize()` | ✅ done | `src/eval/logger.py` |
+| `runs.jsonl` append-only enforced | ✅ done | `src/agent_eval/logger.py` |
+| Secret redaction in `_sanitize()` | ✅ done | `src/agent_eval/logger.py` |
 | Mismatch records include `run_id`, `record_id`, `gold`, `pred`, `human_policy`, `reason` | ✅ done | `scripts/run_remote_filter_eval.py` |
 
 ---
@@ -108,9 +108,9 @@
 
 | Task | Status | Location |
 | --- | --- | --- |
-| `tests/eval/` directory + stubs (19 tests) | ✅ done | `tests/eval/` |
-| `test_logger.py` — implement all 10 stubs | ✅ done | `tests/eval/test_logger.py` |
-| `test_metrics.py` — implement all 9 stubs | ✅ done | `tests/eval/test_metrics.py` |
+| `tests/agent_eval/` directory + stubs (19 tests) | ✅ done | `tests/agent_eval/` |
+| `test_logger.py` — implement all 10 stubs | ✅ done | `tests/agent_eval/test_logger.py` |
+| `test_metrics.py` — implement all 9 stubs | ✅ done | `tests/agent_eval/test_metrics.py` |
 
 ---
 
