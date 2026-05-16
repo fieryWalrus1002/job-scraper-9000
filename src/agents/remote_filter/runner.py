@@ -17,7 +17,7 @@ from utils.git_info import get_git_metadata, get_prompt_hash
 
 log = logging.getLogger(__name__)
 
-DEFAULT_INPUT_DIR = Path("data/raw")
+DEFAULT_INPUT_DIR = Path("data/prefiltered/remote_filter_input.jsonl")
 DEFAULT_PASS_PATH = Path("data/filtered/remote_filter_pass.jsonl")
 DEFAULT_TRASH_PATH = Path("data/trash/remote_filter_trash.jsonl")
 DEFAULT_CONFIG_PATH = Path("config/agent/remote_agent.yml")
@@ -56,7 +56,7 @@ def run_remote_filter(
     user_location: str = "USA",
     user_timezone: str | None = None,
 ) -> dict[str, int]:
-    """Run the remote-filter agent over raw jobs and split pass/trash JSONL outputs."""
+    """Run the remote-filter agent over routed candidate jobs and split pass/trash JSONL outputs."""
     input_path = Path(input_path)
     pass_path = Path(pass_path)
     trash_path = Path(trash_path)

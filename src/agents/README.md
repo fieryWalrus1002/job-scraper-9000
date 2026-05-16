@@ -1,6 +1,6 @@
 # agents
 
-The processing pipeline for job-scraper-9000. Reads raw JSONL from `data/raw/`, runs it through LLM agents, and produces filtered/scored output.
+The processing pipeline for job-scraper-9000. Reads routed candidate JSONL (prefiltered from `data/raw/`), runs it through LLM agents, and produces filtered/scored output.
 
 ## Entry point
 
@@ -33,6 +33,10 @@ Agents use OpenAI by default. Switch providers with env vars in `.env`:
 
 ```
 data/raw/*.jsonl
+      ↓
+  prefilter router
+      ↓
+data/prefiltered/remote_filter_input.jsonl
       ↓
   remote-filter run
       ↓
