@@ -169,10 +169,19 @@ def _parse_args(*argv):
                 with patch("job_scraper.cli._cmd_greenhouse", side_effect=capture):
                     with patch("job_scraper.cli._cmd_lever", side_effect=capture):
                         with patch("job_scraper.cli._cmd_ashby", side_effect=capture):
-                            with patch(
-                                "job_scraper.cli._cmd_run_config", side_effect=capture
-                            ):
-                                main()
+                            with patch("job_scraper.cli._cmd_sel", side_effect=capture):
+                                with patch(
+                                    "job_scraper.cli._cmd_discover", side_effect=capture
+                                ):
+                                    with patch(
+                                        "job_scraper.cli._cmd_remote_filter",
+                                        side_effect=capture,
+                                    ):
+                                        with patch(
+                                            "job_scraper.cli._cmd_run_config",
+                                            side_effect=capture,
+                                        ):
+                                            main()
 
     return captured["args"]
 
@@ -474,6 +483,77 @@ def test_ashby_cmd_passes_company():
 def test_ashby_cmd_no_descriptions_flag():
     query = _run_ashby_cmd(no_descriptions=True)
     assert query.fetch_descriptions is False
+
+
+# ---------------------------------------------------------------------------
+# run-config — argument parsing
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# remote-filter — argument parsing and command handler
+# ---------------------------------------------------------------------------
+
+
+def test_remote_filter_defaults():
+    with patch.dict("os.environ", {}, clear=True):
+        with patch("job_scraper.cli.load_dotenv"):
+            args = _parse_args("remote-filter")
+    assert args.input == "data/raw"
+    assert args.pass_output == "data/filtered/remote_filter_pass.jsonl"
+    assert args.trash_output == "data/trash/remote_filter_trash.jsonl"
+    assert args.config == "config/agent/remote_agent.yml"
+    assert args.user_location == "USA"
+    assert args.user_timezone is None
+
+
+def test_remote_filter_custom_paths():
+    args = _parse_args(
+        "remote-filter",
+        "--input",
+        "raw.jsonl",
+        "--pass-output",
+        "pass.jsonl",
+        "--trash-output",
+        "trash.jsonl",
+        "--config",
+        "remote.yml",
+        "--user-location",
+        "Canada",
+        "--user-timezone",
+        "PST",
+    )
+    assert args.input == "raw.jsonl"
+    assert args.pass_output == "pass.jsonl"
+    assert args.trash_output == "trash.jsonl"
+    assert args.config == "remote.yml"
+    assert args.user_location == "Canada"
+    assert args.user_timezone == "PST"
+
+
+def test_remote_filter_cmd_calls_runner():
+    from job_scraper.cli import _cmd_remote_filter
+
+    args = _fake_args(
+        input="raw.jsonl",
+        pass_output="pass.jsonl",
+        trash_output="trash.jsonl",
+        config="remote.yml",
+        user_location="USA",
+        user_timezone="PST",
+    )
+
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    mock_run.assert_called_once_with(
+        input_path="raw.jsonl",
+        pass_path="pass.jsonl",
+        trash_path="trash.jsonl",
+        config_path="remote.yml",
+        user_location="USA",
+        user_timezone="PST",
+    )
 
 
 # ---------------------------------------------------------------------------

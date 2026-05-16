@@ -63,7 +63,13 @@ To retune behavior, adjust `policy_thresholds` or the prompt and rerun evals.
 
 ## Running the agent
 
-The production-ish script reads all JSONL files from `data/raw/`, applies the remote filter, and writes pass/trash outputs:
+The CLI reads all JSONL files from `data/raw/`, applies the remote filter, and writes pass/trash outputs:
+
+```bash
+uv run job-scraper remote-filter
+```
+
+The legacy script entry point still works:
 
 ```bash
 python scripts/run_remote_filter.py
