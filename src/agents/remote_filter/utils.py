@@ -10,10 +10,10 @@ from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)
 
-_PROMPT_PATH = (
-    Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v2.txt"
+REMOTE_FILTER_PROMPT_PATH = (
+    Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt.txt"
 )
-_PROMPT = _PROMPT_PATH.read_text()
+_PROMPT = REMOTE_FILTER_PROMPT_PATH.read_text()
 
 
 def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:

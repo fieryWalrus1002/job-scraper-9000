@@ -24,7 +24,7 @@ _Last updated: 2026-05-15_
   - [x] Batch merge script (`merge_batch_results.py`) — joins teacher results back to original jobs
   - [x] Streamlit HITL review UI — confirm or correct teacher verdicts, writes to gold layer
   - [x] Eval framework basics — run logging, provenance, metrics, mismatch files, and run comparison CLI
-  - [ ] Fix prompt provenance mismatch between agent runtime and eval/batch metadata paths
+  - [x] Fix prompt provenance mismatch between agent runtime and eval/batch metadata paths
   - [ ] Package/install cleanup — include `src/eval`, `src/utils`, and review UI support modules as needed
   - [ ] Golden dataset expansion/balancing — especially more true-pass remote roles
   - [ ] Eval throughput work — parallel synchronous eval (`--workers`) and OpenAI Batch eval scripts

@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agents.remote_filter.models import SCHEMA_VERSION
 from agents.remote_filter.utils import (
+    REMOTE_FILTER_PROMPT_PATH,
     analyze_remote,
     load_raw_jobs,
     passes_remote_filter,
@@ -31,9 +32,7 @@ CONFIG_PATH = Path("config/agent/remote_agent.yml")
 USER_LOCATION = os.environ.get("USER_LOCATION", "USA")
 USER_TIMEZONE = os.environ.get("USER_TIMEZONE", None)
 
-_PROMPT_FILE = (
-    Path(__file__).parents[1] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
-)
+_PROMPT_FILE = REMOTE_FILTER_PROMPT_PATH
 
 
 def main() -> None:

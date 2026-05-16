@@ -9,7 +9,7 @@
 
 | Task | Status | Location |
 | --- | --- | --- |
-| Align prompt provenance paths — `analyze_remote()` currently loads `system_prompt_v2.txt` while eval/filter metadata points at `system_prompt_v1.txt` | ⬜ pending | `src/agents/remote_filter/utils.py`, `scripts/run_remote_filter.py`, `scripts/run_remote_filter_eval.py`, `scripts/merge_batch_results.py` |
+| Align prompt provenance paths — canonical `system_prompt.txt` files now drive runtime, eval, and batch metadata | ✅ done | `prompts/remote_agent/system_prompt.txt`, `prompts/remote_agent_teacher/system_prompt.txt`, `src/agents/remote_filter/utils.py`, `scripts/run_remote_filter.py`, `scripts/run_remote_filter_eval.py`, `scripts/prepare_batch.py`, `scripts/merge_batch_results.py` |
 | Update docs that lag implementation status | ⬜ pending | `README.md`, `scripts/README.md`, `src/review_ui/README.md`, `project-status.md`, `specs/project_impl_status.md` |
 | Package install cleanup — include reusable support packages beyond `job_scraper`, `agents`, and `ci` | ⬜ pending | `pyproject.toml` (`src/eval`, `src/utils`, possibly `src/review_ui`) |
 | Keep Phase 2 status focused on eval/data quality before starting skills-fit scorer | ⬜ pending | `project-status.md`, `specs/project_impl_status.md` |

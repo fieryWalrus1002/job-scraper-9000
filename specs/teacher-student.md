@@ -37,7 +37,7 @@ Rather than relying on expensive cloud APIs for every job, we use the cloud as a
 2. **HITL Verification:** Humans verify the reasoning in the Review UI, correcting edge cases (e.g., "Remote in title, but Hybrid in fine print").
 3. **Behavioral Cloning:** The `reasoning_trace` from the Gold dataset is used to "few-shot" or fine-tune the local Student model, effectively "cloning" GPT-5 level logic into a 7B local environment.
 
-See the prompt we have in mind at [teacher prompt v1](prompts/remote_agent_teacher/system_prompt_v1.txt)
+See the active teacher prompt at [`prompts/remote_agent_teacher/system_prompt.txt`](../prompts/remote_agent_teacher/system_prompt.txt). Historical copies live under `prompts/remote_agent_teacher/versions/`.
 
 ---
 

@@ -27,7 +27,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agents.remote_filter.utils import analyze_remote, passes_remote_filter
+from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH, analyze_remote, passes_remote_filter
 from eval.logger import JsonlRunLogger, RunLogger
 from eval.metrics import compute_metrics
 from eval.provenance import build_run_record, generate_run_id
@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 GOLD_FILE = "data/eval/ground_truth.jsonl"
 CONFIG_PATH = "config/agent/remote_agent.yml"
 RUNS_FILE = "data/eval/runs.jsonl"
-PROMPT_PATH = Path(__file__).parents[1] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
+PROMPT_PATH = REMOTE_FILTER_PROMPT_PATH
 
 USER_LOCATION = os.environ.get("USER_LOCATION", "USA")
 USER_TIMEZONE = os.environ.get("USER_TIMEZONE", None)
