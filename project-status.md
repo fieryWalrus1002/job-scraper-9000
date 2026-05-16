@@ -28,7 +28,7 @@ _Last updated: 2026-05-15_
   - [x] Package/install cleanup — renamed generic eval package to `agent_eval` and included support packages in wheel config
   - [ ] Golden dataset expansion/balancing — especially more true-pass remote roles
   - [x] Eval throughput work — parallel synchronous eval (`--workers`)
-  - [ ] OpenAI Batch eval scripts for lower-cost regression runs
+  - [x] OpenAI Batch eval scripts for lower-cost regression runs
   - [ ] `uv run agents remote-filter` CLI not wired into `pyproject.toml` — currently run via `scripts/run_remote_filter.py`
 
 - [ ] **Phase 3 — Skills Fit Scoring Agent:** Designed, not started.

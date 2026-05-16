@@ -95,12 +95,12 @@
 
 | Task | Status | Location |
 | --- | --- | --- |
-| `submit_eval_batch.py` — build + submit batch, write sidecar | ⬜ pending | `scripts/submit_eval_batch.py` |
-| `poll_eval_batch.py` — check status, download, compute metrics, log run record | ⬜ pending | `scripts/poll_eval_batch.py` |
-| Sidecar schema `{batch_id, run_id, submitted_at, gold_file, gold_hash, config, prompt_hash}` | ⬜ pending | `scripts/submit_eval_batch.py` |
-| `--sidecar <path>` override; defaults to most recent sidecar | ⬜ pending | `scripts/poll_eval_batch.py` |
-| Clear error if `--provider ollama` passed to submit script | ⬜ pending | `scripts/submit_eval_batch.py` |
-| Run record written by poll script is SC-2 compliant | ⬜ pending | `scripts/poll_eval_batch.py` |
+| `submit_eval_batch.py` — build + submit batch, write sidecar | ✅ done | `scripts/submit_eval_batch.py` |
+| `poll_eval_batch.py` — check status, download, compute metrics, log run record | ✅ done | `scripts/poll_eval_batch.py` |
+| Sidecar schema `{batch_id, run_id, submitted_at, gold_file, gold_hash, config, prompt_hash}` | ✅ done | `scripts/submit_eval_batch.py` |
+| `--sidecar <path>` override; defaults to most recent sidecar | ✅ done | `scripts/poll_eval_batch.py` |
+| Clear error if `--provider ollama` passed to submit script | ✅ done | `scripts/submit_eval_batch.py` |
+| Run record written by poll script is SC-2 compliant | ✅ done | `scripts/poll_eval_batch.py` |
 
 ---
 
@@ -112,9 +112,10 @@
 | `test_logger.py` — implement all 10 stubs | ✅ done | `tests/agent_eval/test_logger.py` |
 | `test_metrics.py` — implement all 9 stubs | ✅ done | `tests/agent_eval/test_metrics.py` |
 | Parallel eval order/count tests | ✅ done | `tests/test_run_remote_filter_eval.py` |
+| Batch eval request/result tests | ✅ done | `tests/test_eval_batch.py` |
 
 ---
 
-## SC-1 through SC-6 complete — 316/316 tests passing
+## SC-1 through SC-7 complete — 319/319 tests passing
 
-## Docs cleanup and SC-7 pending implementation
+## Broader docs cleanup and gold dataset balancing still pending

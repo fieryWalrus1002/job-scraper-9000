@@ -26,7 +26,7 @@ Distinguish genuine remote-flexible roles from deceptive hybrid listings. Return
 | Agent functional (OpenAI framework) | ✅ done |
 | Teacher batch pipeline + HITL review UI | ✅ done |
 | Golden dataset assembled | 🔄 in progress (8 pass / 42 trash → target 25 pass) |
-| Eval framework | 🔄 in progress — SC-1 through SC-6 complete; docs cleanup and batch eval pending. See [eval_impl_status.md](eval_impl_status.md) |
+| Eval framework | ✅ done — SC-1 through SC-7 complete. See [eval_impl_status.md](eval_impl_status.md) |
 | Prompt/runtime provenance alignment | ✅ done — canonical prompt files used by runtime, eval, and metadata logging |
 | Packaging/docs cleanup | 🔄 in progress — generic eval package renamed to `agent_eval` and support packages included in install config; broader docs cleanup still pending |
 
