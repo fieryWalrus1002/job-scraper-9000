@@ -1,0 +1,47 @@
+You are analyzing a job posting to extract its remote work policy.
+You will produce a structured analysis in JSON format.
+
+Read the posting carefully. Look for:
+
+1. Explicit statements about remote vs. onsite vs. hybrid work
+2. Location requirements ("must reside in X", "within commuting distance of Y")
+3. Travel expectations (frequency, purpose, percentage of time)
+4. Relocation requirements (immediate or future)
+5. Time zone or geographic restrictions
+
+If a search context is provided (e.g. [Search context: workplace_filter=remote]), treat it as
+employer-declared signal about the role's remote policy. A posting retrieved via a platform's
+remote workplace filter was explicitly listed by the employer as a remote-eligible role. Use this
+as supporting evidence when the posting itself is ambiguous. Do not classify a job as "unclear"
+solely because the posting lacks explicit remote language when the search context already
+confirms remote intent — instead, classify as "fully_remote" or "location_restricted" as
+appropriate based on any other location details in the posting.
+
+Use "unclear" ONLY when there is genuinely no location AND no remote policy anywhere in the
+posting AND no search context confirming remote intent — not as a hedge when the answer is
+obvious from context. A named city with no remote language is onsite, not unclear.
+
+Common patterns to recognize:
+- "Remote" in the title but "must be located in [city]" in the body → onsite_disguised, requires_local_presence=true
+- "Remote with quarterly all-hands" → remote_with_quarterly_travel
+- "Hybrid" or "X days per week in office" → hybrid
+- "US-based remote" → fully_remote, location_restrictions=["US-only"]
+- "Open to remote candidates in [list of states]" → location_restricted
+- "Quarterly on-site meetings" → remote_with_quarterly_travel, NOT hybrid
+- "Must relocate to [city]" or "relocation assistance provided" or "relocation required" → requires_relocation=true
+- Posting lists a specific city/office with no mention of remote or hybrid → onsite (silence is not ambiguity when a physical location is named)
+
+For estimated_travel_days_per_year:
+- "Quarterly meetings" → 4
+- "Monthly meetings" → 12
+- "10% travel" → 25
+- "Occasional travel" → 6
+- If unspecified, leave null
+
+For timezone_requirements: extract hard timezone requirements as short strings, e.g. ["EST", "Eastern time", "Pacific timezone overlap"]. A hard requirement means the posting says the candidate MUST be in that timezone, or that it is required/mandatory. Soft preferences ("Eastern preferred", "PST a plus") are NOT requirements — leave timezone_requirements empty for those. Leave empty if no timezone is mentioned at all.
+
+For key_phrases: extract 2-5 verbatim phrases copied exactly from the posting that directly support your classification. These are the snippets a human reviewer would want highlighted — the sentences or clauses about remote policy, travel, location requirements, or relocation. Prefer exact quotes over paraphrases.
+
+For reasoning_trace: think step by step. Quote the relevant parts of the posting, analyze what they mean, and explain how you reached your classification. Make the reasoning explicit enough that a human reviewer can verify or correct it.
+
+Return ONLY valid JSON matching the schema. No commentary outside the JSON.

@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-05-12_
+_Last updated: 2026-05-15_
 
 ---
 
@@ -15,7 +15,7 @@ _Last updated: 2026-05-12_
   - [x] GitHub Actions CI (ruff lint + pytest on push and PR)
   - [x] Comprehensive test suite — 12 test files, ~1,700 lines covering all scrapers, CLI, config, PII, discovery
 
-- [ ] **Phase 2 — Remote Filter Agent:** Core complete, pipeline partially assembled.
+- [ ] **Phase 2 — Remote Filter Agent:** Core complete, eval/provenance loop complete; dataset/policy tuning in progress.
   - [x] Pydantic v2 validation schema (`RemoteAnalysis`) with 8-category classification
   - [x] Agent functional — `analyze_remote()` + `passes_remote_filter()` with structured output
   - [x] Policy fully config-driven via `config/agent/remote_agent.yml` (no code changes needed to retune)
@@ -23,9 +23,15 @@ _Last updated: 2026-05-12_
   - [x] Batch preparation script (`prepare_batch.py`) — builds OpenAI Batch API request file
   - [x] Batch merge script (`merge_batch_results.py`) — joins teacher results back to original jobs
   - [x] Streamlit HITL review UI — confirm or correct teacher verdicts, writes to gold layer
+  - [x] Eval framework basics — run logging, provenance, metrics, mismatch files, and run comparison CLI
+  - [x] Fix prompt provenance mismatch between agent runtime and eval/batch metadata paths
+  - [x] Package/install cleanup — renamed generic eval package to `agent_eval` and included support packages in wheel config
+  - [ ] Golden dataset expansion/balancing — current eval set is 104 records (~31 pass / 73 trash); add more true-pass remote roles and review smoke-test mismatches
+  - [x] Eval throughput work — parallel synchronous eval (`--workers`)
+  - [x] OpenAI Batch eval scripts for lower-cost regression runs
+  - [x] Parallel eval smoke test passed — `smoke_parallel_20260516_045209_a6da`: accuracy 0.8654, precision 0.7073, recall 0.9355, F1 0.8056
+  - [ ] Future sprint: eval-driven data quality and policy/prompt tuning — see [specs/remote_filter_eval_tuning.md](specs/remote_filter_eval_tuning.md)
   - [ ] `uv run agents remote-filter` CLI not wired into `pyproject.toml` — currently run via `scripts/run_remote_filter.py`
-  - [ ] Golden dataset not yet assembled — silver layer empty, 1 hand-labeled eval record exists
-  - [ ] Evaluation framework not implemented — no accuracy metrics, drift detection, or model comparison
 
 - [ ] **Phase 3 — Skills Fit Scoring Agent:** Designed, not started.
   - [ ] Pydantic schema for scoring output (`fit_score`, `top_matches`, `gaps`, `verdict`)

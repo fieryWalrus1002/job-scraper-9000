@@ -10,10 +10,25 @@ from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)
 
-_PROMPT_PATH = (
-    Path(__file__).parents[3] / "prompts" / "remote_agent" / "system_prompt_v1.txt"
-)
-_PROMPT = _PROMPT_PATH.read_text()
+def _resolve_prompt_path() -> Path:
+    """Return the active remote-filter prompt path in source trees or installed wheels."""
+    relative = Path("prompts") / "remote_agent" / "system_prompt.txt"
+    candidates = [
+        Path(__file__).parents[3] / relative,  # repo root when running from src/
+        Path(__file__).parents[2] / relative,  # site-packages when prompts are wheel data
+        Path.cwd() / relative,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "Remote filter prompt not found. Checked: "
+        + ", ".join(str(candidate) for candidate in candidates)
+    )
+
+
+REMOTE_FILTER_PROMPT_PATH = _resolve_prompt_path()
+_PROMPT = REMOTE_FILTER_PROMPT_PATH.read_text()
 
 
 def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:

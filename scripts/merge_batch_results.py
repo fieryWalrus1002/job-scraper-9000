@@ -34,7 +34,7 @@ PROMPT_FILE = (
     Path(__file__).parents[1]
     / "prompts"
     / "remote_agent_teacher"
-    / "system_prompt_v1.txt"
+    / "system_prompt.txt"
 )
 
 

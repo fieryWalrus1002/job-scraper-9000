@@ -37,9 +37,9 @@ The full pipeline has four phases:
 
 ---
 
-**Current state:** Phases 1 and 2 are production-ready. Phase 3 (scoring) and Phase 4 (dispatch) are coming.
+**Current state:** Phase 1 done. Phase 2 remote-filter implementation and eval framework are complete; dataset balancing and policy/prompt tuning are in progress. See [specs/project_impl_status.md](specs/project_impl_status.md) for the full tracker.
 
-The remote filter agent is being improved via a teacher-student distillation pattern — a cloud teacher model builds a labeled dataset that trains a faster local student model. See [specs/teacher-student.md](specs/teacher-student.md) for the design.
+The remote filter agent is evaluated against a human-verified gold dataset built through a teacher/HITL workflow: a stronger cloud model proposes remote-policy labels, then the Streamlit review UI confirms or corrects them. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly. The current 104-record gold eval set has a `gpt-4o-mini` smoke baseline of accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056. Future local-model distillation can build on this gold layer; see [specs/teacher-student.md](specs/teacher-student.md) for the design.
 
 ---
 
@@ -79,6 +79,20 @@ uv run job-scraper run-config config/search.yml --save
 python scripts/run_remote_filter.py
 ```
 
+**Run evals:**
+
+```bash
+uv run scripts/run_remote_filter_eval.py --workers 4
+uv run scripts/compare_evals.py --last 5
+```
+
+**Run lower-cost OpenAI Batch eval:**
+
+```bash
+uv run python scripts/submit_eval_batch.py --run-id gpt4o_mini_batch
+uv run python scripts/poll_eval_batch.py
+```
+
 **Run the teacher batch pipeline + HITL review:**
 
 More details in [the HITL README.md](src/review_ui/README.md).
@@ -109,12 +123,13 @@ streamlit run src/review_ui/app.py     # open the review UI
 
 | Topic | Doc |
 | --- | --- |
-| Project status — what's built, what's next | [project-status.md](project-status.md) |
+| Project status — what's built, what's next | [specs/project_impl_status.md](specs/project_impl_status.md) |
 | Scraper module — how it works, backends, YAML config format | [src/job_scraper/README.md](src/job_scraper/README.md) |
 | Scraper CLI — all commands, flags, YAML config | [src/agents/README.md](src/agents/README.md) |
 | Remote filter agent — config, commands, classification schema | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md) |
 | Teacher-student distillation design | [specs/teacher-student.md](specs/teacher-student.md) |
 | Batch pipeline scripts — prepare, merge, sample | [scripts/README.md](scripts/README.md) |
+| Eval scripts — running evals, CLI flags, comparing runs | [scripts/README.md#eval](scripts/README.md#eval) |
 | HITL review UI — how it works, input format, gold layer output | [src/review_ui/README.md](src/review_ui/README.md) |
 
 ---
