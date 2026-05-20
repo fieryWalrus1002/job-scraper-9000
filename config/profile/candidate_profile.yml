@@ -1,0 +1,50 @@
+# Candidate profile — the scoring contract for skills_fit.
+#
+# This is part of the eval, not just config. `profile_version` is recorded
+# in every scored record's metadata (plus a sha256 of this file) so runs are
+# comparable across profile changes. Bump `profile_version` on every edit.
+#
+# Phase R stub. Expand with real content during Phase G prompt iteration —
+# the profile is the second-strongest knob after the system prompt.
+
+profile_version: "2026-05-19-stub"
+
+summary: |
+  Senior software engineer with deep experience in C++, Python, and applied
+  ML. Comfortable across the stack but happiest in systems-adjacent
+  engineering: data pipelines, ML infrastructure, developer tooling,
+  automation. Looking for fully-remote senior IC roles in the US.
+
+core_skills:
+  - Python
+  - C++
+  - Applied ML / deep learning
+  - Data engineering
+  - Software systems
+
+adjacent_skills:
+  - LLM application development
+  - Computer vision
+  - PyTorch
+  - Linux systems
+  - Docker
+  - AWS
+
+preferred_domains:
+  - Developer tooling and infrastructure
+  - ML platforms and tooling
+  - Automation
+  - Scientific or engineering software
+
+avoided_domains:
+  - Ad-tech
+  - High-frequency trading
+  - Pure web/CRUD frontend work
+
+level: senior IC
+
+constraints:
+  - Fully remote (US-based)
+  - No required relocation
+  - No frequent travel (>15 days/year)
+  - Full-time, not contract
