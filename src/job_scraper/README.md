@@ -8,11 +8,11 @@ This is the ingestion layer — it talks to job boards, normalises every posting
 
 ```
 job_scraper (this module)
-    ↓  data/raw/*.jsonl
+    ↓  data/raw/YYYY-MM-DD/        (with --run-date; flat data/raw/ otherwise)
 prefilter router
-    ↓  data/prefiltered/remote_filter_input.jsonl
+    ↓  data/prefiltered/YYYY-MM-DD/
 remote_filter agent
-    ↓  data/filtered/ or data/trash/
+    ↓  data/filtered/YYYY-MM-DD/ or data/trash/YYYY-MM-DD/
 skills scorer  →  dispatch
 ```
 
@@ -31,6 +31,7 @@ There are five scraper backends. Each one implements the same two-method interfa
 | **Greenhouse** | `boards.greenhouse.io/<token>/jobs` | Companies you specifically target |
 | **Lever** | `jobs.lever.co/<company>` | Companies you specifically target |
 | **Ashby** | `jobs.ashbyhq.com/<company>` | Companies you specifically target |
+| **SEL** | Workday CXS API (`selinc.wd1.myworkdayjobs.com`) | Schweitzer Engineering Laboratories — location/worker-type filtered |
 
 The ATS scrapers (Greenhouse / Lever / Ashby) pull **all open roles** from a company board — no keyword filter. That's intentional: you see everything and the remote filter + scorer handle triage downstream.
 
@@ -86,19 +87,22 @@ uv run job-scraper ashby mistral --save
 
 # Multi-board (Indeed, ZipRecruiter, etc.)
 uv run job-scraper jobspy "AI engineer" --location USA --save
+
+# SEL (Schweitzer Engineering Laboratories)
+uv run job-scraper sel --location pullman_wa --save
 ```
 
 `--save` writes to `data/raw/YYYY-MM-DD_HH-MM_<source>_<keywords>.jsonl`. Without it, output goes to stdout.
 
 ### YAML config (recommended for daily runs)
 
-Define all your searches in one file and run them together:
+`load_config()` parses the YAML into a flat `list[BaseScraper]` — one entry per keyword search and one per ATS board. `run-config` then iterates through that list serially, calling `.scrape()` on each and writing its output immediately before moving to the next. A failure on one scraper is caught and logged; the rest of the list continues.
 
 ```bash
-uv run job-scraper run-config config/search.yml --save
+uv run job-scraper run-config config/search.yml --save --run-date 2026-05-19
 ```
 
-See [example-search-config.yml](../../config/example-search-config.yml) for a full example. Dry-run to preview without hitting any APIs:
+`--run-date YYYY-MM-DD` writes all outputs to `data/raw/YYYY-MM-DD/` instead of the flat `data/raw/` directory. Omit it to use the flat layout. Dry-run to preview the full scraper list without hitting any APIs:
 
 ```bash
 uv run job-scraper run-config config/search.yml --dry-run
@@ -181,7 +185,7 @@ Transient errors (rate limits, 5xx) are **not** recorded; they just get logged a
 job_scraper/
   models.py          # JobPosting dataclass
   pii.py             # email/phone scrubbing
-  query.py           # typed query dataclasses (LinkedIn, JobSpy)
+  query.py           # typed query dataclasses (LinkedIn, JobSpy, SEL)
   config.py          # YAML config loader → list[BaseScraper]
   cli.py             # argparse CLI wiring
   _maps.py           # string → enum maps (workplace, job_type, time)
@@ -195,4 +199,5 @@ job_scraper/
     greenhouse.py
     lever.py
     ashby.py
+    sel.py           # Schweitzer Engineering Labs (Workday CXS API)
 ```
