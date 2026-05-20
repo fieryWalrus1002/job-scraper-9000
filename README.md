@@ -45,9 +45,11 @@ The full pipeline has four phases, plus a deterministic routing step between ing
 
 ---
 
-**Current state:** Phase 1 done. The deterministic prefilter router is implemented and sits between raw ingestion and the paid remote filter. Phase 2 remote-filter implementation and eval framework are complete; dataset balancing and policy/prompt tuning are in progress. See [specs/project_impl_status.md](specs/project_impl_status.md) for the full tracker.
+**Current state:** Phases 1 and 1.5 are complete. The Phase 2 remote-filter implementation and eval framework are complete; golden dataset balancing and precision tuning are in progress (current baseline: accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056 on 104 records). Phase 3 (Skills Fit) is next.
 
-The remote filter agent is evaluated against a human-verified gold dataset built through a teacher/HITL workflow: a stronger cloud model proposes remote-policy labels, then the Streamlit review UI confirms or corrects them. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly. The current 104-record gold eval set has a `gpt-4o-mini` smoke baseline of accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056. Future local-model distillation can build on this gold layer; see [specs/teacher-student.md](specs/teacher-student.md) for the design.
+The remote filter agent is evaluated against a human-verified gold dataset built through a teacher/HITL workflow: a stronger cloud model proposes remote-policy labels, then the Streamlit review UI confirms or corrects them. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly. Future local-model distillation can build on this gold layer; see [specs/teacher-student.md](specs/teacher-student.md) for the design.
+
+Work tracked on GitHub — `gh issue list` or https://github.com/fieryWalrus1002/job-scraper-9000/issues
 
 ---
 
@@ -78,19 +80,19 @@ cp .env.example .env   # fill in API keys
 **Scrape jobs:**
 
 ```bash
-uv run job-scraper run-config config/search.yml --save
+uv run job-scraper run-config config/search.yml --save --run-date $(date +%F)
 ```
 
 **Run the prefilter router:**
 
 ```bash
-uv run job-scraper prefilter
+uv run job-scraper prefilter --run-date $(date +%F)
 ```
 
 **Run the remote filter:**
 
 ```bash
-uv run job-scraper remote-filter
+uv run job-scraper remote-filter --run-date $(date +%F)
 ```
 
 **Run evals:**
@@ -137,7 +139,7 @@ streamlit run src/review_ui/app.py     # open the review UI
 
 | Topic | Doc |
 | --- | --- |
-| Project status — what's built, what's next | [specs/project_impl_status.md](specs/project_impl_status.md) |
+| Project status — what's built, what's next | `gh issue list` or https://github.com/fieryWalrus1002/job-scraper-9000/issues |
 | Prefilter router — deterministic routing layer, config, CLI | [src/prefilter/README.md](src/prefilter/README.md) |
 | Prefilter router design — deterministic routing layer before remote filter | [specs/prefilter_design.md](specs/prefilter_design.md) |
 | Prefilter implementation plan — branch-ready build plan | [specs/prefilter_implementation_plan.md](specs/prefilter_implementation_plan.md) |
