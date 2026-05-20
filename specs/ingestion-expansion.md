@@ -1,28 +1,18 @@
-# Ingestion Expansion - Third wave
+# Ingestion Expansion
 
-## Job Board APIs to ingest
+## Job Board API Priority
 
-We've identified these additional job boards we can pillage for jobs.
+| Priority | Platform | Strategy |
+|---|---|---|
+| 1 | Workable | REST API — developer-friendly, structured JSON, no auth for public listings |
+| 2 | BambooHR | REST API — mid-market standard, per-company API key required |
+| 3 | JOIN.com | Webhook/API or simple DOM — growing in EU/tech |
+| 4 | ADP | Partner API — high complexity, requires Marketplace approval |
+| 5 | Workday | **RPA / Browser Agent** — heavily anti-scrape; treat as a separate RPA workstream |
 
-| Priority | Platform | Implementation Strategy | API Reference / Guide |
-| --- | --- | --- | --- |
-| **1** | **Workable** | **REST API**: Very developer-friendly; provides structured JSON responses. | [Workable API Ref](https://workable.readme.io/reference) |
-| **2** | **BambooHR** | **REST API**: Standard for mid-market; requires an API key per company. | [BambooHR API](https://documentation.bamboohr.com/docs) |
-| **3** | **JOIN** | **Webhook/API**: Growing in Europe/Tech; simpler DOM structure if scraping. | [JOIN.com API](https://www.google.com/search?q=https://join.com/api-documentation) |
-| **4** | **ADP** | **Partner API**: High complexity; often requires formal "Marketplace" approval. | [ADP Developer Portal](https://developers.adp.com/) |
-| **5** | **Workday** | **RPA / Browser Agent**: The "Final Boss." Heavily protected against scrapers. | [Workday API (Requires Auth)](https://community.workday.com/sites/default/files/file-hosting/restapi/index.html) |
+## Notes
 
----
+- **The Workday Problem**: Workday actively blocks scrapers. A browser extension or RPA approach is likely required. Do not attempt a raw HTTP scraper.
+- **Cost efficiency**: Run ingestion once daily via a scheduled job (Azure Container App Job or Logic App). No persistent container needed.
 
-### Things to keep in mind:
-
-1. **The "Workday" Problem**: Workday does not want to be scraped. We may need to create a **Browser Extension (RPA)** workaround.
-2. **Cost-Efficiency**: Use an **Azure Logic App** or **ADF Trigger** to run these once a day. Do not keep a container running 24/7 for a job that only changes every 24 hours.
-
-```markdown
-# Engineering Standards: Job Ingestion Pipeline
-
-Where does it end up after raw?
-
-## Success Criteria
-- **Source Fidelity**: Raw JSON/HTML must be saved to `bronze/job-data/{vendor}/{timestamp}.json`.
+Work tracked on GitHub — `gh issue list` or https://github.com/fieryWalrus1002/job-scraper-9000/issues

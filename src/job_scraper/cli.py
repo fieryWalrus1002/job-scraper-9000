@@ -22,8 +22,20 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def _auto_path(source: str, keywords: str) -> Path:
+def _parse_run_date(value: str) -> str:
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"Invalid --run-date {value!r}: expected YYYY-MM-DD (e.g. 2026-05-19)"
+        )
+    return value
+
+
+def _auto_path(source: str, keywords: str, run_date: str | None = None) -> Path:
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    if run_date:
+        return DATA_DIR / run_date / f"{ts}_{source}_{_slug(keywords)}.jsonl"
     return DATA_DIR / f"{ts}_{source}_{_slug(keywords)}.jsonl"
 
 
@@ -414,12 +426,24 @@ def _add_sel(sub: argparse._SubParsersAction) -> None:
 def _cmd_prefilter(args) -> None:
     from prefilter.router import run_prefilter
 
+    run_date = getattr(args, "run_date", None)
+    if run_date:
+        input_path = args.input or f"data/raw/{run_date}"
+        remote_out = args.remote_out or f"data/prefiltered/{run_date}/remote_filter_input.jsonl"
+        local_out = args.local_out or f"data/local/{run_date}/local_jobs.jsonl"
+        trash_out = args.trash_out or f"data/trash/{run_date}/prefilter_trash.jsonl"
+    else:
+        input_path = args.input or "data/raw"
+        remote_out = args.remote_out or "data/prefiltered/remote_filter_input.jsonl"
+        local_out = args.local_out or "data/local/local_jobs.jsonl"
+        trash_out = args.trash_out or "data/trash/prefilter_trash.jsonl"
+
     try:
         run_prefilter(
-            input_path=args.input,
-            remote_out=args.remote_out,
-            local_out=args.local_out,
-            trash_out=args.trash_out,
+            input_path=input_path,
+            remote_out=remote_out,
+            local_out=local_out,
+            trash_out=trash_out,
             config_path=args.config,
             dry_run=args.dry_run,
         )
@@ -434,9 +458,17 @@ def _add_prefilter(sub: argparse._SubParsersAction) -> None:
         help="Deterministically route raw jobs before the remote-filter agent",
     )
     p.add_argument(
+        "--run-date",
+        default=None,
+        dest="run_date",
+        metavar="YYYY-MM-DD",
+        type=_parse_run_date,
+        help="Route this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
+    )
+    p.add_argument(
         "--input",
-        default="data/raw",
-        help="Raw JSONL file or directory to read (default: data/raw)",
+        default=None,
+        help="Raw JSONL file or directory to read (overrides --run-date)",
     )
     p.add_argument(
         "--config",
@@ -445,18 +477,18 @@ def _add_prefilter(sub: argparse._SubParsersAction) -> None:
     )
     p.add_argument(
         "--remote-out",
-        default="data/prefiltered/remote_filter_input.jsonl",
-        help="JSONL path for jobs routed to the remote filter",
+        default=None,
+        help="JSONL path for jobs routed to the remote filter (overrides --run-date)",
     )
     p.add_argument(
         "--local-out",
-        default="data/local/local_jobs.jsonl",
-        help="JSONL path for local jobs",
+        default=None,
+        help="JSONL path for local jobs (overrides --run-date)",
     )
     p.add_argument(
         "--trash-out",
-        default="data/trash/prefilter_trash.jsonl",
-        help="JSONL path for rejected jobs",
+        default=None,
+        help="JSONL path for rejected jobs (overrides --run-date)",
     )
     p.add_argument(
         "--dry-run",
@@ -474,11 +506,21 @@ def _add_prefilter(sub: argparse._SubParsersAction) -> None:
 def _cmd_remote_filter(args) -> None:
     from agents.remote_filter.runner import run_remote_filter
 
+    run_date = getattr(args, "run_date", None)
+    if run_date:
+        input_path = args.input or f"data/prefiltered/{run_date}"
+        pass_path = args.pass_output or f"data/filtered/{run_date}/remote_filter_pass.jsonl"
+        trash_path = args.trash_output or f"data/trash/{run_date}/remote_filter_trash.jsonl"
+    else:
+        input_path = args.input or "data/prefiltered/remote_filter_input.jsonl"
+        pass_path = args.pass_output or "data/filtered/remote_filter_pass.jsonl"
+        trash_path = args.trash_output or "data/trash/remote_filter_trash.jsonl"
+
     try:
         run_remote_filter(
-            input_path=args.input,
-            pass_path=args.pass_output,
-            trash_path=args.trash_output,
+            input_path=input_path,
+            pass_path=pass_path,
+            trash_path=trash_path,
             config_path=args.config,
             user_location=args.user_location,
             user_timezone=args.user_timezone,
@@ -494,19 +536,27 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
         help="Run the remote-filter agent over routed candidates and split pass/trash outputs",
     )
     p.add_argument(
+        "--run-date",
+        default=None,
+        dest="run_date",
+        metavar="YYYY-MM-DD",
+        type=_parse_run_date,
+        help="Filter this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
+    )
+    p.add_argument(
         "--input",
-        default="data/prefiltered/remote_filter_input.jsonl",
-        help="JSONL file or directory to read (default: data/prefiltered/remote_filter_input.jsonl)",
+        default=None,
+        help="JSONL file or directory to read (overrides --run-date)",
     )
     p.add_argument(
         "--pass-output",
-        default="data/filtered/remote_filter_pass.jsonl",
-        help="JSONL path for jobs that pass the filter",
+        default=None,
+        help="JSONL path for jobs that pass the filter (overrides --run-date)",
     )
     p.add_argument(
         "--trash-output",
-        default="data/trash/remote_filter_trash.jsonl",
-        help="JSONL path for rejected jobs",
+        default=None,
+        help="JSONL path for rejected jobs (overrides --run-date)",
     )
     p.add_argument(
         "--config",
@@ -587,7 +637,7 @@ def _cmd_run_config(args) -> None:
                     or info.get("board_token")
                     or s.source_name
                 )
-                dest = _auto_path(_slug(s.source_name), label)
+                dest = _auto_path(_slug(s.source_name), label, run_date=getattr(args, "run_date", None))
                 dest.parent.mkdir(parents=True, exist_ok=True)
             else:
                 dest = None
@@ -617,6 +667,14 @@ def _add_run_config(sub: argparse._SubParsersAction) -> None:
         "run-config", help="Run all searches defined in a YAML config file"
     )
     p.add_argument("config", metavar="CONFIG", help="Path to YAML search config")
+    p.add_argument(
+        "--run-date",
+        default=None,
+        dest="run_date",
+        metavar="YYYY-MM-DD",
+        type=_parse_run_date,
+        help="Write all outputs under data/raw/YYYY-MM-DD/ (creates a run partition)",
+    )
     p.add_argument(
         "--dry-run",
         action="store_true",
