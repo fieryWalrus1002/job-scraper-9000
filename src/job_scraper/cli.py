@@ -22,10 +22,20 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def _parse_run_date(value: str) -> str:
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"Invalid --run-date {value!r}: expected YYYY-MM-DD (e.g. 2026-05-19)"
+        )
+    return value
+
+
 def _auto_path(source: str, keywords: str, run_date: str | None = None) -> Path:
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
     if run_date:
-        return Path("data/raw") / run_date / f"{ts}_{source}_{_slug(keywords)}.jsonl"
+        return DATA_DIR / run_date / f"{ts}_{source}_{_slug(keywords)}.jsonl"
     return DATA_DIR / f"{ts}_{source}_{_slug(keywords)}.jsonl"
 
 
@@ -452,6 +462,7 @@ def _add_prefilter(sub: argparse._SubParsersAction) -> None:
         default=None,
         dest="run_date",
         metavar="YYYY-MM-DD",
+        type=_parse_run_date,
         help="Route this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
     )
     p.add_argument(
@@ -529,6 +540,7 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
         default=None,
         dest="run_date",
         metavar="YYYY-MM-DD",
+        type=_parse_run_date,
         help="Filter this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
     )
     p.add_argument(
@@ -660,6 +672,7 @@ def _add_run_config(sub: argparse._SubParsersAction) -> None:
         default=None,
         dest="run_date",
         metavar="YYYY-MM-DD",
+        type=_parse_run_date,
         help="Write all outputs under data/raw/YYYY-MM-DD/ (creates a run partition)",
     )
     p.add_argument(

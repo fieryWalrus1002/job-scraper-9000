@@ -8,7 +8,7 @@ This is the ingestion layer — it talks to job boards, normalises every posting
 
 ```
 job_scraper (this module)
-    ↓  data/raw/YYYY-MM-DD/
+    ↓  data/raw/YYYY-MM-DD/        (with --run-date; flat data/raw/ otherwise)
 prefilter router
     ↓  data/prefiltered/YYYY-MM-DD/
 remote_filter agent

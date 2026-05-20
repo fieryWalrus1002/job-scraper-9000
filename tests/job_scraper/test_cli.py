@@ -21,6 +21,7 @@ from job_scraper.cli import (
     DATA_DIR,
     _auto_path,
     _output,
+    _parse_run_date,
     _resolve_dest,
     _slug,
     main,
@@ -100,7 +101,46 @@ def test_auto_path_with_run_date_uses_dated_partition():
         mock_dt.now.return_value.strftime.return_value = "2026-05-16_09-00"
         p = _auto_path("linkedin", "LLM Ops", run_date="2026-05-16")
 
-    assert p == Path("data/raw/2026-05-16/2026-05-16_09-00_linkedin_llm-ops.jsonl")
+    assert p == DATA_DIR / "2026-05-16" / "2026-05-16_09-00_linkedin_llm-ops.jsonl"
+
+
+# ---------------------------------------------------------------------------
+# _parse_run_date
+# ---------------------------------------------------------------------------
+
+
+def test_parse_run_date_accepts_valid_date():
+    assert _parse_run_date("2026-05-19") == "2026-05-19"
+
+
+def test_parse_run_date_rejects_invalid_format():
+    import argparse
+    with pytest.raises(argparse.ArgumentTypeError):
+        _parse_run_date("19-05-2026")
+
+
+def test_parse_run_date_rejects_path_traversal():
+    import argparse
+    with pytest.raises(argparse.ArgumentTypeError):
+        _parse_run_date("../../etc/passwd")
+
+
+def test_run_config_invalid_run_date_exits():
+    with patch("sys.argv", ["job-scraper", "run-config", "config.yml", "--run-date", "not-a-date"]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+def test_prefilter_invalid_run_date_exits():
+    with patch("sys.argv", ["job-scraper", "prefilter", "--run-date", "20260519"]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+def test_remote_filter_invalid_run_date_exits():
+    with patch("sys.argv", ["job-scraper", "remote-filter", "--run-date", "2026/05/19"]):
+        with pytest.raises(SystemExit):
+            main()
 
 
 # ---------------------------------------------------------------------------
