@@ -32,11 +32,11 @@ The full pipeline has four phases, plus a deterministic routing step between ing
 ### 3. Skills Fit Scoring Agent
 
 - Batch-send surviving postings to a cloud LLM (OpenAI / Anthropic) or local Ollama instance.
-- Score each against a candidate profile using a structured rubric:
-  - **Technical overlap** — does the stack match core expertise (C++, Python, AI, data engineering)?
+- Score each against a versioned candidate profile (`config/profile/candidate_profile.yml`) using an ordinal 1-5 rubric:
+  - **Technical overlap** — does the core stack match (C++, Python, applied ML, data engineering)?
   - **Level alignment** — senior/lead role, or entry level?
-  - **Domain context** — involves engineering, automation, or deep learning where experience is deep?
-- Returns structured JSON with `fit_score`, `top_matches`, `gaps`, `verdict`.
+  - **Domain context** — engineering, automation, scientific instrumentation, or deep learning?
+- Returns structured JSON with `fit_score` (1-5), `confidence`, `score_rationale`, `top_matches`, `gaps`, and `hard_concerns`. `fit_score` is the verdict; there is no separate `verdict` field.
 
 ### 4. Dispatch
 
@@ -45,7 +45,7 @@ The full pipeline has four phases, plus a deterministic routing step between ing
 
 ---
 
-**Current state:** Phases 1 and 1.5 are complete. The Phase 2 remote-filter implementation and eval framework are complete; golden dataset balancing and precision tuning are in progress (current baseline: accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056 on 104 records). Phase 3 (Skills Fit) is next.
+**Current state:** Phases 1 and 1.5 are complete. The Phase 2 remote-filter implementation and eval framework are complete; golden dataset balancing and precision tuning are in progress (current baseline: accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056 on 104 records). Phase 3 (Skills Fit) is in progress: schema, ordinal eval harness (ordinal-agreement + top-k metrics), keyword baseline, real rubric prompt, and v4 candidate profile are in place; seed gold set is being built via teacher-first HITL (frontier teacher proposes labels, human ratifies/overrides through a per-record markdown review). See [specs/skills_fit_agent_plan.md](specs/skills_fit_agent_plan.md) and [src/agents/skills_fit/README.md](src/agents/skills_fit/README.md).
 
 The remote filter agent is evaluated against a human-verified gold dataset built through a teacher/HITL workflow: a stronger cloud model proposes remote-policy labels, then the Streamlit review UI confirms or corrects them. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly. Future local-model distillation can build on this gold layer; see [specs/teacher-student.md](specs/teacher-student.md) for the design.
 
@@ -146,6 +146,8 @@ streamlit run src/review_ui/app.py     # open the review UI
 | Scraper module — how it works, backends, YAML config format | [src/job_scraper/README.md](src/job_scraper/README.md) |
 | Scraper CLI — all commands, flags, YAML config | [src/agents/README.md](src/agents/README.md) |
 | Remote filter agent — config, commands, classification schema | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md) |
+| Skills fit agent — ordinal scoring, profile contract, teacher-first HITL | [src/agents/skills_fit/README.md](src/agents/skills_fit/README.md) |
+| Skills fit plan — schema, calibration, sequencing (Phase R / G / B) | [specs/skills_fit_agent_plan.md](specs/skills_fit_agent_plan.md) |
 | Teacher-student distillation design | [specs/teacher-student.md](specs/teacher-student.md) |
 | Batch pipeline scripts — prepare, merge, sample | [scripts/README.md](scripts/README.md) |
 | Eval scripts — running evals, CLI flags, comparing runs | [scripts/README.md#eval](scripts/README.md#eval) |

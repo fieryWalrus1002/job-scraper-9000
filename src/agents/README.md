@@ -15,8 +15,9 @@ python scripts/run_remote_filter.py   # remote filter
 | Agent | Purpose |
 | --- | --- |
 | `remote-filter` | Classifies job postings by remote work policy using a structured-output LLM |
+| `skills_fit` | Scores remote-filter PASS jobs against a versioned candidate profile on a 1-5 ordinal scale (Phase R: eval harness + real rubric prompt landed; production runner / CLI subcommand land in Phase B). See [skills_fit/README.md](skills_fit/README.md). |
 
-Future agents: `scorer`, `dispatcher`
+Future agents: `dispatcher`
 
 ## Provider configuration
 
@@ -43,7 +44,7 @@ data/prefiltered/remote_filter_input.jsonl
 data/filtered/remote_filter_pass.jsonl   ← genuinely remote
 data/trash/remote_filter_trash.jsonl     ← hybrid / onsite / dealbreakers
       ↓
-  scorer run  (coming soon)
+  skills_fit eval / scorer  (Phase R: eval-only; Phase B: production runner)
       ↓
 data/scored/
       ↓

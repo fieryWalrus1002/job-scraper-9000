@@ -2,7 +2,7 @@
 
 Reusable evaluation infrastructure for job-scraper-9000 agents.
 
-This package is intentionally agent-agnostic: it handles run logging, provenance, environment capture, hashing, and metric calculation. Agent-specific eval drivers live outside this package, currently in `scripts/run_remote_filter_eval.py` for the remote-filter agent.
+This package is intentionally agent-agnostic: it handles run logging, provenance, environment capture, hashing, and metric calculation. Agent-specific eval drivers live outside this package — currently `scripts/run_remote_filter_eval.py` for the remote-filter agent and `scripts/run_skills_fit_eval.py` for the skills-fit agent.
 
 Working from the spec: [`../../specs/eval_framework_requirements.md`](../../specs/eval_framework_requirements.md). Implementation status: SC-1 through SC-7 complete.
 
@@ -15,7 +15,8 @@ src/agent_eval/
 ├── __init__.py        # exports RunLogger, JsonlRunLogger, provenance helpers
 ├── logger.py          # RunLogger Protocol, JsonlRunLogger, MLFlowRunLogger stub
 ├── provenance.py      # run IDs, hashes, git/env metadata, run-record assembly
-└── metrics.py         # compute_metrics(tp, fp, tn, fn, skipped)
+└── metrics.py         # compute_metrics() — binary remote-filter metrics
+                       # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
 ```
 
 The package is used by:
@@ -25,6 +26,7 @@ scripts/run_remote_filter_eval.py   # synchronous eval, supports --workers
 scripts/submit_eval_batch.py        # OpenAI Batch API eval submission
 scripts/poll_eval_batch.py          # batch result scoring + run logging
 scripts/compare_evals.py            # reads data/eval/runs.jsonl
+scripts/run_skills_fit_eval.py      # skills-fit eval driver (--scorer {llm,keyword})
 ```
 
 ---
@@ -35,8 +37,9 @@ Eval data lives under `data/eval/`:
 
 | Path | Purpose |
 | --- | --- |
-| `data/eval/ground_truth.jsonl` | Human-verified gold dataset from the HITL review UI |
-| `data/eval/runs.jsonl` | Append-only eval run history |
+| `data/eval/ground_truth.jsonl` | Remote-filter human-verified gold from the HITL review UI |
+| `data/eval/skills_fit_ground_truth.jsonl` | Skills-fit human-verified gold from the teacher-first markdown / CLI review |
+| `data/eval/runs.jsonl` | Append-only eval run history (both agents) |
 | `data/eval/mismatches_<run_id>.jsonl` | Per-run mismatch records |
 | `data/eval/batch/` | OpenAI Batch API request/result files |
 | `data/eval/eval_batch_<run_id>.json` | Batch eval sidecar metadata |
@@ -54,12 +57,14 @@ Each eval run records:
 - gold file path + hash
 - resolved prompt hash
 - provider/model/temperature
-- policy thresholds
+- policy thresholds (remote-filter) or score bands (skills-fit)
 - Python/platform/uv/lockfile metadata
-- confusion matrix + accuracy/precision/recall/F1
+- confusion matrix + accuracy/precision/recall/F1 (remote-filter)
+- ordinal metrics (exact / off-by-one / MAE / bias / Spearman) + top-k metrics + 5x5 confusion (skills-fit)
+- scorer choice (`llm` vs `keyword`) and profile metadata (`profile_hash`, `profile_version`) for skills-fit runs
 - mismatch artifact path
 
-This makes prompt, model, config, and dataset changes comparable across runs.
+This makes prompt, model, profile, config, and dataset changes comparable across runs.
 
 ---
 
