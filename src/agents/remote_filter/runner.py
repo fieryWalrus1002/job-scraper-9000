@@ -11,9 +11,10 @@ from agents.remote_filter.models import SCHEMA_VERSION
 from agents.remote_filter.utils import (
     REMOTE_FILTER_PROMPT_PATH,
     analyze_remote,
+    context_fingerprint,
     load_raw_jobs,
     passes_remote_filter,
-    resolve_llm_model,
+    resolve_provider_and_model,
 )
 from utils.dedup import dedup_jobs
 from utils.git_info import get_git_metadata, get_prompt_hash
@@ -97,7 +98,7 @@ def run_remote_filter(
     )
 
     cache = AnalysisCache(cache_path) if cache_path is not None else None
-    model = resolve_llm_model(llm_config)
+    provider, model = resolve_provider_and_model(llm_config)
     prompt_hash = filter_meta["prompt_hash"]
 
     pass_path.parent.mkdir(parents=True, exist_ok=True)
@@ -125,11 +126,25 @@ def run_remote_filter(
                 **({"user_timezone": user_timezone} if user_timezone else {}),
             }
             dedup_key = job.get("dedup_hash") or job.get("source_job_id") or ""
+            context_fp = context_fingerprint(search_context)
             analysis = None
             from_cache = False
-            if cache is not None and dedup_key:
-                analysis = cache.get(dedup_key, prompt_hash, model)
-                from_cache = analysis is not None
+            cache_keyable = cache is not None and bool(dedup_key)
+            if cache_keyable:
+                analysis = cache.get(
+                    dedup_hash=dedup_key,
+                    prompt_hash=prompt_hash,
+                    provider=provider,
+                    model=model,
+                    context_fp=context_fp,
+                )
+                if analysis is not None:
+                    from_cache = True
+                    cache_hits += 1
+                else:
+                    # Count the miss at lookup time so the hit-rate metric
+                    # stays honest even when the LLM call below fails.
+                    cache_misses += 1
 
             if analysis is None:
                 analysis = analyze_remote(
@@ -143,11 +158,15 @@ def run_remote_filter(
                     log.warning("Agent failed on %s @ %s — skipping", title, company)
                     skipped += 1
                     continue
-                if cache is not None and dedup_key:
-                    cache.put(dedup_key, prompt_hash, model, analysis)
-                    cache_misses += 1
-            else:
-                cache_hits += 1
+                if cache_keyable:
+                    cache.put(
+                        dedup_hash=dedup_key,
+                        prompt_hash=prompt_hash,
+                        provider=provider,
+                        model=model,
+                        context_fp=context_fp,
+                        analysis=analysis,
+                    )
 
             ok, reason = passes_remote_filter(analysis, config, user_location)
 

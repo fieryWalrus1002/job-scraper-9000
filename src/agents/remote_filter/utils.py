@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -31,7 +32,7 @@ REMOTE_FILTER_PROMPT_PATH = _resolve_prompt_path()
 _PROMPT = REMOTE_FILTER_PROMPT_PATH.read_text()
 
 
-def _resolve_provider_and_model(llm_config: dict | None = None) -> tuple[str, str]:
+def resolve_provider_and_model(llm_config: dict | None = None) -> tuple[str, str]:
     """Single source of truth for which (provider, model) a config resolves to.
 
     Both `_get_client` (inference) and `resolve_llm_model` (cache keying) route
@@ -47,7 +48,7 @@ def _resolve_provider_and_model(llm_config: dict | None = None) -> tuple[str, st
 
 def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
     cfg = llm_config or {}
-    provider, model = _resolve_provider_and_model(cfg)
+    provider, model = resolve_provider_and_model(cfg)
     if provider == "ollama":
         client = OpenAI(
             base_url=cfg.get(
@@ -201,4 +202,31 @@ def load_raw_jobs(path: Path) -> list[dict]:
 
 def resolve_llm_model(llm_config: dict | None = None) -> str:
     """Return the model name that `_get_client` would use, for cache keying."""
-    return _resolve_provider_and_model(llm_config)[1]
+    return resolve_provider_and_model(llm_config)[1]
+
+
+# Fields of `search_context` that `_build_user_message` actually reads. Keep
+# this in sync with that function — anything that affects the LLM prompt must
+# affect the cache key, or stale analyses leak across runs.
+_CONTEXT_FIELDS = ("keywords", "workplace", "job_type", "user_timezone")
+
+
+def context_fingerprint(search_context: dict | None) -> str:
+    """8-hex fingerprint over search-context fields that affect the LLM prompt.
+
+    Folded into the analysis cache key so a change in keywords, workplace,
+    job_type, or user_timezone invalidates the cache rather than serving an
+    analysis produced under different context. Returns `"none"` when no
+    relevant context is present, matching `_build_user_message`'s no-op path.
+    """
+    if not search_context:
+        return "none"
+    relevant: dict[str, object] = {}
+    for k in _CONTEXT_FIELDS:
+        v = search_context.get(k)
+        if v:
+            relevant[k] = v
+    if not relevant:
+        return "none"
+    canonical = json.dumps(relevant, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:8]
