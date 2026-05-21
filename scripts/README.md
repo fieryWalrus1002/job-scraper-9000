@@ -210,3 +210,17 @@ uv run scripts/compare_evals.py --diff 20260514_100000_aaaa 20260514_120000_bbbb
 | `data/eval/ground_truth.jsonl` | Gold | Human-verified records from the Streamlit UI |
 | `data/filtered/` | — | Student agent pass results |
 | `data/trash/` | — | Student agent trash results |
+
+--- 
+
+## skills_fit eval pool 
+
+``` bash
+
+  # Ready to re-run. Wipe the stale teacher proposals + review files, then re-propose:
+  rm data/staging/skills_fit_seed_proposed.jsonl
+  rm -rf data/staging/skills_fit_review/
+  uv run scripts/propose_skills_fit_seed.py --model gpt-5.5 --temperature 1.0
+  uv run scripts/render_skills_fit_review_md.py
+
+```

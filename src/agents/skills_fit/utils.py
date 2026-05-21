@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -30,7 +31,11 @@ def _resolve_prompt_path() -> Path:
 
 
 SKILLS_FIT_PROMPT_PATH = _resolve_prompt_path()
-_PROMPT = SKILLS_FIT_PROMPT_PATH.read_text()
+
+
+@lru_cache(maxsize=None)
+def _load_prompt(path: Path) -> str:
+    return path.read_text()
 
 
 def load_candidate_profile(path: str | Path) -> dict:
@@ -100,6 +105,7 @@ def analyze_skills_fit(
     title: str | None = None,
     location: str | None = None,
     llm_config: dict | None = None,
+    prompt_path: str | Path | None = None,
     max_retries: int = 2,
 ) -> SkillsFitAnalysis | None:
     """Run the structured LLM call. Returns None if the agent fails after retries."""
@@ -107,13 +113,14 @@ def analyze_skills_fit(
     user_message = _build_user_message(
         job_description, candidate_profile, title=title, location=location
     )
+    prompt = _load_prompt(Path(prompt_path) if prompt_path else SKILLS_FIT_PROMPT_PATH)
 
     for attempt in range(max_retries + 1):
         try:
             response = client.beta.chat.completions.parse(
                 model=model,
                 messages=[
-                    {"role": "system", "content": _PROMPT},
+                    {"role": "system", "content": prompt},
                     {"role": "user", "content": user_message},
                 ],
                 response_format=SkillsFitAnalysis,

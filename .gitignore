@@ -8,6 +8,7 @@ dist/
 # Data files — keep directory placeholders (.gitkeep) but ignore all content
 data/**/*.jsonl
 data/**/*.txt
+data/**/*.md
 
 # stray jsonl at the repo root
 /*.jsonl

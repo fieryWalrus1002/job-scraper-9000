@@ -25,15 +25,17 @@ config/profile/candidate_profile.yml # the scoring contract (versioned, hashed i
 
 scripts/run_skills_fit_eval.py       # eval driver, both scorers
 scripts/prepare_skills_fit_seed.py   # sampler to make hand-scoring easier
+scripts/propose_skills_fit_seed.py   # teacher LLM proposes labels (HITL path)
+scripts/score_skills_fit_seed.py     # CLI scorer — teacher-aware when proposals exist
 ```
 
 ---
 
 ## Phase R — running the eval
 
-The harness is ready. The seed gold set is not (it's a manual task).
+The harness is ready. The seed gold set is a manual task. Two paths are supported; the spec's Phase R step 3 describes when to pick which.
 
-**1. Sample candidate records for hand-scoring:**
+**1. Sample candidate records:**
 
 ```bash
 uv run scripts/prepare_skills_fit_seed.py --n 40 --in data/filtered/
@@ -41,9 +43,23 @@ uv run scripts/prepare_skills_fit_seed.py --n 40 --in data/filtered/
 
 Writes `data/staging/skills_fit_seed_template.jsonl` with empty `_human_*` fields.
 
-**2. Hand-score 25 records, stratified 5×5 across bands.**
+**2a. (Optional but recommended) Run teacher proposals.** Cold single-rater labeling drifts in calibration across 25+ records, and a literal-reading reviewer additionally over-rejects due to JD aspirational phrasing ("required" / "preferred" / "experience with"). Teacher-first mitigates both. See the "Teacher-first HITL alternative" subsection in the spec.
 
-Open the template, score each record. Aim for:
+```bash
+uv run scripts/propose_skills_fit_seed.py --model gpt-4o
+```
+
+Writes `data/staging/skills_fit_seed_proposed.jsonl` with `_teacher_*` fields populated. Resume-safe by `source_job_id`.
+
+**2b. Score 25 records, stratified 5×5 across bands.**
+
+```bash
+uv run scripts/score_skills_fit_seed.py
+```
+
+The CLI auto-detects the proposed file. When present: shows the teacher's labels next to each posting, prompts `a` accept / `1-5` override / `s` skip / `q` quit, with press-enter-to-keep defaults for the list fields. When absent: scores from blank.
+
+Aim for:
 
 | Count | Type |
 | --- | --- |
@@ -53,9 +69,9 @@ Open the template, score each record. Aim for:
 | 5 | **deceptive 2s** — mention your stack but mismatch on level/credential/domain/role type |
 | 5 | hard-reject 1s |
 
-`_human_notes` is **mandatory**, not optional — those notes become the in-context calibration examples in Phase G. See the Calibration section of the spec.
+`_human_notes` is **mandatory**, not optional — those notes become the in-context calibration examples in Phase G, and are especially load-bearing on flips (where you disagreed with the teacher). See the Calibration section of the spec.
 
-Save scored records (drop unused candidates) to `data/eval/skills_fit_ground_truth.jsonl`.
+Scored records append to `data/eval/skills_fit_ground_truth.jsonl`. Teacher fields are preserved alongside human labels for audit trail.
 
 **3. Run the eval with both scorers:**
 

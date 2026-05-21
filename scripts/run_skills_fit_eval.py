@@ -50,7 +50,6 @@ log = logging.getLogger(__name__)
 GOLD_FILE = "data/eval/skills_fit_ground_truth.jsonl"
 CONFIG_PATH = "config/agent/skills_fit.yml"
 RUNS_FILE = "data/eval/runs.jsonl"
-PROMPT_PATH = SKILLS_FIT_PROMPT_PATH
 
 
 class MismatchRecord(BaseModel):
@@ -95,6 +94,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--model", help="Override llm.model in-memory")
     p.add_argument("--temperature", type=float, help="Override llm.temperature in-memory")
     p.add_argument("--provider", help="Override llm.provider in-memory")
+    p.add_argument(
+        "--prompt",
+        help=f"Override the system prompt file (default: {SKILLS_FIT_PROMPT_PATH})",
+    )
     p.add_argument("--run-id", dest="run_id", help="Custom run label (auto-generated if omitted)")
     p.add_argument("--no-mismatches", action="store_true", help="Skip writing mismatch file")
     p.add_argument(
@@ -124,6 +127,7 @@ def _evaluate_record(
     scorer: str,
     profile: dict,
     llm_config: dict | None,
+    prompt_path: Path,
     run_id: str,
 ) -> RecordEvalResult:
     gold_score = job.get("_human_fit_score")
@@ -157,6 +161,7 @@ def _evaluate_record(
             title=title,
             location=location,
             llm_config=llm_config,
+            prompt_path=prompt_path,
         )
     elapsed = time.monotonic() - t0
 
@@ -217,6 +222,7 @@ def run_eval(
     scorer: str,
     profile: dict,
     llm_config: dict | None,
+    prompt_path: Path,
     run_id: str,
     workers: int,
 ) -> tuple[list[MismatchRecord], list[int], list[int], int]:
@@ -224,7 +230,7 @@ def run_eval(
         results = [
             _evaluate_record(
                 i, job, scorer=scorer, profile=profile,
-                llm_config=llm_config, run_id=run_id,
+                llm_config=llm_config, prompt_path=prompt_path, run_id=run_id,
             )
             for i, job in enumerate(records)
         ]
@@ -236,7 +242,8 @@ def run_eval(
                     lambda item: _evaluate_record(
                         item[0], item[1],
                         scorer=scorer, profile=profile,
-                        llm_config=llm_config, run_id=run_id,
+                        llm_config=llm_config, prompt_path=prompt_path,
+                        run_id=run_id,
                     ),
                     enumerate(records),
                 )
@@ -330,6 +337,11 @@ def main(run_logger: RunLogger | None = None) -> None:
         sys.exit(1)
     profile = load_candidate_profile(profile_path)
 
+    prompt_path = Path(args.prompt) if args.prompt else SKILLS_FIT_PROMPT_PATH
+    if not prompt_path.exists():
+        log.error("Prompt file not found: %s", prompt_path)
+        sys.exit(1)
+
     run_id = generate_run_id(args.run_id)
     if run_logger is None:
         run_logger = JsonlRunLogger(args.runs_file)
@@ -347,6 +359,7 @@ def main(run_logger: RunLogger | None = None) -> None:
         scorer=args.scorer,
         profile=profile,
         llm_config=llm_config,
+        prompt_path=prompt_path,
         run_id=run_id,
         workers=args.workers,
     )
@@ -365,7 +378,7 @@ def main(run_logger: RunLogger | None = None) -> None:
         )
         log.info("Mismatches written to %s", mismatch_path)
 
-    prompt_text = PROMPT_PATH.read_text()
+    prompt_text = prompt_path.read_text()
     run_record = build_run_record(
         run_id=run_id,
         gold_file=gold_path,
@@ -375,11 +388,12 @@ def main(run_logger: RunLogger | None = None) -> None:
         metrics=metrics["metrics"],
         mismatch_file=mismatch_path,
     )
-    # Skills_fit-specific provenance: scorer choice + profile hash/version.
+    # Skills_fit-specific provenance: scorer choice + profile hash/version + prompt file.
     run_record["scorer"] = args.scorer
     run_record["profile_file"] = str(profile_path)
     run_record["profile_hash"] = hash_file(profile_path)
     run_record["profile_version"] = profile.get("profile_version", "unknown")
+    run_record["prompt_file"] = str(prompt_path)
     run_record["skills_fit_schema_version"] = SCHEMA_VERSION
     # The default policy_thresholds field isn't applicable here; null it out
     # rather than misrepresenting remote-filter policy on a skills-fit run.
