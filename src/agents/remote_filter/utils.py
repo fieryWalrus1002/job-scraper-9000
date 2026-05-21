@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any, Callable
 
 from openai import OpenAI
 from pydantic import ValidationError
@@ -58,8 +59,38 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
             api_key="ollama",
         )
     else:
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        # Per-component API keys: `llm.api_key_env` in the agent YAML names
+        # which env var to read. Defaults to OPENAI_API_KEY for back-compat.
+        api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
+        api_key = os.environ.get(api_key_env)
+        if not api_key:
+            raise RuntimeError(
+                f"{api_key_env} is not set in environment "
+                "(configured via llm.api_key_env in the agent YAML; "
+                "defaults to OPENAI_API_KEY)"
+            )
+        client = OpenAI(api_key=api_key)
     return client, model
+
+
+def _extract_usage(usage_obj: Any) -> dict[str, int]:
+    """Pull token counts out of an OpenAI ``ChatCompletion.usage`` object.
+
+    Returns zero-valued dict if usage data is absent (e.g., some local-LLM
+    servers don't emit it). Cached input tokens come from the nested
+    ``prompt_tokens_details.cached_tokens`` introduced with prompt caching.
+    """
+    if usage_obj is None:
+        return {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
+    cached = 0
+    details = getattr(usage_obj, "prompt_tokens_details", None)
+    if details is not None:
+        cached = getattr(details, "cached_tokens", 0) or 0
+    return {
+        "input_tokens": getattr(usage_obj, "prompt_tokens", 0) or 0,
+        "cached_input_tokens": cached,
+        "output_tokens": getattr(usage_obj, "completion_tokens", 0) or 0,
+    }
 
 
 def _build_user_message(
@@ -99,8 +130,14 @@ def analyze_remote(
     search_context: dict | None = None,
     llm_config: dict | None = None,
     max_retries: int = 2,
+    usage_callback: Callable[[dict[str, int]], None] | None = None,
 ) -> RemoteAnalysis | None:
-    """Returns None if the agent fails after retries — caller decides what to do."""
+    """Returns None if the agent fails after retries — caller decides what to do.
+
+    If ``usage_callback`` is provided, it's called with a dict of token counts
+    (``input_tokens``, ``cached_input_tokens``, ``output_tokens``) on each
+    successful API call. Wire it to ``RunTracker.add_token_usage`` for telemetry.
+    """
     client, model = _get_client(llm_config)
     user_message = _build_user_message(job_description, search_context, location, title)
 
@@ -115,6 +152,8 @@ def analyze_remote(
                 response_format=RemoteAnalysis,
                 temperature=(llm_config or {}).get("temperature", 0.1),
             )
+            if usage_callback is not None:
+                usage_callback(_extract_usage(response.usage))
             return response.choices[0].message.parsed
         except ValidationError as exc:
             log.warning(

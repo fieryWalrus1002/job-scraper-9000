@@ -1,7 +1,14 @@
 llm:
+  # Provider options: openai | ollama
+  #
+  # Optional `api_key_env` names which env var holds the OpenAI key.
+  # Defaults to OPENAI_API_KEY. Use this to scope an agent to its own key
+  # (e.g., api_key_env: OPENAI_API_KEY_SKILLS_FIT) for per-component spend
+  # attribution and per-key spending caps in the OpenAI dashboard.
   provider: openai        # openai | ollama
   model: gpt-4o-mini
   temperature: 0.1
+  # api_key_env: OPENAI_API_KEY   # optional; this is the default
   # base_url: http://localhost:11434/v1   # uncomment for ollama
 
 policy_thresholds:
