@@ -516,6 +516,10 @@ def _cmd_remote_filter(args) -> None:
         pass_path = args.pass_output or "data/filtered/remote_filter_pass.jsonl"
         trash_path = args.trash_output or "data/trash/remote_filter_trash.jsonl"
 
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
+
+    cache_path = None if args.no_cache else (args.cache_path or DEFAULT_CACHE_PATH)
+
     try:
         run_remote_filter(
             input_path=input_path,
@@ -524,6 +528,7 @@ def _cmd_remote_filter(args) -> None:
             config_path=args.config,
             user_location=args.user_location,
             user_timezone=args.user_timezone,
+            cache_path=cache_path,
         )
     except FileNotFoundError as exc:
         log.error(str(exc))
@@ -572,6 +577,18 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
         "--user-timezone",
         default=os.environ.get("USER_TIMEZONE"),
         help="Candidate timezone context for the model",
+    )
+    p.add_argument(
+        "--cache-path",
+        default=None,
+        dest="cache_path",
+        help="JSONL path for the across-batch analysis cache (default: data/cache/remote_filter_analyses.jsonl)",
+    )
+    p.add_argument(
+        "--no-cache",
+        action="store_true",
+        dest="no_cache",
+        help="Disable the across-batch cache; always call the LLM",
     )
     p.set_defaults(func=_cmd_remote_filter)
 

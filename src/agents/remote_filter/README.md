@@ -82,6 +82,10 @@ Outputs:
 
 Override `--input data/raw` if you want to run the filter directly on raw scraped jobs.
 
+Within-batch duplicates (by `dedup_hash`, falling back to `source_job_id`) are collapsed before the LLM step — when the same posting shows up in multiple scrapers in one run, it's analyzed once.
+
+Across-batch analyses are cached at `data/cache/remote_filter_analyses.jsonl`, keyed by `(dedup_hash, prompt_hash, model)`. Cache hits skip the LLM call entirely; misses append the new analysis. The key includes `prompt_hash` and `model`, so prompt edits or model swaps invalidate automatically. Pass `--no-cache` to bypass, or `--cache-path` to point elsewhere. The run summary logs `cache N/M hits (X%)`.
+
 Each enriched output record contains all original job fields plus:
 
 ```json

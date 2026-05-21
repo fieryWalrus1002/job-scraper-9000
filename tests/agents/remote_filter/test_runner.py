@@ -125,8 +125,8 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
     _write_jsonl(
         input_path,
         [
-            _job(source_job_id="1", title="Remote Engineer"),
-            _job(source_job_id="2", title="Hybrid Engineer"),
+            _job(source_job_id="1", title="Remote Engineer", dedup_hash="h1"),
+            _job(source_job_id="2", title="Hybrid Engineer", dedup_hash="h2"),
         ],
     )
 
@@ -143,9 +143,16 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
                 trash_path=trash_path,
                 config_path=config_path,
                 user_location="USA",
+                cache_path=tmp_path / "cache.jsonl",
             )
 
-    assert counts == {"pass": 1, "trash": 1, "skipped": 0, "total": 2}
+    assert counts["pass"] == 1
+    assert counts["trash"] == 1
+    assert counts["skipped"] == 0
+    assert counts["total"] == 2
+    assert counts["deduped"] == 0
+    assert counts["cache_hits"] == 0
+    assert counts["cache_misses"] == 2
 
     pass_records = [json.loads(line) for line in pass_path.read_text().splitlines()]
     trash_records = [json.loads(line) for line in trash_path.read_text().splitlines()]
@@ -157,7 +164,7 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
     assert (
         pass_records[0]["_remote_analysis"]["remote_classification"] == "fully_remote"
     )
-    assert pass_records[0]["_filter_metadata"] == FILTER_METADATA
+    assert pass_records[0]["_filter_metadata"] == {**FILTER_METADATA, "from_cache": False}
 
     assert len(trash_records) == 1
     assert trash_records[0]["title"] == "Hybrid Engineer"
@@ -183,9 +190,13 @@ def test_run_remote_filter_skips_missing_description_without_inference(tmp_path)
                 pass_path=pass_path,
                 trash_path=trash_path,
                 config_path=config_path,
+                cache_path=None,
             )
 
-    assert counts == {"pass": 0, "trash": 0, "skipped": 1, "total": 1}
+    assert counts["pass"] == 0
+    assert counts["trash"] == 0
+    assert counts["skipped"] == 1
+    assert counts["total"] == 1
     mock_analyze.assert_not_called()
     assert pass_path.read_text() == ""
     assert trash_path.read_text() == ""
@@ -209,9 +220,13 @@ def test_run_remote_filter_skips_failed_agent_result(tmp_path):
                 pass_path=pass_path,
                 trash_path=trash_path,
                 config_path=config_path,
+                cache_path=None,
             )
 
-    assert counts == {"pass": 0, "trash": 0, "skipped": 1, "total": 1}
+    assert counts["pass"] == 0
+    assert counts["trash"] == 0
+    assert counts["skipped"] == 1
+    assert counts["total"] == 1
     assert pass_path.read_text() == ""
     assert trash_path.read_text() == ""
 
