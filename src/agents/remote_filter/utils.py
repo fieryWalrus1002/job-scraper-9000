@@ -31,9 +31,23 @@ REMOTE_FILTER_PROMPT_PATH = _resolve_prompt_path()
 _PROMPT = REMOTE_FILTER_PROMPT_PATH.read_text()
 
 
-def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
+def _resolve_provider_and_model(llm_config: dict | None = None) -> tuple[str, str]:
+    """Single source of truth for which (provider, model) a config resolves to.
+
+    Both `_get_client` (inference) and `resolve_llm_model` (cache keying) route
+    through this so a config drift can't cause the cache key to lie about which
+    model produced the analysis.
+    """
     cfg = llm_config or {}
     provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
+    default_model = "qwen2.5:14b" if provider == "ollama" else "gpt-4o-mini"
+    model = cfg.get("model", os.environ.get("LLM_MODEL", default_model))
+    return provider, model
+
+
+def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
+    cfg = llm_config or {}
+    provider, model = _resolve_provider_and_model(cfg)
     if provider == "ollama":
         client = OpenAI(
             base_url=cfg.get(
@@ -42,10 +56,8 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
             ),
             api_key="ollama",
         )
-        model = cfg.get("model", os.environ.get("LLM_MODEL", "qwen2.5:14b"))
     else:
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        model = cfg.get("model", os.environ.get("LLM_MODEL", "gpt-4o-mini"))
     return client, model
 
 
@@ -189,7 +201,4 @@ def load_raw_jobs(path: Path) -> list[dict]:
 
 def resolve_llm_model(llm_config: dict | None = None) -> str:
     """Return the model name that `_get_client` would use, for cache keying."""
-    cfg = llm_config or {}
-    provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
-    default = "qwen2.5:14b" if provider == "ollama" else "gpt-4o-mini"
-    return cfg.get("model", os.environ.get("LLM_MODEL", default))
+    return _resolve_provider_and_model(llm_config)[1]
