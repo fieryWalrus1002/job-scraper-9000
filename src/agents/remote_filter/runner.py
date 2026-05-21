@@ -6,12 +6,15 @@ from typing import Any
 
 import yaml
 
+from agents.remote_filter.cache import DEFAULT_CACHE_PATH, AnalysisCache
 from agents.remote_filter.models import SCHEMA_VERSION
 from agents.remote_filter.utils import (
     REMOTE_FILTER_PROMPT_PATH,
     analyze_remote,
+    dedup_jobs,
     load_raw_jobs,
     passes_remote_filter,
+    resolve_llm_model,
 )
 from utils.git_info import get_git_metadata, get_prompt_hash
 
@@ -55,8 +58,13 @@ def run_remote_filter(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     user_location: str = "USA",
     user_timezone: str | None = None,
+    cache_path: str | Path | None = DEFAULT_CACHE_PATH,
 ) -> dict[str, int]:
-    """Run the remote-filter agent over routed candidate jobs and split pass/trash JSONL outputs."""
+    """Run the remote-filter agent over routed candidate jobs and split pass/trash JSONL outputs.
+
+    Within-batch duplicates (by `dedup_hash` / `source_job_id`) are collapsed to
+    a single LLM call. Pass `cache_path=None` to disable the across-batch cache.
+    """
     input_path = Path(input_path)
     pass_path = Path(pass_path)
     trash_path = Path(trash_path)
@@ -66,6 +74,16 @@ def run_remote_filter(
     jobs = load_raw_jobs(input_path)
     if not jobs:
         raise FileNotFoundError(f"No jobs found in {input_path}")
+
+    total_loaded = len(jobs)
+    jobs, deduped = dedup_jobs(jobs)
+    if deduped:
+        log.info(
+            "Within-batch dedup dropped %d of %d jobs (%.1f%%)",
+            deduped,
+            total_loaded,
+            100 * deduped / total_loaded,
+        )
 
     log.info("Running remote-filter on %d jobs...", len(jobs))
 
@@ -78,10 +96,14 @@ def run_remote_filter(
         filter_meta["dirty"],
     )
 
+    cache = AnalysisCache(cache_path) if cache_path is not None else None
+    model = resolve_llm_model(llm_config)
+    prompt_hash = filter_meta["prompt_hash"]
+
     pass_path.parent.mkdir(parents=True, exist_ok=True)
     trash_path.parent.mkdir(parents=True, exist_ok=True)
 
-    passed = failed = skipped = 0
+    passed = failed = skipped = cache_hits = cache_misses = 0
 
     with (
         pass_path.open("w", encoding="utf-8") as pass_f,
@@ -102,17 +124,30 @@ def run_remote_filter(
                 **(job.get("search_params") or {}),
                 **({"user_timezone": user_timezone} if user_timezone else {}),
             }
-            analysis = analyze_remote(
-                description,
-                title=title,
-                location=location,
-                search_context=search_context or None,
-                llm_config=llm_config,
-            )
+            dedup_key = job.get("dedup_hash") or job.get("source_job_id") or ""
+            analysis = None
+            from_cache = False
+            if cache is not None and dedup_key:
+                analysis = cache.get(dedup_key, prompt_hash, model)
+                from_cache = analysis is not None
+
             if analysis is None:
-                log.warning("Agent failed on %s @ %s — skipping", title, company)
-                skipped += 1
-                continue
+                analysis = analyze_remote(
+                    description,
+                    title=title,
+                    location=location,
+                    search_context=search_context or None,
+                    llm_config=llm_config,
+                )
+                if analysis is None:
+                    log.warning("Agent failed on %s @ %s — skipping", title, company)
+                    skipped += 1
+                    continue
+                if cache is not None and dedup_key:
+                    cache.put(dedup_key, prompt_hash, model, analysis)
+                    cache_misses += 1
+            else:
+                cache_hits += 1
 
             ok, reason = passes_remote_filter(analysis, config, user_location)
 
@@ -121,19 +156,49 @@ def run_remote_filter(
                 "_remote_analysis": analysis.model_dump(),
                 "_filter_result": "pass" if ok else "trash",
                 "_filter_reason": reason,
-                "_filter_metadata": filter_meta,
+                "_filter_metadata": {**filter_meta, "from_cache": from_cache},
             }
 
             if ok:
                 pass_f.write(json.dumps(enriched) + "\n")
                 passed += 1
                 log.info(
-                    "PASS  %s @ %s (%s)", title, company, analysis.remote_classification
+                    "PASS  %s @ %s (%s)%s",
+                    title,
+                    company,
+                    analysis.remote_classification,
+                    " [cached]" if from_cache else "",
                 )
             else:
                 trash_f.write(json.dumps(enriched) + "\n")
                 failed += 1
-                log.info("TRASH %s @ %s — %s", title, company, reason)
+                log.info(
+                    "TRASH %s @ %s — %s%s",
+                    title,
+                    company,
+                    reason,
+                    " [cached]" if from_cache else "",
+                )
 
-    log.info("Done — %d pass | %d trash | %d skipped", passed, failed, skipped)
-    return {"pass": passed, "trash": failed, "skipped": skipped, "total": len(jobs)}
+    cache_lookups = cache_hits + cache_misses
+    cache_hit_pct = (100 * cache_hits / cache_lookups) if cache_lookups else 0.0
+    log.info(
+        "Done — %d pass | %d trash | %d skipped | %d deduped | cache %d/%d hits (%.1f%%)",
+        passed,
+        failed,
+        skipped,
+        deduped,
+        cache_hits,
+        cache_lookups,
+        cache_hit_pct,
+    )
+    return {
+        "pass": passed,
+        "trash": failed,
+        "skipped": skipped,
+        "total": len(jobs),
+        "input_total": total_loaded,
+        "deduped": deduped,
+        "cache_hits": cache_hits,
+        "cache_misses": cache_misses,
+    }
