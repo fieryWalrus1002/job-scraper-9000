@@ -649,6 +649,7 @@ def test_remote_filter_custom_paths():
 
 
 def test_remote_filter_cmd_calls_runner():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
     from job_scraper.cli import _cmd_remote_filter
 
     args = _fake_args(
@@ -658,6 +659,8 @@ def test_remote_filter_cmd_calls_runner():
         config="remote.yml",
         user_location="USA",
         user_timezone="PST",
+        cache_path=None,
+        no_cache=False,
     )
 
     with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
@@ -670,6 +673,7 @@ def test_remote_filter_cmd_calls_runner():
         config_path="remote.yml",
         user_location="USA",
         user_timezone="PST",
+        cache_path=DEFAULT_CACHE_PATH,
     )
 
 
@@ -908,6 +912,7 @@ def test_remote_filter_run_date_flag():
 
 
 def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
     from job_scraper.cli import _cmd_remote_filter
 
     args = _fake_args(
@@ -918,6 +923,8 @@ def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
         user_location="USA",
         user_timezone=None,
         run_date=None,
+        cache_path=None,
+        no_cache=False,
     )
     with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
         _cmd_remote_filter(args)
@@ -929,10 +936,12 @@ def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
         config_path="remote.yml",
         user_location="USA",
         user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
     )
 
 
 def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
     from job_scraper.cli import _cmd_remote_filter
 
     args = _fake_args(
@@ -943,6 +952,8 @@ def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
         user_location="USA",
         user_timezone=None,
         run_date="2026-05-16",
+        cache_path=None,
+        no_cache=False,
     )
     with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
         _cmd_remote_filter(args)
@@ -954,10 +965,32 @@ def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
         config_path="remote.yml",
         user_location="USA",
         user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
     )
 
 
+def test_remote_filter_cmd_no_cache_flag_disables_cache():
+    from job_scraper.cli import _cmd_remote_filter
+
+    args = _fake_args(
+        input="raw.jsonl",
+        pass_output="pass.jsonl",
+        trash_output="trash.jsonl",
+        config="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        run_date=None,
+        cache_path=None,
+        no_cache=True,
+    )
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    assert mock_run.call_args.kwargs["cache_path"] is None
+
+
 def test_remote_filter_cmd_explicit_paths_override_run_date():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
     from job_scraper.cli import _cmd_remote_filter
 
     args = _fake_args(
@@ -968,6 +1001,8 @@ def test_remote_filter_cmd_explicit_paths_override_run_date():
         user_location="USA",
         user_timezone=None,
         run_date="2026-05-16",
+        cache_path=None,
+        no_cache=False,
     )
     with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
         _cmd_remote_filter(args)
@@ -979,4 +1014,5 @@ def test_remote_filter_cmd_explicit_paths_override_run_date():
         config_path="remote.yml",
         user_location="USA",
         user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
     )
