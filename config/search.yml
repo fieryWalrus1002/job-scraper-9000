@@ -1,5 +1,34 @@
 # job-scraper-9000 search config
-# v1
+# v2 — targeted to candidate profile (2026-05-20)
+#
+# v1 was a naive first pass: 7 generic tech-engineer titles (data engineer,
+# software engineer, AI engineer, etc.). Those produced lots of volume but
+# low signal — most results were enterprise SaaS / ad-tech / pure-CRUD work
+# that doesn't match this candidate's distinctive evidence (C++ systems,
+# scientific computing, network management, lab MLOps).
+#
+# v2 search terms are grouped by candidate evidence:
+# - Primary niche: C++ systems engineering (NMS contract — 322K LOC,
+#   network management, Cisco/SNMP, legacy modernization)
+# - Research / scientific software (14yr Kirchhoff Lab role, M.S. ag
+#   engineering with deep-learning focus, 3 PNAS-class publications)
+# - Network engineering (current NMS contract is exactly this)
+# - Infrastructure / platform / test (Linux/Proxmox/Docker depth,
+#   GTest/GMock harness build-out, RHEL 9 systemd daemon)
+# - ML / MLOps with applied/research bent (not enterprise FAANG-scale)
+# - LLM / AI eval (growth direction, less mature)
+#
+# Generic terms dropped: "data engineer" (too broad, mostly SaaS),
+# "software engineer" (too broad for LinkedIn; kept for local-jobspy
+# because the Pullman/Moscow pool is small enough that broad terms catch
+# more than they pollute). "AI engineer" kept as the broadest catchment
+# for cross-domain ML work that doesn't fit a specific niche.
+#
+# Tradeoff: more queries (17 LinkedIn + 14 jobspy = 31, vs v1's 17 total)
+# means more API calls and more dedup work, but the per-query signal
+# density should be meaningfully higher. Worth measuring after a few runs:
+# if the niche queries return mostly junk, drop them; if generic queries
+# keep producing the bulk of viable jobs, dial back on niches.
 
 global:
   default_max_results: 50
@@ -8,6 +37,11 @@ global:
   salary_floor_k: 120
 
 # companies:
+  # Consider activating this block for high-leverage targeted searches —
+  # pick 10-20 companies you'd actually want to work for and pull all their
+  # current postings. Far higher hit rate than generic keyword searches for
+  # someone new to broad job searching. Pair with greenhouse: block below
+  # for companies on Greenhouse ATS.
   # - notion
   # - mistral
   # - cohere
@@ -16,51 +50,11 @@ global:
   # - deepmind
   # - replit
   # - figma
-  # - notion
   # - stripe
 
-# sel:
-  # for now, just use the default settings for everything, but we can customize these later if we want
-
-linkedin:
-  experience: "2,3,4,5"
-  workplace: remote
-  job_type: fulltime
-
-  searches:
-    - keywords: "data engineer"
-    - keywords: "AI engineer"
-    - keywords: "machine learning engineer"
-    - keywords: "software engineer"
-    - keywords: "computer vision engineer"
-    - keywords: "MLOps engineer"
-    - keywords: "geospatial data engineer"
-
-jobspy:
-  # we covered linked in with the linkedin scraper, so no need to duplicate those results here
-  sites: indeed,zip_recruiter
-  no_remote: false
-
-  searches:
-    # Pullman/onsite — broad terms, small market
-    - search_term: "data engineer"
-      location: "${HOME_LOCATION}"
-    - search_term: "software engineer"
-      location: "${HOME_LOCATION}"
-    - search_term: "machine learning engineer"
-      location: "${HOME_LOCATION}"
-    - search_term: "AI engineer"
-      location: "${HOME_LOCATION}"
-
-    # Remote — mirrors LinkedIn core terms to get Indeed/ZipRecruiter coverage
-    - search_term: "data engineer"
-    - search_term: "AI engineer"
-    - search_term: "machine learning engineer"
-    - search_term: "software engineer"
-    - search_term: "MLOps engineer"
-    - search_term: "computer vision engineer"
-
 # greenhouse:
+  # Worth activating alongside companies: above. Greenhouse is the ATS for
+  # many tech companies that don't post comprehensively on LinkedIn.
   # boards:
     # - anthropic
     # - openai
@@ -70,3 +64,87 @@ jobspy:
     # - planet-labs
     # - descartes-labs
     # - scale-ai
+
+linkedin:
+  # Experience codes: 1=Intern, 2=Entry, 3=Associate, 4=Mid-Senior, 5=Director, 6=Executive
+  # v3 profile: not seeking junior (drops 2); Director/VP out (drops 5).
+  # 3,4 covers Associate (mid) through Mid-Senior (senior/staff/principal).
+  experience: "3,4"
+  workplace: remote
+  job_type: fulltime
+
+  searches:
+    # Primary niche — C++ / systems / embedded (candidate's strongest evidence)
+    - keywords: "C++ engineer"
+    - keywords: "embedded software engineer"
+    - keywords: "systems engineer"
+
+    # Research / scientific software (14yr lab role, M.S. in agricultural
+    # automation with deep-learning focus)
+    - keywords: "research engineer"
+    - keywords: "research software engineer"
+    - keywords: "scientific software engineer"
+    - keywords: "applied scientist"
+
+    # Network engineering (current NMS contract — Cisco IOS-XE, Juniper Mist,
+    # SNMP, DHCP/DNS at scale)
+    - keywords: "network engineer"
+    - keywords: "network automation engineer"
+
+    # Platform / infrastructure / DevOps (Linux + Proxmox + Docker + RHEL 9
+    # systemd + test engineering depth)
+    - keywords: "platform engineer"
+    - keywords: "infrastructure engineer"
+    - keywords: "DevOps engineer"
+
+    # ML / MLOps / CV with research bent (lab MLOps, PyTorch on Azure,
+    # UAV multispectral imagery from M.S. thesis)
+    - keywords: "machine learning engineer"
+    - keywords: "MLOps engineer"
+    - keywords: "computer vision engineer"
+
+    # LLM / AI growth direction (job-scraper-9000 + az-hydroflow-dpl
+    # evidence; broadest catchment for emerging roles)
+    - keywords: "LLM engineer"
+    - keywords: "AI engineer"
+
+jobspy:
+  # LinkedIn is covered by the dedicated linkedin scraper; jobspy adds
+  # Indeed + ZipRecruiter coverage. Same niche terms as LinkedIn, plus
+  # broader terms for the local-only Pullman/Moscow market (small pool
+  # tolerates broader terms without too much noise).
+  sites: indeed,zip_recruiter
+  no_remote: false
+
+  searches:
+    # Local (Pullman/Moscow) — small market, broader terms catch more here
+    # (e.g., WSU IT, regional employers, University of Idaho, INL)
+    - search_term: "C++ engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "research engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "network engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "systems engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "software engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "data engineer"
+      location: "${HOME_LOCATION}"
+
+    # Remote — mirrors the LinkedIn niche terms for Indeed/ZipRecruiter
+    # coverage. More condensed than LinkedIn since jobspy is supplementary.
+    - search_term: "C++ engineer"
+    - search_term: "embedded software engineer"
+    - search_term: "research engineer"
+    - search_term: "network automation engineer"
+    - search_term: "platform engineer"
+    - search_term: "MLOps engineer"
+    - search_term: "machine learning engineer"
+    - search_term: "computer vision engineer"
+
+# Local-only scraper for the Schweitzer Engineering Lab contract in Pullman, WA.
+sel:
+  location: pullman_wa
+  job_type: regular
+  fetch_descriptions: true
