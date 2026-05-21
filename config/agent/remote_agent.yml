@@ -5,11 +5,24 @@ llm:
   # Defaults to OPENAI_API_KEY. Use this to scope an agent to its own key
   # (e.g., api_key_env: OPENAI_API_KEY_SKILLS_FIT) for per-component spend
   # attribution and per-key spending caps in the OpenAI dashboard.
-  provider: openai        # openai | ollama
-  model: gpt-4o-mini
-  temperature: 0.1
+  #
+  # |-- OpenAI --|
+  # provider: openai
+  # model: gpt-4o-mini
+  # temperature: 0.1
   # api_key_env: OPENAI_API_KEY   # optional; this is the default
+
+  # |-- Ollama --|
+  # provider: ollama
+  # model: qwen-27b-mtp
+  # temperature: 0.1
   # base_url: http://localhost:11434/v1   # uncomment for ollama
+
+  # |-- llama.cpp --|
+  provider: ollama # is really llama.cpp but uses ollama-compatible API
+  model: qwen-27b-mtp
+  temperature: 0.1
+  base_url: http://localhost:8080/v1   # was 11434 (Ollama default); llama.cpp uses 8080
 
 policy_thresholds:
   disallowed_classifications:
