@@ -52,8 +52,21 @@
 #   trust upstream filters, don't over-penalize on location alone.
 # - Added section `evidence_highlights` (not currently consumed by prompt)
 #   for credibility signals that don't fit "skill list" shape.
+#
+# v4 update (schema refactor, 2026-05-21):
+# - Promoted `education` to a top-level field (out of evidence_highlights).
+#   Education is a first-class JD field (almost every posting has a dedicated
+#   "Education" or "Required qualifications" section listing degree
+#   requirements); profile structure should match. Now rendered into the
+#   prompt via utils.py's _format_profile_block — model sees the M.S.
+# - No other content changes. publications / operational_scale /
+#   career_consistency stay in evidence_highlights pending Phase G decisions
+#   on whether to expose them too.
+# - Existing v3-draft proposals are stale by construction (they were scored
+#   without education visible); re-propose the seed with this v4 profile to
+#   refresh the gold baseline.
 
-profile_version: "2026-05-20-v3-draft"
+profile_version: "2026-05-21-v4-draft"
 
 summary: |
   Senior C++ systems engineer specializing in modernizing legacy production
@@ -103,6 +116,9 @@ level: |
   into it as part of breaking into enterprise from a consulting +
   scientific-research background. Director / VP / C-suite roles are out
   (insufficient people-management depth to back them up).
+
+education:
+  - "M.S., Agricultural Engineering — Washington State University (defended Dec 2025, conferred May 2026). Focus: agricultural automation with deep-learning applications (UAV multispectral imagery pipeline, PyTorch image segmentation, OpenCV)."
 
 core_skills:
   - Modern C++ (C++17 / C++20)
@@ -166,8 +182,10 @@ constraints:
 
 # ----------------------------------------------------------------------------
 # Items below are not currently consumed by the prompt (utils.py reads only
-# the 7 fields above). Kept here for the Phase G profile-audit session to
-# decide what to expose. They do NOT increase fit scores in this first pass.
+# the 8 fields above — summary, level, education, core_skills,
+# adjacent_skills, preferred_domains, avoided_domains, constraints). Kept
+# here for the Phase G profile-audit session to decide what to expose.
+# They do NOT increase fit scores in this first pass.
 # ----------------------------------------------------------------------------
 
 # Things I have light exposure to or am developing toward — NOT evidence of
@@ -192,8 +210,6 @@ evidence_highlights:
     - "Koper et al. (2021). Plant and Cell Physiology 62(1), 125–142."
     - "Höhner et al. (2020). PNAS 117(26), 15354–15362."
     - "Kirchhoff, Hall, Wood, et al. (2011). PNAS 108(50), 20248–20253."
-  education:
-    - "M.S., Agricultural Engineering — Washington State University (defended Dec 2025, conferred May 2026). Focus: agricultural automation with deep-learning applications (UAV multispectral imagery pipeline, PyTorch image segmentation, OpenCV)."
   operational_scale:
     - "Production network: ~3,500 APs, ~350 switches, 150–200K unique client MACs (~50K active/day), 6-minute ingestion cycle load-bearing for DHCP/DNS config build"
     - "Multi-TB on-prem data pipelines for image and spectroscopy data, 14 years operational longevity"

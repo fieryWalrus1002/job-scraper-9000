@@ -68,6 +68,8 @@ def _format_profile_block(profile: dict) -> str:
         lines.append(f"Summary: {summary.strip()}")
     if level := profile.get("level"):
         lines.append(f"Level: {level}")
+    if education := profile.get("education"):
+        lines.append("Education: " + "; ".join(education))
     if core := profile.get("core_skills"):
         lines.append("Core skills: " + ", ".join(core))
     if adj := profile.get("adjacent_skills"):
