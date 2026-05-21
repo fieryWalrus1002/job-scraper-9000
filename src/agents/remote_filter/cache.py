@@ -4,6 +4,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# TODO: when skills_fit ships its own analysis cache, extract a generic
+# base class (probably src/utils/analysis_cache.py) and make this a typed
+# subclass over RemoteAnalysis. Two consumers > one — design the abstraction
+# then, not now.
 from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)

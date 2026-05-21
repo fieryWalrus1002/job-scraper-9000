@@ -11,11 +11,11 @@ from agents.remote_filter.models import SCHEMA_VERSION
 from agents.remote_filter.utils import (
     REMOTE_FILTER_PROMPT_PATH,
     analyze_remote,
-    dedup_jobs,
     load_raw_jobs,
     passes_remote_filter,
     resolve_llm_model,
 )
+from utils.dedup import dedup_jobs
 from utils.git_info import get_git_metadata, get_prompt_hash
 
 log = logging.getLogger(__name__)
