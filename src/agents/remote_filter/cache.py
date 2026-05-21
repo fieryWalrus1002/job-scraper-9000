@@ -15,16 +15,25 @@ log = logging.getLogger(__name__)
 DEFAULT_CACHE_PATH = Path("data/cache/remote_filter_analyses.jsonl")
 
 
-def _composite_key(dedup_hash: str, prompt_hash: str, model: str) -> str:
-    return f"{dedup_hash}|{prompt_hash}|{model}"
+def _composite_key(
+    *,
+    dedup_hash: str,
+    prompt_hash: str,
+    provider: str,
+    model: str,
+    context_fp: str,
+) -> str:
+    return f"{dedup_hash}|{prompt_hash}|{provider}|{model}|{context_fp}"
 
 
 class AnalysisCache:
     """Append-only JSONL cache for remote-filter analyses.
 
-    Key: (dedup_hash, prompt_hash, model). When prompt or model changes the
-    composite key changes and entries cache-miss, so no manual invalidation
-    is needed. Later entries with the same key override earlier ones on load.
+    Composite key: (dedup_hash, prompt_hash, provider, model, context_fp).
+    Any change to the prompt, the provider/model pair, or the search-context
+    fields the prompt reads (keywords, workplace, job_type, user_timezone)
+    changes the key and forces a miss — no manual invalidation needed.
+    Later entries with the same key override earlier ones on load.
     """
 
     def __init__(self, path: Path | str = DEFAULT_CACHE_PATH) -> None:
@@ -49,9 +58,21 @@ class AnalysisCache:
                 self._entries[key] = entry
 
     def get(
-        self, dedup_hash: str, prompt_hash: str, model: str
+        self,
+        *,
+        dedup_hash: str,
+        prompt_hash: str,
+        provider: str,
+        model: str,
+        context_fp: str,
     ) -> RemoteAnalysis | None:
-        key = _composite_key(dedup_hash, prompt_hash, model)
+        key = _composite_key(
+            dedup_hash=dedup_hash,
+            prompt_hash=prompt_hash,
+            provider=provider,
+            model=model,
+            context_fp=context_fp,
+        )
         entry = self._entries.get(key)
         if entry is None:
             return None
@@ -63,17 +84,28 @@ class AnalysisCache:
 
     def put(
         self,
+        *,
         dedup_hash: str,
         prompt_hash: str,
+        provider: str,
         model: str,
+        context_fp: str,
         analysis: RemoteAnalysis,
     ) -> None:
-        key = _composite_key(dedup_hash, prompt_hash, model)
+        key = _composite_key(
+            dedup_hash=dedup_hash,
+            prompt_hash=prompt_hash,
+            provider=provider,
+            model=model,
+            context_fp=context_fp,
+        )
         entry = {
             "key": key,
             "dedup_hash": dedup_hash,
             "prompt_hash": prompt_hash,
+            "provider": provider,
             "model": model,
+            "context_fp": context_fp,
             "analysis": analysis.model_dump(),
             "cached_at": datetime.now(timezone.utc).isoformat(),
         }
