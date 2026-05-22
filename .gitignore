@@ -16,6 +16,11 @@ data/**/*.md
 # known failures don't need to be tracked in git
 config/known_failures.json
 
+# Candidate profiles contain PII (name, employer, comp, etc.). The
+# .example template is the only profile YAML that should be tracked.
+config/profile/*.yml
+!config/profile/*.yml.example
+
 # IDE config — local only
 .vscode/
 
