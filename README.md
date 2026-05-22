@@ -140,6 +140,7 @@ streamlit run src/review_ui/app.py     # open the review UI
 | Topic | Doc |
 | --- | --- |
 | Project status — what's built, what's next | `gh issue list` or https://github.com/fieryWalrus1002/job-scraper-9000/issues |
+| `data/` layout — directory map, writers, schemas | [data/README.md](data/README.md) |
 | Prefilter router — deterministic routing layer, config, CLI | [src/prefilter/README.md](src/prefilter/README.md) |
 | Prefilter router design — deterministic routing layer before remote filter | [specs/prefilter_design.md](specs/prefilter_design.md) |
 | Prefilter implementation plan — branch-ready build plan | [specs/prefilter_implementation_plan.md](specs/prefilter_implementation_plan.md) |
@@ -168,20 +169,15 @@ uv run pytest
 ```text
 src/
   job_scraper/        # scraper library + CLI
-  agents/             # LLM agents (remote_filter, future: scorer, dispatcher)
+  prefilter/          # deterministic routing layer (no LLM)
+  agents/             # LLM agents (remote_filter, skills_fit)
+  agent_eval/         # eval framework (metrics, run logger)
   review_ui/          # Streamlit HITL review app
 
 scripts/              # one-off data pipeline scripts (prepare, merge, sample)
 prompts/              # LLM system prompts
-config/               # search configs, agent policy, company board database
+config/               # search configs, agent policy, candidate profile
 specs/                # design docs
-
-data/
-  raw/                # scraped JSONL (Bronze, source truth)
-  prefiltered/        # jobs routed onward to remote_filter
-  local/              # local jobs held aside from remote_filter
-  staging/            # teacher-annotated, awaiting review (Silver)
-  eval/               # human-verified golden dataset (Gold)
-  filtered/           # remote_filter pass results
-  trash/              # prefilter and remote_filter rejects
 ```
+
+`data/` is the local pipeline workspace — directory layout, writers, and schemas are documented in [data/README.md](data/README.md).
