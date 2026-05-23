@@ -18,8 +18,19 @@ class JobPosting:
     dedup_hash: str = ""
 
     def compute_hash(self) -> None:
+        # source_job_id distinguishes legitimately distinct postings that share
+        # (company, title, location). SEL re-posts the same title at the same
+        # location for different teams/cohorts; without source_job_id in the
+        # key, those collide and the downstream AnalysisCache returns a stale
+        # analysis for the second posting. `source` defends against
+        # source_job_id collisions across scrapers. Tradeoff: cross-source
+        # dedup of the same listing (e.g. LinkedIn mirror of a Greenhouse post)
+        # is no longer collapsed by this hash — rare in practice, and a
+        # separate fuzzy-match step would be the right place for that.
         key = "|".join(
             [
+                (self.source or "").lower().strip(),
+                (self.source_job_id or "").lower().strip(),
                 (self.company or "").lower().strip(),
                 (self.title or "").lower().strip(),
                 (self.location or "").lower().strip(),
