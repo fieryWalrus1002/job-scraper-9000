@@ -103,7 +103,7 @@ Runs the remote filter agent over every record in the golden dataset and writes 
 uv run scripts/run_remote_filter_eval.py
 ```
 
-**Input:** `data/eval/ground_truth.jsonl`  
+**Input:** `data/eval/ground_truth.jsonl`
 **Output:** `data/eval/runs.jsonl` (appended), `data/eval/mismatches_{run_id}.jsonl` (if any mismatches)
 
 | Flag | Default | Description |
@@ -114,7 +114,7 @@ uv run scripts/run_remote_filter_eval.py
 | `--model` | _(from config)_ | Override `llm.model` in-memory — does not modify the YAML |
 | `--temperature` | _(from config)_ | Override `llm.temperature` in-memory |
 | `--provider` | _(from config)_ | Override `llm.provider` in-memory (`openai` or `ollama`) |
-| `--run-id` | _(auto-generated)_ | Human-readable label for this run; rejected if already in `runs.jsonl` |
+| `--run-id` | _(auto-generated)_ | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
 | `--no-mismatches` | off | Skip writing the mismatch file |
 | `--workers` | `1` | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
 
@@ -312,7 +312,7 @@ uv run scripts/run_skills_fit_eval.py --scorer llm     --run-id phase_r_llm_rubr
 | `--config` | `config/agent/skills_fit.yml` | Agent config YAML |
 | `--scorer` | `llm` | `llm` or `keyword` |
 | `--model` / `--provider` / `--temperature` | _(from config)_ | In-memory overrides |
-| `--run-id` | _(auto-generated)_ | Human-readable label; rejected if already present in `runs.jsonl` |
+| `--run-id` | _(auto-generated)_ | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
 | `--workers` | `1` | Concurrent inference workers for the LLM scorer |
 | `--no-mismatches` | off | Skip writing the mismatch file |
 

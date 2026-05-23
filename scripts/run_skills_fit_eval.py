@@ -123,6 +123,7 @@ def parse_args() -> argparse.Namespace:
         "--positive-threshold",
         type=int,
         default=4,
+        choices=[1, 2, 3, 4, 5],
         help="Min gold score for precision_at_k (default: 4)",
     )
     args = p.parse_args()
@@ -278,27 +279,25 @@ def run_eval(
             for i, job in enumerate(records)
         ]
     else:
-        executor = ThreadPoolExecutor(max_workers=workers)
-        try:
-            results = list(
-                executor.map(
-                    lambda item: _evaluate_record(
-                        item[0],
-                        item[1],
-                        scorer=scorer,
-                        profile=profile,
-                        llm_config=llm_config,
-                        prompt_path=prompt_path,
-                        run_id=run_id,
-                    ),
-                    enumerate(records),
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            try:
+                results = list(
+                    executor.map(
+                        lambda item: _evaluate_record(
+                            item[0],
+                            item[1],
+                            scorer=scorer,
+                            profile=profile,
+                            llm_config=llm_config,
+                            prompt_path=prompt_path,
+                            run_id=run_id,
+                        ),
+                        enumerate(records),
+                    )
                 )
-            )
-        except KeyboardInterrupt:
-            executor.shutdown(wait=False, cancel_futures=True)
-            raise
-        else:
-            executor.shutdown()
+            except KeyboardInterrupt:
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise
 
     preds: list[int] = []
     golds: list[int] = []

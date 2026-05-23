@@ -76,7 +76,14 @@ def extract_review_yaml(md_text: str) -> dict | None:
     m = YAML_BLOCK_RE.search(md_text)
     if not m:
         return None
-    return yaml.safe_load(m.group(1))
+    data = yaml.safe_load(m.group(1))
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"YAML block is {type(data).__name__}, expected a mapping (dict)"
+        )
+    return data
 
 
 def validate_review(data: dict) -> tuple[bool, str | None]:
@@ -142,9 +149,7 @@ def main() -> None:
     }
 
     proposed = load_jsonl(proposed_path)
-    proposed_by_id = {
-        r["source_job_id"]: r for r in proposed if r.get("source_job_id")
-    }
+    proposed_by_id = {r["source_job_id"]: r for r in proposed if r.get("source_job_id")}
 
     gold = load_jsonl(gold_path)
     scored_ids = {r.get("source_job_id") for r in gold if r.get("source_job_id")}
@@ -166,14 +171,15 @@ def main() -> None:
         except yaml.YAMLError as e:
             errors.append((md_path.name, f"YAML parse error: {e}"))
             continue
+        except ValueError as e:
+            errors.append((md_path.name, f"YAML structure error: {e}"))
+            continue
         except Exception as e:
             errors.append((md_path.name, f"unexpected: {type(e).__name__}: {e}"))
             continue
 
         if data is None:
-            errors.append(
-                (md_path.name, "no YAML block found under '## YOUR REVIEW'")
-            )
+            errors.append((md_path.name, "no YAML block found under '## YOUR REVIEW'"))
             continue
 
         source_job_id = data.get("source_job_id")

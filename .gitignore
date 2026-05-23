@@ -9,6 +9,7 @@ dist/
 data/**/*.jsonl
 data/**/*.txt
 data/**/*.md
+!data/README.md
 
 # stray jsonl at the repo root
 /*.jsonl
@@ -37,4 +38,3 @@ ai_response.txt
 
 # issue templates that I paste to make issues, but don't want to track in git
 issues/
-

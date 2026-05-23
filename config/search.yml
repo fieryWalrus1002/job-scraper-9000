@@ -142,7 +142,10 @@ jobspy:
     - search_term: "machine learning engineer"
     - search_term: "computer vision engineer"
 
-# Local-only scraper for the Schweitzer Engineering Lab contract in ${HOME_LOCATION}.
+# Local-only scraper for the Schweitzer Engineering Lab job board.
+# `pullman_wa` is an SEL board-specific location key (mapped to "Washington -
+# Pullman" by src/job_scraper/scrapers/sel.py), not a free-form location
+# string. Not interchangeable with ${HOME_LOCATION}.
 sel:
   location: pullman_wa
   job_type: regular
