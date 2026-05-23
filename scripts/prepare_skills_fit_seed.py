@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Sample candidate jobs for hand-scoring the skills_fit seed gold.
 
-Reads remote_filter_pass.jsonl outputs, picks N diverse records, and writes
-them to a template JSONL with empty _human_* fields ready to fill in.
+Reads remote_filter_pass.jsonl outputs, picks a random sample of N records,
+and writes them to a template JSONL with empty _human_* fields ready to fill
+in. (No diversity heuristic — that's what select_skills_fit_review.py does
+for the stratified-by-band selection downstream.)
 
 Workflow:
     1. uv run scripts/prepare_skills_fit_seed.py --n 40 --in data/filtered/2026-05-16/
@@ -23,12 +25,12 @@ from pathlib import Path
 DEFAULT_OUT = Path("data/staging/skills_fit_seed_template.jsonl")
 
 EMPTY_HUMAN_FIELDS = {
-    "_human_fit_score": None,         # int 1-5
-    "_human_confidence": None,        # "low" | "medium" | "high"
+    "_human_fit_score": None,  # int 1-5
+    "_human_confidence": None,  # "low" | "medium" | "high"
     "_human_top_matches": [],
     "_human_gaps": [],
     "_human_hard_concerns": [],
-    "_human_notes": "",               # REQUIRED — see Calibration section of spec
+    "_human_notes": "",  # REQUIRED — see Calibration section of spec
 }
 
 
@@ -45,15 +47,26 @@ def load_records(path: Path) -> list[dict]:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument(
-        "--in", dest="input",
+        "--in",
+        dest="input",
         default="data/filtered/",
         help="File or directory of remote_filter_pass.jsonl outputs",
     )
-    p.add_argument("--n", type=int, default=40, help="Candidate count to sample (default: 40)")
-    p.add_argument("--out", default=str(DEFAULT_OUT), help=f"Output template path (default: {DEFAULT_OUT})")
-    p.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    p.add_argument(
+        "--n", type=int, default=40, help="Candidate count to sample (default: 40)"
+    )
+    p.add_argument(
+        "--out",
+        default=str(DEFAULT_OUT),
+        help=f"Output template path (default: {DEFAULT_OUT})",
+    )
+    p.add_argument(
+        "--seed", type=int, default=None, help="Random seed for reproducibility"
+    )
     args = p.parse_args()
 
     input_path = Path(args.input)

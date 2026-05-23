@@ -333,10 +333,11 @@ def print_report(
     print(f"  mae                        : {m['mae']:.4f}")
     print(f"  bias                       : {m['bias']:+.4f}  (+ = model scores high)")
     print(f"  spearman_rho               : {m['spearman_rho']:.4f}")
+    threshold = m["positive_threshold"]
     print(
-        f"  precision_at_5 (gold>=4)   : {m['precision_at_5']:.4f}  ← top-of-list metric"
+        f"  precision_at_5 (gold>={threshold})   : {m['precision_at_5']:.4f}  ← top-of-list metric"
     )
-    print(f"  precision_at_10            : {m['precision_at_10']:.4f}")
+    print(f"  precision_at_10 (gold>={threshold})  : {m['precision_at_10']:.4f}")
     print(f"  mean_gold_score_at_top_10  : {m['mean_gold_score_at_top_10']:.4f}")
     print(f"  top_bucket_purity (pred=5) : {m['top_bucket_purity']:.4f}")
     print("-" * 60)
