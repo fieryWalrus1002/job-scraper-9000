@@ -18,6 +18,7 @@ Usage:
 import argparse
 import logging
 import os
+import shutil
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -49,6 +50,7 @@ log = logging.getLogger(__name__)
 GOLD_FILE = "data/eval/skills_fit_ground_truth.jsonl"
 CONFIG_PATH = "config/agent/skills_fit.yml"
 RUNS_FILE = "data/eval/runs.jsonl"
+OLD_PROFILES_DIR = Path("config/profile/old_profiles")
 
 
 class MismatchRecord(BaseModel):
@@ -364,6 +366,21 @@ def print_report(
     print()
 
 
+def snapshot_profile(profile_path: Path, profile_version: str) -> Path | None:
+    if profile_version == "unknown":
+        log.warning(
+            "Skipping profile snapshot: candidate_profile.yml has no profile_version"
+        )
+        return None
+    OLD_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    archive_path = OLD_PROFILES_DIR / f"candidate_profile_{profile_version}.yml"
+    if archive_path.exists():
+        return archive_path
+    shutil.copy(profile_path, archive_path)
+    log.info("Profile snapshot written: %s", archive_path)
+    return archive_path
+
+
 def main(run_logger: RunLogger | None = None) -> None:
     args = parse_args()
 
@@ -393,6 +410,7 @@ def main(run_logger: RunLogger | None = None) -> None:
         log.error("Profile file not found: %s", profile_path)
         sys.exit(1)
     profile = load_candidate_profile(profile_path)
+    snapshot_profile(profile_path, profile.get("profile_version", "unknown"))
 
     prompt_path = Path(args.prompt) if args.prompt else SKILLS_FIT_PROMPT_PATH
     if not prompt_path.exists():
