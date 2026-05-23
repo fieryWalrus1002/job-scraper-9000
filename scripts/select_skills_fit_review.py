@@ -52,7 +52,9 @@ def main() -> None:
     p.add_argument("--proposed", default=str(DEFAULT_PROPOSED))
     p.add_argument("--gold", default=str(DEFAULT_GOLD))
     p.add_argument("--out", default=str(DEFAULT_OUT))
-    p.add_argument("--per-band", type=int, default=5, help="Records per band 1-5 (default: 5)")
+    p.add_argument(
+        "--per-band", type=int, default=5, help="Records per band 1-5 (default: 5)"
+    )
     p.add_argument("--seed", type=int, default=None)
     args = p.parse_args()
 
@@ -105,7 +107,7 @@ def main() -> None:
     print(f"Wrote {len(selected)} records to {out_path}")
     print()
     print("Next:")
-    print(f"  rm -rf data/staging/skills_fit_review/")
+    print("  rm -rf data/staging/skills_fit_review/")
     print(f"  uv run scripts/render_skills_fit_review_md.py --in {out_path}")
 
 

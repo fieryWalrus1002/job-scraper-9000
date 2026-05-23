@@ -1,7 +1,5 @@
 """Smoke tests for the keyword-overlap baseline scorer."""
 
-import pytest
-
 from agents.skills_fit.baselines import keyword_overlap_analyze
 from agents.skills_fit.models import SkillsFitAnalysis
 

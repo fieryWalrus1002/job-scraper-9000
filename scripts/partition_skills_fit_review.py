@@ -73,7 +73,9 @@ def main() -> None:
     p.add_argument("--source-dir", required=True)
     p.add_argument("--target-dir", required=True)
     p.add_argument("--template", default=str(DEFAULT_TEMPLATE))
-    p.add_argument("--per-band", type=int, default=1, help="Records per band 1-5 (default: 1)")
+    p.add_argument(
+        "--per-band", type=int, default=1, help="Records per band 1-5 (default: 1)"
+    )
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--dry-run", action="store_true", help="Show picks but don't copy")
     args = p.parse_args()
@@ -89,8 +91,13 @@ def main() -> None:
         print(f"Template not found: {template_path}", file=sys.stderr)
         sys.exit(1)
     if target_dir.exists() and any(target_dir.iterdir()):
-        print(f"Target dir already exists and is non-empty: {target_dir}", file=sys.stderr)
-        print("Refusing to overwrite. Remove it first if you want to repartition.", file=sys.stderr)
+        print(
+            f"Target dir already exists and is non-empty: {target_dir}", file=sys.stderr
+        )
+        print(
+            "Refusing to overwrite. Remove it first if you want to repartition.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     template = load_jsonl(template_path)
@@ -162,12 +169,12 @@ def main() -> None:
         print(f"Done. {len(picks)} files in {target_dir}")
         print()
         print("Next: send target dir to reviewer B. After both reviewers return:")
-        print(f"  uv run scripts/parse_skills_fit_review_md.py \\")
+        print("  uv run scripts/parse_skills_fit_review_md.py \\")
         print(f"    --review-dir {source_dir} \\")
-        print(f"    --gold data/eval/skills_fit_gold_a.jsonl")
-        print(f"  uv run scripts/parse_skills_fit_review_md.py \\")
+        print("    --gold data/eval/skills_fit_gold_a.jsonl")
+        print("  uv run scripts/parse_skills_fit_review_md.py \\")
         print(f"    --review-dir {target_dir} \\")
-        print(f"    --gold data/eval/skills_fit_gold_b.jsonl")
+        print("    --gold data/eval/skills_fit_gold_b.jsonl")
 
 
 if __name__ == "__main__":

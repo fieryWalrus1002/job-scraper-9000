@@ -81,9 +81,17 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    p.add_argument("--gold", default=GOLD_FILE, help=f"Ground truth JSONL (default: {GOLD_FILE})")
-    p.add_argument("--config", default=CONFIG_PATH, help=f"Agent config YAML (default: {CONFIG_PATH})")
-    p.add_argument("--runs-file", default=RUNS_FILE, help=f"Run log JSONL (default: {RUNS_FILE})")
+    p.add_argument(
+        "--gold", default=GOLD_FILE, help=f"Ground truth JSONL (default: {GOLD_FILE})"
+    )
+    p.add_argument(
+        "--config",
+        default=CONFIG_PATH,
+        help=f"Agent config YAML (default: {CONFIG_PATH})",
+    )
+    p.add_argument(
+        "--runs-file", default=RUNS_FILE, help=f"Run log JSONL (default: {RUNS_FILE})"
+    )
     p.add_argument(
         "--scorer",
         choices=["llm", "keyword"],
@@ -91,14 +99,20 @@ def parse_args() -> argparse.Namespace:
         help="Which scorer to evaluate (default: llm)",
     )
     p.add_argument("--model", help="Override llm.model in-memory")
-    p.add_argument("--temperature", type=float, help="Override llm.temperature in-memory")
+    p.add_argument(
+        "--temperature", type=float, help="Override llm.temperature in-memory"
+    )
     p.add_argument("--provider", help="Override llm.provider in-memory")
     p.add_argument(
         "--prompt",
         help=f"Override the system prompt file (default: {SKILLS_FIT_PROMPT_PATH})",
     )
-    p.add_argument("--run-id", dest="run_id", help="Custom run label (auto-generated if omitted)")
-    p.add_argument("--no-mismatches", action="store_true", help="Skip writing mismatch file")
+    p.add_argument(
+        "--run-id", dest="run_id", help="Custom run label (auto-generated if omitted)"
+    )
+    p.add_argument(
+        "--no-mismatches", action="store_true", help="Skip writing mismatch file"
+    )
     p.add_argument(
         "--workers",
         type=int,
@@ -132,17 +146,29 @@ def _evaluate_record(
     gold_score = job.get("_human_fit_score")
     if not isinstance(gold_score, int) or not (1 <= gold_score <= 5):
         return RecordEvalResult(
-            index=i, job=job, gold_score=None, pred_score=None,
-            pred_confidence=None, pred_rationale=None, elapsed=0.0,
-            skipped=True, skip_reason="invalid_human_fit_score",
+            index=i,
+            job=job,
+            gold_score=None,
+            pred_score=None,
+            pred_confidence=None,
+            pred_rationale=None,
+            elapsed=0.0,
+            skipped=True,
+            skip_reason="invalid_human_fit_score",
         )
 
     description = job.get("description", "")
     if not description:
         return RecordEvalResult(
-            index=i, job=job, gold_score=gold_score, pred_score=None,
-            pred_confidence=None, pred_rationale=None, elapsed=0.0,
-            skipped=True, skip_reason="missing_description",
+            index=i,
+            job=job,
+            gold_score=gold_score,
+            pred_score=None,
+            pred_confidence=None,
+            pred_rationale=None,
+            elapsed=0.0,
+            skipped=True,
+            skip_reason="missing_description",
         )
 
     title = job.get("title") or None
@@ -166,9 +192,15 @@ def _evaluate_record(
 
     if analysis is None:
         return RecordEvalResult(
-            index=i, job=job, gold_score=gold_score, pred_score=None,
-            pred_confidence=None, pred_rationale=None, elapsed=elapsed,
-            skipped=True, skip_reason="agent_failed",
+            index=i,
+            job=job,
+            gold_score=gold_score,
+            pred_score=None,
+            pred_confidence=None,
+            pred_rationale=None,
+            elapsed=elapsed,
+            skipped=True,
+            skip_reason="agent_failed",
         )
 
     pred = analysis.fit_score
@@ -187,9 +219,14 @@ def _evaluate_record(
         )
 
     return RecordEvalResult(
-        index=i, job=job, gold_score=gold_score, pred_score=pred,
-        pred_confidence=analysis.confidence, pred_rationale=analysis.score_rationale,
-        elapsed=elapsed, mismatch=mismatch,
+        index=i,
+        job=job,
+        gold_score=gold_score,
+        pred_score=pred,
+        pred_confidence=analysis.confidence,
+        pred_rationale=analysis.score_rationale,
+        elapsed=elapsed,
+        mismatch=mismatch,
     )
 
 
@@ -198,7 +235,9 @@ def _log_record_result(result: RecordEvalResult) -> None:
     if result.skipped:
         log.warning(
             "Record %d (%s) skipped — %s",
-            result.index, job.get("title"), result.skip_reason,
+            result.index,
+            job.get("title"),
+            result.skip_reason,
         )
         return
     delta = (result.pred_score or 0) - (result.gold_score or 0)
@@ -228,8 +267,13 @@ def run_eval(
     if workers == 1 or scorer == "keyword":
         results = [
             _evaluate_record(
-                i, job, scorer=scorer, profile=profile,
-                llm_config=llm_config, prompt_path=prompt_path, run_id=run_id,
+                i,
+                job,
+                scorer=scorer,
+                profile=profile,
+                llm_config=llm_config,
+                prompt_path=prompt_path,
+                run_id=run_id,
             )
             for i, job in enumerate(records)
         ]
@@ -239,9 +283,12 @@ def run_eval(
             results = list(
                 executor.map(
                     lambda item: _evaluate_record(
-                        item[0], item[1],
-                        scorer=scorer, profile=profile,
-                        llm_config=llm_config, prompt_path=prompt_path,
+                        item[0],
+                        item[1],
+                        scorer=scorer,
+                        profile=profile,
+                        llm_config=llm_config,
+                        prompt_path=prompt_path,
                         run_id=run_id,
                     ),
                     enumerate(records),
@@ -271,7 +318,9 @@ def run_eval(
     return mismatches, preds, golds, skipped
 
 
-def print_report(metrics: dict, mismatches: list[MismatchRecord], run_id: str, scorer: str) -> None:
+def print_report(
+    metrics: dict, mismatches: list[MismatchRecord], run_id: str, scorer: str
+) -> None:
     m = metrics["metrics"]
     print()
     print("=" * 60)
@@ -285,14 +334,16 @@ def print_report(metrics: dict, mismatches: list[MismatchRecord], run_id: str, s
     print(f"  mae                        : {m['mae']:.4f}")
     print(f"  bias                       : {m['bias']:+.4f}  (+ = model scores high)")
     print(f"  spearman_rho               : {m['spearman_rho']:.4f}")
-    print(f"  precision_at_5 (gold>=4)   : {m['precision_at_5']:.4f}  ← top-of-list metric")
+    print(
+        f"  precision_at_5 (gold>=4)   : {m['precision_at_5']:.4f}  ← top-of-list metric"
+    )
     print(f"  precision_at_10            : {m['precision_at_10']:.4f}")
     print(f"  mean_gold_score_at_top_10  : {m['mean_gold_score_at_top_10']:.4f}")
     print(f"  top_bucket_purity (pred=5) : {m['top_bucket_purity']:.4f}")
     print("-" * 60)
     print("  confusion_5x5 (rows=pred, cols=gold, idx 0-4 = scores 1-5):")
     for i, row in enumerate(m["confusion_5x5"]):
-        print(f"    pred={i+1}: {row}")
+        print(f"    pred={i + 1}: {row}")
     print("=" * 60)
 
     if mismatches:
@@ -330,7 +381,9 @@ def main(run_logger: RunLogger | None = None) -> None:
     if args.provider:
         config.setdefault("llm", {})["provider"] = args.provider
 
-    profile_path = Path(config.get("profile_file", "config/profile/candidate_profile.yml"))
+    profile_path = Path(
+        config.get("profile_file", "config/profile/candidate_profile.yml")
+    )
     if not profile_path.exists():
         log.error("Profile file not found: %s", profile_path)
         sys.exit(1)
