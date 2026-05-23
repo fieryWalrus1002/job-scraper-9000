@@ -183,8 +183,10 @@ uv run scripts/compare_evals.py
 | --- | --- | --- |
 | `--runs-file` | `data/eval/runs.jsonl` | Run log to read |
 | `--last N` | _(all)_ | Show only the N most recent runs |
-| `--sort-by` | `timestamp` | Sort by `timestamp`, `accuracy`, `precision`, `recall`, or `f1` |
+| `--sort-by` | `timestamp` | Sort by `timestamp` or a scorer-specific metric |
 | `--diff <id_a> <id_b>` | — | Side-by-side metric comparison with `↑`/`↓`/`=` indicators |
+| `--against-champion <scorer>` | — | Resolve the left-hand diff run from `config/eval/champions.yml` |
+| `--per-record` | `false` | After aggregate diff, print a per-record markdown table (`skills_fit` only) |
 
 **Examples:**
 
@@ -197,6 +199,12 @@ uv run scripts/compare_evals.py --last 5 --sort-by f1
 
 # Diff two specific runs
 uv run scripts/compare_evals.py --diff 20260514_100000_aaaa 20260514_120000_bbbb
+
+# Compare a new skills_fit run against the pinned champion
+uv run scripts/compare_evals.py \
+  --against-champion skills_fit \
+  --diff phase_g_pr1_llm_reframe_v5_20260523_182056_fbf3 \
+  --per-record
 ```
 
 ---
