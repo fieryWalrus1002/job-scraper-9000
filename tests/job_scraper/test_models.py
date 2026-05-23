@@ -55,3 +55,22 @@ def test_compute_hash_differs_on_different_fields():
 def test_dedup_hash_initially_empty():
     job = _make_job()
     assert job.dedup_hash == ""
+
+
+def test_compute_hash_distinguishes_same_metadata_different_source_job_id():
+    # SEL re-posts the same (title, location) for different teams with
+    # distinct source_job_ids. The hash must distinguish them so the
+    # AnalysisCache doesn't return a stale result for the second posting.
+    a = _make_job(source_job_id="2026-21012")
+    b = _make_job(source_job_id="2026-20434")
+    a.compute_hash()
+    b.compute_hash()
+    assert a.dedup_hash != b.dedup_hash
+
+
+def test_compute_hash_distinguishes_across_sources():
+    a = _make_job(source="linkedin", source_job_id="123")
+    b = _make_job(source="greenhouse", source_job_id="123")
+    a.compute_hash()
+    b.compute_hash()
+    assert a.dedup_hash != b.dedup_hash
