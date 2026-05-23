@@ -1,0 +1,13 @@
+# Pinned baseline run-IDs per scorer type. The "champion" is the
+# incumbent against which a new calibration run must demonstrate lift
+# (per notes/skills_fit_phase_g/governance.md).
+#
+# Update via PR when a calibration run establishes a new champion
+# against the same yardstick (gold set). Gold-expansion PRs reset the
+# affected entry to null — the next eval on the new gold establishes
+# the next champion.
+#
+# Run-IDs reference rows in data/eval/runs.jsonl.
+
+skills_fit: phase_r_llm_magnus_20260522_215948_7429
+remote_filter: null  # not yet established
