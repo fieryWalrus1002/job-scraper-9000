@@ -7,7 +7,7 @@ For each unreviewed candidate, writes a Markdown document containing:
   - A YAML block at the bottom pre-populated with the teacher's values, for the
     human to ratify or override
 
-Records already in the gold JSONL (by source_job_id) are skipped — the workflow
+Records already in the gold JSONL (by dedup_hash) are skipped — the workflow
 is idempotent. Pre-existing .md files are kept by default; pass --overwrite to
 regenerate everything from scratch (destroys any in-progress edits).
 
@@ -137,7 +137,9 @@ def render_record(rec: dict, idx: int, total: int) -> str:
         yaml_gaps = yaml_list(gaps)
         yaml_hard_concerns = yaml_list(hard_concerns)
     else:
-        teacher_section = "## Teacher proposal\n\n_No teacher proposal for this record._\n"
+        teacher_section = (
+            "## Teacher proposal\n\n_No teacher proposal for this record._\n"
+        )
         yaml_fit_score = '""'
         yaml_confidence = '""'
         yaml_top_matches = " []"
@@ -221,12 +223,12 @@ def main() -> None:
     proposed_by_id = {r["source_job_id"]: r for r in proposed if r.get("source_job_id")}
 
     gold = load_jsonl(gold_path)
-    scored_ids = {r.get("source_job_id") for r in gold if r.get("source_job_id")}
+    scored_ids = {r.get("dedup_hash") for r in gold if r.get("dedup_hash")}
 
     remaining = [
         merge_teacher_fields(c, proposed_by_id)
         for c in candidates
-        if c.get("source_job_id") not in scored_ids
+        if c.get("dedup_hash") not in scored_ids
     ]
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -248,7 +250,9 @@ def main() -> None:
         written += 1
 
     print(f"template:        {in_path}  ({len(candidates)} candidates)")
-    print(f"proposed:        {proposed_path}  ({len(proposed_by_id)} with teacher labels)")
+    print(
+        f"proposed:        {proposed_path}  ({len(proposed_by_id)} with teacher labels)"
+    )
     print(f"gold:            {gold_path}  ({len(gold)} already scored, skipped)")
     print(f"out dir:         {out_dir}")
     print(f"files written:   {written}")

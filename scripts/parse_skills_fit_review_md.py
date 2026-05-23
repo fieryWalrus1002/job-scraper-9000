@@ -9,7 +9,7 @@ Records are skipped (not written to gold) if:
   - `fit_score` is unset, "SKIP", or out of range (1-5)
   - `confidence` is not one of low/medium/high
   - `notes` is empty (notes are mandatory — they become Phase G's calibration anchors)
-  - `source_job_id` is already in the gold file (no duplicates)
+  - `dedup_hash` is already in the gold file (no duplicates)
 
 Validation failures are reported per-file and the script continues.
 
@@ -72,11 +72,25 @@ def append_jsonl(path: Path, record: dict) -> None:
         f.write(json.dumps(record) + "\n")
 
 
+_QUOTE_MAP = str.maketrans(
+    {
+        "“": '"',
+        "”": '"',  # " "
+        "‘": "'",
+        "’": "'",  # ' '
+    }
+)
+
+
+def _normalize_quotes(text: str) -> str:
+    return text.translate(_QUOTE_MAP)
+
+
 def extract_review_yaml(md_text: str) -> dict | None:
     m = YAML_BLOCK_RE.search(md_text)
     if not m:
         return None
-    data = yaml.safe_load(m.group(1))
+    data = yaml.safe_load(_normalize_quotes(m.group(1)))
     if data is None:
         return None
     if not isinstance(data, dict):
@@ -152,7 +166,7 @@ def main() -> None:
     proposed_by_id = {r["source_job_id"]: r for r in proposed if r.get("source_job_id")}
 
     gold = load_jsonl(gold_path)
-    scored_ids = {r.get("source_job_id") for r in gold if r.get("source_job_id")}
+    scored_ids = {r.get("dedup_hash") for r in gold if r.get("dedup_hash")}
 
     md_files = sorted(review_dir.glob("*.md"))
     if not md_files:
@@ -187,7 +201,15 @@ def main() -> None:
             errors.append((md_path.name, "source_job_id missing in identifiers"))
             continue
 
-        if source_job_id in scored_ids:
+        original = candidates_by_id.get(source_job_id)
+        if original is None:
+            errors.append(
+                (md_path.name, f"source_job_id {source_job_id!r} not in template")
+            )
+            continue
+
+        record_dedup_hash = original.get("dedup_hash")
+        if record_dedup_hash and record_dedup_hash in scored_ids:
             skipped_already_in_gold += 1
             continue
 
@@ -195,13 +217,6 @@ def main() -> None:
         if not is_valid:
             skipped_invalid += 1
             print(f"  skip  {md_path.name}: {reason}")
-            continue
-
-        original = candidates_by_id.get(source_job_id)
-        if original is None:
-            errors.append(
-                (md_path.name, f"source_job_id {source_job_id!r} not in template")
-            )
             continue
 
         teacher = proposed_by_id.get(source_job_id, {})
@@ -228,7 +243,8 @@ def main() -> None:
             )
         else:
             append_jsonl(gold_path, scored)
-            scored_ids.add(source_job_id)
+            if record_dedup_hash:
+                scored_ids.add(record_dedup_hash)
             print(
                 f"  saved {md_path.name}: "
                 f"fit_score={data['fit_score']} ({data['confidence']})"
