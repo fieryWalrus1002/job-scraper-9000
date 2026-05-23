@@ -1,0 +1,16 @@
+llm:
+  provider: openai        # openai | ollama
+  model: gpt-4o-mini
+  temperature: 0.1
+  # base_url: http://localhost:11434/v1   # uncomment for ollama
+
+profile_file: config/profile/candidate_profile.yml
+
+# Score-band thresholds for downstream consumers (dispatcher) — not used by the
+# agent itself, which emits raw 1-5. Kept here so prompt/policy stay co-located.
+score_bands:
+  strong_fit: 5
+  good_fit: 4
+  possible_fit: 3
+  weak_fit: 2
+  reject: 1
