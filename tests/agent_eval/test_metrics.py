@@ -120,32 +120,75 @@ def test_output_contains_all_required_metric_keys():
 # ---------------------------------------------------------------------------
 
 
-def test_precision_at_k_tie_breaking_is_stable():
-    """precision@k must not change when gold file order changes but preds are identical."""
+def test_precision_at_5_is_input_order_invariant_with_more_ties_than_k():
+    """precision@5 must be stable across input orderings when >k records tie on pred.
+
+    Without tie-breaking, Python's stable sort preserves input order, so top-5
+    of a reversed input contains different records than top-5 of the forward
+    input — and the metric changes.
+    """
     from agent_eval.metrics import compute_ordinal_metrics
 
-    # Two records with pred=4; one has gold>=4 (good), one doesn't.
-    # Without stable tie-breaking, which one lands in top-1 depends on input order.
-    preds = [4, 4]
-    golds = [4, 2]
-    ids = ["aaa", "zzz"]  # "aaa" < "zzz", so "aaa" always sorts first
+    # 6 records all pred=4. Goods (gold>=4) at "a", "b", "c"; rest are 2s.
+    # Without tie-break:
+    #   forward top-5 = {a,b,c,d,e} → 3 goods → 0.6
+    #   reverse top-5 = {f,e,d,c,b} → 2 goods (c,b) → 0.4
+    # With ID-sort tie-break: top-5 is always {a..e} → 3 goods → 0.6 either way.
+    preds = [4, 4, 4, 4, 4, 4]
+    golds = [4, 4, 4, 2, 2, 2]
+    ids = ["a", "b", "c", "d", "e", "f"]
 
-    m1 = compute_ordinal_metrics(preds, golds, record_ids=ids)
-    # Reverse the input order — metrics should be unchanged.
-    m2 = compute_ordinal_metrics(preds[::-1], golds[::-1], record_ids=ids[::-1])
+    m_forward = compute_ordinal_metrics(preds, golds, record_ids=ids)
+    m_reverse = compute_ordinal_metrics(preds[::-1], golds[::-1], record_ids=ids[::-1])
 
-    assert m1["metrics"]["precision_at_5"] == m2["metrics"]["precision_at_5"]
-    assert m1["metrics"]["precision_at_10"] == m2["metrics"]["precision_at_10"]
+    assert (
+        m_forward["metrics"]["precision_at_5"] == m_reverse["metrics"]["precision_at_5"]
+    )
+    assert m_forward["metrics"]["precision_at_5"] == pytest.approx(3 / 5)
 
 
-def test_top_k_rank_determined_by_record_id_on_tie():
-    """Record with lower record_id string sorts first on tied pred score."""
+def test_precision_at_10_is_input_order_invariant_with_more_ties_than_k():
+    """Same property for k=10 — needs >10 tied records to exercise."""
     from agent_eval.metrics import compute_ordinal_metrics
 
-    # record "aaa" pred=4 gold=2, record "bbb" pred=4 gold=4
-    # With tie-break on record_id ASC: "aaa" is top-1 → precision@1 = 0 (gold=2 < 4)
-    m = compute_ordinal_metrics([4, 4], [2, 4], record_ids=["aaa", "bbb"])
-    assert m["metrics"]["precision_at_5"] == pytest.approx(0.5)  # both in top-5
-    # top-1 would be "aaa" (gold=2) if k=1, but we only have precision_at_5 and _10
-    # Verify order: mean_gold_at_top_10 = (2+4)/2 = 3.0
-    assert m["metrics"]["mean_gold_score_at_top_10"] == pytest.approx(3.0)
+    # 12 records all pred=4. Goods at ids "a"–"e" (5 of the first 10).
+    # Without tie-break:
+    #   forward top-10 = {a..j} → 5 goods → 0.5
+    #   reverse top-10 = {l..c} → 3 goods (e,d,c) → 0.3
+    # With ID-sort: top-10 = {a..j} regardless → 0.5 either way.
+    n = 12
+    preds = [4] * n
+    ids = [chr(ord("a") + i) for i in range(n)]  # a..l
+    golds = [4, 4, 4, 4, 4, 2, 2, 2, 2, 2, 2, 2]
+
+    m_forward = compute_ordinal_metrics(preds, golds, record_ids=ids)
+    m_reverse = compute_ordinal_metrics(preds[::-1], golds[::-1], record_ids=ids[::-1])
+
+    assert (
+        m_forward["metrics"]["precision_at_10"]
+        == m_reverse["metrics"]["precision_at_10"]
+    )
+    assert m_forward["metrics"]["precision_at_10"] == pytest.approx(5 / 10)
+
+
+def test_mean_gold_at_top_10_is_input_order_invariant_with_more_ties_than_k():
+    """mean_gold_at_top_10 also depends on which records land in top-10."""
+    from agent_eval.metrics import compute_ordinal_metrics
+
+    # 12 records all pred=4. Last two (k, l) have higher gold than the rest.
+    # Without tie-break:
+    #   forward top-10 = {a..j} all gold=3 → mean = 3.0
+    #   reverse top-10 = {l..c} includes k,l with gold=5 → mean = (5+5+8*3)/10 = 3.4
+    # With ID-sort: top-10 = {a..j} regardless → mean = 3.0 either way.
+    n = 12
+    preds = [4] * n
+    ids = [chr(ord("a") + i) for i in range(n)]
+    golds = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5]
+
+    m_forward = compute_ordinal_metrics(preds, golds, record_ids=ids)
+    m_reverse = compute_ordinal_metrics(preds[::-1], golds[::-1], record_ids=ids[::-1])
+    assert (
+        m_forward["metrics"]["mean_gold_score_at_top_10"]
+        == m_reverse["metrics"]["mean_gold_score_at_top_10"]
+    )
+    assert m_forward["metrics"]["mean_gold_score_at_top_10"] == pytest.approx(3.0)

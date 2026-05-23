@@ -312,7 +312,10 @@ def run_eval(
             continue
         preds.append(r.pred_score)
         golds.append(r.gold_score)
-        record_ids.append((r.job.get("dedup_hash") or "")[:8])
+        # Use full dedup_hash for tie-break stability; truncation collisions
+        # would reintroduce input-order dependence. Per-record index fallback
+        # keeps every id unique when dedup_hash is missing.
+        record_ids.append(r.job.get("dedup_hash") or f"_idx_{r.index}")
         if r.mismatch is not None:
             mismatches.append(r.mismatch)
 
