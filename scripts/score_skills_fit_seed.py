@@ -77,11 +77,15 @@ def has_teacher_proposal(rec: dict) -> bool:
 def print_record(rec: dict, idx: int, total: int) -> None:
     print("\n" + "=" * 78)
     print(f"  [{idx}/{total}]  {rec.get('title', '<no title>')}")
-    print(f"  {rec.get('company', '<no company>')}  ·  {rec.get('location', '<no location>')}")
+    print(
+        f"  {rec.get('company', '<no company>')}  ·  {rec.get('location', '<no location>')}"
+    )
     print(f"  url: {rec.get('source_url', '<no url>')}")
     remote = rec.get("_remote_analysis") or {}
     if remote:
-        print(f"  remote: {remote.get('remote_score')}  reasoning: {remote.get('reasoning', '')[:100]}")
+        print(
+            f"  remote: {remote.get('remote_score')}  reasoning: {remote.get('reasoning', '')[:100]}"
+        )
     print("=" * 78)
     desc = rec.get("description", "")
     for para in desc.split("\n"):
@@ -95,10 +99,14 @@ def print_record(rec: dict, idx: int, total: int) -> None:
 def print_teacher_proposal(rec: dict) -> None:
     print()
     print(f"  TEACHER ({rec.get('_teacher_model', '?')}) proposes:")
-    print(f"    fit_score:      {rec.get('_teacher_fit_score')}  ({rec.get('_teacher_confidence')})")
+    print(
+        f"    fit_score:      {rec.get('_teacher_fit_score')}  ({rec.get('_teacher_confidence')})"
+    )
     rationale = rec.get("_teacher_score_rationale", "")
     if rationale:
-        print(f"    rationale:      {textwrap.fill(rationale, width=72, subsequent_indent='                    ')}")
+        print(
+            f"    rationale:      {textwrap.fill(rationale, width=72, subsequent_indent='                    ')}"
+        )
     for label, key in (
         ("top_matches", "_teacher_top_matches"),
         ("gaps", "_teacher_gaps"),
@@ -159,7 +167,9 @@ def prompt_list(label: str, default: list[str] | None = None) -> list[str]:
 
 def prompt_notes() -> str:
     while True:
-        raw = input("notes (REQUIRED — why this band, what tipped it, esp. if flipping teacher): ").strip()
+        raw = input(
+            "notes (REQUIRED — why this band, what tipped it, esp. if flipping teacher): "
+        ).strip()
         if raw:
             return raw
         print("  ! notes are mandatory — they become Phase G's calibration anchors")
@@ -188,14 +198,28 @@ def main() -> None:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--in", dest="input", default=str(DEFAULT_IN), help=f"Template JSONL (default: {DEFAULT_IN})")
+    p.add_argument(
+        "--in",
+        dest="input",
+        default=str(DEFAULT_IN),
+        help=f"Template JSONL (default: {DEFAULT_IN})",
+    )
     p.add_argument(
         "--proposed",
         default=str(DEFAULT_PROPOSED),
         help=f"Teacher proposals JSONL — used when present (default: {DEFAULT_PROPOSED})",
     )
-    p.add_argument("--out", default=str(DEFAULT_OUT), help=f"Gold JSONL to append to (default: {DEFAULT_OUT})")
-    p.add_argument("--target-per-band", type=int, default=5, help="Stratification target per band (default: 5)")
+    p.add_argument(
+        "--out",
+        default=str(DEFAULT_OUT),
+        help=f"Gold JSONL to append to (default: {DEFAULT_OUT})",
+    )
+    p.add_argument(
+        "--target-per-band",
+        type=int,
+        default=5,
+        help="Stratification target per band (default: 5)",
+    )
     args = p.parse_args()
 
     in_path = Path(args.input)
@@ -211,14 +235,27 @@ def main() -> None:
     proposed_by_id = {r["source_job_id"]: r for r in proposed if r.get("source_job_id")}
 
     existing = load_jsonl(out_path)
-    scored_ids = {r.get("source_job_id") for r in existing if r.get("source_job_id")}
+    scored_ids = {r.get("dedup_hash") for r in existing if r.get("dedup_hash")}
     band_counts: dict[int, int] = {}
     for r in existing:
         s = r.get("_human_fit_score")
         if isinstance(s, int):
             band_counts[s] = band_counts.get(s, 0) + 1
 
-    remaining = [merge_teacher_fields(c, proposed_by_id) for c in candidates if c.get("source_job_id") not in scored_ids]
+    # Dedup within the current template too: a multi-source collision (#35)
+    # could put the same dedup_hash in twice. Render once; if the loop writes
+    # it, subsequent appearances are caught by the scored_ids update below.
+    seen_in_batch: set[str] = set()
+    remaining: list[dict] = []
+    for c in candidates:
+        h = c.get("dedup_hash")
+        if h and h in scored_ids:
+            continue
+        if h and h in seen_in_batch:
+            continue
+        if h:
+            seen_in_batch.add(h)
+        remaining.append(merge_teacher_fields(c, proposed_by_id))
 
     print(f"template:   {in_path}  ({len(candidates)} candidates)")
     print(f"proposed:   {proposed_path}  ({len(proposed_by_id)} with teacher labels)")
@@ -228,6 +265,12 @@ def main() -> None:
 
     total = len(remaining)
     for idx, rec in enumerate(remaining, start=1):
+        # In case the same dedup_hash got written earlier in this session
+        # (e.g., via teacher-accept), skip the duplicate.
+        rec_hash = rec.get("dedup_hash")
+        if rec_hash and rec_hash in scored_ids:
+            continue
+
         print_record(rec, idx, total)
         has_teacher = has_teacher_proposal(rec)
         if has_teacher:
@@ -253,10 +296,15 @@ def main() -> None:
             assert isinstance(score, int)
             teacher_conf = rec.get("_teacher_confidence") if has_teacher else None
             confidence = prompt_confidence(teacher_conf)
-            top_matches = prompt_list("top_matches", rec.get("_teacher_top_matches") if has_teacher else None)
-            gaps = prompt_list("gaps", rec.get("_teacher_gaps") if has_teacher else None)
+            top_matches = prompt_list(
+                "top_matches", rec.get("_teacher_top_matches") if has_teacher else None
+            )
+            gaps = prompt_list(
+                "gaps", rec.get("_teacher_gaps") if has_teacher else None
+            )
             hard_concerns = prompt_list(
-                "hard_concerns", rec.get("_teacher_hard_concerns") if has_teacher else None
+                "hard_concerns",
+                rec.get("_teacher_hard_concerns") if has_teacher else None,
             )
 
         notes = prompt_notes()
@@ -271,6 +319,8 @@ def main() -> None:
             "_human_notes": notes,
         }
         append_jsonl(out_path, scored)
+        if rec_hash:
+            scored_ids.add(rec_hash)
         band_counts[score] = band_counts.get(score, 0) + 1
         print(f"  → saved (band {score})")
 
