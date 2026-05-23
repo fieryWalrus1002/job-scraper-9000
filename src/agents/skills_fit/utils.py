@@ -25,8 +25,7 @@ def _resolve_prompt_path() -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError(
-        "Skills-fit prompt not found. Checked: "
-        + ", ".join(str(c) for c in candidates)
+        "Skills-fit prompt not found. Checked: " + ", ".join(str(c) for c in candidates)
     )
 
 
@@ -43,6 +42,15 @@ def load_candidate_profile(path: str | Path) -> dict:
         return yaml.safe_load(os.path.expandvars(f.read())) or {}
 
 
+def _to_list(val: object) -> list:
+    """Coerce a profile field to list; guards against scalar YAML values."""
+    if isinstance(val, list):
+        return val
+    if val is None:
+        return []
+    return [str(val)]
+
+
 def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
     cfg = llm_config or {}
     provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
@@ -56,7 +64,16 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
         )
         model = cfg.get("model", os.environ.get("LLM_MODEL", "qwen2.5:14b"))
     else:
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        # Per-component API keys: llm.api_key_env names which env var to read.
+        api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
+        api_key = os.environ.get(api_key_env)
+        if not api_key:
+            raise EnvironmentError(
+                f"{api_key_env} is not set in environment "
+                "(configure via llm.api_key_env in the agent YAML; "
+                "defaults to OPENAI_API_KEY)"
+            )
+        client = OpenAI(api_key=api_key)
         model = cfg.get("model", os.environ.get("LLM_MODEL", "gpt-4o-mini"))
     return client, model
 
@@ -68,17 +85,17 @@ def _format_profile_block(profile: dict) -> str:
         lines.append(f"Summary: {summary.strip()}")
     if level := profile.get("level"):
         lines.append(f"Level: {level}")
-    if education := profile.get("education"):
+    if education := _to_list(profile.get("education")):
         lines.append("Education: " + "; ".join(education))
-    if core := profile.get("core_skills"):
+    if core := _to_list(profile.get("core_skills")):
         lines.append("Core skills: " + ", ".join(core))
-    if adj := profile.get("adjacent_skills"):
+    if adj := _to_list(profile.get("adjacent_skills")):
         lines.append("Adjacent skills: " + ", ".join(adj))
-    if domains := profile.get("preferred_domains"):
+    if domains := _to_list(profile.get("preferred_domains")):
         lines.append("Preferred domains: " + ", ".join(domains))
-    if avoid := profile.get("avoided_domains"):
+    if avoid := _to_list(profile.get("avoided_domains")):
         lines.append("Avoided domains: " + ", ".join(avoid))
-    if constraints := profile.get("constraints"):
+    if constraints := _to_list(profile.get("constraints")):
         lines.append("Constraints: " + "; ".join(constraints))
     return "\n".join(lines)
 
@@ -137,9 +154,7 @@ def analyze_skills_fit(
                 exc,
             )
         except Exception as exc:
-            log.warning(
-                "Attempt %d/%d failed: %s", attempt + 1, max_retries + 1, exc
-            )
+            log.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries + 1, exc)
 
     log.error("All %d attempts failed", max_retries + 1)
     return None
