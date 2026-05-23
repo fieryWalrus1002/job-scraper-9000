@@ -225,11 +225,23 @@ def main() -> None:
     gold = load_jsonl(gold_path)
     scored_ids = {r.get("dedup_hash") for r in gold if r.get("dedup_hash")}
 
-    remaining = [
-        merge_teacher_fields(c, proposed_by_id)
-        for c in candidates
-        if c.get("dedup_hash") not in scored_ids
-    ]
+    # Dedup within the current template too: if the input has two records
+    # with the same dedup_hash (e.g., a multi-source collision from #35),
+    # only render the first one. Otherwise the human ends up reviewing the
+    # same job twice and the duplicate would still land in gold.
+    seen_in_batch: set[str] = set()
+    remaining: list[dict] = []
+    skipped_in_batch = 0
+    for c in candidates:
+        h = c.get("dedup_hash")
+        if h and h in scored_ids:
+            continue
+        if h and h in seen_in_batch:
+            skipped_in_batch += 1
+            continue
+        if h:
+            seen_in_batch.add(h)
+        remaining.append(merge_teacher_fields(c, proposed_by_id))
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -261,6 +273,8 @@ def main() -> None:
             f"files skipped:   {skipped_existing} already exist "
             "(use --overwrite to replace)"
         )
+    if skipped_in_batch:
+        print(f"batch dups:      {skipped_in_batch} skipped (same dedup_hash)")
     print()
     print(f"Open the files in {out_dir} to fill in your reviews.")
     print("When done (or partway through), run:")

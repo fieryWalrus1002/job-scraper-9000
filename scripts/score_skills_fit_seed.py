@@ -242,11 +242,20 @@ def main() -> None:
         if isinstance(s, int):
             band_counts[s] = band_counts.get(s, 0) + 1
 
-    remaining = [
-        merge_teacher_fields(c, proposed_by_id)
-        for c in candidates
-        if c.get("dedup_hash") not in scored_ids
-    ]
+    # Dedup within the current template too: a multi-source collision (#35)
+    # could put the same dedup_hash in twice. Render once; if the loop writes
+    # it, subsequent appearances are caught by the scored_ids update below.
+    seen_in_batch: set[str] = set()
+    remaining: list[dict] = []
+    for c in candidates:
+        h = c.get("dedup_hash")
+        if h and h in scored_ids:
+            continue
+        if h and h in seen_in_batch:
+            continue
+        if h:
+            seen_in_batch.add(h)
+        remaining.append(merge_teacher_fields(c, proposed_by_id))
 
     print(f"template:   {in_path}  ({len(candidates)} candidates)")
     print(f"proposed:   {proposed_path}  ({len(proposed_by_id)} with teacher labels)")
@@ -256,6 +265,12 @@ def main() -> None:
 
     total = len(remaining)
     for idx, rec in enumerate(remaining, start=1):
+        # In case the same dedup_hash got written earlier in this session
+        # (e.g., via teacher-accept), skip the duplicate.
+        rec_hash = rec.get("dedup_hash")
+        if rec_hash and rec_hash in scored_ids:
+            continue
+
         print_record(rec, idx, total)
         has_teacher = has_teacher_proposal(rec)
         if has_teacher:
@@ -304,6 +319,8 @@ def main() -> None:
             "_human_notes": notes,
         }
         append_jsonl(out_path, scored)
+        if rec_hash:
+            scored_ids.add(rec_hash)
         band_counts[score] = band_counts.get(score, 0) + 1
         print(f"  → saved (band {score})")
 
