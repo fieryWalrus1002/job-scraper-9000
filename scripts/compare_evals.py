@@ -7,6 +7,8 @@ Usage:
     uv run scripts/compare_evals.py --type skills_fit
     uv run scripts/compare_evals.py --sort-by spearman
     uv run scripts/compare_evals.py --diff <run_id_a> <run_id_b>
+    uv run scripts/compare_evals.py --against-champion skills_fit --diff <run_id_b>
+    uv run scripts/compare_evals.py --against-champion skills_fit --diff <run_id_b> --per-record
     uv run scripts/compare_evals.py --runs-file path/to/runs.jsonl
 """
 
@@ -15,7 +17,11 @@ import json
 import sys
 from pathlib import Path
 
+import yaml
+
 RUNS_FILE = "data/eval/runs.jsonl"
+CHAMPIONS_FILE = "config/eval/champions.yml"
+TITLE_WIDTH = 28
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +144,15 @@ ALL_SORT_CHOICES = sorted(
 # ---------------------------------------------------------------------------
 
 
+def die(message: str) -> None:
+    print(message)
+    sys.exit(1)
+
+
+def warn(message: str) -> None:
+    print(f"Warning: {message}", file=sys.stderr)
+
+
 def detect_eval_type(run: dict) -> str:
     m = run.get("metrics", {})
     for name, spec in SCORER_REGISTRY.items():
@@ -146,20 +161,38 @@ def detect_eval_type(run: dict) -> str:
     return "unknown"
 
 
+def load_jsonl(path: str | Path) -> list[dict]:
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(str(p))
+    rows = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            rows.append(json.loads(line))
+    return rows
+
+
 def load_runs(path: str) -> list[dict]:
     p = Path(path)
     if not p.exists():
         print(f"No runs file found at {path}. Run the eval first.")
         sys.exit(0)
-    runs = []
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line:
-            runs.append(json.loads(line))
+    runs = load_jsonl(p)
     if not runs:
         print(f"No runs recorded yet in {path}.")
         sys.exit(0)
     return runs
+
+
+def load_champions(path: str = CHAMPIONS_FILE) -> dict:
+    p = Path(path)
+    if not p.exists():
+        die(f"Champions file not found: {path}")
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        die(f"Champions file must contain a YAML mapping: {path}")
+    return data
 
 
 def format_cell(col: str, val, spec: dict) -> str:
@@ -213,6 +246,187 @@ def print_diff(a: dict, b: dict, spec: dict) -> None:
     print()
 
 
+def truncate_text(text: str, width: int = TITLE_WIDTH) -> str:
+    clean = " ".join((text or "").split())
+    if len(clean) <= width:
+        return clean
+    return clean[: width - 3] + "..."
+
+
+def escape_md(text: str) -> str:
+    return text.replace("|", "\\|")
+
+
+def resolve_diff_ids(args: argparse.Namespace) -> tuple[str, str]:
+    if not args.diff:
+        die("Internal error: resolve_diff_ids called without --diff")
+
+    if args.against_champion:
+        champions = load_champions()
+        champion_run_id = champions.get(args.against_champion)
+        if not champion_run_id:
+            die(
+                f"No champion configured for {args.against_champion!r} in {CHAMPIONS_FILE}"
+            )
+        return champion_run_id, args.diff[0]
+
+    return args.diff[0], args.diff[1]
+
+
+def ensure_same_gold(run_a: dict, run_b: dict, id_a: str, id_b: str) -> None:
+    hash_a = run_a.get("gold_hash")
+    hash_b = run_b.get("gold_hash")
+    same_gold = bool(hash_a and hash_b and hash_a == hash_b)
+    if not same_gold:
+        if run_a.get("gold_file") != run_b.get("gold_file") or hash_a != hash_b:
+            die(
+                f"Run {id_a} uses gold {run_a.get('gold_file')}, "
+                f"Run {id_b} uses gold {run_b.get('gold_file')} — not comparable"
+            )
+
+
+def ensure_no_skips(run: dict, run_id: str) -> None:
+    skipped = (run.get("metrics") or {}).get("skipped", 0)
+    if skipped > 0:
+        die(
+            f"Per-record diff requires skipped=0 for both runs; "
+            f"{run_id} has skipped={skipped}"
+        )
+
+
+def reconstruct_skills_fit_predictions(
+    run_record: dict,
+) -> tuple[dict[str, int], dict[str, int], dict[str, str]]:
+    gold_rows = load_jsonl(run_record["gold_file"])
+    gold: dict[str, int] = {}
+    preds: dict[str, int] = {}
+    titles: dict[str, str] = {}
+    short_to_full: dict[str, list[str]] = {}
+
+    for row in gold_rows:
+        full_id = row.get("dedup_hash")
+        gold_score = row.get("_human_fit_score")
+        if not full_id:
+            die(f"Gold row missing dedup_hash in {run_record['gold_file']}")
+        if not isinstance(gold_score, int):
+            die(
+                f"Gold row for dedup_hash {full_id} has invalid _human_fit_score "
+                f"in {run_record['gold_file']}: {gold_score!r}"
+            )
+        gold[full_id] = gold_score
+        preds[full_id] = gold_score
+        titles[full_id] = row.get("title", "")
+        short_to_full.setdefault(full_id[:8], []).append(full_id)
+
+    mismatch_path = run_record.get("mismatch_file")
+    if not mismatch_path:
+        return preds, gold, titles
+
+    mismatch_file = Path(mismatch_path)
+    if not mismatch_file.exists():
+        warn(f"mismatch file not found: {mismatch_file} — treating as no mismatches")
+        return preds, gold, titles
+
+    for mismatch in load_jsonl(mismatch_file):
+        short_id = mismatch.get("record_id")
+        matches = short_to_full.get(short_id, [])
+        if len(matches) != 1:
+            if not matches:
+                die(
+                    f"Mismatch record_id {short_id!r} from {mismatch_file} does not match any "
+                    f"gold dedup_hash prefix"
+                )
+            die(
+                f"Mismatch record_id {short_id!r} from {mismatch_file} is ambiguous across "
+                f"multiple gold records"
+            )
+        pred_score = mismatch.get("pred_score")
+        if not isinstance(pred_score, int):
+            die(
+                f"Mismatch row for record_id {short_id!r} has invalid pred_score in "
+                f"{mismatch_file}: {pred_score!r}"
+            )
+        preds[matches[0]] = pred_score
+
+    return preds, gold, titles
+
+
+def build_skills_fit_per_record_rows(
+    run_a: dict, run_b: dict, id_a: str, id_b: str
+) -> list[dict]:
+    ensure_same_gold(run_a, run_b, id_a, id_b)
+    ensure_no_skips(run_a, id_a)
+    ensure_no_skips(run_b, id_b)
+
+    preds_a, gold_a, titles_a = reconstruct_skills_fit_predictions(run_a)
+    preds_b, gold_b, _titles_b = reconstruct_skills_fit_predictions(run_b)
+
+    if set(gold_a) != set(gold_b):
+        die("Gold record sets differ between runs — not comparable")
+
+    rows: list[dict] = []
+    for full_id in gold_a:
+        gold_score_a = gold_a[full_id]
+        gold_score_b = gold_b[full_id]
+        if gold_score_a != gold_score_b:
+            die(
+                f"Gold score differs for record {full_id[:8]} between runs — not comparable"
+            )
+        pred_a = preds_a[full_id]
+        pred_b = preds_b[full_id]
+        delta_a = pred_a - gold_score_a
+        delta_b = pred_b - gold_score_a
+        rows.append(
+            {
+                "record_id": full_id[:8],
+                "title": truncate_text(titles_a.get(full_id, "")),
+                "gold": gold_score_a,
+                "pred_a": pred_a,
+                "pred_b": pred_b,
+                "delta_a": delta_a,
+                "delta_b": delta_b,
+                "flipped": "yes" if pred_a != pred_b else "no",
+                "sort_score": abs(delta_a) + abs(delta_b),
+            }
+        )
+
+    rows.sort(key=lambda r: (-r["sort_score"], r["record_id"]))
+    return rows
+
+
+def print_skills_fit_per_record_diff(rows: list[dict]) -> None:
+    print(f"  Per-record diff (n={len(rows)}, sorted by |Δ_A| + |Δ_B| desc)")
+    print()
+    print("| record_id | title | gold | A.pred | B.pred | Δ_A | Δ_B | flipped |")
+    print("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |")
+    for row in rows:
+        print(
+            "| "
+            + " | ".join(
+                [
+                    row["record_id"],
+                    escape_md(row["title"]),
+                    str(row["gold"]),
+                    str(row["pred_a"]),
+                    str(row["pred_b"]),
+                    f"{row['delta_a']:+d}",
+                    f"{row['delta_b']:+d}",
+                    row["flipped"],
+                ]
+            )
+            + " |"
+        )
+    print()
+
+    flipped = sum(1 for row in rows if row["flipped"] == "yes")
+    if flipped == 0:
+        summary = f"Summary: {len(rows)} records | 0 flipped | identical predictions on all {len(rows)}"
+    else:
+        summary = f"Summary: {len(rows)} records | {flipped} flipped"
+    print(f"  {summary}")
+    print()
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -245,11 +459,36 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--diff",
-        nargs=2,
-        metavar=("RUN_ID_A", "RUN_ID_B"),
-        help="Side-by-side diff of two runs",
+        nargs="+",
+        metavar="RUN_ID",
+        help=(
+            "Side-by-side diff. Use '--diff <run_a> <run_b>' or "
+            "'--against-champion <scorer> --diff <run_b>'"
+        ),
     )
-    return p.parse_args()
+    p.add_argument(
+        "--against-champion",
+        choices=list(SCORER_REGISTRY),
+        help=f"Resolve the left-hand diff run from {CHAMPIONS_FILE}",
+    )
+    p.add_argument(
+        "--per-record",
+        action="store_true",
+        help="After aggregate diff, print a per-record table (skills_fit only)",
+    )
+    args = p.parse_args()
+
+    if args.per_record and not args.diff:
+        p.error("--per-record requires --diff")
+    if args.against_champion and not args.diff:
+        p.error("--against-champion requires --diff")
+    if args.against_champion:
+        if len(args.diff) != 1:
+            p.error("--against-champion requires exactly one run ID with --diff")
+    elif args.diff and len(args.diff) != 2:
+        p.error("--diff requires two run IDs unless --against-champion is set")
+
+    return args
 
 
 def main() -> None:
@@ -258,26 +497,31 @@ def main() -> None:
 
     # Tag every run with its eval type and flatten it.
     tagged: list[tuple[str, dict]] = []
+    by_id: dict[str, tuple[str, dict, dict]] = {}
     for run in raw_runs:
         etype = detect_eval_type(run)
         if etype == "unknown":
             continue
         spec = SCORER_REGISTRY[etype]
-        tagged.append((etype, spec["flatten"](run)))
+        flat = spec["flatten"](run)
+        tagged.append((etype, flat))
+        by_id[flat["run_id"]] = (etype, run, flat)
 
     if args.diff:
-        id_a, id_b = args.diff
-        by_id = {row["run_id"]: (etype, row) for etype, row in tagged}
+        id_a, id_b = resolve_diff_ids(args)
         missing = [rid for rid in (id_a, id_b) if rid not in by_id]
         if missing:
-            print(f"Run IDs not found: {', '.join(missing)}")
-            sys.exit(1)
-        type_a, row_a = by_id[id_a]
-        type_b, row_b = by_id[id_b]
+            die(f"Run IDs not found: {', '.join(missing)}")
+        type_a, raw_a, row_a = by_id[id_a]
+        type_b, raw_b, row_b = by_id[id_b]
         if type_a != type_b:
-            print(f"Cannot diff runs of different types: {type_a} vs {type_b}")
-            sys.exit(1)
+            die(f"Cannot diff runs of different types: {type_a} vs {type_b}")
         print_diff(row_a, row_b, SCORER_REGISTRY[type_a])
+        if args.per_record:
+            if type_a != "skills_fit":
+                die("--per-record is currently supported only for skills_fit runs")
+            rows = build_skills_fit_per_record_rows(raw_a, raw_b, id_a, id_b)
+            print_skills_fit_per_record_diff(rows)
         return
 
     # Group by type, optionally filter.
