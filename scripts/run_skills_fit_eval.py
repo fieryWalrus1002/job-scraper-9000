@@ -312,6 +312,9 @@ def run_eval(
         if r.skipped:
             skipped += 1
             continue
+        # Dataclass invariant: non-skipped results always have both scores set.
+        # Assert so type checkers can narrow int|None → int at the append calls.
+        assert r.pred_score is not None and r.gold_score is not None
         preds.append(r.pred_score)
         golds.append(r.gold_score)
         # Use full dedup_hash for tie-break stability; truncation collisions
