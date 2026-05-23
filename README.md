@@ -59,19 +59,10 @@ Requires Python 3.13+ and [`uv`](https://github.com/astral-sh/uv).
 
 ```bash
 uv sync
-cp .env.example .env   # fill in API keys
+cp .env.example .env   # fill in your secrets
 ```
 
-`.env` variables:
-
-| Variable | Purpose |
-| --- | --- |
-| `OPENAI_API_KEY` | Required for remote_filter (OpenAI) and teacher batch runs |
-| `LLM_PROVIDER` | `openai` (default) or `ollama` |
-| `LLM_MODEL` | Model override — defaults to `gpt-4o-mini` / `qwen2.5:14b` |
-| `OLLAMA_BASE_URL` | Ollama endpoint — defaults to `http://localhost:11434/v1` |
-| `HOME_LOCATION` | Expands `${HOME_LOCATION}` in YAML search configs |
-| `USER_LOCATION` | Used in remote_filter geographic restriction checks (default: `USA`) |
+`.env` holds secrets and per-machine values (API keys, your home location). See [`.env.example`](.env.example) for the canonical list with inline comments. Non-secret runtime config (LLM provider/model/URL, policy thresholds, search targets) lives in YAML under `config/`, not `.env`.
 
 ---
 
