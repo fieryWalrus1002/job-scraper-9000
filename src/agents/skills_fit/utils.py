@@ -42,12 +42,17 @@ def load_candidate_profile(path: str | Path) -> dict:
         return yaml.safe_load(os.path.expandvars(f.read())) or {}
 
 
-def _to_list(val: object) -> list:
-    """Coerce a profile field to list; guards against scalar YAML values."""
-    if isinstance(val, list):
-        return val
+def _to_list(val: object) -> list[str]:
+    """Coerce a profile field to a join-safe list of strings.
+
+    Guards against two YAML shapes that would otherwise produce garbage in
+    the prompt: scalar values (would iterate characters in join()) and
+    non-string list items (would TypeError in join()).
+    """
     if val is None:
         return []
+    if isinstance(val, list):
+        return [str(x) for x in val]
     return [str(val)]
 
 
@@ -68,7 +73,7 @@ def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
         api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
         api_key = os.environ.get(api_key_env)
         if not api_key:
-            raise EnvironmentError(
+            raise RuntimeError(
                 f"{api_key_env} is not set in environment "
                 "(configure via llm.api_key_env in the agent YAML; "
                 "defaults to OPENAI_API_KEY)"

@@ -18,6 +18,10 @@ class TestToList:
     def test_scalar_int_wraps(self):
         assert _to_list(42) == ["42"]
 
+    def test_list_with_non_string_items_coerced(self):
+        # YAML lists can contain ints/floats; join() would TypeError without coercion
+        assert _to_list([42, "Python", 3.14]) == ["42", "Python", "3.14"]
+
 
 class TestFormatProfileBlock:
     def test_list_fields_join_correctly(self):
@@ -49,13 +53,13 @@ class TestFormatProfileBlock:
 class TestGetClient:
     def test_missing_api_key_raises(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        with pytest.raises(EnvironmentError, match="OPENAI_API_KEY"):
+        with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
             _get_client({"provider": "openai"})
 
     def test_custom_api_key_env_used(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("MY_KEY", raising=False)
-        with pytest.raises(EnvironmentError, match="MY_KEY"):
+        with pytest.raises(RuntimeError, match="MY_KEY"):
             _get_client({"provider": "openai", "api_key_env": "MY_KEY"})
 
     def test_valid_api_key_returns_client(self, monkeypatch):
