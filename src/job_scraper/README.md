@@ -58,7 +58,7 @@ Every scraper returns a list of `JobPosting` dataclasses (defined in `models.py`
 }
 ```
 
-`dedup_hash` is a SHA-256 of `company|title|location` (lowercased). It's what deduplication across sources is keyed on.
+`dedup_hash` is a SHA-256 of `source|source_job_id|company|title|location` (lowercased). It's what within-source dedup and the downstream analysis cache are keyed on. `source` and `source_job_id` are part of the key because re-posts of the same title at the same company/location for different teams or cohorts (notably SEL) are legitimately distinct postings; including them avoids stale-analysis collisions. Tradeoff: a single listing mirrored across multiple sources is no longer collapsed by this hash — a separate fuzzy-match step is the right place for cross-source dedup.
 
 ---
 

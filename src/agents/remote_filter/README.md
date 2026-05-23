@@ -24,10 +24,10 @@ Current config shape:
 
 ```yaml
 llm:
-  provider: openai        # openai | ollama
-  model: gpt-4o-mini
+  provider: ollama        # openai | ollama (the ollama provider also targets
+  model: qwen-27b-mtp     # llama.cpp via its OpenAI-compatible API)
   temperature: 0.1
-  # base_url: http://localhost:11434/v1   # uncomment for ollama
+  base_url: http://localhost:8080/v1   # llama.cpp default; Ollama's is 11434
 
 policy_thresholds:
   disallowed_classifications:

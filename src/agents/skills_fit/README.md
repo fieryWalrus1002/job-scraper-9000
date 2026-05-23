@@ -2,7 +2,7 @@
 
 Phase 3 of the pipeline — scores remote-filtered jobs against the candidate profile on a 1–5 ordinal scale.
 
-**Status:** Phase R (red baseline) with a real rubric prompt in place. Schema, eval harness (ordinal + top-k metrics), keyword baseline, calibrated rubric prompt, and the v4 candidate profile (education promoted to a top-level field) are committed. Seed gold set is being built via the teacher-first HITL workflow below. Phase G expansion (≥80 records, in-context `_human_notes` examples lifted into the prompt) follows.
+**Status:** Phase R (red baseline) closed. Schema, eval harness (ordinal + top-k metrics), keyword baseline, calibrated rubric prompt, the v5 candidate profile (LLM-reframe), and a 21-record human-ratified seed gold set are committed. The pinned Phase R champion is recorded in [`config/eval/champions.yml`](../../../config/eval/champions.yml). Phase G (calibration loop, one-lever-per-PR) is the active phase; the workflow below documents how the seed gold set was built and can be re-used when expanding to ≥80 records.
 
 See [specs/skills_fit_agent_plan.md](../../../specs/skills_fit_agent_plan.md) for the full plan, including the eval-forward sequencing (Phase R → G → B), the calibration discipline, and the architectural variants parked for later.
 
@@ -26,7 +26,9 @@ prompts/skills_fit/
 config/agent/skills_fit.yml          # LLM + profile pointer + score_bands
 config/profile/candidate_profile.yml # The scoring contract — versioned (profile_version)
                                      # and hashed (profile_hash) in every run record.
-                                     # v4 (2026-05-21): education promoted to top-level.
+                                     # Current: v5 (2026-05-22, LLM-reframe).
+                                     # Auto-snapshotted to config/profile/old_profiles/
+                                     # on every eval run (gitignored, contains PII).
 
 scripts/prepare_skills_fit_seed.py        # sampler — blank template for hand-scoring
 scripts/propose_skills_fit_seed.py        # teacher LLM proposes labels (HITL path)

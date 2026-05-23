@@ -80,7 +80,7 @@ Evidence:
 
 ### `data/cache/`
 
-**Purpose:** Append-only analysis cache for remote_filter. Lets re-runs skip LLM calls for already-classified `(dedup_hash, prompt_hash, model)` triples. Prompt or model changes naturally invalidate via the composite key.
+**Purpose:** Append-only analysis cache for remote_filter. Lets re-runs skip LLM calls for already-classified `(dedup_hash, prompt_hash, provider, model, context_fp)` 5-tuples. Prompt, provider/model, or search-context changes naturally invalidate via the composite key.
 
 The remote filter uses an append-only analysis cache unless disabled with `--no-cache`.
 
