@@ -264,7 +264,7 @@ def run_eval(
     prompt_path: Path,
     run_id: str,
     workers: int,
-) -> tuple[list[MismatchRecord], list[int], list[int], int]:
+) -> tuple[list[MismatchRecord], list[int], list[int], list[str], int]:
     if workers == 1 or scorer == "keyword":
         results = [
             _evaluate_record(
@@ -301,6 +301,7 @@ def run_eval(
 
     preds: list[int] = []
     golds: list[int] = []
+    record_ids: list[str] = []
     mismatches: list[MismatchRecord] = []
     skipped = 0
 
@@ -311,10 +312,14 @@ def run_eval(
             continue
         preds.append(r.pred_score)
         golds.append(r.gold_score)
+        # Use full dedup_hash for tie-break stability; truncation collisions
+        # would reintroduce input-order dependence. Per-record index fallback
+        # keeps every id unique when dedup_hash is missing.
+        record_ids.append(r.job.get("dedup_hash") or f"_idx_{r.index}")
         if r.mismatch is not None:
             mismatches.append(r.mismatch)
 
-    return mismatches, preds, golds, skipped
+    return mismatches, preds, golds, record_ids, skipped
 
 
 def print_report(
@@ -406,7 +411,7 @@ def main(run_logger: RunLogger | None = None) -> None:
     log.info("Scorer: %s", args.scorer)
 
     llm_config = config.get("llm") if args.scorer == "llm" else None
-    mismatches, preds, golds, skipped = run_eval(
+    mismatches, preds, golds, record_ids, skipped = run_eval(
         records,
         scorer=args.scorer,
         profile=profile,
@@ -417,7 +422,11 @@ def main(run_logger: RunLogger | None = None) -> None:
     )
 
     metrics = compute_ordinal_metrics(
-        preds, golds, skipped=skipped, positive_threshold=args.positive_threshold
+        preds,
+        golds,
+        skipped=skipped,
+        positive_threshold=args.positive_threshold,
+        record_ids=record_ids,
     )
     print_report(metrics, mismatches, run_id, args.scorer)
 
