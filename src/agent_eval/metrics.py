@@ -38,6 +38,7 @@ def compute_ordinal_metrics(
     *,
     skipped: int = 0,
     positive_threshold: int = 4,
+    record_ids: list[str] | None = None,
 ) -> dict:
     """Ordinal-agreement + top-of-list metrics for skills_fit eval.
 
@@ -87,7 +88,8 @@ def compute_ordinal_metrics(
     rho = _spearman(preds, golds)
     confusion = _build_confusion_5x5(preds, golds)
 
-    ranked = sorted(zip(preds, golds), key=lambda pg: pg[0], reverse=True)
+    ids = record_ids if record_ids is not None else [str(i) for i in range(n)]
+    ranked = sorted(zip(preds, golds, ids), key=lambda t: (-t[0], t[2]))
     precision_at_5 = _precision_at_k(ranked, 5, positive_threshold)
     precision_at_10 = _precision_at_k(ranked, 10, positive_threshold)
     mean_gold_at_10 = _mean_gold_at_k(ranked, 10)
@@ -120,19 +122,19 @@ def compute_ordinal_metrics(
 
 
 def _precision_at_k(
-    ranked: list[tuple[int, int]], k: int, positive_threshold: int
+    ranked: list[tuple[int, int, str]], k: int, positive_threshold: int
 ) -> float:
     top = ranked[:k]
     if not top:
         return 0.0
-    return sum(1 for _, g in top if g >= positive_threshold) / len(top)
+    return sum(1 for _, g, _ in top if g >= positive_threshold) / len(top)
 
 
-def _mean_gold_at_k(ranked: list[tuple[int, int]], k: int) -> float:
+def _mean_gold_at_k(ranked: list[tuple[int, int, str]], k: int) -> float:
     top = ranked[:k]
     if not top:
         return 0.0
-    return sum(g for _, g in top) / len(top)
+    return sum(g for _, g, _ in top) / len(top)
 
 
 def _spearman(preds: list[int], golds: list[int]) -> float:
