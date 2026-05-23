@@ -9,5 +9,5 @@
 #
 # Run-IDs reference rows in data/eval/runs.jsonl.
 
-skills_fit: phase_r_llm_magnus_20260522_215948_7429
+skills_fit: phase_g_baseline_v5_20260523_233913_5a80
 remote_filter: null  # not yet established
