@@ -9,7 +9,7 @@ Built as a personal job-hunting tool and a learning project for multi-agent syst
 1. **Ingestion** — Scrape LinkedIn, Indeed, ZipRecruiter, Glassdoor, and direct ATS boards (Greenhouse, Lever, Ashby). Deduplicate across sources using a composite hash of company + title + location.
 2. **Prefilter** — Deterministic routing layer: country gate, local allowlist, obvious reject signals. No LLM cost for clear cases.
 3. **Remote Filter Agent** — LLM classifies each remaining posting: genuinely remote-flexible vs. deceptive hybrid. Returns PASS/TRASH with rationale.
-4. **Skills Fit Agent** — Scores PASS jobs against a candidate profile (technical overlap, level alignment, domain context). Returns `fit_score`, `verdict`, `top_matches`, `gaps`.
+4. **Skills Fit Agent** — Scores PASS jobs against a versioned candidate profile on an ordinal 1-5 scale (technical overlap, level alignment, domain context). Returns `fit_score` (1-5), `confidence`, `score_rationale`, `top_matches`, `gaps`, and `hard_concerns`. `fit_score` is the verdict — there is no separate `verdict` field.
 5. **Dispatch** — Delivers the ranked shortlist via email or a local FastAPI web UI.
 
 ## Orchestration

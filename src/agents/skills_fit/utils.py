@@ -1,0 +1,159 @@
+import json
+import logging
+import os
+from functools import lru_cache
+from pathlib import Path
+
+import yaml
+from openai import OpenAI
+from pydantic import ValidationError
+
+from .models import SkillsFitAnalysis
+
+log = logging.getLogger(__name__)
+
+
+def _resolve_prompt_path() -> Path:
+    """Return the active skills-fit prompt path in source trees or installed wheels."""
+    relative = Path("prompts") / "skills_fit" / "system_prompt.txt"
+    candidates = [
+        Path(__file__).parents[3] / relative,
+        Path(__file__).parents[2] / relative,
+        Path.cwd() / relative,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "Skills-fit prompt not found. Checked: "
+        + ", ".join(str(c) for c in candidates)
+    )
+
+
+SKILLS_FIT_PROMPT_PATH = _resolve_prompt_path()
+
+
+@lru_cache(maxsize=None)
+def _load_prompt(path: Path) -> str:
+    return path.read_text()
+
+
+def load_candidate_profile(path: str | Path) -> dict:
+    with open(path) as f:
+        return yaml.safe_load(os.path.expandvars(f.read())) or {}
+
+
+def _get_client(llm_config: dict | None = None) -> tuple[OpenAI, str]:
+    cfg = llm_config or {}
+    provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
+    if provider == "ollama":
+        client = OpenAI(
+            base_url=cfg.get(
+                "base_url",
+                os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+            ),
+            api_key="ollama",
+        )
+        model = cfg.get("model", os.environ.get("LLM_MODEL", "qwen2.5:14b"))
+    else:
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        model = cfg.get("model", os.environ.get("LLM_MODEL", "gpt-4o-mini"))
+    return client, model
+
+
+def _format_profile_block(profile: dict) -> str:
+    """Render the candidate profile YAML as a compact text block for the prompt."""
+    lines = ["=== CANDIDATE PROFILE ==="]
+    if summary := profile.get("summary"):
+        lines.append(f"Summary: {summary.strip()}")
+    if level := profile.get("level"):
+        lines.append(f"Level: {level}")
+    if education := profile.get("education"):
+        lines.append("Education: " + "; ".join(education))
+    if core := profile.get("core_skills"):
+        lines.append("Core skills: " + ", ".join(core))
+    if adj := profile.get("adjacent_skills"):
+        lines.append("Adjacent skills: " + ", ".join(adj))
+    if domains := profile.get("preferred_domains"):
+        lines.append("Preferred domains: " + ", ".join(domains))
+    if avoid := profile.get("avoided_domains"):
+        lines.append("Avoided domains: " + ", ".join(avoid))
+    if constraints := profile.get("constraints"):
+        lines.append("Constraints: " + "; ".join(constraints))
+    return "\n".join(lines)
+
+
+def _build_user_message(
+    description: str,
+    profile: dict,
+    *,
+    title: str | None = None,
+    location: str | None = None,
+) -> str:
+    parts = [_format_profile_block(profile), "=== JOB POSTING ==="]
+    if title:
+        parts.append(f"Title: {title}")
+    if location:
+        parts.append(f"Location: {location}")
+    parts.append("")
+    parts.append(description)
+    return "\n".join(parts)
+
+
+def analyze_skills_fit(
+    job_description: str,
+    *,
+    candidate_profile: dict,
+    title: str | None = None,
+    location: str | None = None,
+    llm_config: dict | None = None,
+    prompt_path: str | Path | None = None,
+    max_retries: int = 2,
+) -> SkillsFitAnalysis | None:
+    """Run the structured LLM call. Returns None if the agent fails after retries."""
+    client, model = _get_client(llm_config)
+    user_message = _build_user_message(
+        job_description, candidate_profile, title=title, location=location
+    )
+    prompt = _load_prompt(Path(prompt_path) if prompt_path else SKILLS_FIT_PROMPT_PATH)
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                response_format=SkillsFitAnalysis,
+                temperature=(llm_config or {}).get("temperature", 0.1),
+            )
+            return response.choices[0].message.parsed
+        except ValidationError as exc:
+            log.warning(
+                "Attempt %d/%d failed validation: %s",
+                attempt + 1,
+                max_retries + 1,
+                exc,
+            )
+        except Exception as exc:
+            log.warning(
+                "Attempt %d/%d failed: %s", attempt + 1, max_retries + 1, exc
+            )
+
+    log.error("All %d attempts failed", max_retries + 1)
+    return None
+
+
+def load_gold(path: Path) -> list[dict]:
+    """Last entry per dedup_hash wins (re-reviews override)."""
+    seen: dict[str, dict] = {}
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            key = r.get("dedup_hash") or r.get("source_url") or str(id(r))
+            seen[key] = r
+    return list(seen.values())

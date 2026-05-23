@@ -20,7 +20,7 @@
 #
 # Generic terms dropped: "data engineer" (too broad, mostly SaaS),
 # "software engineer" (too broad for LinkedIn; kept for local-jobspy
-# because the Pullman/Moscow pool is small enough that broad terms catch
+# because the ${HOME_LOCATION} pool is small enough that broad terms catch
 # more than they pollute). "AI engineer" kept as the broadest catchment
 # for cross-domain ML work that doesn't fit a specific niche.
 #
@@ -60,7 +60,6 @@ global:
     # - openai
     # - microsoft
     # - amazon
-    # - palantir
     # - planet-labs
     # - descartes-labs
     # - scale-ai
@@ -111,13 +110,13 @@ linkedin:
 jobspy:
   # LinkedIn is covered by the dedicated linkedin scraper; jobspy adds
   # Indeed + ZipRecruiter coverage. Same niche terms as LinkedIn, plus
-  # broader terms for the local-only Pullman/Moscow market (small pool
+  # broader terms for the local-only ${HOME_LOCATION} market (small pool
   # tolerates broader terms without too much noise).
-  sites: indeed,zip_recruiter
+  sites: linkedin, indeed  #,zip_recruiter <- is not working, 403 Forbidden, likely anti-scraping measures
   no_remote: false
 
   searches:
-    # Local (Pullman/Moscow) — small market, broader terms catch more here
+    # Local (${HOME_LOCATION}) — small market, broader terms catch more here
     # (e.g., WSU IT, regional employers, University of Idaho, INL)
     - search_term: "C++ engineer"
       location: "${HOME_LOCATION}"
@@ -143,7 +142,10 @@ jobspy:
     - search_term: "machine learning engineer"
     - search_term: "computer vision engineer"
 
-# Local-only scraper for the Schweitzer Engineering Lab contract in Pullman, WA.
+# Local-only scraper for the Schweitzer Engineering Lab job board.
+# `pullman_wa` is an SEL board-specific location key (mapped to "Washington -
+# Pullman" by src/job_scraper/scrapers/sel.py), not a free-form location
+# string. Not interchangeable with ${HOME_LOCATION}.
 sel:
   location: pullman_wa
   job_type: regular

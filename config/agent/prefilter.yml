@@ -25,7 +25,6 @@ local_area:
   # HOME_LOCATION is already used elsewhere in this repo and expands from .env.
   allowed_locations:
     - ${HOME_LOCATION}
-    - Pullman, WA
   home_location: ${HOME_LOCATION}
 
 routing:

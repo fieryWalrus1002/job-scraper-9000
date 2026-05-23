@@ -103,7 +103,7 @@ Runs the remote filter agent over every record in the golden dataset and writes 
 uv run scripts/run_remote_filter_eval.py
 ```
 
-**Input:** `data/eval/ground_truth.jsonl`  
+**Input:** `data/eval/ground_truth.jsonl`
 **Output:** `data/eval/runs.jsonl` (appended), `data/eval/mismatches_{run_id}.jsonl` (if any mismatches)
 
 | Flag | Default | Description |
@@ -114,7 +114,7 @@ uv run scripts/run_remote_filter_eval.py
 | `--model` | _(from config)_ | Override `llm.model` in-memory — does not modify the YAML |
 | `--temperature` | _(from config)_ | Override `llm.temperature` in-memory |
 | `--provider` | _(from config)_ | Override `llm.provider` in-memory (`openai` or `ollama`) |
-| `--run-id` | _(auto-generated)_ | Human-readable label for this run; rejected if already in `runs.jsonl` |
+| `--run-id` | _(auto-generated)_ | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
 | `--no-mismatches` | off | Skip writing the mismatch file |
 | `--workers` | `1` | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
 
@@ -210,3 +210,119 @@ uv run scripts/compare_evals.py --diff 20260514_100000_aaaa 20260514_120000_bbbb
 | `data/eval/ground_truth.jsonl` | Gold | Human-verified records from the Streamlit UI |
 | `data/filtered/` | — | Student agent pass results |
 | `data/trash/` | — | Student agent trash results |
+
+---
+
+## skills_fit — seed gold + eval workflow
+
+Phase 3 (Skills Fit) scores remote-filter PASS jobs against the versioned candidate profile at `config/profile/candidate_profile.yml`. The seed gold set is built teacher-first: a frontier LLM proposes labels, a human reviews them in markdown, and the parsed result becomes `data/eval/skills_fit_ground_truth.jsonl`.
+
+See [src/agents/skills_fit/README.md](../src/agents/skills_fit/README.md) for the agent overview and [specs/skills_fit_agent_plan.md](../specs/skills_fit_agent_plan.md) for the full Phase R / G / B plan.
+
+### Pipeline overview
+
+```text
+data/filtered/                                      ← remote-filter PASS records
+    │
+    ├─ prepare_skills_fit_seed.py                   → data/staging/skills_fit_seed_template.jsonl
+    │
+    ├─ propose_skills_fit_seed.py (teacher LLM)     → data/staging/skills_fit_seed_proposed.jsonl
+    │
+    ├─ render_skills_fit_review_md.py               → data/staging/skills_fit_review/*.md
+    │       [human ratifies / overrides / skips in the markdown files]
+    ├─ parse_skills_fit_review_md.py                → data/eval/skills_fit_ground_truth.jsonl  (Gold)
+    │
+    └─ run_skills_fit_eval.py                       → data/eval/runs.jsonl
+```
+
+`score_skills_fit_seed.py` is an alternative CLI-driven review loop kept around for headless / non-markdown reviewing; both paths write the same gold JSONL.
+
+### `prepare_skills_fit_seed.py`
+
+Samples remote-filter PASS records into a blank seed template for hand-scoring.
+
+```bash
+uv run scripts/prepare_skills_fit_seed.py --n 40 --in data/filtered/
+```
+
+**Output:** `data/staging/skills_fit_seed_template.jsonl` with empty `_human_*` fields.
+
+### `propose_skills_fit_seed.py`
+
+Teacher LLM proposes labels and rationale for every template record. Calls `load_dotenv()`, so `OPENAI_API_KEY` from `.env` is picked up. Resume-safe by `source_job_id`.
+
+```bash
+uv run scripts/propose_skills_fit_seed.py --model gpt-5.5 --temperature 1.0
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--in` | `data/staging/skills_fit_seed_template.jsonl` | Template produced by `prepare_skills_fit_seed.py` |
+| `--out` | `data/staging/skills_fit_seed_proposed.jsonl` | Proposed-label output (appended, resume-safe) |
+| `--config` | `config/agent/skills_fit.yml` | Agent config (provides default LLM block) |
+| `--model` | _(from config)_ | Override the model |
+| `--temperature` | _(from config)_ | Override the temperature (ignored by reasoning models that lock it) |
+| `--prompt` | _(skills-fit prompt)_ | Override the system prompt file |
+| `--limit` | _(all)_ | Cap the number of records (smoke testing) |
+
+**Note on `gpt-5.5`:** the GPT-5 family rejects custom `temperature` and runs at its default (1.0). The flag is accepted but the API may ignore it for those models.
+
+### `render_skills_fit_review_md.py`
+
+Renders proposed records as one markdown file per posting, with teacher labels visible and editable fields for the human reviewer.
+
+```bash
+uv run scripts/render_skills_fit_review_md.py
+```
+
+**Output:** `data/staging/skills_fit_review/<idx>_<source_job_id>_<slug>.md`
+
+### `parse_skills_fit_review_md.py`
+
+Parses the filled-in markdown files back into gold JSONL. Preserves `_teacher_*` fields alongside `_human_*` labels for audit trail.
+
+```bash
+uv run scripts/parse_skills_fit_review_md.py
+```
+
+**Output:** `data/eval/skills_fit_ground_truth.jsonl` (append-only; last entry per `dedup_hash` wins).
+
+### `score_skills_fit_seed.py`
+
+Headless CLI alternative to the markdown review. Auto-detects the proposed file: when present, shows teacher labels and prompts `a` accept / `1-5` override / `s` skip / `q` quit, with press-enter-to-keep defaults on list fields. `_human_notes` is mandatory on every saved record.
+
+```bash
+uv run scripts/score_skills_fit_seed.py
+```
+
+**Output:** `data/eval/skills_fit_ground_truth.jsonl` (same gold file as the markdown path).
+
+### `run_skills_fit_eval.py`
+
+Loads the gold set, runs either the LLM scorer (`analyze_skills_fit`) or the keyword baseline (`keyword_overlap_analyze`), computes ordinal + top-k metrics, and writes a `runs.jsonl` record with full provenance (prompt hash, profile hash, `profile_version`, git commit, scorer choice, metric set).
+
+```bash
+uv run scripts/run_skills_fit_eval.py --scorer keyword --run-id phase_r_keyword
+uv run scripts/run_skills_fit_eval.py --scorer llm     --run-id phase_r_llm_rubric
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--gold` | `data/eval/skills_fit_ground_truth.jsonl` | Gold JSONL to evaluate against |
+| `--config` | `config/agent/skills_fit.yml` | Agent config YAML |
+| `--scorer` | `llm` | `llm` or `keyword` |
+| `--model` / `--provider` / `--temperature` | _(from config)_ | In-memory overrides |
+| `--run-id` | _(auto-generated)_ | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
+| `--workers` | `1` | Concurrent inference workers for the LLM scorer |
+| `--no-mismatches` | off | Skip writing the mismatch file |
+
+### Re-running after a profile bump
+
+Profile changes invalidate existing teacher proposals (they were scored against a different contract). To refresh the seed pool:
+
+```bash
+rm data/staging/skills_fit_seed_proposed.jsonl
+rm -rf data/staging/skills_fit_review/
+uv run scripts/propose_skills_fit_seed.py --model gpt-5.5 --temperature 1.0
+uv run scripts/render_skills_fit_review_md.py
+```
