@@ -50,4 +50,6 @@ dev = [
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 exclude = [".venv", "data", "dist", "build", "scripts", "tests"]
