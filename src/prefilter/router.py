@@ -58,6 +58,65 @@ _REJECT_HINTS = [
     "office based",
 ]
 
+# US state abbreviation → full name. Used by _location_contains so that an
+# allowed_location like "Pullman, WA" matches a posting location like
+# "Washington - Pullman" (and vice versa). Scoped to location matching only —
+# do not apply during _contains_phrase, where canonicalizing "or" → "oregon"
+# would corrupt reject/remote hint matching on natural-language descriptions.
+_STATE_ABBREVIATIONS: dict[str, str] = {
+    "al": "alabama",
+    "ak": "alaska",
+    "az": "arizona",
+    "ar": "arkansas",
+    "ca": "california",
+    "co": "colorado",
+    "ct": "connecticut",
+    "de": "delaware",
+    "fl": "florida",
+    "ga": "georgia",
+    "hi": "hawaii",
+    "id": "idaho",
+    "il": "illinois",
+    "in": "indiana",
+    "ia": "iowa",
+    "ks": "kansas",
+    "ky": "kentucky",
+    "la": "louisiana",
+    "me": "maine",
+    "md": "maryland",
+    "ma": "massachusetts",
+    "mi": "michigan",
+    "mn": "minnesota",
+    "ms": "mississippi",
+    "mo": "missouri",
+    "mt": "montana",
+    "ne": "nebraska",
+    "nv": "nevada",
+    "nh": "new hampshire",
+    "nj": "new jersey",
+    "nm": "new mexico",
+    "ny": "new york",
+    "nc": "north carolina",
+    "nd": "north dakota",
+    "oh": "ohio",
+    "ok": "oklahoma",
+    "or": "oregon",
+    "pa": "pennsylvania",
+    "ri": "rhode island",
+    "sc": "south carolina",
+    "sd": "south dakota",
+    "tn": "tennessee",
+    "tx": "texas",
+    "ut": "utah",
+    "vt": "vermont",
+    "va": "virginia",
+    "wa": "washington",
+    "wv": "west virginia",
+    "wi": "wisconsin",
+    "wy": "wyoming",
+    "dc": "district of columbia",
+}
+
 
 @dataclass
 class RouteDecision:
@@ -116,6 +175,25 @@ def _contains_phrase(text: str | None, phrase: str) -> bool:
     return False
 
 
+def _canonicalize_state_tokens(tokens: list[str]) -> list[str]:
+    return [_STATE_ABBREVIATIONS.get(t, t) for t in tokens]
+
+
+def _location_contains(text: str | None, allowed_location: str) -> bool:
+    """Match an allowed_location against text with US state-abbreviation
+    canonicalization and set containment.
+
+    Fixes the case where 'Pullman, WA' (config) should match 'Washington -
+    Pullman' (posting) even though they share no contiguous token sequence:
+    canonicalizing both sides yields {pullman, washington}, then subset.
+    """
+    needle = _canonicalize_state_tokens(_phrase_tokens(allowed_location))
+    haystack = _canonicalize_state_tokens(_tokens(text))
+    if not needle or not haystack:
+        return False
+    return set(needle).issubset(haystack)
+
+
 def _flatten_strings(value: Any) -> list[str]:
     out: list[str] = []
     if value is None:
@@ -168,11 +246,15 @@ def _merge_country_aliases(
     return merged
 
 
-def load_prefilter_config(path: str | Path = DEFAULT_CONFIG_PATH) -> _ResolvedPrefilterConfig:
+def load_prefilter_config(
+    path: str | Path = DEFAULT_CONFIG_PATH,
+) -> _ResolvedPrefilterConfig:
     raw_text = _expand_env_vars(Path(path).read_text())
     raw = yaml.safe_load(raw_text) or {}
     if not isinstance(raw, dict):
-        raise ConfigError(f"Prefilter config must be a YAML mapping, got {type(raw).__name__}")
+        raise ConfigError(
+            f"Prefilter config must be a YAML mapping, got {type(raw).__name__}"
+        )
 
     country = str(raw.get("country", "USA"))
     cd = raw.get("country_detection") or {}
@@ -189,7 +271,9 @@ def load_prefilter_config(path: str | Path = DEFAULT_CONFIG_PATH) -> _ResolvedPr
         country=country,
         country_detection=CountryDetectionConfig(
             enabled=bool(cd.get("enabled", True)),
-            sources=[str(x) for x in (cd.get("sources") or ["location", "description"])],
+            sources=[
+                str(x) for x in (cd.get("sources") or ["location", "description"])
+            ],
             aliases={
                 str(k): [str(v) for v in (vals or [])]
                 for k, vals in (cd.get("aliases") or {}).items()
@@ -197,8 +281,14 @@ def load_prefilter_config(path: str | Path = DEFAULT_CONFIG_PATH) -> _ResolvedPr
             unknown_policy=str(cd.get("unknown_policy", "continue")),
         ),
         local_area=LocalAreaConfig(
-            allowed_locations=[str(x) for x in (local_area.get("allowed_locations") or [])],
-            home_location=(str(local_area["home_location"]) if local_area.get("home_location") else None),
+            allowed_locations=[
+                str(x) for x in (local_area.get("allowed_locations") or [])
+            ],
+            home_location=(
+                str(local_area["home_location"])
+                if local_area.get("home_location")
+                else None
+            ),
         ),
         routing=RoutingConfig(
             route_local_jobs=bool(routing.get("route_local_jobs", True)),
@@ -221,7 +311,9 @@ def build_prefilter_metadata(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
 ) -> dict[str, Any]:
     git_meta = get_git_metadata()
-    config_hash = sha256(json.dumps(_config_dict(cfg), sort_keys=True).encode()).hexdigest()[:12]
+    config_hash = sha256(
+        json.dumps(_config_dict(cfg), sort_keys=True).encode()
+    ).hexdigest()[:12]
     return {
         "schema_version": SCHEMA_VERSION,
         "config_hash": config_hash,
@@ -252,7 +344,13 @@ def _country_hits(
                     hits.append(country)
                     alias_hits[country] = alias
                     if hit_source is None:
-                        hit_source = ["location", "description", "title", "search_params"][source_idx] if source_idx < 4 else "unknown"
+                        hit_source = (
+                            ["location", "description", "title", "search_params"][
+                                source_idx
+                            ]
+                            if source_idx < 4
+                            else "unknown"
+                        )
                     break
     # Keep selected country first if it exists
     if selected_country in hits:
@@ -273,13 +371,13 @@ def _local_match(
         allowed.append(cfg.local_area.home_location)
 
     for allowed_location in allowed:
-        if _contains_phrase(location, allowed_location):
+        if _location_contains(location, allowed_location):
             return True, "location"
-        if _contains_phrase(description, allowed_location):
+        if _location_contains(description, allowed_location):
             return True, "description"
         if cfg.routing.prefer_search_params_as_weak_signal:
             for value in flat_search_params:
-                if _contains_phrase(value, allowed_location):
+                if _location_contains(value, allowed_location):
                     return True, "search_params"
     return False, None
 
@@ -314,7 +412,9 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
         elif source_name == "search_params":
             country_sources.extend(flat_search_params)
 
-    hits, alias_hits, hit_source = _country_hits(country_sources, resolved.aliases, cfg.country)
+    hits, alias_hits, hit_source = _country_hits(
+        country_sources, resolved.aliases, cfg.country
+    )
     trace.append(f"country_check:hits={hits or ['none']}")
 
     if cfg.routing.reject_non_us and any(country != cfg.country for country in hits):
@@ -331,7 +431,9 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
             country_alias_hits=alias_hits,
         )
 
-    local_ok, local_source = _local_match(job, cfg, flat_search_params=flat_search_params)
+    local_ok, local_source = _local_match(
+        job, cfg, flat_search_params=flat_search_params
+    )
     trace.append(f"local_check:{'pass' if local_ok else 'miss'}")
     if local_ok and cfg.routing.route_local_jobs:
         matched_rules.append("local_area_allowlist")
@@ -358,7 +460,9 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
         trace.append(f"signal_check:reject_only:{reject_phrase}")
         return RouteDecision(
             route="prefilter_reject",
-            reason=reject_phrase.replace(" ", "_") if reject_phrase else "obvious_non_viable",
+            reason=reject_phrase.replace(" ", "_")
+            if reject_phrase
+            else "obvious_non_viable",
             matched_rules=matched_rules,
             rule_trace=trace,
             routing_decision_source="title/location/description",
@@ -440,7 +544,11 @@ def run_prefilter(
     base_metadata["config_path"] = str(config_path)
 
     if dry_run:
-        counts = {"remote_filter_candidate": 0, "local_candidate": 0, "prefilter_reject": 0}
+        counts = {
+            "remote_filter_candidate": 0,
+            "local_candidate": 0,
+            "prefilter_reject": 0,
+        }
         for job in jobs:
             decision = route_job(job, resolved)
             counts[decision.route] += 1
