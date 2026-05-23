@@ -309,6 +309,8 @@ uv run scripts/score_skills_fit_seed.py
 
 Loads the gold set, runs either the LLM scorer (`analyze_skills_fit`) or the keyword baseline (`keyword_overlap_analyze`), computes ordinal + top-k metrics, and writes a `runs.jsonl` record with full provenance (prompt hash, profile hash, `profile_version`, git commit, scorer choice, metric set).
 
+Also snapshots the in-flight candidate profile to `config/profile/old_profiles/candidate_profile_<profile_version>.yml` on every run (idempotent — re-runs against the same `profile_version` are no-ops). The directory is gitignored because profiles contain PII.
+
 ```bash
 uv run scripts/run_skills_fit_eval.py --scorer keyword --run-id phase_r_keyword
 uv run scripts/run_skills_fit_eval.py --scorer llm     --run-id phase_r_llm_rubric
