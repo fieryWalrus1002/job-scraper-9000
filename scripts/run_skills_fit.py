@@ -250,6 +250,14 @@ def rank_key(record: dict[str, Any]) -> tuple[bool, int, str]:
     return (score is None, -(score or 0), record["dedup_hash"])
 
 
+def write_output(records: list[dict[str, Any]], output_path: Path) -> None:
+    records.sort(key=rank_key)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record) + "\n")
+
+
 def run_skills_fit(
     *,
     run_date: str | None = None,
@@ -322,17 +330,97 @@ def run_skills_fit(
     failed_agent = 0
     enriched_records: list[dict[str, Any]] = []
 
-    for job in deduped_records:
-        input_source = job["__input_source"]
-        input_path = job["__input_path"]
-        title = job.get("title") or None
-        location = job.get("location") or None
-        description = job.get("description") or ""
-        scored_at = git_metadata["timestamp"]
+    try:
+        for job in deduped_records:
+            input_source = job["__input_source"]
+            input_path = job["__input_path"]
+            title = job.get("title") or None
+            location = job.get("location") or None
+            description = job.get("description") or ""
+            scored_at = git_metadata["timestamp"]
 
-        if not description:
-            log.warning("Skipping %s — missing description", title or job["dedup_hash"])
-            skipped_missing_description += 1
+            if not description:
+                log.warning(
+                    "Skipping %s — missing description", title or job["dedup_hash"]
+                )
+                skipped_missing_description += 1
+                metadata = build_record_metadata(
+                    run_id=run_id,
+                    scored_at=scored_at,
+                    config_file=config_file,
+                    prompt_file=prompt_file,
+                    prompt_hash=prompt_hash,
+                    profile_file=profile_file,
+                    profile_hash=profile_hash,
+                    profile_version=profile_version,
+                    provider=provider_name,
+                    model=model_name,
+                    temperature=resolved_temperature,
+                    git_metadata=git_metadata,
+                    input_source=input_source,
+                    input_path=input_path,
+                    failure_reason="missing_description",
+                )
+                enriched_records.append(
+                    {
+                        **clean_job_record(job),
+                        "_skills_fit_score": None,
+                        "_skills_fit_rationale": None,
+                        "_skills_fit_hard_concerns": [],
+                        "_skills_fit_top_matches": [],
+                        "_skills_fit_analysis": None,
+                        "_skills_fit_gaps": [],
+                        "_skills_fit_confidence": None,
+                        "_skills_fit_input_source": input_source,
+                        "_skills_fit_metadata": metadata,
+                    }
+                )
+                continue
+
+            analysis = analyze_skills_fit(
+                description,
+                candidate_profile=profile,
+                title=title,
+                location=location,
+                llm_config=llm_config,
+                prompt_path=prompt_file,
+            )
+            if analysis is None:
+                log.warning("Agent failed on %s", title or job["dedup_hash"])
+                failed_agent += 1
+                metadata = build_record_metadata(
+                    run_id=run_id,
+                    scored_at=scored_at,
+                    config_file=config_file,
+                    prompt_file=prompt_file,
+                    prompt_hash=prompt_hash,
+                    profile_file=profile_file,
+                    profile_hash=profile_hash,
+                    profile_version=profile_version,
+                    provider=provider_name,
+                    model=model_name,
+                    temperature=resolved_temperature,
+                    git_metadata=git_metadata,
+                    input_source=input_source,
+                    input_path=input_path,
+                    failure_reason="agent_failed",
+                )
+                enriched_records.append(
+                    {
+                        **clean_job_record(job),
+                        "_skills_fit_score": None,
+                        "_skills_fit_rationale": None,
+                        "_skills_fit_hard_concerns": [],
+                        "_skills_fit_top_matches": [],
+                        "_skills_fit_analysis": None,
+                        "_skills_fit_gaps": [],
+                        "_skills_fit_confidence": None,
+                        "_skills_fit_input_source": input_source,
+                        "_skills_fit_metadata": metadata,
+                    }
+                )
+                continue
+
             metadata = build_record_metadata(
                 run_id=run_id,
                 scored_at=scored_at,
@@ -348,105 +436,35 @@ def run_skills_fit(
                 git_metadata=git_metadata,
                 input_source=input_source,
                 input_path=input_path,
-                failure_reason="missing_description",
             )
             enriched_records.append(
                 {
                     **clean_job_record(job),
-                    "_skills_fit_score": None,
-                    "_skills_fit_rationale": None,
-                    "_skills_fit_hard_concerns": [],
-                    "_skills_fit_top_matches": [],
-                    "_skills_fit_analysis": None,
-                    "_skills_fit_gaps": [],
-                    "_skills_fit_confidence": None,
+                    "_skills_fit_score": analysis.fit_score,
+                    "_skills_fit_rationale": analysis.score_rationale,
+                    "_skills_fit_hard_concerns": analysis.hard_concerns,
+                    "_skills_fit_top_matches": analysis.top_matches,
+                    "_skills_fit_analysis": analysis.model_dump(),
+                    "_skills_fit_gaps": analysis.gaps,
+                    "_skills_fit_confidence": analysis.confidence,
                     "_skills_fit_input_source": input_source,
                     "_skills_fit_metadata": metadata,
                 }
             )
-            continue
-
-        analysis = analyze_skills_fit(
-            description,
-            candidate_profile=profile,
-            title=title,
-            location=location,
-            llm_config=llm_config,
-            prompt_path=prompt_file,
-        )
-        if analysis is None:
-            log.warning("Agent failed on %s", title or job["dedup_hash"])
-            failed_agent += 1
-            metadata = build_record_metadata(
-                run_id=run_id,
-                scored_at=scored_at,
-                config_file=config_file,
-                prompt_file=prompt_file,
-                prompt_hash=prompt_hash,
-                profile_file=profile_file,
-                profile_hash=profile_hash,
-                profile_version=profile_version,
-                provider=provider_name,
-                model=model_name,
-                temperature=resolved_temperature,
-                git_metadata=git_metadata,
-                input_source=input_source,
-                input_path=input_path,
-                failure_reason="agent_failed",
+            scored_successfully += 1
+    except KeyboardInterrupt:
+        if enriched_records:
+            write_output(enriched_records, resolved_paths.output)
+            log.warning(
+                "Interrupted — wrote %d partial records to %s",
+                len(enriched_records),
+                resolved_paths.output,
             )
-            enriched_records.append(
-                {
-                    **clean_job_record(job),
-                    "_skills_fit_score": None,
-                    "_skills_fit_rationale": None,
-                    "_skills_fit_hard_concerns": [],
-                    "_skills_fit_top_matches": [],
-                    "_skills_fit_analysis": None,
-                    "_skills_fit_gaps": [],
-                    "_skills_fit_confidence": None,
-                    "_skills_fit_input_source": input_source,
-                    "_skills_fit_metadata": metadata,
-                }
-            )
-            continue
+        else:
+            log.warning("Interrupted before any records were written")
+        raise
 
-        metadata = build_record_metadata(
-            run_id=run_id,
-            scored_at=scored_at,
-            config_file=config_file,
-            prompt_file=prompt_file,
-            prompt_hash=prompt_hash,
-            profile_file=profile_file,
-            profile_hash=profile_hash,
-            profile_version=profile_version,
-            provider=provider_name,
-            model=model_name,
-            temperature=resolved_temperature,
-            git_metadata=git_metadata,
-            input_source=input_source,
-            input_path=input_path,
-        )
-        enriched_records.append(
-            {
-                **clean_job_record(job),
-                "_skills_fit_score": analysis.fit_score,
-                "_skills_fit_rationale": analysis.score_rationale,
-                "_skills_fit_hard_concerns": analysis.hard_concerns,
-                "_skills_fit_top_matches": analysis.top_matches,
-                "_skills_fit_analysis": analysis.model_dump(),
-                "_skills_fit_gaps": analysis.gaps,
-                "_skills_fit_confidence": analysis.confidence,
-                "_skills_fit_input_source": input_source,
-                "_skills_fit_metadata": metadata,
-            }
-        )
-        scored_successfully += 1
-
-    enriched_records.sort(key=rank_key)
-    resolved_paths.output.parent.mkdir(parents=True, exist_ok=True)
-    with resolved_paths.output.open("w", encoding="utf-8") as f:
-        for record in enriched_records:
-            f.write(json.dumps(record) + "\n")
+    write_output(enriched_records, resolved_paths.output)
 
     log.info("Scored successfully: %d", scored_successfully)
     log.info("Skipped missing description: %d", skipped_missing_description)
@@ -484,6 +502,8 @@ def main(argv: list[str] | None = None) -> int:
     except (FileNotFoundError, ValueError) as exc:
         log.error(str(exc))
         return 1
+    except KeyboardInterrupt:
+        return 130
     return 0
 
 

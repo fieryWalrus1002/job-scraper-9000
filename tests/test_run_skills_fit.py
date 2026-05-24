@@ -532,6 +532,63 @@ def test_run_skills_fit_fails_when_prompt_file_is_missing(tmp_path, monkeypatch)
         raise AssertionError("expected FileNotFoundError")
 
 
+def test_run_skills_fit_flushes_partial_results_on_keyboard_interrupt(
+    tmp_path, monkeypatch
+):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [
+            {"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"},
+            {"dedup_hash": "hash-b", "title": "Beta", "description": "beta"},
+        ],
+    )
+
+    call_count = 0
+
+    def fake_analyze(*args, title=None, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise KeyboardInterrupt
+        assert title is not None
+        return analysis(5, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+    monkeypatch.setattr(
+        module,
+        "get_git_metadata",
+        lambda: {
+            "commit": "abc123def456",
+            "dirty": False,
+            "timestamp": "2026-05-23T12:00:00+00:00",
+        },
+    )
+
+    try:
+        module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("expected KeyboardInterrupt")
+
+    output_path = tmp_path / "data/scored/2026-05-23/skills_fit_scored.jsonl"
+    rows = [json.loads(line) for line in output_path.read_text().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["dedup_hash"] == "hash-a"
+    assert rows[0]["_skills_fit_score"] == 5
+
+
 def test_main_returns_one_on_fail_fast_error(tmp_path, monkeypatch):
     module = load_script_module()
     monkeypatch.chdir(tmp_path)
@@ -539,3 +596,18 @@ def test_main_returns_one_on_fail_fast_error(tmp_path, monkeypatch):
     exit_code = module.main(["--config", "config/agent/missing.yml"])
 
     assert exit_code == 1
+
+
+def test_main_returns_130_on_keyboard_interrupt(tmp_path, monkeypatch):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    monkeypatch.setattr(
+        module,
+        "run_skills_fit",
+        lambda **kwargs: (_ for _ in ()).throw(KeyboardInterrupt),
+    )
+
+    exit_code = module.main(["--run-date", "2026-05-23"])
+
+    assert exit_code == 130
