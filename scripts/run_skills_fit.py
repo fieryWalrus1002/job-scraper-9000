@@ -147,6 +147,54 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def is_processed_output_record(record: dict[str, Any]) -> bool:
+    metadata = record.get("_skills_fit_metadata")
+    if not isinstance(metadata, dict):
+        return False
+    if record.get("_skills_fit_score") is not None:
+        return True
+    return metadata.get("failure_reason") is not None
+
+
+def load_existing_output_records(path: Path) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    if not path.exists():
+        return records
+
+    with path.open(encoding="utf-8") as f:
+        for line_number, raw_line in enumerate(f, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                log.warning(
+                    "Skipping malformed existing output line %d in %s: %s",
+                    line_number,
+                    path,
+                    exc,
+                )
+                continue
+            if not isinstance(record, dict):
+                log.warning(
+                    "Skipping non-object existing output line %d in %s",
+                    line_number,
+                    path,
+                )
+                continue
+            dedup_hash = record.get("dedup_hash")
+            if not dedup_hash:
+                log.warning(
+                    "Skipping existing output line %d in %s with missing dedup_hash",
+                    line_number,
+                    path,
+                )
+                continue
+            records[str(dedup_hash)] = record
+    return records
+
+
 def load_tagged_inputs(
     *, remote_input: Path, local_input: Path
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -325,6 +373,15 @@ def run_skills_fit(
         len(deduped_records),
     )
 
+    existing_output_records = load_existing_output_records(resolved_paths.output)
+    resumed_existing = 0
+    if existing_output_records:
+        log.info(
+            "Loaded %d existing scored rows from %s",
+            len(existing_output_records),
+            resolved_paths.output,
+        )
+
     scored_successfully = 0
     skipped_missing_description = 0
     failed_agent = 0
@@ -332,6 +389,12 @@ def run_skills_fit(
 
     try:
         for job in deduped_records:
+            existing = existing_output_records.get(str(job["dedup_hash"]))
+            if existing is not None and is_processed_output_record(existing):
+                enriched_records.append(existing)
+                resumed_existing += 1
+                continue
+
             input_source = job["__input_source"]
             input_path = job["__input_path"]
             title = job.get("title") or None
@@ -466,6 +529,8 @@ def run_skills_fit(
 
     write_output(enriched_records, resolved_paths.output)
 
+    if resumed_existing:
+        log.info("Reused existing scored rows: %d", resumed_existing)
     log.info("Scored successfully: %d", scored_successfully)
     log.info("Skipped missing description: %d", skipped_missing_description)
     log.info("Failed agent: %d", failed_agent)
