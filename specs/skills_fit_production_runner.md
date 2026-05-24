@@ -26,7 +26,7 @@ The repo has already standardized on date-partitioned pipeline stages:
 
 The production skills-fit runner should follow that contract.
 
-Investigation found that the flat file `data/filtered/remote_filter_pass.jsonl` still exists in code and tests, but only as a legacy no-`--run-date` compatibility path. In the real repo data it appears stale compared with the dated partitions. The new runner should therefore treat dated partitions as canonical and flat paths as fallback compatibility only.
+Investigation found that the old flat files are no longer meaningful pipeline inputs. Real runs now land in dated partitions, so the production skills-fit runner should require either a `--run-date` or explicit path overrides rather than silently falling back to stale root-level files.
 
 ---
 
@@ -36,7 +36,7 @@ Investigation found that the flat file `data/filtered/remote_filter_pass.jsonl` 
 
 - Add `scripts/run_skills_fit.py`
 - Read canonical dated inputs when `--run-date` is provided
-- Support legacy flat-path fallback when `--run-date` is omitted
+- Support explicit path override mode when `--run-date` is omitted
 - Score jobs by calling existing `analyze_skills_fit()` only
 - Merge remote-filter PASS jobs with local-candidate jobs
 - Write ranked JSONL output to `data/scored/`
@@ -79,15 +79,15 @@ When `--run-date YYYY-MM-DD` is provided, and explicit path overrides are not:
 - local input: `data/local/<DATE>/local_jobs.jsonl`
 - output: `data/scored/<DATE>/skills_fit_scored.jsonl`
 
-### Legacy compatibility mode
+### Explicit override mode
 
-When `--run-date` is omitted, and explicit path overrides are not:
+When `--run-date` is omitted, all three path flags must be provided explicitly:
 
-- remote input: `data/filtered/remote_filter_pass.jsonl`
-- local input: `data/local/local_jobs.jsonl`
-- output: `data/scored/skills_fit_scored.jsonl`
+- `--remote-input PATH`
+- `--local-input PATH`
+- `--output PATH`
 
-This mode exists only for compatibility with older flat-layout runs.
+If neither `--run-date` nor a full set of explicit path overrides is provided, the runner should fail fast with a clear error.
 
 ### Config inputs
 
@@ -115,7 +115,7 @@ Resolution rules:
 
 1. explicit path flags win
 2. otherwise `--run-date` resolves partitioned paths
-3. otherwise legacy flat paths are used
+3. otherwise the runner errors clearly and exits non-zero
 
 ---
 
@@ -259,9 +259,9 @@ Canonical output path:
 
 - `data/scored/<DATE>/skills_fit_scored.jsonl`
 
-Legacy fallback output path:
+Explicit override output path:
 
-- `data/scored/skills_fit_scored.jsonl`
+- whatever `--output PATH` resolves to
 
 Output record shape is:
 
@@ -293,8 +293,9 @@ A short preview of the top-ranked jobs is nice to have but not required for #61.
 ## Acceptance criteria
 
 - `uv run scripts/run_skills_fit.py --run-date <DATE>` succeeds against a real dated partition
-- default canonical input resolution uses dated directories, not flat root files
-- flat root files still work when `--run-date` is omitted
+- default canonical input resolution uses dated directories
+- the runner fails clearly when neither `--run-date` nor full explicit path overrides are provided
+- explicit path override mode works when `--run-date` is omitted
 - output is written to `data/scored/<DATE>/skills_fit_scored.jsonl` in canonical mode
 - output records are ranked by descending `_skills_fit_score`
 - output records include the required `_skills_fit_*` fields
@@ -318,4 +319,4 @@ Likely later follow-ons:
 - RunTracker integration; until then, skills-fit runs and costs will not appear in `data/runs/runs.jsonl`
 - skills-fit analysis caching, likely via a shared generic analysis-cache base rather than a one-off implementation
 - append-only run manifests under `data/runs/` or `data/runs/<run_id>/...`
-- broader pipeline professionalization to eliminate flat-path ambiguity
+- broader pipeline professionalization around run manifests / component orchestration
