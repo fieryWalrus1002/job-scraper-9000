@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agent_eval.provenance import generate_run_id, hash_file
+from agents.skills_fit.cache import DEFAULT_CACHE_PATH, AnalysisCache
 from agents.skills_fit.models import SCHEMA_VERSION
 from agents.skills_fit.utils import (
     SKILLS_FIT_PROMPT_PATH,
@@ -350,6 +351,9 @@ def run_skills_fit(
 
     provider_name, model_name = resolve_provider_and_model(llm_config)
     resolved_temperature = llm_config.get("temperature")
+    cache = AnalysisCache(DEFAULT_CACHE_PATH)
+    cache_hits = 0
+    cache_misses = 0
     git_metadata = get_git_metadata()
     run_id = generate_run_id("skillsfit")
 
@@ -440,14 +444,34 @@ def run_skills_fit(
                 )
                 continue
 
-            analysis = analyze_skills_fit(
-                description,
-                candidate_profile=profile,
-                title=title,
-                location=location,
-                llm_config=llm_config,
-                prompt_path=prompt_file,
+            analysis = cache.get(
+                dedup_hash=str(job["dedup_hash"]),
+                prompt_hash=prompt_hash,
+                provider=provider_name,
+                model=model_name,
+                profile_hash=profile_hash,
             )
+            if analysis is not None:
+                cache_hits += 1
+            else:
+                cache_misses += 1
+                analysis = analyze_skills_fit(
+                    description,
+                    candidate_profile=profile,
+                    title=title,
+                    location=location,
+                    llm_config=llm_config,
+                    prompt_path=prompt_file,
+                )
+                if analysis is not None:
+                    cache.put(
+                        dedup_hash=str(job["dedup_hash"]),
+                        prompt_hash=prompt_hash,
+                        provider=provider_name,
+                        model=model_name,
+                        profile_hash=profile_hash,
+                        analysis=analysis,
+                    )
             if analysis is None:
                 log.warning("Agent failed on %s", title or job["dedup_hash"])
                 failed_agent += 1
@@ -531,6 +555,8 @@ def run_skills_fit(
 
     if resumed_existing:
         log.info("Reused existing scored rows: %d", resumed_existing)
+    log.info("Cache hits: %d", cache_hits)
+    log.info("Cache misses: %d", cache_misses)
     log.info("Scored successfully: %d", scored_successfully)
     log.info("Skipped missing description: %d", skipped_missing_description)
     log.info("Failed agent: %d", failed_agent)
@@ -546,6 +572,8 @@ def run_skills_fit(
         "scored_successfully": scored_successfully,
         "skipped_missing_description": skipped_missing_description,
         "failed_agent": failed_agent,
+        "cache_hits": cache_hits,
+        "cache_misses": cache_misses,
         "output_path": str(resolved_paths.output),
     }
 

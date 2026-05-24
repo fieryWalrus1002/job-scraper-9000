@@ -226,6 +226,8 @@ def test_run_skills_fit_partitioned_mode_dedupes_sorts_and_enriches(
         "scored_successfully": 3,
         "skipped_missing_description": 1,
         "failed_agent": 1,
+        "cache_hits": 0,
+        "cache_misses": 4,
         "output_path": f"data/scored/{run_date}/skills_fit_scored.jsonl",
     }
 
@@ -656,6 +658,49 @@ def test_run_skills_fit_treats_failure_reason_rows_as_processed(tmp_path, monkey
     rows = [json.loads(line) for line in output_path.read_text().splitlines()]
     assert len(rows) == 1
     assert rows[0]["_skills_fit_metadata"]["failure_reason"] == "agent_failed"
+
+
+def test_run_skills_fit_uses_analysis_cache_across_outputs(tmp_path, monkeypatch):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    output_a = tmp_path / "data/scored/2026-05-23/skills_fit_scored_a.jsonl"
+    output_b = tmp_path / "data/scored/2026-05-23/skills_fit_scored_b.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [{"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"}],
+    )
+
+    call_count = 0
+
+    def fake_analyze(*args, title=None, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        assert title is not None
+        return analysis(4, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+
+    summary_a = module.run_skills_fit(
+        run_date="2026-05-23", config_path=config_path, output=output_a
+    )
+    summary_b = module.run_skills_fit(
+        run_date="2026-05-23", config_path=config_path, output=output_b
+    )
+
+    assert call_count == 1
+    assert summary_a["cache_hits"] == 0
+    assert summary_a["cache_misses"] == 1
+    assert summary_b["cache_hits"] == 1
+    assert summary_b["cache_misses"] == 0
 
 
 def test_run_skills_fit_retries_unscored_rows_without_failure_reason_and_warns_on_malformed_existing_output(
