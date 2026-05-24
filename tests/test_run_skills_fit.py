@@ -1,3 +1,4 @@
+import importlib
 import importlib.util
 import json
 from pathlib import Path
@@ -10,6 +11,10 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "run_skills_fit.py"
 
 
 def load_script_module():
+    return importlib.reload(importlib.import_module("agents.skills_fit.runner"))
+
+
+def load_wrapper_module():
     spec = importlib.util.spec_from_file_location("run_skills_fit_script", SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -826,3 +831,19 @@ def test_main_returns_130_on_keyboard_interrupt(tmp_path, monkeypatch):
     exit_code = module.main(["--run-date", "2026-05-23"])
 
     assert exit_code == 130
+
+
+def test_script_wrapper_reexports_runner_main(monkeypatch):
+    calls: list[list[str] | None] = []
+
+    def fake_main(argv=None):
+        calls.append(argv)
+        return 7
+
+    runner = importlib.import_module("agents.skills_fit.runner")
+    monkeypatch.setattr(runner, "main", fake_main)
+
+    module = load_wrapper_module()
+
+    assert module.main(["--run-date", "2026-05-23"]) == 7
+    assert calls == [["--run-date", "2026-05-23"]]
