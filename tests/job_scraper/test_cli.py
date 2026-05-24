@@ -249,7 +249,7 @@ def _parse_args(*argv):
                                     "job_scraper.cli._cmd_discover", side_effect=capture
                                 ):
                                     with patch(
-                                        "job_scraper.cli._cmd_prefilter",
+                                        "prefilter.cli._cmd_prefilter",
                                         side_effect=capture,
                                     ):
                                         with patch(
@@ -613,7 +613,7 @@ def test_prefilter_custom_paths():
 
 
 def test_prefilter_cmd_calls_runner():
-    from job_scraper.cli import _cmd_prefilter
+    from prefilter.cli import _cmd_prefilter
 
     args = _fake_args(
         input="raw.jsonl",
@@ -928,7 +928,7 @@ def test_prefilter_run_date_flag():
 
 
 def test_prefilter_cmd_no_run_date_uses_legacy_defaults():
-    from job_scraper.cli import _cmd_prefilter
+    from prefilter.cli import _cmd_prefilter
 
     args = _fake_args(
         input=None,
@@ -953,7 +953,7 @@ def test_prefilter_cmd_no_run_date_uses_legacy_defaults():
 
 
 def test_prefilter_cmd_run_date_resolves_partitioned_paths():
-    from job_scraper.cli import _cmd_prefilter
+    from prefilter.cli import _cmd_prefilter
 
     args = _fake_args(
         input=None,
@@ -978,7 +978,7 @@ def test_prefilter_cmd_run_date_resolves_partitioned_paths():
 
 
 def test_prefilter_cmd_explicit_paths_override_run_date():
-    from job_scraper.cli import _cmd_prefilter
+    from prefilter.cli import _cmd_prefilter
 
     args = _fake_args(
         input="custom/raw.jsonl",
