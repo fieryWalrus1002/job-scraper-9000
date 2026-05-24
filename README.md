@@ -68,22 +68,25 @@ cp .env.example .env   # fill in your secrets
 
 ## Quick start
 
+The umbrella CLI is `job-scraper-9000`. The older `job-scraper` name remains
+as a supported alias and points at the same entrypoint.
+
 **Scrape jobs:**
 
 ```bash
-uv run job-scraper run-config config/search.yml --save --run-date $(date +%F)
+uv run job-scraper-9000 run-config config/search.yml --save --run-date $(date +%F)
 ```
 
 **Run the prefilter router:**
 
 ```bash
-uv run job-scraper prefilter --run-date $(date +%F)
+uv run job-scraper-9000 prefilter --run-date $(date +%F)
 ```
 
 **Run the remote filter:**
 
 ```bash
-uv run job-scraper remote-filter --run-date $(date +%F)
+uv run job-scraper-9000 remote-filter --run-date $(date +%F)
 ```
 
 **Run evals:**
@@ -109,6 +112,12 @@ python scripts/prepare_batch.py        # build OpenAI batch request file
 # upload data/raw/gpt_teacher_batch.jsonl → OpenAI, download results
 python scripts/merge_batch_results.py  # merge results into staging
 streamlit run src/review_ui/app.py     # open the review UI
+```
+
+**Run the skills fit agent:**
+
+```bash
+uv run job-scraper-9000 skills-fit --run-date $(date +%F)
 ```
 
 ---

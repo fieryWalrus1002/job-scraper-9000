@@ -410,7 +410,9 @@ def test_build_user_message_title_prepended():
 
 
 def test_build_user_message_location_prepended():
-    msg = _build_user_message("Job desc.", None, location="US-Remote (35 miles+ outside an office)")
+    msg = _build_user_message(
+        "Job desc.", None, location="US-Remote (35 miles+ outside an office)"
+    )
     assert "[Location field: US-Remote (35 miles+ outside an office)]" in msg
     assert "Job desc." in msg
 
@@ -454,23 +456,250 @@ def _mock_client_returning(analysis: RemoteAnalysis):
 
 def test_analyze_remote_includes_title_in_user_message():
     mock_client = _mock_client_returning(_make_analysis())
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
         analyze_remote("Job description.", title="Personal Office Assistant")
-    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][1]["content"]
+    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][
+        1
+    ]["content"]
     assert "[Job title: Personal Office Assistant]" in user_content
 
 
 def test_analyze_remote_includes_location_in_user_message():
     mock_client = _mock_client_returning(_make_analysis())
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
-        analyze_remote("Job description.", location="US-Remote (35 miles+ outside an office)")
-    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][1]["content"]
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
+        analyze_remote(
+            "Job description.", location="US-Remote (35 miles+ outside an office)"
+        )
+    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][
+        1
+    ]["content"]
     assert "[Location field: US-Remote (35 miles+ outside an office)]" in user_content
 
 
 def test_analyze_remote_no_title_no_location_sends_description_only():
     mock_client = _mock_client_returning(_make_analysis())
-    with patch("agents.remote_filter.utils._get_client", return_value=(mock_client, "gpt-4o-mini")):
-        analyze_remote("Plain description.", title=None, location=None, search_context=None)
-    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][1]["content"]
+    with patch(
+        "agents.remote_filter.utils._get_client",
+        return_value=(mock_client, "gpt-4o-mini"),
+    ):
+        analyze_remote(
+            "Plain description.", title=None, location=None, search_context=None
+        )
+    user_content = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"][
+        1
+    ]["content"]
     assert user_content == "Plain description."
+
+
+# ---------------------------------------------------------------------------
+# remote-filter CLI — argument parsing and command handler
+# ---------------------------------------------------------------------------
+
+
+import argparse as _argparse  # noqa: E402
+
+
+from jobs_cli.main import main  # noqa: E402
+
+
+def _cli_fake_args(**kwargs) -> _argparse.Namespace:
+    return _argparse.Namespace(**kwargs)
+
+
+def _cli_parse_args(*argv):
+    captured = {}
+
+    def capture(args):
+        captured["args"] = args
+
+    with patch("sys.argv", ["job-scraper-9000", "remote-filter", *argv]):
+        with patch("agents.remote_filter.cli._cmd_remote_filter", side_effect=capture):
+            main()
+
+    return captured["args"]
+
+
+def test_remote_filter_defaults():
+    import os
+
+    with patch.dict(os.environ, {}, clear=True):
+        with patch("jobs_cli.main.load_dotenv"):
+            args = _cli_parse_args()
+    assert args.input is None
+    assert args.run_date is None
+    assert args.pass_output is None
+    assert args.trash_output is None
+    assert args.config == "config/agent/remote_agent.yml"
+    assert args.user_location == "USA"
+    assert args.user_timezone is None
+
+
+def test_remote_filter_custom_paths():
+    args = _cli_parse_args(
+        "--input",
+        "raw.jsonl",
+        "--pass-output",
+        "pass.jsonl",
+        "--trash-output",
+        "trash.jsonl",
+        "--config",
+        "remote.yml",
+        "--user-location",
+        "Canada",
+        "--user-timezone",
+        "PST",
+    )
+    assert args.input == "raw.jsonl"
+    assert args.pass_output == "pass.jsonl"
+    assert args.trash_output == "trash.jsonl"
+    assert args.config == "remote.yml"
+    assert args.user_location == "Canada"
+    assert args.user_timezone == "PST"
+
+
+def test_remote_filter_run_date_flag():
+    args = _cli_parse_args("--run-date", "2026-05-16")
+    assert args.run_date == "2026-05-16"
+
+
+def test_remote_filter_cmd_calls_runner():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
+    from agents.remote_filter.cli import _cmd_remote_filter
+
+    args = _cli_fake_args(
+        input="raw.jsonl",
+        pass_output="pass.jsonl",
+        trash_output="trash.jsonl",
+        config="remote.yml",
+        user_location="USA",
+        user_timezone="PST",
+        cache_path=None,
+        no_cache=False,
+        run_date=None,
+    )
+
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    mock_run.assert_called_once_with(
+        input_path="raw.jsonl",
+        pass_path="pass.jsonl",
+        trash_path="trash.jsonl",
+        config_path="remote.yml",
+        user_location="USA",
+        user_timezone="PST",
+        cache_path=DEFAULT_CACHE_PATH,
+    )
+
+
+def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
+    from agents.remote_filter.cli import _cmd_remote_filter
+
+    args = _cli_fake_args(
+        input=None,
+        pass_output=None,
+        trash_output=None,
+        config="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        run_date=None,
+        cache_path=None,
+        no_cache=False,
+    )
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    mock_run.assert_called_once_with(
+        input_path="data/prefiltered/remote_filter_input.jsonl",
+        pass_path="data/filtered/remote_filter_pass.jsonl",
+        trash_path="data/trash/remote_filter_trash.jsonl",
+        config_path="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
+    )
+
+
+def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
+    from agents.remote_filter.cli import _cmd_remote_filter
+
+    args = _cli_fake_args(
+        input=None,
+        pass_output=None,
+        trash_output=None,
+        config="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        run_date="2026-05-16",
+        cache_path=None,
+        no_cache=False,
+    )
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    mock_run.assert_called_once_with(
+        input_path="data/prefiltered/2026-05-16",
+        pass_path="data/filtered/2026-05-16/remote_filter_pass.jsonl",
+        trash_path="data/trash/2026-05-16/remote_filter_trash.jsonl",
+        config_path="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
+    )
+
+
+def test_remote_filter_cmd_no_cache_flag_disables_cache():
+    from agents.remote_filter.cli import _cmd_remote_filter
+
+    args = _cli_fake_args(
+        input="raw.jsonl",
+        pass_output="pass.jsonl",
+        trash_output="trash.jsonl",
+        config="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        run_date=None,
+        cache_path=None,
+        no_cache=True,
+    )
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    assert mock_run.call_args.kwargs["cache_path"] is None
+
+
+def test_remote_filter_cmd_explicit_paths_override_run_date():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
+    from agents.remote_filter.cli import _cmd_remote_filter
+
+    args = _cli_fake_args(
+        input="custom/in.jsonl",
+        pass_output="custom/pass.jsonl",
+        trash_output="custom/trash.jsonl",
+        config="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        run_date="2026-05-16",
+        cache_path=None,
+        no_cache=False,
+    )
+    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
+        _cmd_remote_filter(args)
+
+    mock_run.assert_called_once_with(
+        input_path="custom/in.jsonl",
+        pass_path="custom/pass.jsonl",
+        trash_path="custom/trash.jsonl",
+        config_path="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
+    )
