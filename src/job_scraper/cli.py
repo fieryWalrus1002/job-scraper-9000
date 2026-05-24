@@ -32,6 +32,13 @@ def _parse_run_date(value: str) -> str:
     return value
 
 
+def _parse_positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("expected integer >= 1")
+    return parsed
+
+
 def _auto_path(source: str, keywords: str, run_date: str | None = None) -> Path:
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
     if run_date:
@@ -429,7 +436,9 @@ def _cmd_prefilter(args) -> None:
     run_date = getattr(args, "run_date", None)
     if run_date:
         input_path = args.input or f"data/raw/{run_date}"
-        remote_out = args.remote_out or f"data/prefiltered/{run_date}/remote_filter_input.jsonl"
+        remote_out = (
+            args.remote_out or f"data/prefiltered/{run_date}/remote_filter_input.jsonl"
+        )
         local_out = args.local_out or f"data/local/{run_date}/local_jobs.jsonl"
         trash_out = args.trash_out or f"data/trash/{run_date}/prefilter_trash.jsonl"
     else:
@@ -509,8 +518,12 @@ def _cmd_remote_filter(args) -> None:
     run_date = getattr(args, "run_date", None)
     if run_date:
         input_path = args.input or f"data/prefiltered/{run_date}"
-        pass_path = args.pass_output or f"data/filtered/{run_date}/remote_filter_pass.jsonl"
-        trash_path = args.trash_output or f"data/trash/{run_date}/remote_filter_trash.jsonl"
+        pass_path = (
+            args.pass_output or f"data/filtered/{run_date}/remote_filter_pass.jsonl"
+        )
+        trash_path = (
+            args.trash_output or f"data/trash/{run_date}/remote_filter_trash.jsonl"
+        )
     else:
         input_path = args.input or "data/prefiltered/remote_filter_input.jsonl"
         pass_path = args.pass_output or "data/filtered/remote_filter_pass.jsonl"
@@ -594,6 +607,53 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
+# skills-fit subcommand
+# ---------------------------------------------------------------------------
+
+
+def _cmd_skills_fit(args) -> None:
+    from agents.skills_fit.runner import run_skills_fit
+
+    try:
+        run_skills_fit(
+            run_date=args.run_date,
+            config_path=args.config,
+            limit=args.limit,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        log.error(str(exc))
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(130)
+
+
+def _add_skills_fit(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser(
+        "skills-fit",
+        help="Score remote-filter PASS jobs against the candidate profile",
+    )
+    p.add_argument(
+        "--run-date",
+        default=None,
+        dest="run_date",
+        metavar="YYYY-MM-DD",
+        type=_parse_run_date,
+        help="Score this day's partition using the configured input/output conventions",
+    )
+    p.add_argument(
+        "--config",
+        default="config/agent/skills_fit.yml",
+        help="Skills-fit config YAML",
+    )
+    p.add_argument(
+        "--limit",
+        type=_parse_positive_int,
+        help="Limit deduped records for testing",
+    )
+    p.set_defaults(func=_cmd_skills_fit)
+
+
+# ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
 
@@ -654,7 +714,11 @@ def _cmd_run_config(args) -> None:
                     or info.get("board_token")
                     or s.source_name
                 )
-                dest = _auto_path(_slug(s.source_name), label, run_date=getattr(args, "run_date", None))
+                dest = _auto_path(
+                    _slug(s.source_name),
+                    label,
+                    run_date=getattr(args, "run_date", None),
+                )
                 dest.parent.mkdir(parents=True, exist_ok=True)
             else:
                 dest = None
@@ -729,6 +793,7 @@ def main() -> None:
     _add_discover(sub)
     _add_prefilter(sub)
     _add_remote_filter(sub)
+    _add_skills_fit(sub)
     _add_run_config(sub)
 
     args = parser.parse_args()
