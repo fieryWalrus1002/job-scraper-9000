@@ -1,31 +1,19 @@
 """
-Tests for the CLI layer.
+Tests for the scraper-owned CLI commands (linkedin, jobspy, greenhouse,
+lever, ashby, sel, discover, run-config).
 
-Strategy:
-- Utility functions (_slug, _auto_path, _resolve_dest, _output) tested directly.
-- Argument parsing tested by patching sys.argv and catching the parsed args
-  before any scraper is invoked.
-- Command handlers (_cmd_linkedin, _cmd_jobspy, _cmd_greenhouse) tested by
-  passing a fake Namespace and mocking the scraper classes — network is
-  never touched.
+Shared helper tests (_slug, _auto_path, _output, etc.) live in
+tests/jobs_cli/test_common.py. Top-level umbrella dispatch tests live
+in tests/jobs_cli/test_main.py.
 """
 
 import argparse
-import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from job_scraper.cli import (
-    _auto_path,
-    _output,
-    _resolve_dest,
-    _slug,
-)
-from jobs_cli._common import DATA_DIR, _parse_positive_int, _parse_run_date
-from jobs_cli.main import main
 from job_scraper.models import JobPosting
+from jobs_cli.main import main
 
 
 # ---------------------------------------------------------------------------
@@ -53,190 +41,14 @@ def _fake_args(**kwargs) -> argparse.Namespace:
     return argparse.Namespace(**{**defaults, **kwargs})
 
 
-# ---------------------------------------------------------------------------
-# _slug
-# ---------------------------------------------------------------------------
-
-
-def test_slug_lowercases():
-    assert _slug("LLM Ops") == "llm-ops"
-
-
-def test_slug_collapses_special_chars():
-    assert _slug("data  engineer!!") == "data-engineer"
-
-
-def test_slug_strips_leading_trailing_dashes():
-    assert _slug("  -python-  ") == "python"
-
-
-def test_slug_preserves_numbers():
-    assert _slug("Python 3.11") == "python-3-11"
-
-
-# ---------------------------------------------------------------------------
-# _auto_path
-# ---------------------------------------------------------------------------
-
-
-def test_auto_path_format():
-    with patch("jobs_cli._common.datetime") as mock_dt:
-        mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
-        p = _auto_path("linkedin", "LLM Ops")
-
-    assert p == DATA_DIR / "2026-05-11_10-30_linkedin_llm-ops.jsonl"
-
-
-def test_auto_path_slugifies_keywords():
-    with patch("jobs_cli._common.datetime") as mock_dt:
-        mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
-        p = _auto_path("jobspy", "Data Engineer (Senior)")
-
-    assert p.name == "2026-05-11_10-30_jobspy_data-engineer-senior.jsonl"
-
-
-def test_auto_path_with_run_date_uses_dated_partition():
-    with patch("jobs_cli._common.datetime") as mock_dt:
-        mock_dt.now.return_value.strftime.return_value = "2026-05-16_09-00"
-        p = _auto_path("linkedin", "LLM Ops", run_date="2026-05-16")
-
-    assert p == DATA_DIR / "2026-05-16" / "2026-05-16_09-00_linkedin_llm-ops.jsonl"
-
-
-# ---------------------------------------------------------------------------
-# _parse_run_date
-# ---------------------------------------------------------------------------
-
-
-def test_parse_run_date_accepts_valid_date():
-    assert _parse_run_date("2026-05-19") == "2026-05-19"
-
-
-def test_parse_run_date_rejects_invalid_format():
-    import argparse
-
-    with pytest.raises(argparse.ArgumentTypeError):
-        _parse_run_date("19-05-2026")
-
-
-def test_parse_run_date_rejects_path_traversal():
-    import argparse
-
-    with pytest.raises(argparse.ArgumentTypeError):
-        _parse_run_date("../../etc/passwd")
-
-
-def test_parse_positive_int_rejects_zero():
-    import argparse
-
-    with pytest.raises(argparse.ArgumentTypeError):
-        _parse_positive_int("0")
-
-
-def test_run_config_invalid_run_date_exits():
-    with patch(
-        "sys.argv",
-        ["job-scraper", "run-config", "config.yml", "--run-date", "not-a-date"],
-    ):
-        with pytest.raises(SystemExit):
-            main()
-
-
-def test_prefilter_invalid_run_date_exits():
-    with patch("sys.argv", ["job-scraper", "prefilter", "--run-date", "20260519"]):
-        with pytest.raises(SystemExit):
-            main()
-
-
-def test_remote_filter_invalid_run_date_exits():
-    with patch(
-        "sys.argv", ["job-scraper", "remote-filter", "--run-date", "2026/05/19"]
-    ):
-        with pytest.raises(SystemExit):
-            main()
-
-
-def test_skills_fit_invalid_run_date_exits():
-    with patch("sys.argv", ["job-scraper", "skills-fit", "--run-date", "2026/05/19"]):
-        with pytest.raises(SystemExit):
-            main()
-
-
-def test_skills_fit_invalid_limit_exits():
-    with patch("sys.argv", ["job-scraper", "skills-fit", "--limit", "0"]):
-        with pytest.raises(SystemExit):
-            main()
-
-
-# ---------------------------------------------------------------------------
-# _resolve_dest
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_dest_no_flags_returns_none():
-    args = _fake_args(output=None, save=False)
-    assert _resolve_dest(args, "linkedin", "Python") is None
-
-
-def test_resolve_dest_output_flag_returns_path():
-    args = _fake_args(output="my_jobs.jsonl", save=False)
-    assert _resolve_dest(args, "linkedin", "Python") == Path("my_jobs.jsonl")
-
-
-def test_resolve_dest_save_flag_returns_auto_path(tmp_path):
-    args = _fake_args(output=None, save=True)
-    with patch("jobs_cli._common.DATA_DIR", tmp_path):
-        with patch("jobs_cli._common.datetime") as mock_dt:
-            mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
-            result = _resolve_dest(args, "linkedin", "Python")
-
-    assert result == tmp_path / "2026-05-11_10-30_linkedin_python.jsonl"
-    assert result.parent.exists()
-
-
-# ---------------------------------------------------------------------------
-# _output
-# ---------------------------------------------------------------------------
-
-
-def test_output_to_stdout_writes_jsonl(capsys):
-    jobs = [_make_job(title="Dev A"), _make_job(title="Dev B")]
-    _output(jobs, dest=None)
-    captured = capsys.readouterr().out
-    lines = [ln for ln in captured.strip().splitlines() if ln]
-    assert len(lines) == 2
-    assert json.loads(lines[0])["title"] == "Dev A"
-    assert json.loads(lines[1])["title"] == "Dev B"
-
-
-def test_output_to_file_writes_jsonl(tmp_path):
-    dest = tmp_path / "out.jsonl"
-    jobs = [_make_job(title="Dev A"), _make_job(source_job_id="2", title="Dev B")]
-    _output(jobs, dest=dest)
-    lines = dest.read_text().strip().splitlines()
-    assert len(lines) == 2
-    assert json.loads(lines[0])["title"] == "Dev A"
-
-
-def test_output_empty_list_to_stdout(capsys):
-    _output([], dest=None)
-    assert capsys.readouterr().out.strip() == ""
-
-
-# ---------------------------------------------------------------------------
-# Argument parsing — invoke main() with patched sys.argv, intercept the
-# parsed Namespace before any scraper runs.
-# ---------------------------------------------------------------------------
-
-
 def _parse_args(*argv):
-    """Call main() with given argv, capture the Namespace via the func hook."""
+    """Run main() with given argv, capture the Namespace via the scraper handler hook."""
     captured = {}
 
     def capture(args):
         captured["args"] = args
 
-    with patch("sys.argv", ["job-scraper", *argv]):
+    with patch("sys.argv", ["job-scraper-9000", *argv]):
         with patch("job_scraper.cli._cmd_linkedin", side_effect=capture):
             with patch("job_scraper.cli._cmd_jobspy", side_effect=capture):
                 with patch("job_scraper.cli._cmd_greenhouse", side_effect=capture):
@@ -247,24 +59,17 @@ def _parse_args(*argv):
                                     "job_scraper.cli._cmd_discover", side_effect=capture
                                 ):
                                     with patch(
-                                        "prefilter.cli._cmd_prefilter",
+                                        "job_scraper.cli._cmd_run_config",
                                         side_effect=capture,
                                     ):
-                                        with patch(
-                                            "agents.remote_filter.cli._cmd_remote_filter",
-                                            side_effect=capture,
-                                        ):
-                                            with patch(
-                                                "agents.skills_fit.cli._cmd_skills_fit",
-                                                side_effect=capture,
-                                            ):
-                                                with patch(
-                                                    "job_scraper.cli._cmd_run_config",
-                                                    side_effect=capture,
-                                                ):
-                                                    main()
+                                        main()
 
     return captured["args"]
+
+
+# ---------------------------------------------------------------------------
+# linkedin — parsing
+# ---------------------------------------------------------------------------
 
 
 def test_linkedin_defaults():
@@ -306,7 +111,8 @@ def test_linkedin_output_flag():
 
 def test_linkedin_save_and_output_mutually_exclusive():
     with patch(
-        "sys.argv", ["job-scraper", "linkedin", "Python", "--save", "-o", "x.jsonl"]
+        "sys.argv",
+        ["job-scraper-9000", "linkedin", "Python", "--save", "-o", "x.jsonl"],
     ):
         with pytest.raises(SystemExit):
             main()
@@ -342,12 +148,6 @@ def test_greenhouse_no_descriptions():
     assert args.no_descriptions is True
 
 
-def test_missing_subcommand_exits():
-    with patch("sys.argv", ["job-scraper"]):
-        with pytest.raises(SystemExit):
-            main()
-
-
 # ---------------------------------------------------------------------------
 # Command handlers — mock the scraper, verify the query is built correctly
 # ---------------------------------------------------------------------------
@@ -371,12 +171,11 @@ def _run_linkedin_cmd(**arg_overrides):
     args = _fake_args(**{**defaults, **arg_overrides})
 
     mock_jobs = [_make_job()]
-    # Scrapers are deferred imports inside the command functions, so patch at source.
     with patch("job_scraper.scrapers.linkedin.LinkedInJobScraper") as MockScraper:
         MockScraper.return_value.scrape.return_value = mock_jobs
         with patch("job_scraper.cli._output"):
             _cmd_linkedin(args)
-        return MockScraper.call_args[0][0]  # the LinkedInSearchQuery passed to __init__
+        return MockScraper.call_args[0][0]
 
 
 def test_linkedin_cmd_maps_time_to_param():
@@ -430,7 +229,7 @@ def _run_jobspy_cmd(**arg_overrides):
         MockScraper.return_value.scrape.return_value = mock_jobs
         with patch("job_scraper.cli._output"):
             _cmd_jobspy(args)
-        return MockScraper.call_args[0][0]  # the JobSpyQuery
+        return MockScraper.call_args[0][0]
 
 
 def test_jobspy_cmd_splits_sites():
@@ -459,7 +258,7 @@ def _run_greenhouse_cmd(**arg_overrides):
         MockScraper.return_value.scrape.return_value = mock_jobs
         with patch("job_scraper.cli._output"):
             _cmd_greenhouse(args)
-        return MockScraper.call_args[0][0]  # the GreenhouseQuery
+        return MockScraper.call_args[0][0]
 
 
 def test_greenhouse_cmd_passes_board_token():
@@ -473,7 +272,7 @@ def test_greenhouse_cmd_no_descriptions_flag():
 
 
 # ---------------------------------------------------------------------------
-# lever — argument parsing and command handler
+# lever
 # ---------------------------------------------------------------------------
 
 
@@ -506,7 +305,7 @@ def _run_lever_cmd(**arg_overrides):
         MockScraper.return_value.scrape.return_value = mock_jobs
         with patch("job_scraper.cli._output"):
             _cmd_lever(args)
-        return MockScraper.call_args[0][0]  # the LeverQuery
+        return MockScraper.call_args[0][0]
 
 
 def test_lever_cmd_passes_company():
@@ -520,7 +319,7 @@ def test_lever_cmd_no_descriptions_flag():
 
 
 # ---------------------------------------------------------------------------
-# ashby — argument parsing and command handler
+# ashby
 # ---------------------------------------------------------------------------
 
 
@@ -553,7 +352,7 @@ def _run_ashby_cmd(**arg_overrides):
         MockScraper.return_value.scrape.return_value = mock_jobs
         with patch("job_scraper.cli._output"):
             _cmd_ashby(args)
-        return MockScraper.call_args[0][0]  # the AshbyQuery
+        return MockScraper.call_args[0][0]
 
 
 def test_ashby_cmd_passes_company():
@@ -567,215 +366,7 @@ def test_ashby_cmd_no_descriptions_flag():
 
 
 # ---------------------------------------------------------------------------
-# run-config — argument parsing
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# prefilter — argument parsing and command handler
-# ---------------------------------------------------------------------------
-
-
-def test_prefilter_defaults():
-    args = _parse_args("prefilter")
-    assert args.input is None
-    assert args.run_date is None
-    assert args.config == "config/agent/prefilter.yml"
-    assert args.remote_out is None
-    assert args.local_out is None
-    assert args.trash_out is None
-    assert args.dry_run is False
-
-
-def test_prefilter_custom_paths():
-    args = _parse_args(
-        "prefilter",
-        "--input",
-        "raw.jsonl",
-        "--config",
-        "prefilter.yml",
-        "--remote-out",
-        "remote.jsonl",
-        "--local-out",
-        "local.jsonl",
-        "--trash-out",
-        "trash.jsonl",
-        "--dry-run",
-    )
-    assert args.input == "raw.jsonl"
-    assert args.config == "prefilter.yml"
-    assert args.remote_out == "remote.jsonl"
-    assert args.local_out == "local.jsonl"
-    assert args.trash_out == "trash.jsonl"
-    assert args.dry_run is True
-
-
-def test_prefilter_cmd_calls_runner():
-    from prefilter.cli import _cmd_prefilter
-
-    args = _fake_args(
-        input="raw.jsonl",
-        config="prefilter.yml",
-        remote_out="remote.jsonl",
-        local_out="local.jsonl",
-        trash_out="trash.jsonl",
-        dry_run=True,
-    )
-
-    with patch("prefilter.router.run_prefilter") as mock_run:
-        _cmd_prefilter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="raw.jsonl",
-        remote_out="remote.jsonl",
-        local_out="local.jsonl",
-        trash_out="trash.jsonl",
-        config_path="prefilter.yml",
-        dry_run=True,
-    )
-
-
-# ---------------------------------------------------------------------------
-# remote-filter — argument parsing and command handler
-# ---------------------------------------------------------------------------
-
-
-def test_remote_filter_defaults():
-    with patch.dict("os.environ", {}, clear=True):
-        with patch("jobs_cli.main.load_dotenv"):
-            args = _parse_args("remote-filter")
-    assert args.input is None
-    assert args.run_date is None
-    assert args.pass_output is None
-    assert args.trash_output is None
-    assert args.config == "config/agent/remote_agent.yml"
-    assert args.user_location == "USA"
-    assert args.user_timezone is None
-
-
-def test_remote_filter_custom_paths():
-    args = _parse_args(
-        "remote-filter",
-        "--input",
-        "raw.jsonl",
-        "--pass-output",
-        "pass.jsonl",
-        "--trash-output",
-        "trash.jsonl",
-        "--config",
-        "remote.yml",
-        "--user-location",
-        "Canada",
-        "--user-timezone",
-        "PST",
-    )
-    assert args.input == "raw.jsonl"
-    assert args.pass_output == "pass.jsonl"
-    assert args.trash_output == "trash.jsonl"
-    assert args.config == "remote.yml"
-    assert args.user_location == "Canada"
-    assert args.user_timezone == "PST"
-
-
-def test_remote_filter_cmd_calls_runner():
-    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from agents.remote_filter.cli import _cmd_remote_filter
-
-    args = _fake_args(
-        input="raw.jsonl",
-        pass_output="pass.jsonl",
-        trash_output="trash.jsonl",
-        config="remote.yml",
-        user_location="USA",
-        user_timezone="PST",
-        cache_path=None,
-        no_cache=False,
-    )
-
-    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
-        _cmd_remote_filter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="raw.jsonl",
-        pass_path="pass.jsonl",
-        trash_path="trash.jsonl",
-        config_path="remote.yml",
-        user_location="USA",
-        user_timezone="PST",
-        cache_path=DEFAULT_CACHE_PATH,
-    )
-
-
-# ---------------------------------------------------------------------------
-# skills-fit — argument parsing and command handler
-# ---------------------------------------------------------------------------
-
-
-def test_skills_fit_defaults():
-    args = _parse_args("skills-fit")
-    assert args.run_date is None
-    assert args.config == "config/agent/skills_fit.yml"
-    assert args.limit is None
-
-
-def test_skills_fit_custom_args():
-    args = _parse_args(
-        "skills-fit",
-        "--run-date",
-        "2026-05-23",
-        "--config",
-        "skills_fit.yml",
-        "--limit",
-        "5",
-    )
-    assert args.run_date == "2026-05-23"
-    assert args.config == "skills_fit.yml"
-    assert args.limit == 5
-
-
-def test_skills_fit_cmd_calls_runner():
-    from agents.skills_fit.cli import _cmd_skills_fit
-
-    args = _fake_args(
-        run_date="2026-05-23",
-        config="skills_fit.yml",
-        limit=5,
-    )
-
-    with patch("agents.skills_fit.runner.run_skills_fit") as mock_run:
-        _cmd_skills_fit(args)
-
-    mock_run.assert_called_once_with(
-        run_date="2026-05-23",
-        config_path="skills_fit.yml",
-        limit=5,
-    )
-
-
-def test_skills_fit_cmd_returns_shell_friendly_exit_codes():
-    from agents.skills_fit.cli import _cmd_skills_fit
-
-    args = _fake_args(run_date="2026-05-23", config="skills_fit.yml", limit=None)
-
-    with patch(
-        "agents.skills_fit.runner.run_skills_fit",
-        side_effect=ValueError("boom"),
-    ):
-        with pytest.raises(SystemExit) as exc:
-            _cmd_skills_fit(args)
-    assert exc.value.code == 1
-
-    with patch(
-        "agents.skills_fit.runner.run_skills_fit",
-        side_effect=KeyboardInterrupt,
-    ):
-        with pytest.raises(SystemExit) as exc:
-            _cmd_skills_fit(args)
-    assert exc.value.code == 130
-
-
-# ---------------------------------------------------------------------------
-# run-config — argument parsing
+# run-config — parsing
 # ---------------------------------------------------------------------------
 
 
@@ -798,10 +389,20 @@ def test_run_config_save_flag():
 
 def test_run_config_output_flag_rejected():
     with patch(
-        "sys.argv", ["job-scraper", "run-config", "config.yml", "-o", "out.jsonl"]
+        "sys.argv", ["job-scraper-9000", "run-config", "config.yml", "-o", "out.jsonl"]
     ):
         with pytest.raises(SystemExit):
             main()
+
+
+def test_run_config_run_date_default_is_none():
+    args = _parse_args("run-config", "config.yml")
+    assert args.run_date is None
+
+
+def test_run_config_run_date_flag():
+    args = _parse_args("run-config", "config.yml", "--run-date", "2026-05-16")
+    assert args.run_date == "2026-05-16"
 
 
 # ---------------------------------------------------------------------------
@@ -882,21 +483,6 @@ def test_run_config_cmd_dry_run_skips_scrape(capsys):
     assert "linkedin" in capsys.readouterr().out
 
 
-# ---------------------------------------------------------------------------
-# run-config — --run-date flag
-# ---------------------------------------------------------------------------
-
-
-def test_run_config_run_date_default_is_none():
-    args = _parse_args("run-config", "config.yml")
-    assert args.run_date is None
-
-
-def test_run_config_run_date_flag():
-    args = _parse_args("run-config", "config.yml", "--run-date", "2026-05-16")
-    assert args.run_date == "2026-05-16"
-
-
 def test_run_config_save_with_run_date_writes_to_dated_partition():
     from job_scraper.cli import _cmd_run_config
 
@@ -913,205 +499,3 @@ def test_run_config_save_with_run_date_writes_to_dated_partition():
     dest = mock_output.call_args_list[0].args[1]
     assert str(dest).startswith("data/raw/2026-05-16/")
     assert "linkedin" in str(dest)
-
-
-# ---------------------------------------------------------------------------
-# prefilter — --run-date flag and path resolution
-# ---------------------------------------------------------------------------
-
-
-def test_prefilter_run_date_flag():
-    args = _parse_args("prefilter", "--run-date", "2026-05-16")
-    assert args.run_date == "2026-05-16"
-
-
-def test_prefilter_cmd_no_run_date_uses_legacy_defaults():
-    from prefilter.cli import _cmd_prefilter
-
-    args = _fake_args(
-        input=None,
-        config="prefilter.yml",
-        remote_out=None,
-        local_out=None,
-        trash_out=None,
-        dry_run=False,
-        run_date=None,
-    )
-    with patch("prefilter.router.run_prefilter") as mock_run:
-        _cmd_prefilter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="data/raw",
-        remote_out="data/prefiltered/remote_filter_input.jsonl",
-        local_out="data/local/local_jobs.jsonl",
-        trash_out="data/trash/prefilter_trash.jsonl",
-        config_path="prefilter.yml",
-        dry_run=False,
-    )
-
-
-def test_prefilter_cmd_run_date_resolves_partitioned_paths():
-    from prefilter.cli import _cmd_prefilter
-
-    args = _fake_args(
-        input=None,
-        config="prefilter.yml",
-        remote_out=None,
-        local_out=None,
-        trash_out=None,
-        dry_run=False,
-        run_date="2026-05-16",
-    )
-    with patch("prefilter.router.run_prefilter") as mock_run:
-        _cmd_prefilter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="data/raw/2026-05-16",
-        remote_out="data/prefiltered/2026-05-16/remote_filter_input.jsonl",
-        local_out="data/local/2026-05-16/local_jobs.jsonl",
-        trash_out="data/trash/2026-05-16/prefilter_trash.jsonl",
-        config_path="prefilter.yml",
-        dry_run=False,
-    )
-
-
-def test_prefilter_cmd_explicit_paths_override_run_date():
-    from prefilter.cli import _cmd_prefilter
-
-    args = _fake_args(
-        input="custom/raw.jsonl",
-        config="prefilter.yml",
-        remote_out="custom/remote.jsonl",
-        local_out="custom/local.jsonl",
-        trash_out="custom/trash.jsonl",
-        dry_run=False,
-        run_date="2026-05-16",
-    )
-    with patch("prefilter.router.run_prefilter") as mock_run:
-        _cmd_prefilter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="custom/raw.jsonl",
-        remote_out="custom/remote.jsonl",
-        local_out="custom/local.jsonl",
-        trash_out="custom/trash.jsonl",
-        config_path="prefilter.yml",
-        dry_run=False,
-    )
-
-
-# ---------------------------------------------------------------------------
-# remote-filter — --run-date flag and path resolution
-# ---------------------------------------------------------------------------
-
-
-def test_remote_filter_run_date_flag():
-    args = _parse_args("remote-filter", "--run-date", "2026-05-16")
-    assert args.run_date == "2026-05-16"
-
-
-def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
-    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from agents.remote_filter.cli import _cmd_remote_filter
-
-    args = _fake_args(
-        input=None,
-        pass_output=None,
-        trash_output=None,
-        config="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        run_date=None,
-        cache_path=None,
-        no_cache=False,
-    )
-    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
-        _cmd_remote_filter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="data/prefiltered/remote_filter_input.jsonl",
-        pass_path="data/filtered/remote_filter_pass.jsonl",
-        trash_path="data/trash/remote_filter_trash.jsonl",
-        config_path="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        cache_path=DEFAULT_CACHE_PATH,
-    )
-
-
-def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
-    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from agents.remote_filter.cli import _cmd_remote_filter
-
-    args = _fake_args(
-        input=None,
-        pass_output=None,
-        trash_output=None,
-        config="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        run_date="2026-05-16",
-        cache_path=None,
-        no_cache=False,
-    )
-    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
-        _cmd_remote_filter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="data/prefiltered/2026-05-16",
-        pass_path="data/filtered/2026-05-16/remote_filter_pass.jsonl",
-        trash_path="data/trash/2026-05-16/remote_filter_trash.jsonl",
-        config_path="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        cache_path=DEFAULT_CACHE_PATH,
-    )
-
-
-def test_remote_filter_cmd_no_cache_flag_disables_cache():
-    from agents.remote_filter.cli import _cmd_remote_filter
-
-    args = _fake_args(
-        input="raw.jsonl",
-        pass_output="pass.jsonl",
-        trash_output="trash.jsonl",
-        config="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        run_date=None,
-        cache_path=None,
-        no_cache=True,
-    )
-    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
-        _cmd_remote_filter(args)
-
-    assert mock_run.call_args.kwargs["cache_path"] is None
-
-
-def test_remote_filter_cmd_explicit_paths_override_run_date():
-    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from agents.remote_filter.cli import _cmd_remote_filter
-
-    args = _fake_args(
-        input="custom/in.jsonl",
-        pass_output="custom/pass.jsonl",
-        trash_output="custom/trash.jsonl",
-        config="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        run_date="2026-05-16",
-        cache_path=None,
-        no_cache=False,
-    )
-    with patch("agents.remote_filter.runner.run_remote_filter") as mock_run:
-        _cmd_remote_filter(args)
-
-    mock_run.assert_called_once_with(
-        input_path="custom/in.jsonl",
-        pass_path="custom/pass.jsonl",
-        trash_path="custom/trash.jsonl",
-        config_path="remote.yml",
-        user_location="USA",
-        user_timezone=None,
-        cache_path=DEFAULT_CACHE_PATH,
-    )
