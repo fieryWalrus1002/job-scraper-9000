@@ -235,3 +235,17 @@ jq -s 'map(select(.component == "remote_filter" and .cost != null)) | group_by(.
 - I did not find implemented repo code that renames, moves, or deletes files under `data/`.
 - Tests generally write to `tmp_path`, not the real `data/` tree.
 - `.gitignore` ignores `data/**/*.jsonl`, `data/**/*.txt`, and `data/**/*.md`, so most generated data artifacts remain local.
+
+## Data Accumulation Philosophy
+
+I have struggled a bit with the current file-focused approach, which has lead to many replications of the same darn JD prose in jsonl files across the pipeline stages. For jobs that make it past the remote_filter, we've got like 5+ copies of that same JD text across the various layers.
+
+I've thought about a few alternative approaches to mitigate this that I've used before. For example, we could use a SQLite database or a more structured data lake approach where we store the raw scraped data once and then have each pipeline stage write only the deltas (e.g., prefilter decisions, remote filter scores, skills_fit scores) keyed by a unique job ID. This would avoid the need to rewrite the full job record at each stage and reduce storage redundancy.
+
+Another would be to use a more structured file format like Parquet that supports columnar storage and efficient updates, rather than JSONL. This could allow us to store the full job data once and then have separate Parquet files for each stage's outputs that reference the original job records.
+
+I haven't gone with either of these because it feels like pre-mature optimization. Yes, I could min/max for file size. Yes, I could do a wildly complex benchmark of JSONL vs SQLite vs Parquet. But I don't actually know if the current approach is causing any real pain yet. We're at like 110 MB for a few days of scraping. That's not nothing, but if I kept it up for a year I'd be at like 13 GB. Thats pennies for S3/ADLS2 storage, and still easily manageable on local disk for ad-hoc analysis. The current approach is simple, transparent, and easy to work with using standard tools. If we find that storage or performance becomes an issue, we can always refactor to a more efficient format later.
+
+And if I stick with the current approach I can use simple bash jq/python scripts to inspect and manipulate the data at each stage while I'm developing and debugging the pipeline, without needing to set up a database or learn a new file format. I can just `jq` into the JSONL files to see what's going on, which is super convenient.
+
+So in short, thank you for coming to my TED talk where I convince myself to stick with the simple JSONL file approach for now, and only optimize if it becomes a real problem (or if I just get bored and want to refactor for fun).
