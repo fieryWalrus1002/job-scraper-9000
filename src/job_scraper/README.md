@@ -74,22 +74,22 @@ Every description is passed through `pii.scrub()` before being written to disk. 
 
 ```bash
 # LinkedIn keyword search
-uv run job-scraper linkedin "data engineer" --workplace remote --save
+uv run job-scraper-9000 linkedin "data engineer" --workplace remote --save
 
 # Greenhouse board — all open roles at Stripe
-uv run job-scraper greenhouse stripe --save
+uv run job-scraper-9000 greenhouse stripe --save
 
 # Lever board
-uv run job-scraper lever deepmind --save
+uv run job-scraper-9000 lever deepmind --save
 
 # Ashby board
-uv run job-scraper ashby mistral --save
+uv run job-scraper-9000 ashby mistral --save
 
 # Multi-board (Indeed, ZipRecruiter, etc.)
-uv run job-scraper jobspy "AI engineer" --location USA --save
+uv run job-scraper-9000 jobspy "AI engineer" --location USA --save
 
 # SEL (Schweitzer Engineering Laboratories)
-uv run job-scraper sel --location pullman_wa --save
+uv run job-scraper-9000 sel --location pullman_wa --save
 ```
 
 `--save` writes to `data/raw/YYYY-MM-DD_HH-MM_<source>_<keywords>.jsonl`. Without it, output goes to stdout.
@@ -99,13 +99,13 @@ uv run job-scraper sel --location pullman_wa --save
 `load_config()` parses the YAML into a flat `list[BaseScraper]` — one entry per keyword search and one per ATS board. `run-config` then iterates through that list serially, calling `.scrape()` on each and writing its output immediately before moving to the next. A failure on one scraper is caught and logged; the rest of the list continues.
 
 ```bash
-uv run job-scraper run-config config/search.yml --save --run-date 2026-05-19
+uv run job-scraper-9000 run-config config/search.yml --save --run-date 2026-05-19
 ```
 
 `--run-date YYYY-MM-DD` writes all outputs to `data/raw/YYYY-MM-DD/` instead of the flat `data/raw/` directory. Omit it to use the flat layout. Dry-run to preview the full scraper list without hitting any APIs:
 
 ```bash
-uv run job-scraper run-config config/search.yml --dry-run
+uv run job-scraper-9000 run-config config/search.yml --dry-run
 ```
 
 ---
@@ -164,7 +164,7 @@ companies:
 Before you can add a company to `greenhouse:`, `lever:`, or `ashby:`, you need to know which board they're on. The `discover` command probes all three and records the result:
 
 ```bash
-uv run job-scraper discover anthropic mistral cohere notion
+uv run job-scraper-9000 discover anthropic mistral cohere notion
 ```
 
 It prints a summary and writes to `config/company_boards.json`. After that you can use the `companies:` shorthand in your YAML config and the scraper picks the right backend automatically.
