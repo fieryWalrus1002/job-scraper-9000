@@ -34,7 +34,7 @@ from agents.remote_filter.utils import (
     analyze_remote,
     passes_remote_filter,
 )
-from agent_eval.logger import JsonlRunLogger, RunLogger
+from utils.run_logger import JsonlRunLogger, RunLogger
 from agent_eval.metrics import compute_metrics
 from agent_eval.provenance import build_run_record, generate_run_id
 
