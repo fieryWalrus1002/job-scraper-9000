@@ -69,6 +69,36 @@ def analysis(score: int, title: str) -> SkillsFitAnalysis:
     )
 
 
+def existing_output_row(
+    dedup_hash: str,
+    *,
+    score: int | None,
+    failure_reason: str | None = None,
+    title: str = "Existing",
+) -> dict:
+    metadata = {
+        "run_id": "prior_run",
+        "failure_reason": failure_reason,
+    }
+    if failure_reason is None:
+        metadata.pop("failure_reason")
+    return {
+        "dedup_hash": dedup_hash,
+        "title": title,
+        "company": "ExistingCo",
+        "location": "Remote",
+        "_skills_fit_score": score,
+        "_skills_fit_rationale": f"Existing rationale for {title}",
+        "_skills_fit_hard_concerns": [],
+        "_skills_fit_top_matches": [],
+        "_skills_fit_analysis": None,
+        "_skills_fit_gaps": [],
+        "_skills_fit_confidence": None,
+        "_skills_fit_input_source": "remote_filter_pass",
+        "_skills_fit_metadata": metadata,
+    }
+
+
 def test_run_skills_fit_partitioned_mode_dedupes_sorts_and_enriches(
     tmp_path, monkeypatch
 ):
@@ -530,6 +560,146 @@ def test_run_skills_fit_fails_when_prompt_file_is_missing(tmp_path, monkeypatch)
         assert "Prompt file not found" in str(exc)
     else:
         raise AssertionError("expected FileNotFoundError")
+
+
+def test_run_skills_fit_reuses_existing_processed_rows_and_drops_stale_ones(
+    tmp_path, monkeypatch
+):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    output_path = tmp_path / "data/scored/2026-05-23/skills_fit_scored.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [
+            {"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"},
+            {"dedup_hash": "hash-b", "title": "Beta", "description": "beta"},
+        ],
+    )
+    write_jsonl(
+        output_path,
+        [
+            existing_output_row("hash-a", score=5, title="Alpha"),
+            existing_output_row("hash-stale", score=4, title="Stale"),
+        ],
+    )
+
+    seen_titles: list[str] = []
+
+    def fake_analyze(*args, title=None, **kwargs):
+        assert title is not None
+        seen_titles.append(title)
+        return analysis(3, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+    monkeypatch.setattr(module, "generate_run_id", lambda prefix=None: "resume_run")
+    monkeypatch.setattr(
+        module,
+        "get_git_metadata",
+        lambda: {
+            "commit": "abc123def456",
+            "dirty": False,
+            "timestamp": "2026-05-23T12:00:00+00:00",
+        },
+    )
+
+    summary = module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+
+    assert summary["scored_successfully"] == 1
+    assert seen_titles == ["Beta"]
+
+    rows = [json.loads(line) for line in output_path.read_text().splitlines()]
+    assert [row["dedup_hash"] for row in rows] == ["hash-a", "hash-b"]
+    assert rows[0]["_skills_fit_metadata"]["run_id"] == "prior_run"
+    assert rows[1]["_skills_fit_metadata"]["run_id"] == "resume_run"
+
+
+def test_run_skills_fit_treats_failure_reason_rows_as_processed(tmp_path, monkeypatch):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    output_path = tmp_path / "data/scored/2026-05-23/skills_fit_scored.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [{"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"}],
+    )
+    write_jsonl(
+        output_path,
+        [existing_output_row("hash-a", score=None, failure_reason="agent_failed")],
+    )
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(
+        module,
+        "analyze_skills_fit",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("should not run")),
+    )
+
+    summary = module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+
+    assert summary["scored_successfully"] == 0
+    rows = [json.loads(line) for line in output_path.read_text().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["_skills_fit_metadata"]["failure_reason"] == "agent_failed"
+
+
+def test_run_skills_fit_retries_unscored_rows_without_failure_reason_and_warns_on_malformed_existing_output(
+    tmp_path, monkeypatch, caplog
+):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    output_path = tmp_path / "data/scored/2026-05-23/skills_fit_scored.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [{"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"}],
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        "not json\n" + json.dumps(existing_output_row("hash-a", score=None)) + "\n",
+        encoding="utf-8",
+    )
+
+    seen_titles: list[str] = []
+
+    def fake_analyze(*args, title=None, **kwargs):
+        assert title is not None
+        seen_titles.append(title)
+        return analysis(4, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+
+    summary = module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+
+    assert summary["scored_successfully"] == 1
+    assert seen_titles == ["Alpha"]
+    assert "Skipping malformed existing output line 1" in caplog.text
+    rows = [json.loads(line) for line in output_path.read_text().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["_skills_fit_score"] == 4
 
 
 def test_run_skills_fit_flushes_partial_results_on_keyboard_interrupt(
