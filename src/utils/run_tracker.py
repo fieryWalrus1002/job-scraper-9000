@@ -9,7 +9,7 @@ Designed to handle three cases by making the LLM/cost blocks nullable:
   - Local LLM (llama.cpp via ollama): tokens (if returned) + zero cost
   - Deterministic (prefilter, scraper): llm=None, cost=None
 
-Reuses ``agent_eval.logger.JsonlRunLogger`` for the actual file write, which
+Reuses ``utils.run_logger.JsonlRunLogger`` for the actual file write, which
 handles secret sanitization and run_id-uniqueness checks.
 """
 
@@ -27,7 +27,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from agent_eval.logger import JsonlRunLogger
+from utils.run_logger import JsonlRunLogger
 from utils.git_info import get_git_metadata
 
 log = logging.getLogger(__name__)
@@ -242,7 +242,9 @@ class RunTracker(AbstractContextManager["RunTracker"]):
         # Roll up accumulated token counts into the LLM block
         if self.record.llm is not None and any(self._token_totals.values()):
             self.record.llm.input_tokens_total = self._token_totals["input_tokens"]
-            self.record.llm.input_tokens_cached = self._token_totals["cached_input_tokens"]
+            self.record.llm.input_tokens_cached = self._token_totals[
+                "cached_input_tokens"
+            ]
             self.record.llm.output_tokens_total = self._token_totals["output_tokens"]
 
         # Roll up latencies
@@ -257,9 +259,14 @@ class RunTracker(AbstractContextManager["RunTracker"]):
                 )
 
         # Derived: cache hit rate
-        if self.record.cache and (self.record.cache.hits + self.record.cache.misses) > 0:
+        if (
+            self.record.cache
+            and (self.record.cache.hits + self.record.cache.misses) > 0
+        ):
             total_lookups = self.record.cache.hits + self.record.cache.misses
-            self.record.cache.hit_rate = round(self.record.cache.hits / total_lookups, 4)
+            self.record.cache.hit_rate = round(
+                self.record.cache.hits / total_lookups, 4
+            )
 
         # Derived: cost per record
         if (
