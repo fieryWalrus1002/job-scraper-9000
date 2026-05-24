@@ -21,6 +21,7 @@ from job_scraper.cli import (
     DATA_DIR,
     _auto_path,
     _output,
+    _parse_positive_int,
     _parse_run_date,
     _resolve_dest,
     _slug,
@@ -115,18 +116,30 @@ def test_parse_run_date_accepts_valid_date():
 
 def test_parse_run_date_rejects_invalid_format():
     import argparse
+
     with pytest.raises(argparse.ArgumentTypeError):
         _parse_run_date("19-05-2026")
 
 
 def test_parse_run_date_rejects_path_traversal():
     import argparse
+
     with pytest.raises(argparse.ArgumentTypeError):
         _parse_run_date("../../etc/passwd")
 
 
+def test_parse_positive_int_rejects_zero():
+    import argparse
+
+    with pytest.raises(argparse.ArgumentTypeError):
+        _parse_positive_int("0")
+
+
 def test_run_config_invalid_run_date_exits():
-    with patch("sys.argv", ["job-scraper", "run-config", "config.yml", "--run-date", "not-a-date"]):
+    with patch(
+        "sys.argv",
+        ["job-scraper", "run-config", "config.yml", "--run-date", "not-a-date"],
+    ):
         with pytest.raises(SystemExit):
             main()
 
@@ -138,7 +151,21 @@ def test_prefilter_invalid_run_date_exits():
 
 
 def test_remote_filter_invalid_run_date_exits():
-    with patch("sys.argv", ["job-scraper", "remote-filter", "--run-date", "2026/05/19"]):
+    with patch(
+        "sys.argv", ["job-scraper", "remote-filter", "--run-date", "2026/05/19"]
+    ):
+        with pytest.raises(SystemExit):
+            main()
+
+
+def test_skills_fit_invalid_run_date_exits():
+    with patch("sys.argv", ["job-scraper", "skills-fit", "--run-date", "2026/05/19"]):
+        with pytest.raises(SystemExit):
+            main()
+
+
+def test_skills_fit_invalid_limit_exits():
+    with patch("sys.argv", ["job-scraper", "skills-fit", "--limit", "0"]):
         with pytest.raises(SystemExit):
             main()
 
@@ -230,10 +257,14 @@ def _parse_args(*argv):
                                             side_effect=capture,
                                         ):
                                             with patch(
-                                                "job_scraper.cli._cmd_run_config",
+                                                "job_scraper.cli._cmd_skills_fit",
                                                 side_effect=capture,
                                             ):
-                                                main()
+                                                with patch(
+                                                    "job_scraper.cli._cmd_run_config",
+                                                    side_effect=capture,
+                                                ):
+                                                    main()
 
     return captured["args"]
 
@@ -678,6 +709,74 @@ def test_remote_filter_cmd_calls_runner():
 
 
 # ---------------------------------------------------------------------------
+# skills-fit — argument parsing and command handler
+# ---------------------------------------------------------------------------
+
+
+def test_skills_fit_defaults():
+    args = _parse_args("skills-fit")
+    assert args.run_date is None
+    assert args.config == "config/agent/skills_fit.yml"
+    assert args.limit is None
+
+
+def test_skills_fit_custom_args():
+    args = _parse_args(
+        "skills-fit",
+        "--run-date",
+        "2026-05-23",
+        "--config",
+        "skills_fit.yml",
+        "--limit",
+        "5",
+    )
+    assert args.run_date == "2026-05-23"
+    assert args.config == "skills_fit.yml"
+    assert args.limit == 5
+
+
+def test_skills_fit_cmd_calls_runner():
+    from job_scraper.cli import _cmd_skills_fit
+
+    args = _fake_args(
+        run_date="2026-05-23",
+        config="skills_fit.yml",
+        limit=5,
+    )
+
+    with patch("agents.skills_fit.runner.run_skills_fit") as mock_run:
+        _cmd_skills_fit(args)
+
+    mock_run.assert_called_once_with(
+        run_date="2026-05-23",
+        config_path="skills_fit.yml",
+        limit=5,
+    )
+
+
+def test_skills_fit_cmd_returns_shell_friendly_exit_codes():
+    from job_scraper.cli import _cmd_skills_fit
+
+    args = _fake_args(run_date="2026-05-23", config="skills_fit.yml", limit=None)
+
+    with patch(
+        "agents.skills_fit.runner.run_skills_fit",
+        side_effect=ValueError("boom"),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            _cmd_skills_fit(args)
+    assert exc.value.code == 1
+
+    with patch(
+        "agents.skills_fit.runner.run_skills_fit",
+        side_effect=KeyboardInterrupt,
+    ):
+        with pytest.raises(SystemExit) as exc:
+            _cmd_skills_fit(args)
+    assert exc.value.code == 130
+
+
+# ---------------------------------------------------------------------------
 # run-config — argument parsing
 # ---------------------------------------------------------------------------
 
@@ -804,7 +903,9 @@ def test_run_config_save_with_run_date_writes_to_dated_partition():
     from job_scraper.cli import _cmd_run_config
 
     scrapers = [_make_mock_scraper("linkedin", {"keywords": "Python"})]
-    args = _fake_args(config="config.yml", dry_run=False, save=True, run_date="2026-05-16")
+    args = _fake_args(
+        config="config.yml", dry_run=False, save=True, run_date="2026-05-16"
+    )
 
     with patch("job_scraper.config.load_config", return_value=scrapers):
         with patch("job_scraper.cli._output") as mock_output:
