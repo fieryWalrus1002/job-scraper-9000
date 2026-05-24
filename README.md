@@ -114,6 +114,12 @@ python scripts/merge_batch_results.py  # merge results into staging
 streamlit run src/review_ui/app.py     # open the review UI
 ```
 
+**Run the skills fit agent:**
+
+```bash
+uv run job-scraper-9000 skills-fit --run-date $(date +%F)
+```
+
 ---
 
 ## Tech stack
