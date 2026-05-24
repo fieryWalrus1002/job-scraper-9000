@@ -33,7 +33,7 @@
 global:
   default_max_results: 50
   hours_old: 48
-  linkedin_time: week
+  linkedin_time: day            # day | week | month | any
   salary_floor_k: 120
 
 # companies:

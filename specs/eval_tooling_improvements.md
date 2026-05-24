@@ -1,9 +1,9 @@
 # Eval-tooling improvements (Phase G, Track A support)
 
-**Status:** approved, ready to execute
-**Scope:** reduce per-PR manual work in the Phase G calibration loop
+**Status:** partially completed, still live
+**Scope:** reduce manual work in the Phase G calibration and promotion loop
 **Track:** B (calibration support), does **not** block A
-**PR sequence:** three small PRs, sequential
+**Implementation sequence:** three small changes, sequential
 
 ---
 
@@ -15,6 +15,20 @@ After landing the v5 profile-reframe eval, investigating the "no diff" outcome w
 2. **Real tooling gaps.** Two pieces don't exist regardless of docs:
    - **Per-record diff.** `compare_evals.py --diff` shows aggregate metrics only. For the v5 case, confirming "no records flipped" required manually opening `mismatches_*.jsonl`. No tool reconstructs `gold | A.pred | B.pred` for every record.
    - **Profile snapshots.** `candidate_profile.yml` is gitignored (PII). `runs.jsonl` records `profile_version` + `profile_hash`, but the profile **content** at the time of v5 lives only on the active workstation. Bumping to v6 makes v5 unreproducible.
+
+This spec assumes the current Phase G workflow:
+- calibration exploration happens locally or on scratch branches,
+- every meaningful experiment is logged,
+- PRs are reserved for promotion-worthy winners and structural changes.
+
+## Implementation status
+
+| Change | Status | Notes |
+|---|---|---|
+| Change 1: docs + `champions.yml` | Done | Docs now point to `compare_evals.py`; champion registry lives in `config/eval/champions.yml`. |
+| Change 2: per-record diff | Done | `compare_evals.py` supports `--against-champion` and `--per-record` for `skills_fit`. |
+| Change 3: profile auto-snapshot | Done | `run_skills_fit_eval.py` snapshots `candidate_profile.yml` by `profile_version` before scoring. |
+| Next tooling work | Pending | No additional tooling is defined in this spec yet. Future work should be added as a new change block rather than inferred from old text. |
 
 ---
 
@@ -41,15 +55,16 @@ After landing the v5 profile-reframe eval, investigating the "no diff" outcome w
 
 ---
 
-## PR 1 — doc refresh + champions.yml (no code)
+## Change 1 — doc refresh + champions.yml (no code)
 
 ### New file: `config/eval/champions.yml`
 
 ```yaml
 # Pinned baseline run-IDs per scorer type. Update via PR when a
-# calibration run establishes new champion metrics against the same
-# yardstick (gold set). Gold expansion PRs reset entries to null —
-# the next eval run on the new gold establishes the next champion.
+# promotion-worthy calibration run establishes new champion metrics
+# against the same yardstick (gold set). Gold expansion PRs reset
+# entries to null — the next eval run on the new gold establishes
+# the next champion.
 #
 # Run-IDs reference data/eval/runs.jsonl.
 
@@ -82,13 +97,13 @@ remote_filter: null  # not yet established
 
 ---
 
-## PR 2 — Stage 2 Component A: per-record diff
+## Change 2 — Stage 2 Component A: per-record diff
 
 ### File: `scripts/compare_evals.py` (extend)
 
 ### New flag
 
-`--per-record`, combined with `--diff`. In PR 2, support this for **skills_fit** runs only; other scorer types can keep aggregate-only diff for now. Prints a per-record table after the existing aggregate diff.
+`--per-record`, combined with `--diff`. In Change 2, support this for **skills_fit** runs only; other scorer types can keep aggregate-only diff for now. Prints a per-record table after the existing aggregate diff.
 
 ### Convenience flag (additive)
 
@@ -165,11 +180,11 @@ Title truncated to ~28 chars by default. Sort by `|Δ_A| + |Δ_B|` descending.
 - Diff between baseline + v5 runs with `--per-record` shows 0 flipped records (matches the manual finding).
 - `--against-champion skills_fit --diff <run> --per-record` works end-to-end.
 - `--per-record` fails clearly if either run has skipped rows or if the scorer is not `skills_fit`.
-- Output is markdown-formatted and pastes cleanly into PR descriptions.
+- Output is markdown-formatted and useful both for local calibration analysis and PR descriptions.
 
 ---
 
-## PR 3 — Stage 2 Component B: profile auto-snapshot
+## Change 3 — Stage 2 Component B: profile auto-snapshot
 
 ### File: `scripts/run_skills_fit_eval.py` (modify)
 
@@ -187,7 +202,7 @@ if not archive_path.exists():
 
 Idempotent: skips if archive for this `profile_version` already exists. No hash validation (decided: single-user workflow, would just be noise).
 
-### One-time migration (pre-PR or first-thing in PR)
+### One-time migration (before the change lands)
 
 Manually snapshot the current v5 profile so it isn't lost when v6 lands:
 
@@ -204,7 +219,7 @@ Confirm `config/profile/old_profiles/` is already gitignored (it should be — p
 
 ### Optional cleanup
 
-The two existing legacy files (`candidate_profile.yml`, `candidate_profile_b.yml`) under `old_profiles/` should be renamed if their `profile_version` is recoverable, or left as legacy noise. Out of scope for this PR — just flag in the PR body.
+The two existing legacy files (`candidate_profile.yml`, `candidate_profile_b.yml`) under `old_profiles/` should be renamed if their `profile_version` is recoverable, or left as legacy noise. Out of scope for this change — just note it where the work lands.
 
 ### Acceptance
 
@@ -218,8 +233,27 @@ The two existing legacy files (`candidate_profile.yml`, `candidate_profile_b.yml
 
 ## Implementation order
 
-Sequential, three small PRs. Each independently shippable.
+Sequential, three small changes. Each independently shippable. They may land as separate PRs, but that is an implementation choice, not a requirement of the calibration loop.
 
-1. **PR 1 (Stage 1)** — docs + champions.yml. ~15 minutes.
-2. **PR 2 (Component A)** — per-record diff. ~2 hours.
-3. **PR 3 (Component B)** — auto-snapshot + migration. ~30 minutes.
+1. **Change 1 (Stage 1)** — docs + champions.yml. ~15 minutes.
+2. **Change 2 (Component A)** — per-record diff. ~2 hours.
+3. **Change 3 (Component B)** — auto-snapshot + migration. ~30 minutes.
+
+## Relationship to Phase G workflow
+
+This spec supports the current operating model for `skills_fit`:
+
+- Use local or scratch-branch iteration for most prompt/profile/config exploration.
+- Log runs to `data/eval/runs.jsonl` for provenance, including failed or neutral experiments.
+- Use `compare_evals.py` to analyze whether a candidate is worth keeping.
+- Open a PR only when promoting a winner, updating the champion, or changing the yardstick/infrastructure.
+
+The goal of this tooling is to make disciplined exploration cheap and promotion decisions easier to justify.
+
+## How To Use This Spec
+
+If you are continuing Phase G work:
+
+- Use `notes/skills_fit_phase_g/README.md` for the current operating rules and next recommended action.
+- Use this spec only for tooling/support work, not as the source of truth for day-to-day calibration policy.
+- Before starting a tooling task, check the implementation-status table above so you do not re-do work that already landed.
