@@ -18,15 +18,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from job_scraper.cli import (
-    DATA_DIR,
     _auto_path,
     _output,
     _parse_positive_int,
     _parse_run_date,
     _resolve_dest,
     _slug,
-    main,
 )
+from jobs_cli._common import DATA_DIR
+from jobs_cli.main import main
 from job_scraper.models import JobPosting
 
 
@@ -644,7 +644,7 @@ def test_prefilter_cmd_calls_runner():
 
 def test_remote_filter_defaults():
     with patch.dict("os.environ", {}, clear=True):
-        with patch("job_scraper.cli.load_dotenv"):
+        with patch("jobs_cli.main.load_dotenv"):
             args = _parse_args("remote-filter")
     assert args.input is None
     assert args.run_date is None

@@ -3,8 +3,6 @@ import logging
 import os
 import sys
 
-from dotenv import load_dotenv
-
 from jobs_cli._common import (
     DATA_DIR,
     _add_save_output,
@@ -706,19 +704,11 @@ def _add_run_config(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Umbrella registration
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    load_dotenv()
-    parser = argparse.ArgumentParser(
-        prog="job-scraper",
-        description="Scrape job postings from LinkedIn, multi-board (JobSpy), or Greenhouse ATS.",
-    )
-    sub = parser.add_subparsers(dest="command", metavar="SCRAPER")
-    sub.required = True
-
+def register(sub: argparse._SubParsersAction) -> None:
     _add_linkedin(sub)
     _add_jobspy(sub)
     _add_greenhouse(sub)
@@ -730,10 +720,3 @@ def main() -> None:
     _add_remote_filter(sub)
     _add_skills_fit(sub)
     _add_run_config(sub)
-
-    args = parser.parse_args()
-    args.func(args)
-
-
-if __name__ == "__main__":
-    main()
