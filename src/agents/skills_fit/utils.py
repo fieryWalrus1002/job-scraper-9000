@@ -3,6 +3,7 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, Callable
 
 import yaml
 from openai import OpenAI
@@ -122,6 +123,21 @@ def _build_user_message(
     return "\n".join(parts)
 
 
+def _extract_usage(usage_obj: Any) -> dict[str, int]:
+    """Pull token counts out of an OpenAI ``ChatCompletion.usage`` object."""
+    if usage_obj is None:
+        return {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
+    cached = 0
+    details = getattr(usage_obj, "prompt_tokens_details", None)
+    if details is not None:
+        cached = getattr(details, "cached_tokens", 0) or 0
+    return {
+        "input_tokens": getattr(usage_obj, "prompt_tokens", 0) or 0,
+        "cached_input_tokens": cached,
+        "output_tokens": getattr(usage_obj, "completion_tokens", 0) or 0,
+    }
+
+
 def analyze_skills_fit(
     job_description: str,
     *,
@@ -131,6 +147,7 @@ def analyze_skills_fit(
     llm_config: dict | None = None,
     prompt_path: str | Path | None = None,
     max_retries: int = 2,
+    usage_callback: Callable[[dict[str, int]], None] | None = None,
 ) -> SkillsFitAnalysis | None:
     """Run the structured LLM call. Returns None if the agent fails after retries."""
     client, model = _get_client(llm_config)
@@ -150,6 +167,8 @@ def analyze_skills_fit(
                 response_format=SkillsFitAnalysis,
                 temperature=(llm_config or {}).get("temperature", 0.1),
             )
+            if usage_callback is not None:
+                usage_callback(_extract_usage(response.usage))
             return response.choices[0].message.parsed
         except ValidationError as exc:
             log.warning(
