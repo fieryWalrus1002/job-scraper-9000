@@ -82,7 +82,7 @@ def test_slug_preserves_numbers():
 
 
 def test_auto_path_format():
-    with patch("job_scraper.cli.datetime") as mock_dt:
+    with patch("jobs_cli._common.datetime") as mock_dt:
         mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
         p = _auto_path("linkedin", "LLM Ops")
 
@@ -90,7 +90,7 @@ def test_auto_path_format():
 
 
 def test_auto_path_slugifies_keywords():
-    with patch("job_scraper.cli.datetime") as mock_dt:
+    with patch("jobs_cli._common.datetime") as mock_dt:
         mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
         p = _auto_path("jobspy", "Data Engineer (Senior)")
 
@@ -98,7 +98,7 @@ def test_auto_path_slugifies_keywords():
 
 
 def test_auto_path_with_run_date_uses_dated_partition():
-    with patch("job_scraper.cli.datetime") as mock_dt:
+    with patch("jobs_cli._common.datetime") as mock_dt:
         mock_dt.now.return_value.strftime.return_value = "2026-05-16_09-00"
         p = _auto_path("linkedin", "LLM Ops", run_date="2026-05-16")
 
@@ -187,8 +187,8 @@ def test_resolve_dest_output_flag_returns_path():
 
 def test_resolve_dest_save_flag_returns_auto_path(tmp_path):
     args = _fake_args(output=None, save=True)
-    with patch("job_scraper.cli.DATA_DIR", tmp_path):
-        with patch("job_scraper.cli.datetime") as mock_dt:
+    with patch("jobs_cli._common.DATA_DIR", tmp_path):
+        with patch("jobs_cli._common.datetime") as mock_dt:
             mock_dt.now.return_value.strftime.return_value = "2026-05-11_10-30"
             result = _resolve_dest(args, "linkedin", "Python")
 

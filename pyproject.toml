@@ -16,8 +16,8 @@ dependencies = [
 ]
 
 [project.scripts]
-job-scraper-9000 = "jobs_cli:main"
-job-scraper = "jobs_cli:main"
+job-scraper-9000 = "jobs_cli.main:main"
+job-scraper = "jobs_cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
