@@ -66,7 +66,7 @@ To retune behavior, adjust `policy_thresholds` or the prompt and rerun evals.
 The CLI reads the routed candidate JSONL from `data/prefiltered/remote_filter_input.jsonl` by default, applies the remote filter, and writes pass/trash outputs:
 
 ```bash
-uv run job-scraper remote-filter
+uv run job-scraper-9000 remote-filter
 ```
 
 The legacy script entry point still works:

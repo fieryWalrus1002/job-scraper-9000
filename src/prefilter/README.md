@@ -24,15 +24,15 @@ The raw scrape output is immutable source truth. The prefilter simply decides wh
 ## CLI
 
 ```bash
-uv run job-scraper prefilter
+uv run job-scraper-9000 prefilter
 python scripts/run_prefilter.py
 ```
 
 Useful overrides:
 
 ```bash
-uv run job-scraper prefilter --input data/raw --dry-run
-uv run job-scraper prefilter --remote-out /tmp/remote.jsonl
+uv run job-scraper-9000 prefilter --input data/raw --dry-run
+uv run job-scraper-9000 prefilter --remote-out /tmp/remote.jsonl
 ```
 
 ## Routing rules

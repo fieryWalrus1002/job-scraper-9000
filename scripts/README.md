@@ -70,12 +70,12 @@ Edit `create_sample_batch()` arguments directly to change the source file or sam
 
 ---
 
-### `job-scraper remote-filter`
+### `job-scraper-9000 remote-filter`
 
 Runs the remote-filter agent over all raw jobs and splits them into pass/trash.
 
 ```bash
-uv run job-scraper remote-filter
+uv run job-scraper-9000 remote-filter
 ```
 
 The legacy script entry point still works:

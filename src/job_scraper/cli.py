@@ -1,91 +1,22 @@
 import argparse
-import json
 import logging
-import os
-import re
 import sys
-from dataclasses import asdict
-from datetime import datetime
-from pathlib import Path
 
-from dotenv import load_dotenv
+from jobs_cli._common import (
+    DATA_DIR,
+    _add_save_output,
+    _auto_path,
+    _output,
+    _parse_run_date,
+    _resolve_dest,
+    _slug,
+    _summary,
+)
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
-
-DATA_DIR = Path("data/raw")
-
-
-def _slug(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-
-
-def _parse_run_date(value: str) -> str:
-    try:
-        datetime.strptime(value, "%Y-%m-%d")
-    except ValueError:
-        raise argparse.ArgumentTypeError(
-            f"Invalid --run-date {value!r}: expected YYYY-MM-DD (e.g. 2026-05-19)"
-        )
-    return value
-
-
-def _parse_positive_int(value: str) -> int:
-    parsed = int(value)
-    if parsed < 1:
-        raise argparse.ArgumentTypeError("expected integer >= 1")
-    return parsed
-
-
-def _auto_path(source: str, keywords: str, run_date: str | None = None) -> Path:
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    if run_date:
-        return DATA_DIR / run_date / f"{ts}_{source}_{_slug(keywords)}.jsonl"
-    return DATA_DIR / f"{ts}_{source}_{_slug(keywords)}.jsonl"
-
-
-def _resolve_dest(args, source: str, keywords: str) -> Path | None:
-    if args.output:
-        return Path(args.output)
-    if getattr(args, "save", False):
-        path = _auto_path(source, keywords)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        return path
-    return None
-
-
-def _output(jobs, dest: Path | None) -> None:
-    lines = [json.dumps(asdict(j)) for j in jobs]
-    if dest:
-        with open(dest, "w") as f:
-            f.write("\n".join(lines) + "\n")
-        log.info("Wrote %d jobs → %s", len(jobs), dest)
-    else:
-        sys.stdout.write("\n".join(lines) + "\n")
-
-
-def _summary(jobs) -> None:
-    scrubbed = sum(
-        j.scrub_counts.get("email", 0) + j.scrub_counts.get("phone", 0) for j in jobs
-    )
-    log.info("Total: %d jobs | PII items redacted: %d", len(jobs), scrubbed)
-
-
-def _add_save_output(p: argparse.ArgumentParser) -> None:
-    group = p.add_mutually_exclusive_group()
-    group.add_argument(
-        "--output",
-        "-o",
-        metavar="FILE",
-        help="Write JSONL to a specific file (default: stdout)",
-    )
-    group.add_argument(
-        "--save",
-        action="store_true",
-        help=f"Write JSONL to {DATA_DIR}/YYYY-MM-DD_<source>_<keywords>.jsonl",
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -426,234 +357,6 @@ def _add_sel(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
-# prefilter subcommand
-# ---------------------------------------------------------------------------
-
-
-def _cmd_prefilter(args) -> None:
-    from prefilter.router import run_prefilter
-
-    run_date = getattr(args, "run_date", None)
-    if run_date:
-        input_path = args.input or f"data/raw/{run_date}"
-        remote_out = (
-            args.remote_out or f"data/prefiltered/{run_date}/remote_filter_input.jsonl"
-        )
-        local_out = args.local_out or f"data/local/{run_date}/local_jobs.jsonl"
-        trash_out = args.trash_out or f"data/trash/{run_date}/prefilter_trash.jsonl"
-    else:
-        input_path = args.input or "data/raw"
-        remote_out = args.remote_out or "data/prefiltered/remote_filter_input.jsonl"
-        local_out = args.local_out or "data/local/local_jobs.jsonl"
-        trash_out = args.trash_out or "data/trash/prefilter_trash.jsonl"
-
-    try:
-        run_prefilter(
-            input_path=input_path,
-            remote_out=remote_out,
-            local_out=local_out,
-            trash_out=trash_out,
-            config_path=args.config,
-            dry_run=args.dry_run,
-        )
-    except FileNotFoundError as exc:
-        log.error(str(exc))
-        sys.exit(1)
-
-
-def _add_prefilter(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser(
-        "prefilter",
-        help="Deterministically route raw jobs before the remote-filter agent",
-    )
-    p.add_argument(
-        "--run-date",
-        default=None,
-        dest="run_date",
-        metavar="YYYY-MM-DD",
-        type=_parse_run_date,
-        help="Route this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
-    )
-    p.add_argument(
-        "--input",
-        default=None,
-        help="Raw JSONL file or directory to read (overrides --run-date)",
-    )
-    p.add_argument(
-        "--config",
-        default="config/agent/prefilter.yml",
-        help="Prefilter config YAML",
-    )
-    p.add_argument(
-        "--remote-out",
-        default=None,
-        help="JSONL path for jobs routed to the remote filter (overrides --run-date)",
-    )
-    p.add_argument(
-        "--local-out",
-        default=None,
-        help="JSONL path for local jobs (overrides --run-date)",
-    )
-    p.add_argument(
-        "--trash-out",
-        default=None,
-        help="JSONL path for rejected jobs (overrides --run-date)",
-    )
-    p.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Route jobs in memory and print summary without writing files",
-    )
-    p.set_defaults(func=_cmd_prefilter)
-
-
-# ---------------------------------------------------------------------------
-# remote-filter subcommand
-# ---------------------------------------------------------------------------
-
-
-def _cmd_remote_filter(args) -> None:
-    from agents.remote_filter.runner import run_remote_filter
-
-    run_date = getattr(args, "run_date", None)
-    if run_date:
-        input_path = args.input or f"data/prefiltered/{run_date}"
-        pass_path = (
-            args.pass_output or f"data/filtered/{run_date}/remote_filter_pass.jsonl"
-        )
-        trash_path = (
-            args.trash_output or f"data/trash/{run_date}/remote_filter_trash.jsonl"
-        )
-    else:
-        input_path = args.input or "data/prefiltered/remote_filter_input.jsonl"
-        pass_path = args.pass_output or "data/filtered/remote_filter_pass.jsonl"
-        trash_path = args.trash_output or "data/trash/remote_filter_trash.jsonl"
-
-    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-
-    cache_path = None if args.no_cache else (args.cache_path or DEFAULT_CACHE_PATH)
-
-    try:
-        run_remote_filter(
-            input_path=input_path,
-            pass_path=pass_path,
-            trash_path=trash_path,
-            config_path=args.config,
-            user_location=args.user_location,
-            user_timezone=args.user_timezone,
-            cache_path=cache_path,
-        )
-    except FileNotFoundError as exc:
-        log.error(str(exc))
-        sys.exit(1)
-
-
-def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser(
-        "remote-filter",
-        help="Run the remote-filter agent over routed candidates and split pass/trash outputs",
-    )
-    p.add_argument(
-        "--run-date",
-        default=None,
-        dest="run_date",
-        metavar="YYYY-MM-DD",
-        type=_parse_run_date,
-        help="Filter this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
-    )
-    p.add_argument(
-        "--input",
-        default=None,
-        help="JSONL file or directory to read (overrides --run-date)",
-    )
-    p.add_argument(
-        "--pass-output",
-        default=None,
-        help="JSONL path for jobs that pass the filter (overrides --run-date)",
-    )
-    p.add_argument(
-        "--trash-output",
-        default=None,
-        help="JSONL path for rejected jobs (overrides --run-date)",
-    )
-    p.add_argument(
-        "--config",
-        default="config/agent/remote_agent.yml",
-        help="Remote-filter config YAML",
-    )
-    p.add_argument(
-        "--user-location",
-        default=os.environ.get("USER_LOCATION", "USA"),
-        help="Candidate location for geographic restriction checks",
-    )
-    p.add_argument(
-        "--user-timezone",
-        default=os.environ.get("USER_TIMEZONE"),
-        help="Candidate timezone context for the model",
-    )
-    p.add_argument(
-        "--cache-path",
-        default=None,
-        dest="cache_path",
-        help="JSONL path for the across-batch analysis cache (default: data/cache/remote_filter_analyses.jsonl)",
-    )
-    p.add_argument(
-        "--no-cache",
-        action="store_true",
-        dest="no_cache",
-        help="Disable the across-batch cache; always call the LLM",
-    )
-    p.set_defaults(func=_cmd_remote_filter)
-
-
-# ---------------------------------------------------------------------------
-# skills-fit subcommand
-# ---------------------------------------------------------------------------
-
-
-def _cmd_skills_fit(args) -> None:
-    from agents.skills_fit.runner import run_skills_fit
-
-    try:
-        run_skills_fit(
-            run_date=args.run_date,
-            config_path=args.config,
-            limit=args.limit,
-        )
-    except (FileNotFoundError, ValueError) as exc:
-        log.error(str(exc))
-        sys.exit(1)
-    except KeyboardInterrupt:
-        sys.exit(130)
-
-
-def _add_skills_fit(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser(
-        "skills-fit",
-        help="Score remote-filter PASS jobs against the candidate profile",
-    )
-    p.add_argument(
-        "--run-date",
-        default=None,
-        dest="run_date",
-        metavar="YYYY-MM-DD",
-        type=_parse_run_date,
-        help="Score this day's partition using the configured input/output conventions",
-    )
-    p.add_argument(
-        "--config",
-        default="config/agent/skills_fit.yml",
-        help="Skills-fit config YAML",
-    )
-    p.add_argument(
-        "--limit",
-        type=_parse_positive_int,
-        help="Limit deduped records for testing",
-    )
-    p.set_defaults(func=_cmd_skills_fit)
-
-
-# ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
 
@@ -771,19 +474,11 @@ def _add_run_config(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Umbrella registration
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    load_dotenv()
-    parser = argparse.ArgumentParser(
-        prog="job-scraper",
-        description="Scrape job postings from LinkedIn, multi-board (JobSpy), or Greenhouse ATS.",
-    )
-    sub = parser.add_subparsers(dest="command", metavar="SCRAPER")
-    sub.required = True
-
+def register(sub: argparse._SubParsersAction) -> None:
     _add_linkedin(sub)
     _add_jobspy(sub)
     _add_greenhouse(sub)
@@ -791,14 +486,4 @@ def main() -> None:
     _add_ashby(sub)
     _add_sel(sub)
     _add_discover(sub)
-    _add_prefilter(sub)
-    _add_remote_filter(sub)
-    _add_skills_fit(sub)
     _add_run_config(sub)
-
-    args = parser.parse_args()
-    args.func(args)
-
-
-if __name__ == "__main__":
-    main()
