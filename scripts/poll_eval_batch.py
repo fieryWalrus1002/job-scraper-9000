@@ -26,7 +26,7 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parents[1]))
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from agent_eval.logger import JsonlRunLogger
+from utils.run_logger import JsonlRunLogger
 from agent_eval.metrics import compute_metrics
 from agent_eval.provenance import build_run_record, hash_file, hash_string
 from agents.remote_filter.models import RemoteAnalysis

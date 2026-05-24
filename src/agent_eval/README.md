@@ -12,12 +12,13 @@ Working from the spec: [`../../specs/eval_framework_requirements.md`](../../spec
 
 ```text
 src/agent_eval/
-├── __init__.py        # exports RunLogger, JsonlRunLogger, provenance helpers
-├── logger.py          # RunLogger Protocol, JsonlRunLogger, MLFlowRunLogger stub
+├── __init__.py        # exports provenance helpers
 ├── provenance.py      # run IDs, hashes, git/env metadata, run-record assembly
 └── metrics.py         # compute_metrics() — binary remote-filter metrics
                        # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
 ```
+
+Run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) lives in `utils.run_logger`.
 
 The package is used by:
 
@@ -91,4 +92,4 @@ Primary tuning target: reduce false positives where onsite or location-restricte
 
 ## Design note
 
-Generic eval utilities belong in `src/agent_eval/`. Agent-specific schemas, prompts, and scoring logic should live with their agent package under `src/agents/*` or in that agent's eval driver script.
+Generic eval utilities belong in `src/agent_eval/`. Generic run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) belongs in `utils.run_logger`. Agent-specific schemas, prompts, and scoring logic should live with their agent package under `src/agents/*` or in that agent's eval driver script.

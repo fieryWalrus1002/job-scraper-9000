@@ -5,10 +5,12 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
 class RunLogger(Protocol):
     def log_run(self, record: dict[str, Any]) -> None:
         """Persist evaluation run metrics and provenance."""
         ...
+
 
 class MLFlowRunLogger:
     def __init__(self, mlflow_client, experiment_name: str):
@@ -16,13 +18,13 @@ class MLFlowRunLogger:
         self.experiment_name = experiment_name
 
     def log_run(self, record: dict[str, Any]) -> None:
-        """ 
-        Encapsulates the stateful interaction with MLFlow, including error 
-        handling to ensure robustness. 
-         - SC-1: If MLFlow logging fails (e.g., due to network issues), it 
+        """
+        Encapsulates the stateful interaction with MLFlow, including error
+        handling to ensure robustness.
+         - SC-1: If MLFlow logging fails (e.g., due to network issues), it
            logs a warning but does not raise an exception, ensuring that the
            main evaluation flow is not disrupted.
-         - SC-2: The method expects a dictionary of run metadata (e.g., 
+         - SC-2: The method expects a dictionary of run metadata (e.g.,
          parameters, metrics) and attempts to log each key-value pair to MLFlow
          under the specified experiment.
         """
@@ -35,8 +37,9 @@ class MLFlowRunLogger:
             # SC-1: Failure must not suppress or abort eval results
             logger.warning(f"Failed to log run to MLFlow: {e}")
 
+
 class JsonlRunLogger:
-    def __init__(self, log_path: str | Path = "data/eval/runs.jsonl"):
+    def __init__(self, log_path: str | Path):
         self.log_path = Path(log_path)
 
     def _sanitize(self, record: dict[str, Any]) -> dict[str, Any]:
@@ -46,13 +49,16 @@ class JsonlRunLogger:
         """
         # Deep copy to avoid mutating the caller's dictionary
         safe_record = json.loads(json.dumps(record))
-        
+
         if "config" in safe_record and isinstance(safe_record["config"], dict):
             for key in list(safe_record["config"].keys()):
                 # Catch standard credential patterns
-                if any(secret in key.lower() for secret in ["key", "token", "secret", "password"]):
+                if any(
+                    secret in key.lower()
+                    for secret in ["key", "token", "secret", "password"]
+                ):
                     safe_record["config"][key] = "[REDACTED]"
-                    
+
         return safe_record
 
     def _existing_run_ids(self) -> set[str]:
