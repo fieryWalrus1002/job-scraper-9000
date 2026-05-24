@@ -20,12 +20,10 @@ import pytest
 from job_scraper.cli import (
     _auto_path,
     _output,
-    _parse_positive_int,
-    _parse_run_date,
     _resolve_dest,
     _slug,
 )
-from jobs_cli._common import DATA_DIR
+from jobs_cli._common import DATA_DIR, _parse_positive_int, _parse_run_date
 from jobs_cli.main import main
 from job_scraper.models import JobPosting
 
@@ -253,11 +251,11 @@ def _parse_args(*argv):
                                         side_effect=capture,
                                     ):
                                         with patch(
-                                            "job_scraper.cli._cmd_remote_filter",
+                                            "agents.remote_filter.cli._cmd_remote_filter",
                                             side_effect=capture,
                                         ):
                                             with patch(
-                                                "job_scraper.cli._cmd_skills_fit",
+                                                "agents.skills_fit.cli._cmd_skills_fit",
                                                 side_effect=capture,
                                             ):
                                                 with patch(
@@ -681,7 +679,7 @@ def test_remote_filter_custom_paths():
 
 def test_remote_filter_cmd_calls_runner():
     from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from job_scraper.cli import _cmd_remote_filter
+    from agents.remote_filter.cli import _cmd_remote_filter
 
     args = _fake_args(
         input="raw.jsonl",
@@ -736,7 +734,7 @@ def test_skills_fit_custom_args():
 
 
 def test_skills_fit_cmd_calls_runner():
-    from job_scraper.cli import _cmd_skills_fit
+    from agents.skills_fit.cli import _cmd_skills_fit
 
     args = _fake_args(
         run_date="2026-05-23",
@@ -755,7 +753,7 @@ def test_skills_fit_cmd_calls_runner():
 
 
 def test_skills_fit_cmd_returns_shell_friendly_exit_codes():
-    from job_scraper.cli import _cmd_skills_fit
+    from agents.skills_fit.cli import _cmd_skills_fit
 
     args = _fake_args(run_date="2026-05-23", config="skills_fit.yml", limit=None)
 
@@ -1014,7 +1012,7 @@ def test_remote_filter_run_date_flag():
 
 def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
     from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from job_scraper.cli import _cmd_remote_filter
+    from agents.remote_filter.cli import _cmd_remote_filter
 
     args = _fake_args(
         input=None,
@@ -1043,7 +1041,7 @@ def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
 
 def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
     from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from job_scraper.cli import _cmd_remote_filter
+    from agents.remote_filter.cli import _cmd_remote_filter
 
     args = _fake_args(
         input=None,
@@ -1071,7 +1069,7 @@ def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
 
 
 def test_remote_filter_cmd_no_cache_flag_disables_cache():
-    from job_scraper.cli import _cmd_remote_filter
+    from agents.remote_filter.cli import _cmd_remote_filter
 
     args = _fake_args(
         input="raw.jsonl",
@@ -1092,7 +1090,7 @@ def test_remote_filter_cmd_no_cache_flag_disables_cache():
 
 def test_remote_filter_cmd_explicit_paths_override_run_date():
     from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-    from job_scraper.cli import _cmd_remote_filter
+    from agents.remote_filter.cli import _cmd_remote_filter
 
     args = _fake_args(
         input="custom/in.jsonl",

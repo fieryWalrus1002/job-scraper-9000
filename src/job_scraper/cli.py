@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 import sys
 
 from jobs_cli._common import (
@@ -8,7 +7,6 @@ from jobs_cli._common import (
     _add_save_output,
     _auto_path,
     _output,
-    _parse_positive_int,
     _parse_run_date,
     _resolve_dest,
     _slug,
@@ -359,152 +357,6 @@ def _add_sel(sub: argparse._SubParsersAction) -> None:
 
 
 # ---------------------------------------------------------------------------
-# remote-filter subcommand
-# ---------------------------------------------------------------------------
-
-
-def _cmd_remote_filter(args) -> None:
-    from agents.remote_filter.runner import run_remote_filter
-
-    run_date = getattr(args, "run_date", None)
-    if run_date:
-        input_path = args.input or f"data/prefiltered/{run_date}"
-        pass_path = (
-            args.pass_output or f"data/filtered/{run_date}/remote_filter_pass.jsonl"
-        )
-        trash_path = (
-            args.trash_output or f"data/trash/{run_date}/remote_filter_trash.jsonl"
-        )
-    else:
-        input_path = args.input or "data/prefiltered/remote_filter_input.jsonl"
-        pass_path = args.pass_output or "data/filtered/remote_filter_pass.jsonl"
-        trash_path = args.trash_output or "data/trash/remote_filter_trash.jsonl"
-
-    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
-
-    cache_path = None if args.no_cache else (args.cache_path or DEFAULT_CACHE_PATH)
-
-    try:
-        run_remote_filter(
-            input_path=input_path,
-            pass_path=pass_path,
-            trash_path=trash_path,
-            config_path=args.config,
-            user_location=args.user_location,
-            user_timezone=args.user_timezone,
-            cache_path=cache_path,
-        )
-    except FileNotFoundError as exc:
-        log.error(str(exc))
-        sys.exit(1)
-
-
-def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser(
-        "remote-filter",
-        help="Run the remote-filter agent over routed candidates and split pass/trash outputs",
-    )
-    p.add_argument(
-        "--run-date",
-        default=None,
-        dest="run_date",
-        metavar="YYYY-MM-DD",
-        type=_parse_run_date,
-        help="Filter this day's partition; auto-resolves input/output paths under data/*/YYYY-MM-DD/",
-    )
-    p.add_argument(
-        "--input",
-        default=None,
-        help="JSONL file or directory to read (overrides --run-date)",
-    )
-    p.add_argument(
-        "--pass-output",
-        default=None,
-        help="JSONL path for jobs that pass the filter (overrides --run-date)",
-    )
-    p.add_argument(
-        "--trash-output",
-        default=None,
-        help="JSONL path for rejected jobs (overrides --run-date)",
-    )
-    p.add_argument(
-        "--config",
-        default="config/agent/remote_agent.yml",
-        help="Remote-filter config YAML",
-    )
-    p.add_argument(
-        "--user-location",
-        default=os.environ.get("USER_LOCATION", "USA"),
-        help="Candidate location for geographic restriction checks",
-    )
-    p.add_argument(
-        "--user-timezone",
-        default=os.environ.get("USER_TIMEZONE"),
-        help="Candidate timezone context for the model",
-    )
-    p.add_argument(
-        "--cache-path",
-        default=None,
-        dest="cache_path",
-        help="JSONL path for the across-batch analysis cache (default: data/cache/remote_filter_analyses.jsonl)",
-    )
-    p.add_argument(
-        "--no-cache",
-        action="store_true",
-        dest="no_cache",
-        help="Disable the across-batch cache; always call the LLM",
-    )
-    p.set_defaults(func=_cmd_remote_filter)
-
-
-# ---------------------------------------------------------------------------
-# skills-fit subcommand
-# ---------------------------------------------------------------------------
-
-
-def _cmd_skills_fit(args) -> None:
-    from agents.skills_fit.runner import run_skills_fit
-
-    try:
-        run_skills_fit(
-            run_date=args.run_date,
-            config_path=args.config,
-            limit=args.limit,
-        )
-    except (FileNotFoundError, ValueError) as exc:
-        log.error(str(exc))
-        sys.exit(1)
-    except KeyboardInterrupt:
-        sys.exit(130)
-
-
-def _add_skills_fit(sub: argparse._SubParsersAction) -> None:
-    p = sub.add_parser(
-        "skills-fit",
-        help="Score remote-filter PASS jobs against the candidate profile",
-    )
-    p.add_argument(
-        "--run-date",
-        default=None,
-        dest="run_date",
-        metavar="YYYY-MM-DD",
-        type=_parse_run_date,
-        help="Score this day's partition using the configured input/output conventions",
-    )
-    p.add_argument(
-        "--config",
-        default="config/agent/skills_fit.yml",
-        help="Skills-fit config YAML",
-    )
-    p.add_argument(
-        "--limit",
-        type=_parse_positive_int,
-        help="Limit deduped records for testing",
-    )
-    p.set_defaults(func=_cmd_skills_fit)
-
-
-# ---------------------------------------------------------------------------
 # run-config subcommand
 # ---------------------------------------------------------------------------
 
@@ -634,6 +486,4 @@ def register(sub: argparse._SubParsersAction) -> None:
     _add_ashby(sub)
     _add_sel(sub)
     _add_discover(sub)
-    _add_remote_filter(sub)
-    _add_skills_fit(sub)
     _add_run_config(sub)
