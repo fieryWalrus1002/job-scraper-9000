@@ -27,6 +27,10 @@ def write_jsonl(path: Path, records: list[dict]) -> None:
     path.write_text("\n".join(json.dumps(record) for record in records) + "\n")
 
 
+def read_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
 def write_config(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -178,6 +182,7 @@ def test_run_skills_fit_partitioned_mode_dedupes_sorts_and_enriches(
         llm_config=None,
         prompt_path=None,
         max_retries=2,
+        usage_callback=None,
     ):
         seen_calls.append(
             {
@@ -354,6 +359,17 @@ def test_run_skills_fit_override_mode_works_without_run_date(tmp_path, monkeypat
     assert rows[0]["_skills_fit_score"] == 4
     assert rows[0]["_skills_fit_metadata"]["input_source"] == "remote_filter_pass"
     assert rows[0]["_skills_fit_metadata"]["input_path"] == str(remote_input)
+
+    runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
+    assert len(runs) == 1
+    assert runs[0]["run_date"] is None
+    assert runs[0]["input"]["path"] == str(remote_input)
+    assert runs[0]["outputs"][0]["path"] == str(output)
+    assert runs[0]["extras"]["path_overrides"] == {
+        "remote_input": True,
+        "local_input": True,
+        "output": True,
+    }
 
 
 def test_resolve_paths_explicit_overrides_beat_run_date():
@@ -807,6 +823,177 @@ def test_run_skills_fit_flushes_partial_results_on_keyboard_interrupt(
     assert len(rows) == 1
     assert rows[0]["dedup_hash"] == "hash-a"
     assert rows[0]["_skills_fit_score"] == 5
+
+
+def test_run_skills_fit_writes_run_tracker_record(tmp_path, monkeypatch):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [
+            {"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"},
+            {"dedup_hash": "hash-b", "title": "No Description", "description": ""},
+        ],
+    )
+
+    def fake_analyze(*args, title=None, usage_callback=None, **kwargs):
+        if usage_callback is not None:
+            usage_callback(
+                {
+                    "input_tokens": 100,
+                    "cached_input_tokens": 20,
+                    "output_tokens": 50,
+                }
+            )
+        assert title is not None
+        return analysis(5, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+    monkeypatch.setattr(
+        module, "generate_run_id", lambda prefix=None: "skillsfit_tracker"
+    )
+    monkeypatch.setattr(
+        module,
+        "get_git_metadata",
+        lambda: {
+            "commit": "abc123def456",
+            "dirty": False,
+            "timestamp": "2026-05-23T12:00:00+00:00",
+        },
+    )
+
+    summary = module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+
+    assert summary["run_id"] == "skillsfit_tracker"
+    runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
+    assert len(runs) == 1
+
+    run = runs[0]
+    assert run["run_id"] == "skillsfit_tracker"
+    assert run["component"] == "skills_fit"
+    assert run["run_type"] == "production"
+    assert run["run_date"] == "2026-05-23"
+    assert run["input"] == {
+        "path": "data/filtered/2026-05-23/remote_filter_pass.jsonl",
+        "record_count": 2,
+        "dedup_dropped": 0,
+        "deduped_record_count": 2,
+    }
+    assert run["config"]["agent_config_path"] == str(config_path)
+    assert run["config"]["agent_config_hash"].startswith("sha256:")
+    assert run["config"]["prompt_path"] == str(prompt_path)
+    assert run["config"]["prompt_hash"].startswith("sha256:")
+    assert run["config"]["profile_version"] == "test-v1"
+    assert run["config"]["profile_hash"].startswith("sha256:")
+    assert run["llm"]["provider"] == "openai"
+    assert run["llm"]["model"] == "gpt-4o-mini"
+    assert run["llm"]["temperature"] == 0.1
+    assert run["llm"]["calls_made"] == 1
+    assert run["llm"]["calls_failed"] == 0
+    assert run["llm"]["input_tokens_total"] == 100
+    assert run["llm"]["input_tokens_cached"] == 20
+    assert run["llm"]["output_tokens_total"] == 50
+    assert run["cache"] == {
+        "path": "data/cache/skills_fit_analyses.jsonl",
+        "hits": 0,
+        "misses": 1,
+        "hit_rate": 0.0,
+    }
+    assert {output["label"] for output in run["outputs"]} == {
+        "scored_rows",
+        "scored_successfully",
+        "missing_description",
+    }
+    assert run["outputs"][0]["path"] == "data/scored/2026-05-23/skills_fit_scored.jsonl"
+    assert run["outputs"][0]["record_count"] == 2
+    assert run["extras"]["remote_loaded"] == 2
+    assert run["extras"]["local_loaded"] == 0
+    assert run["extras"]["existing_output_loaded"] == 0
+    assert run["extras"]["skipped_missing_description"] == 1
+    assert run["extras"]["failed_agent"] == 0
+    assert run["cost"]["estimated_total"] is not None
+
+
+def test_run_skills_fit_writes_run_tracker_record_on_interrupt(tmp_path, monkeypatch):
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+    write_jsonl(
+        remote_input,
+        [
+            {"dedup_hash": "hash-a", "title": "Alpha", "description": "alpha"},
+            {"dedup_hash": "hash-b", "title": "Beta", "description": "beta"},
+        ],
+    )
+
+    call_count = 0
+
+    def fake_analyze(*args, title=None, usage_callback=None, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1 and usage_callback is not None:
+            usage_callback(
+                {
+                    "input_tokens": 90,
+                    "cached_input_tokens": 10,
+                    "output_tokens": 40,
+                }
+            )
+        if call_count == 2:
+            raise KeyboardInterrupt
+        assert title is not None
+        return analysis(5, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+    monkeypatch.setattr(
+        module, "generate_run_id", lambda prefix=None: "skillsfit_interrupt"
+    )
+    monkeypatch.setattr(
+        module,
+        "get_git_metadata",
+        lambda: {
+            "commit": "abc123def456",
+            "dirty": False,
+            "timestamp": "2026-05-23T12:00:00+00:00",
+        },
+    )
+
+    try:
+        module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("expected KeyboardInterrupt")
+
+    runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
+    assert len(runs) == 1
+
+    run = runs[0]
+    assert run["run_id"] == "skillsfit_interrupt"
+    assert run["events"]["failure_count"] == 1
+    assert any("Interrupted" in note for note in run["events"]["notable"])
+    assert any("KeyboardInterrupt" in note for note in run["events"]["notable"])
+    assert run["outputs"][0]["record_count"] == 1
+    assert run["cache"]["hits"] == 0
+    assert run["cache"]["misses"] == 2
+    assert run["llm"]["calls_made"] == 2
 
 
 def test_main_returns_one_on_fail_fast_error(tmp_path, monkeypatch):

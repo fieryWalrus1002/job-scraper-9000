@@ -2,7 +2,9 @@ import argparse
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,8 @@ from agents.skills_fit.utils import (
 )
 from utils.dedup import dedup_jobs
 from utils.git_info import get_git_metadata
+from utils.openai_pricing import estimate_cost
+from utils.run_tracker import RunTracker
 
 load_dotenv()
 
@@ -136,6 +140,18 @@ def resolve_provider_and_model(llm_config: dict[str, Any] | None) -> tuple[str, 
     default_model = "qwen2.5:14b" if provider == "ollama" else "gpt-4o-mini"
     model = cfg.get("model", os.environ.get("LLM_MODEL", default_model))
     return provider, model
+
+
+def infer_run_date(*paths: Path) -> str | None:
+    for path in paths:
+        for part in path.parts:
+            if len(part) == 10 and part.count("-") == 2:
+                try:
+                    datetime.strptime(part, "%Y-%m-%d")
+                    return part
+                except ValueError:
+                    continue
+    return None
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -318,6 +334,8 @@ def run_skills_fit(
     model: str | None = None,
     temperature: float | None = None,
     limit: int | None = None,
+    run_type: str = "production",
+    parent_run_id: str | None = None,
 ) -> dict[str, Any]:
     resolved_paths = resolve_paths(
         run_date=run_date,
@@ -325,233 +343,368 @@ def run_skills_fit(
         local_input=local_input,
         output=output,
     )
-
-    config_file = Path(config_path)
-    config = apply_llm_overrides(
-        load_config(config_file),
-        provider=provider,
-        model=model,
-        temperature=temperature,
-    )
-    llm_config = config.get("llm") or {}
-
-    profile_file = Path(
-        config.get("profile_file", "config/profile/candidate_profile.yml")
-    )
-    if not profile_file.exists():
-        raise FileNotFoundError(f"Profile file not found: {profile_file}")
-    profile = load_candidate_profile(profile_file)
-    profile_hash = hash_file(profile_file)
-    profile_version = profile.get("profile_version", "unknown")
-
-    prompt_file = Path(SKILLS_FIT_PROMPT_PATH)
-    if not prompt_file.exists():
-        raise FileNotFoundError(f"Prompt file not found: {prompt_file}")
-    prompt_hash = hash_file(prompt_file)
-
-    provider_name, model_name = resolve_provider_and_model(llm_config)
-    resolved_temperature = llm_config.get("temperature")
-    cache = AnalysisCache(DEFAULT_CACHE_PATH)
-    cache_hits = 0
-    cache_misses = 0
-    git_metadata = get_git_metadata()
     run_id = generate_run_id("skillsfit")
 
-    remote_records, local_records = load_tagged_inputs(
-        remote_input=resolved_paths.remote_input,
-        local_input=resolved_paths.local_input,
-    )
-    merged_records = remote_records + local_records
-    validate_dedup_hashes(merged_records)
-    deduped_records, deduped = dedup_jobs(merged_records)
-
-    if limit is not None:
-        deduped_records = deduped_records[:limit]
-        log.info("Limiting run to first %d deduped records", len(deduped_records))
-
-    log.info(
-        "Loaded %d remote + %d local = %d merged records (%d after dedupe)",
-        len(remote_records),
-        len(local_records),
-        len(merged_records),
-        len(deduped_records),
+    config_file = Path(config_path)
+    prompt_file = Path(SKILLS_FIT_PROMPT_PATH)
+    cache_path = DEFAULT_CACHE_PATH
+    tracker_run_date = run_date or infer_run_date(
+        resolved_paths.remote_input,
+        resolved_paths.local_input,
+        resolved_paths.output,
     )
 
-    existing_output_records = load_existing_output_records(resolved_paths.output)
+    cache_hits = 0
+    cache_misses = 0
     resumed_existing = 0
-    if existing_output_records:
-        log.info(
-            "Loaded %d existing scored rows from %s",
-            len(existing_output_records),
-            resolved_paths.output,
-        )
-
     scored_successfully = 0
     skipped_missing_description = 0
     failed_agent = 0
+    deduped = 0
+    remote_records: list[dict[str, Any]] = []
+    local_records: list[dict[str, Any]] = []
+    merged_records: list[dict[str, Any]] = []
+    deduped_records: list[dict[str, Any]] = []
     enriched_records: list[dict[str, Any]] = []
 
-    try:
-        for job in deduped_records:
-            existing = existing_output_records.get(str(job["dedup_hash"]))
-            if existing is not None and is_processed_output_record(existing):
-                enriched_records.append(existing)
-                resumed_existing += 1
-                continue
+    with RunTracker(
+        component="skills_fit",
+        run_type=run_type,
+        run_date=tracker_run_date,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+    ) as run:
+        run.record.extras.update(
+            {
+                "remote_input_path": str(resolved_paths.remote_input),
+                "local_input_path": str(resolved_paths.local_input),
+                "output_path": str(resolved_paths.output),
+                "cache_path": str(cache_path),
+                "path_overrides": {
+                    "remote_input": remote_input is not None,
+                    "local_input": local_input is not None,
+                    "output": output is not None,
+                },
+            }
+        )
 
-            input_source = job["__input_source"]
-            input_path = job["__input_path"]
-            title = job.get("title") or None
-            location = job.get("location") or None
-            description = job.get("description") or ""
-            scored_at = git_metadata["timestamp"]
+        config = apply_llm_overrides(
+            load_config(config_file),
+            provider=provider,
+            model=model,
+            temperature=temperature,
+        )
+        llm_config = config.get("llm") or {}
+        config_hash = hash_file(config_file)
 
-            if not description:
-                log.warning(
-                    "Skipping %s — missing description", title or job["dedup_hash"]
-                )
-                skipped_missing_description += 1
-                metadata = build_record_metadata(
-                    run_id=run_id,
-                    scored_at=scored_at,
-                    config_file=config_file,
-                    prompt_file=prompt_file,
-                    prompt_hash=prompt_hash,
-                    profile_file=profile_file,
-                    profile_hash=profile_hash,
-                    profile_version=profile_version,
-                    provider=provider_name,
-                    model=model_name,
-                    temperature=resolved_temperature,
-                    git_metadata=git_metadata,
-                    input_source=input_source,
-                    input_path=input_path,
-                    failure_reason="missing_description",
-                )
-                enriched_records.append(
-                    {
-                        **clean_job_record(job),
-                        "_skills_fit_score": None,
-                        "_skills_fit_rationale": None,
-                        "_skills_fit_hard_concerns": [],
-                        "_skills_fit_top_matches": [],
-                        "_skills_fit_analysis": None,
-                        "_skills_fit_gaps": [],
-                        "_skills_fit_confidence": None,
-                        "_skills_fit_input_source": input_source,
-                        "_skills_fit_metadata": metadata,
-                    }
-                )
-                continue
+        profile_file = Path(
+            config.get("profile_file", "config/profile/candidate_profile.yml")
+        )
+        if not profile_file.exists():
+            raise FileNotFoundError(f"Profile file not found: {profile_file}")
+        profile = load_candidate_profile(profile_file)
+        profile_hash = hash_file(profile_file)
+        profile_version = profile.get("profile_version", "unknown")
 
-            analysis = cache.get(
-                dedup_hash=str(job["dedup_hash"]),
-                prompt_hash=prompt_hash,
-                provider=provider_name,
-                model=model_name,
-                profile_hash=profile_hash,
+        if not prompt_file.exists():
+            raise FileNotFoundError(f"Prompt file not found: {prompt_file}")
+        prompt_hash = hash_file(prompt_file)
+
+        provider_name, model_name = resolve_provider_and_model(llm_config)
+        resolved_temperature = llm_config.get("temperature")
+        git_metadata = get_git_metadata()
+        cache = AnalysisCache(cache_path)
+
+        run.set_config(
+            agent_config_path=str(config_file),
+            agent_config_hash=config_hash,
+            prompt_path=str(prompt_file),
+            prompt_hash=prompt_hash,
+            profile_version=profile_version,
+            profile_hash=profile_hash,
+        )
+        run.set_llm(
+            provider=provider_name,
+            model=model_name,
+            endpoint=llm_config.get("base_url"),
+            api_key_env=(
+                llm_config.get("api_key_env", "OPENAI_API_KEY")
+                if provider_name != "ollama"
+                else None
+            ),
+            temperature=resolved_temperature,
+        )
+
+        remote_records, local_records = load_tagged_inputs(
+            remote_input=resolved_paths.remote_input,
+            local_input=resolved_paths.local_input,
+        )
+        merged_records = remote_records + local_records
+        validate_dedup_hashes(merged_records)
+        deduped_records, deduped = dedup_jobs(merged_records)
+
+        if limit is not None:
+            deduped_records = deduped_records[:limit]
+            log.info("Limiting run to first %d deduped records", len(deduped_records))
+            run.add_notable(f"Limited run to {len(deduped_records)} deduped records")
+
+        run.set_input(
+            path=str(resolved_paths.remote_input),
+            record_count=len(merged_records),
+            dedup_dropped=deduped,
+            deduped_record_count=len(deduped_records),
+        )
+        run.record.extras.update(
+            {
+                "remote_loaded": len(remote_records),
+                "local_loaded": len(local_records),
+                "merged_before_dedupe": len(merged_records),
+                "local_input_exists": resolved_paths.local_input.exists(),
+            }
+        )
+
+        log.info(
+            "Loaded %d remote + %d local = %d merged records (%d after dedupe)",
+            len(remote_records),
+            len(local_records),
+            len(merged_records),
+            len(deduped_records),
+        )
+
+        existing_output_records = load_existing_output_records(resolved_paths.output)
+        run.record.extras["existing_output_loaded"] = len(existing_output_records)
+        if existing_output_records:
+            log.info(
+                "Loaded %d existing scored rows from %s",
+                len(existing_output_records),
+                resolved_paths.output,
             )
-            if analysis is not None:
-                cache_hits += 1
-            else:
-                cache_misses += 1
-                analysis = analyze_skills_fit(
-                    description,
-                    candidate_profile=profile,
-                    title=title,
-                    location=location,
-                    llm_config=llm_config,
-                    prompt_path=prompt_file,
-                )
-                if analysis is not None:
-                    cache.put(
+
+        try:
+            try:
+                for job in deduped_records:
+                    existing = existing_output_records.get(str(job["dedup_hash"]))
+                    if existing is not None and is_processed_output_record(existing):
+                        enriched_records.append(existing)
+                        resumed_existing += 1
+                        continue
+
+                    input_source = job["__input_source"]
+                    input_path = job["__input_path"]
+                    title = job.get("title") or None
+                    location = job.get("location") or None
+                    description = job.get("description") or ""
+                    scored_at = git_metadata["timestamp"]
+
+                    if not description:
+                        log.warning(
+                            "Skipping %s — missing description",
+                            title or job["dedup_hash"],
+                        )
+                        skipped_missing_description += 1
+                        metadata = build_record_metadata(
+                            run_id=run_id,
+                            scored_at=scored_at,
+                            config_file=config_file,
+                            prompt_file=prompt_file,
+                            prompt_hash=prompt_hash,
+                            profile_file=profile_file,
+                            profile_hash=profile_hash,
+                            profile_version=profile_version,
+                            provider=provider_name,
+                            model=model_name,
+                            temperature=resolved_temperature,
+                            git_metadata=git_metadata,
+                            input_source=input_source,
+                            input_path=input_path,
+                            failure_reason="missing_description",
+                        )
+                        enriched_records.append(
+                            {
+                                **clean_job_record(job),
+                                "_skills_fit_score": None,
+                                "_skills_fit_rationale": None,
+                                "_skills_fit_hard_concerns": [],
+                                "_skills_fit_top_matches": [],
+                                "_skills_fit_analysis": None,
+                                "_skills_fit_gaps": [],
+                                "_skills_fit_confidence": None,
+                                "_skills_fit_input_source": input_source,
+                                "_skills_fit_metadata": metadata,
+                            }
+                        )
+                        continue
+
+                    analysis = cache.get(
                         dedup_hash=str(job["dedup_hash"]),
                         prompt_hash=prompt_hash,
                         provider=provider_name,
                         model=model_name,
                         profile_hash=profile_hash,
-                        analysis=analysis,
                     )
-            if analysis is None:
-                log.warning("Agent failed on %s", title or job["dedup_hash"])
-                failed_agent += 1
-                metadata = build_record_metadata(
-                    run_id=run_id,
-                    scored_at=scored_at,
-                    config_file=config_file,
-                    prompt_file=prompt_file,
-                    prompt_hash=prompt_hash,
-                    profile_file=profile_file,
-                    profile_hash=profile_hash,
-                    profile_version=profile_version,
-                    provider=provider_name,
-                    model=model_name,
-                    temperature=resolved_temperature,
-                    git_metadata=git_metadata,
-                    input_source=input_source,
-                    input_path=input_path,
-                    failure_reason="agent_failed",
-                )
-                enriched_records.append(
-                    {
-                        **clean_job_record(job),
-                        "_skills_fit_score": None,
-                        "_skills_fit_rationale": None,
-                        "_skills_fit_hard_concerns": [],
-                        "_skills_fit_top_matches": [],
-                        "_skills_fit_analysis": None,
-                        "_skills_fit_gaps": [],
-                        "_skills_fit_confidence": None,
-                        "_skills_fit_input_source": input_source,
-                        "_skills_fit_metadata": metadata,
-                    }
-                )
-                continue
+                    if analysis is not None:
+                        cache_hits += 1
+                    else:
+                        cache_misses += 1
+                        call_started = time.time()
+                        analysis = analyze_skills_fit(
+                            description,
+                            candidate_profile=profile,
+                            title=title,
+                            location=location,
+                            llm_config=llm_config,
+                            prompt_path=prompt_file,
+                            usage_callback=run.add_token_usage,
+                        )
+                        run.record_call_latency(time.time() - call_started)
+                        if analysis is not None:
+                            cache.put(
+                                dedup_hash=str(job["dedup_hash"]),
+                                prompt_hash=prompt_hash,
+                                provider=provider_name,
+                                model=model_name,
+                                profile_hash=profile_hash,
+                                analysis=analysis,
+                            )
+                    if analysis is None:
+                        log.warning("Agent failed on %s", title or job["dedup_hash"])
+                        failed_agent += 1
+                        run.increment_failures()
+                        metadata = build_record_metadata(
+                            run_id=run_id,
+                            scored_at=scored_at,
+                            config_file=config_file,
+                            prompt_file=prompt_file,
+                            prompt_hash=prompt_hash,
+                            profile_file=profile_file,
+                            profile_hash=profile_hash,
+                            profile_version=profile_version,
+                            provider=provider_name,
+                            model=model_name,
+                            temperature=resolved_temperature,
+                            git_metadata=git_metadata,
+                            input_source=input_source,
+                            input_path=input_path,
+                            failure_reason="agent_failed",
+                        )
+                        enriched_records.append(
+                            {
+                                **clean_job_record(job),
+                                "_skills_fit_score": None,
+                                "_skills_fit_rationale": None,
+                                "_skills_fit_hard_concerns": [],
+                                "_skills_fit_top_matches": [],
+                                "_skills_fit_analysis": None,
+                                "_skills_fit_gaps": [],
+                                "_skills_fit_confidence": None,
+                                "_skills_fit_input_source": input_source,
+                                "_skills_fit_metadata": metadata,
+                            }
+                        )
+                        continue
 
-            metadata = build_record_metadata(
-                run_id=run_id,
-                scored_at=scored_at,
-                config_file=config_file,
-                prompt_file=prompt_file,
-                prompt_hash=prompt_hash,
-                profile_file=profile_file,
-                profile_hash=profile_hash,
-                profile_version=profile_version,
-                provider=provider_name,
-                model=model_name,
-                temperature=resolved_temperature,
-                git_metadata=git_metadata,
-                input_source=input_source,
-                input_path=input_path,
+                    metadata = build_record_metadata(
+                        run_id=run_id,
+                        scored_at=scored_at,
+                        config_file=config_file,
+                        prompt_file=prompt_file,
+                        prompt_hash=prompt_hash,
+                        profile_file=profile_file,
+                        profile_hash=profile_hash,
+                        profile_version=profile_version,
+                        provider=provider_name,
+                        model=model_name,
+                        temperature=resolved_temperature,
+                        git_metadata=git_metadata,
+                        input_source=input_source,
+                        input_path=input_path,
+                    )
+                    enriched_records.append(
+                        {
+                            **clean_job_record(job),
+                            "_skills_fit_score": analysis.fit_score,
+                            "_skills_fit_rationale": analysis.score_rationale,
+                            "_skills_fit_hard_concerns": analysis.hard_concerns,
+                            "_skills_fit_top_matches": analysis.top_matches,
+                            "_skills_fit_analysis": analysis.model_dump(),
+                            "_skills_fit_gaps": analysis.gaps,
+                            "_skills_fit_confidence": analysis.confidence,
+                            "_skills_fit_input_source": input_source,
+                            "_skills_fit_metadata": metadata,
+                        }
+                    )
+                    scored_successfully += 1
+            except KeyboardInterrupt:
+                if enriched_records:
+                    write_output(enriched_records, resolved_paths.output)
+                    message = (
+                        f"Interrupted — wrote {len(enriched_records)} partial records to "
+                        f"{resolved_paths.output}"
+                    )
+                else:
+                    message = "Interrupted before any records were written"
+                log.warning(message)
+                run.add_notable(message)
+                raise
+
+            write_output(enriched_records, resolved_paths.output)
+        finally:
+            run.add_output(
+                label="scored_rows",
+                path=str(resolved_paths.output),
+                record_count=len(enriched_records),
             )
-            enriched_records.append(
+            if scored_successfully:
+                run.add_output(
+                    label="scored_successfully", record_count=scored_successfully
+                )
+            if resumed_existing:
+                run.add_output(label="reused_existing", record_count=resumed_existing)
+            if skipped_missing_description:
+                run.add_output(
+                    label="missing_description",
+                    record_count=skipped_missing_description,
+                )
+            if failed_agent:
+                run.add_output(label="agent_failed", record_count=failed_agent)
+
+            run.set_cache(path=str(cache_path), hits=cache_hits, misses=cache_misses)
+            run.update_llm_stats(calls_made=cache_misses, calls_failed=failed_agent)
+            run.record.extras.update(
                 {
-                    **clean_job_record(job),
-                    "_skills_fit_score": analysis.fit_score,
-                    "_skills_fit_rationale": analysis.score_rationale,
-                    "_skills_fit_hard_concerns": analysis.hard_concerns,
-                    "_skills_fit_top_matches": analysis.top_matches,
-                    "_skills_fit_analysis": analysis.model_dump(),
-                    "_skills_fit_gaps": analysis.gaps,
-                    "_skills_fit_confidence": analysis.confidence,
-                    "_skills_fit_input_source": input_source,
-                    "_skills_fit_metadata": metadata,
+                    "merged_after_dedupe": len(deduped_records),
+                    "deduped": deduped,
+                    "resumed_existing": resumed_existing,
+                    "scored_successfully": scored_successfully,
+                    "skipped_missing_description": skipped_missing_description,
+                    "failed_agent": failed_agent,
+                    "cache_hits": cache_hits,
+                    "cache_misses": cache_misses,
                 }
             )
-            scored_successfully += 1
-    except KeyboardInterrupt:
-        if enriched_records:
-            write_output(enriched_records, resolved_paths.output)
-            log.warning(
-                "Interrupted — wrote %d partial records to %s",
-                len(enriched_records),
-                resolved_paths.output,
-            )
-        else:
-            log.warning("Interrupted before any records were written")
-        raise
-
-    write_output(enriched_records, resolved_paths.output)
+            if resumed_existing:
+                run.add_notable(f"Reused existing scored rows: {resumed_existing}")
+            if skipped_missing_description:
+                run.add_notable(
+                    f"Skipped missing description: {skipped_missing_description}"
+                )
+            if failed_agent:
+                run.add_notable(f"Agent failures: {failed_agent}")
+            if provider_name == "openai":
+                token_totals = run.token_totals
+                breakdown = estimate_cost(
+                    model_name,
+                    input_tokens=token_totals["input_tokens"],
+                    cached_input_tokens=token_totals["cached_input_tokens"],
+                    output_tokens=token_totals["output_tokens"],
+                )
+                if breakdown is not None:
+                    total = breakdown.pop("total")
+                    run.set_cost(estimated_total=total, breakdown=breakdown)
+                else:
+                    run.add_notable(
+                        f"No pricing entry for model '{model_name}' — actual cost will need backfill"
+                    )
 
     if resumed_existing:
         log.info("Reused existing scored rows: %d", resumed_existing)
