@@ -405,12 +405,10 @@ def _is_in_banned_terms(
     combined_texts_lower = [text.lower() for text in texts]
 
     for category, terms in banned_terms.items():
-        print(f"Checking banned category: {category} with terms {terms}")
         for term in terms:
             term_lower = term.lower()
             # Loop through each string block (title, location, desc)
             for text in combined_texts_lower:
-                print(f"Checking if '{term_lower}' is in text block: '{text}'")
                 if term_lower in text:  # <-- Substring match check
                     return True, f"{category}:{term}"
 
@@ -434,18 +432,6 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
     flat_search_params = _flatten_strings(search_params)
     combined_texts = [title, location, description]
     filter_terms = getattr(cfg, "filter_terms", {}) or {}
-
-    if not filter_terms:
-        print("No filter terms configured.")
-
-    for category, terms in filter_terms.items():
-        print(f"Configured filter category: {category}")
-        # Ensure terms is iterable (e.g. if a category was left blank in YAML)
-        if terms:
-            for term in terms:
-                print(f"Configured banned term: {category}:{term}")
-        else:
-            print(f"Configured banned term category '{category}' has no terms.")
 
     trace: list[str] = []
     matched_rules: list[str] = []
@@ -501,9 +487,7 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
     #
     # Voila!
 
-    banned, matched_term = _is_in_banned_terms(
-        combined_texts + [company], cfg.filter_terms
-    )
+    banned, matched_term = _is_in_banned_terms(combined_texts + [company], filter_terms)
 
     if banned:
         matched_rules.append(f"banned_term:{matched_term}")
