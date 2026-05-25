@@ -37,10 +37,11 @@ uv run job-scraper-9000 prefilter --remote-out /tmp/remote.jsonl
 
 ## Routing rules
 
-1. Reject jobs with explicit non-selected-country signals.
+1. Reject jobs that mention a non-selected country **and** do not also mention the selected country.
 2. Route jobs matching the local allowlist to `local_candidate`.
-3. Reject obvious onsite/hybrid/local-presence jobs outside the local area.
-4. Send everything else to `remote_filter_candidate`.
+3. Send everything else to `remote_filter_candidate`.
+
+Onsite/hybrid/must-live-in judgments are intentionally not made here — substring matching on description text produces too many false positives (technical terms like "hybrid-cloud", perks copy like "free onsite gym", wrong-polarity hits like "must live in [the United States]"). Those calls belong to the remote_filter agent, which reads the full JD with context.
 
 ## Metadata
 
