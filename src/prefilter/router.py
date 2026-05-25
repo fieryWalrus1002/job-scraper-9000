@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+
+# from curses import raw
 import json
 import logging
 import os
@@ -252,6 +254,14 @@ def load_prefilter_config(
     if not isinstance(routing, dict):
         raise ConfigError("routing must be a YAML mapping")
 
+    filter_terms_raw = raw.get("filter_terms") or {}
+    if not isinstance(filter_terms_raw, dict):
+        raise ConfigError("filter_terms must be a YAML mapping")
+
+    filter_terms = {
+        str(k): [str(v) for v in (vals or [])] for k, vals in filter_terms_raw.items()
+    }
+
     config = PrefilterConfig(
         country=country,
         country_detection=CountryDetectionConfig(
@@ -283,6 +293,7 @@ def load_prefilter_config(
                 routing.get("prefer_search_params_as_weak_signal", True)
             ),
         ),
+        filter_terms=filter_terms,
     )
     return _ResolvedPrefilterConfig(
         config=config,
@@ -375,18 +386,71 @@ def _has_phrase(texts: list[str], phrases: list[str]) -> tuple[bool, str | None]
     return False, None
 
 
+def _is_in_banned_terms(
+    texts: list[str], banned_terms: dict
+) -> tuple[bool, str | None]:
+    """
+    Helper function to check if any of the banned terms are present in the texts. Returns a tuple of (is_banned, matched_term).
+
+    e.g:
+    banned_terms = {
+        "ai_factory": ["upwork", "freelancer", "fiverr"],
+        "other_category": ["some other term"],
+    }
+
+    If a job's title/location/description/search_params contains "upwork", this would return (True, "ai_factory:upwork"),
+    which can then be used for routing decisions and trace logging.
+
+    """
+    combined_texts_lower = [text.lower() for text in texts]
+
+    for category, terms in banned_terms.items():
+        print(f"Checking banned category: {category} with terms {terms}")
+        for term in terms:
+            term_lower = term.lower()
+            # Loop through each string block (title, location, desc)
+            for text in combined_texts_lower:
+                print(f"Checking if '{term_lower}' is in text block: '{text}'")
+                if term_lower in text:  # <-- Substring match check
+                    return True, f"{category}:{term}"
+
+    return False, None
+
+
 def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteDecision:
+    """
+    Apply routing rules to a single job and return a RouteDecision with the route, reason, matched rules, and trace info.
+
+    Composed of modular checks for country detection, banned terms, local area matching, and remote hints, with detailed trace logging for debugging and analysis.
+    """
+
     cfg = resolved.config
     target_country = cfg.country
+    company = str(job.get("company") or "")
     title = str(job.get("title") or "")
     location = str(job.get("location") or "")
     description = str(job.get("description") or "")
     search_params = job.get("search_params") or {}
     flat_search_params = _flatten_strings(search_params)
+    combined_texts = [title, location, description]
+    filter_terms = getattr(cfg, "filter_terms", {}) or {}
+
+    if not filter_terms:
+        print("No filter terms configured.")
+
+    for category, terms in filter_terms.items():
+        print(f"Configured filter category: {category}")
+        # Ensure terms is iterable (e.g. if a category was left blank in YAML)
+        if terms:
+            for term in terms:
+                print(f"Configured banned term: {category}:{term}")
+        else:
+            print(f"Configured banned term category '{category}' has no terms.")
 
     trace: list[str] = []
     matched_rules: list[str] = []
 
+    # Check 1: Route based on country detection
     country_sources = []
     for source_name in cfg.country_detection.sources:
         if source_name == "location":
@@ -417,6 +481,44 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
             country_alias_hits=alias_hits,
         )
 
+    # Check 2: Arbitrary term matches route to trash based on config-defined banned terms.
+    #
+    # Do you REALLY hate low-quality "AI factory" platforms (e.g. Upwork, Freelancer)? Well
+    # screw them in particular!
+    #
+    # To avoid wasting remote filter budget on them, we give a hard-reject and note which of
+    # the banned terms was matched in the trace for observability. This is a bit of a
+    # sledgehammer approach and I'm okay with it.
+    #
+    # You could also use this as a hard filter for literally anything else you want to ban.
+    # Just add it to the config under a new category and it'll get the same treatment.
+    # e.g. if you want to ban job postings that mention "hustle" or "grind", you could add:
+    #
+    # filter_terms:
+    #   hustle_and_grind:
+    #     - hustle
+    #     - grind
+    #
+    # Voila!
+
+    banned, matched_term = _is_in_banned_terms(
+        combined_texts + [company], cfg.filter_terms
+    )
+
+    if banned:
+        matched_rules.append(f"banned_term:{matched_term}")
+        trace.append(f"banned_term:reject:{matched_term}")
+        return RouteDecision(
+            route="prefilter_reject",
+            reason="banned_term",
+            matched_rules=matched_rules,
+            rule_trace=trace,
+            routing_decision_source="company/title/location/description",
+            country_hits=hits,
+            country_alias_hits=alias_hits,
+        )
+
+    # Check 3: Route based on local area allowlist
     local_ok, local_source = _local_match(
         job, cfg, flat_search_params=flat_search_params
     )
@@ -433,6 +535,7 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
             country_alias_hits=alias_hits,
         )
 
+    # Check 4: Route based on remote hints
     combined_texts = [title, location, description]
     if cfg.routing.prefer_search_params_as_weak_signal:
         combined_texts.extend(flat_search_params)
@@ -456,6 +559,7 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
             country_alias_hits=alias_hits,
         )
 
+    # Check 5: Fallthrough for jobs that didn't match previous checks.
     matched_rules.append("routing_disabled:remote_candidates")
     return RouteDecision(
         route="prefilter_reject",
@@ -498,6 +602,10 @@ def run_prefilter(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     dry_run: bool = False,
 ) -> dict[str, int]:
+    """
+    Main entry point for the prefilter router. Reads raw jobs, applies routing rules, and writes annotated jobs to remote/local/trash outputs.
+    """
+
     input_path = Path(input_path)
     remote_out = Path(remote_out)
     local_out = Path(local_out)

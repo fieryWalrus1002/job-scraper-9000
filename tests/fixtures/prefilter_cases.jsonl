@@ -8,3 +8,5 @@
 {"title": "Hardware Engineering Technician I", "company": "SEL", "location": "Washington - Pullman", "description": "Hardware lab role.", "search_params": {}, "expected_route": "local_candidate", "expected_reason": "allowed_local_location"}
 {"title": "Software Engineer", "company": "Acme", "location": "Pullman, Washington", "description": "Engineering role.", "search_params": {}, "expected_route": "local_candidate", "expected_reason": "allowed_local_location"}
 {"title": "Software Engineer", "company": "Acme", "location": "Pomeroy, WA", "description": "Distributed team, fully remote.", "search_params": {}, "expected_route": "remote_filter_candidate", "expected_reason": "remote_or_ambiguous"}
+{"title": "AI Laser Engineer", "company": "Toxic-company", "location": "Madeup, WA", "description": "Distributed team, fully remote.", "search_params": {}, "expected_route": "prefilter_reject", "expected_reason": "banned_term"}
+{"title": "AI Laser Engineer", "company": "Acme", "location": "Madeup, WA", "description": "Distributed team, fully remote.", "search_params": {}, "expected_route": "remote_filter_candidate", "expected_reason": "remote_or_ambiguous"}
