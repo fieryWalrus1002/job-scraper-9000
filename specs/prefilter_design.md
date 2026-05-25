@@ -1,6 +1,6 @@
 # Prefilter Design
 
-_Last updated: 2026-05-16_
+_Last updated: 2026-05-25
 
 This spec defines a deterministic routing layer that sits between raw scraping and the paid remote-filter LLM. It is intentionally **not** an agent and does **not** use an LLM.
 
@@ -42,12 +42,12 @@ python scripts/run_prefilter.py
 ## Data flow
 
 ```text
-data/raw/*.jsonl
+data/raw/{run_date}/*.jsonl
   ↓
 prefilter router
-  ├─ data/prefiltered/remote_filter_input.jsonl
-  ├─ data/local/local_jobs.jsonl
-  └─ data/trash/prefilter_trash.jsonl
+  ├─ data/prefiltered/{run_date}/remote_filter_input.jsonl
+  ├─ data/local/{run_date}/local_jobs.jsonl
+  └─ data/trash/{run_date}/prefilter_trash.jsonl
 ```
 
 `data/raw/` remains source truth. The router consumes the combined raw set and writes one combined output file per bucket.
@@ -192,8 +192,9 @@ country_detection:
 
 local_area:
   allowed_locations:
-    - "Pullman, WA"
+    - "Gorge, WA"
     - "Seattle, WA"
+    - "Portland, OR"
 
 routing:
   route_local_jobs: true
@@ -209,13 +210,13 @@ The config should be easy to tune later without changing code.
 Default behavior:
 
 ```bash
-uv run job-scraper prefilter
+uv run job-scraper prefilter --run-date 2026-05-25
 ```
 
 Script fallback:
 
 ```bash
-python scripts/run_prefilter.py
+python scripts/run_prefilter.py --run-date 2026-05-25
 ```
 
 Recommended flags:
@@ -270,3 +271,10 @@ The prefilter does not merge local and remote lanes yet; that is deferred to lat
 - Should the router be pure library + CLI, or expose a small public API for reuse?
 - Should config hashing include the resolved env-expanded YAML only, or also supporting code version?
 - Should `local_candidate` records keep a distinct output schema later, or remain the same JobPosting shape with annotations?
+
+## Design Evolution & Refactors
+
+### 2026-05-25: Logic tweaks and static keyword blocklist
+
+- Country detection logic was rejecting valid US jobs because they mentioned another country. Adjusted to allow mention of other countries as long as USA is also mentioned. This is a common pattern in job descriptions for multi-country companies.
+- Implemented a modular filter for term-based rejections, importing from the config file. Using this to filter out particular corporations I've associated with scammy postings in the past, e.g. "Pyramid Corp". This is a static blocklist that can be easily updated without code changes.
