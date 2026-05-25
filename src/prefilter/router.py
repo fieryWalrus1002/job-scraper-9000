@@ -392,6 +392,7 @@ def _has_phrase(texts: list[str], phrases: list[str]) -> tuple[bool, str | None]
 
 def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteDecision:
     cfg = resolved.config
+    target_country = cfg.country
     title = str(job.get("title") or "")
     location = str(job.get("location") or "")
     description = str(job.get("description") or "")
@@ -413,12 +414,12 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
             country_sources.extend(flat_search_params)
 
     hits, alias_hits, hit_source = _country_hits(
-        country_sources, resolved.aliases, cfg.country
+        country_sources, resolved.aliases, target_country
     )
     trace.append(f"country_check:hits={hits or ['none']}")
 
-    if cfg.routing.reject_non_us and any(country != cfg.country for country in hits):
-        other = next(country for country in hits if country != cfg.country)
+    if cfg.routing.reject_non_us and hits and target_country not in hits:
+        other = hits[0]
         trace.append(f"country_check:reject:{other}")
         matched_rules.append(f"country:{other}")
         return RouteDecision(
