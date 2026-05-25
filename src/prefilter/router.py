@@ -43,21 +43,6 @@ _REMOTE_HINTS = [
     "anywhere",
 ]
 
-_REJECT_HINTS = [
-    "onsite",
-    "on-site",
-    "hybrid",
-    "in office",
-    "in-office",
-    "relocation required",
-    "must relocate",
-    "commuting distance",
-    "local presence required",
-    "must reside",
-    "must live in",
-    "office based",
-]
-
 # US state abbreviation → full name. Used by _location_contains so that an
 # allowed_location like "Pullman, WA" matches a posting location like
 # "Washington - Pullman" (and vice versa). Scoped to location matching only —
@@ -453,23 +438,7 @@ def route_job(job: dict[str, Any], resolved: _ResolvedPrefilterConfig) -> RouteD
         combined_texts.extend(flat_search_params)
 
     remote_hit, remote_phrase = _has_phrase(combined_texts, _REMOTE_HINTS)
-    reject_hit, reject_phrase = _has_phrase(combined_texts, _REJECT_HINTS)
-    trace.append(f"signal_check:remote={remote_hit},reject={reject_hit}")
-
-    if reject_hit and not remote_hit:
-        matched_rules.append(f"reject:{reject_phrase}")
-        trace.append(f"signal_check:reject_only:{reject_phrase}")
-        return RouteDecision(
-            route="prefilter_reject",
-            reason=reject_phrase.replace(" ", "_")
-            if reject_phrase
-            else "obvious_non_viable",
-            matched_rules=matched_rules,
-            rule_trace=trace,
-            routing_decision_source="title/location/description",
-            country_hits=hits,
-            country_alias_hits=alias_hits,
-        )
+    trace.append(f"signal_check:remote={remote_hit}")
 
     if cfg.routing.route_remote_candidates:
         if remote_hit:
