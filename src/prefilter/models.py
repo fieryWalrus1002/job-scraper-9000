@@ -74,6 +74,9 @@ class RoutingConfig:
 @dataclass
 class PrefilterConfig:
     country: str = "USA"
-    country_detection: CountryDetectionConfig = field(default_factory=CountryDetectionConfig)
+    country_detection: CountryDetectionConfig = field(
+        default_factory=CountryDetectionConfig
+    )
     local_area: LocalAreaConfig = field(default_factory=LocalAreaConfig)
     routing: RoutingConfig = field(default_factory=RoutingConfig)
+    filter_terms: dict[str, list[str]] = field(default_factory=dict)

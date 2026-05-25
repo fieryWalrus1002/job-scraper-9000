@@ -17,10 +17,10 @@ def _write_jsonl(path: Path, records: list[dict]) -> None:
 
 
 @pytest.fixture()
-def prefilter_config(tmp_path, monkeypatch):
+def prefilter_setup(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME_LOCATION", "Pullman, WA")
-    cfg = tmp_path / "prefilter.yml"
-    cfg.write_text(
+    cfg_path = tmp_path / "prefilter.yml"
+    cfg_path.write_text(
         """country: USA
 country_detection:
   enabled: true
@@ -38,10 +38,14 @@ routing:
   route_remote_candidates: true
   reject_non_us: true
   prefer_search_params_as_weak_signal: true
+filter_terms:
+  ai_factory_keywords:
+    - toxic-company
 """,
         encoding="utf-8",
     )
-    return load_prefilter_config(cfg)
+    # Return both the parsed config object AND the exact path where it lives
+    return load_prefilter_config(cfg_path), cfg_path
 
 
 @pytest.mark.parametrize(
@@ -56,18 +60,27 @@ routing:
         if line.strip()
     ],
 )
-def test_route_job_fixtures(job, expected_route, expected_reason, prefilter_config):
-    decision = route_job(job, prefilter_config)
+def test_route_job_fixtures(job, expected_route, expected_reason, prefilter_setup):
+    config_obj, _ = prefilter_setup
+    decision = route_job(job, config_obj)
     assert decision.route == expected_route
     assert decision.reason == expected_reason
     assert decision.rule_trace
     assert decision.country_hits is not None
 
 
-def test_run_prefilter_writes_combined_bucket_outputs(tmp_path, prefilter_config, monkeypatch):
+def test_run_prefilter_writes_combined_bucket_outputs(
+    tmp_path, prefilter_setup, monkeypatch
+):
     monkeypatch.setenv("HOME_LOCATION", "Pullman, WA")
+    # 1. FIX: Unpack the tuple here to get the correct config path
+    _, cfg_file_path = prefilter_setup
 
-    jobs = [json.loads(line) for line in FIXTURE_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
+    jobs = [
+        json.loads(line)
+        for line in FIXTURE_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     input_path = tmp_path / "raw"
     input_path.mkdir()
     _write_jsonl(input_path / "jobs.jsonl", jobs)
@@ -81,7 +94,7 @@ def test_run_prefilter_writes_combined_bucket_outputs(tmp_path, prefilter_config
         remote_out=remote_out,
         local_out=local_out,
         trash_out=trash_out,
-        config_path=tmp_path / "prefilter.yml",
+        config_path=cfg_file_path,  # 2. FIX: Pass the verified path from the fixture
     )
 
     assert counts["total"] == len(jobs)
@@ -89,17 +102,42 @@ def test_run_prefilter_writes_combined_bucket_outputs(tmp_path, prefilter_config
     assert local_out.exists()
     assert trash_out.exists()
 
-    remote_lines = [json.loads(line) for line in remote_out.read_text(encoding="utf-8").splitlines() if line.strip()]
-    local_lines = [json.loads(line) for line in local_out.read_text(encoding="utf-8").splitlines() if line.strip()]
-    trash_lines = [json.loads(line) for line in trash_out.read_text(encoding="utf-8").splitlines() if line.strip()]
+    remote_lines = [
+        json.loads(line)
+        for line in remote_out.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    local_lines = [
+        json.loads(line)
+        for line in local_out.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    trash_lines = [
+        json.loads(line)
+        for line in trash_out.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
-    assert sum(len(bucket) for bucket in (remote_lines, local_lines, trash_lines)) == len(jobs)
-    assert all("_prefilter_result" in rec for rec in remote_lines + local_lines + trash_lines)
-    assert all("_prefilter_metadata" in rec for rec in remote_lines + local_lines + trash_lines)
+    assert sum(
+        len(bucket) for bucket in (remote_lines, local_lines, trash_lines)
+    ) == len(jobs)
+    assert all(
+        "_prefilter_result" in rec for rec in remote_lines + local_lines + trash_lines
+    )
+    assert all(
+        "_prefilter_metadata" in rec for rec in remote_lines + local_lines + trash_lines
+    )
 
 
-def test_dry_run_does_not_write_outputs(tmp_path, prefilter_config):
-    jobs = [json.loads(line) for line in FIXTURE_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
+def test_dry_run_does_not_write_outputs(tmp_path, prefilter_setup, monkeypatch):
+    # This one you got perfectly!
+    _, cfg_file_path = prefilter_setup
+
+    jobs = [
+        json.loads(line)
+        for line in FIXTURE_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
     input_path = tmp_path / "raw"
     input_path.mkdir()
     _write_jsonl(input_path / "jobs.jsonl", jobs)
@@ -113,7 +151,7 @@ def test_dry_run_does_not_write_outputs(tmp_path, prefilter_config):
         remote_out=remote_out,
         local_out=local_out,
         trash_out=trash_out,
-        config_path=tmp_path / "prefilter.yml",
+        config_path=cfg_file_path,
         dry_run=True,
     )
 

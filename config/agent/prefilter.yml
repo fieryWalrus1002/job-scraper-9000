@@ -32,3 +32,18 @@ routing:
   route_remote_candidates: true
   reject_non_us: true
   prefer_search_params_as_weak_signal: true
+
+
+filter_terms:
+  # For each of these categories, if any of the specified keywords are present in the title, location, description,
+  # or search params, the job will be rejected with a matched rule of "banned_term:{term}".
+  ai_factory_keywords:
+    - alignerr
+    - outlier
+    - remotasks
+    - dataannotation
+    - appen
+    - crowdgen
+    - welocalize
+    - oneforma
+    - telus digital
