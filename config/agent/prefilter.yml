@@ -38,11 +38,11 @@ filter_terms:
   # For each of these categories, if any of the specified keywords are present in the title, location, description,
   # or search params, the job will be rejected with a matched rule of "banned_term:{term}".
   ai_factory_keywords:
-    - alignerr
-    - outlier
+    - dataannotation # The bulk of the jobs are from this company
+    - alignerr # yeah screw you too
+    - rex.zone # remote "talent" platform for "data annotation" work, often with a "research" or "engineer" title attached to what is basically glorified microwork. Not a real company name, so it triggers on the word "zone" in other contexts.
+    - haystack  # same deal, remote "talent" platform for "data annotation"
     - remotasks
-    - dataannotation
-    - appen
     - crowdgen
     - welocalize
     - oneforma
