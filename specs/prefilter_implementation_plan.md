@@ -87,9 +87,9 @@ Implement a pure routing function that inspects:
 Rules, in order:
 
 1. country gate (`location + description`)
-2. local allowlist match
-3. obvious onsite/hybrid/local-presence rejects
-4. remote-ish / ambiguous → `remote_filter_candidate`
+1. local allowlist match
+1. obvious onsite/hybrid/local-presence rejects
+1. remote-ish / ambiguous → `remote_filter_candidate`
 
 Routing must be single-route only.
 
@@ -168,11 +168,11 @@ Coverage should include:
 ## Execution sequence
 
 1. create `src/prefilter/`
-2. add config schema + routing rules
-3. wire CLI/script
-4. add fixtures and tests
-5. update docs and project status
-6. run targeted tests, then full test suite
+1. add config schema + routing rules
+1. wire CLI/script
+1. add fixtures and tests
+1. update docs and project status
+1. run targeted tests, then full test suite
 
 ## Out of scope for v1
 

@@ -2,7 +2,7 @@
 
 A structured-output LLM agent that reads job descriptions and classifies their remote-work policy. It catches issues that keyword filters miss: travel requirements, local presence clauses, relocation language, hard timezone constraints, and location restrictions disguised as remote roles.
 
----
+______________________________________________________________________
 
 ## Configuration
 
@@ -59,7 +59,7 @@ policy_thresholds:
 
 To retune behavior, adjust `policy_thresholds` or the prompt and rerun evals.
 
----
+______________________________________________________________________
 
 ## Running the agent
 
@@ -110,24 +110,24 @@ Each enriched output record contains all original job fields plus:
 }
 ```
 
----
+______________________________________________________________________
 
 ## Classification schema
 
-| Classification | Meaning |
-| --- | --- |
-| `fully_remote` | No physical presence ever expected |
-| `remote_with_quarterly_travel` | Remote with travel roughly quarterly or less |
-| `remote_with_monthly_travel` | Remote with travel roughly monthly |
-| `remote_with_frequent_travel` | Remote with frequent/material travel, e.g. >12 days/year or 25%+ |
-| `hybrid` | Regular in-office days expected |
-| `onsite_disguised` | Listed as remote but requires local/commuting presence |
-| `location_restricted` | Genuinely remote but restricted to specific geographies |
-| `unclear` | Description and context do not provide enough signal |
+| Classification                 | Meaning                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `fully_remote`                 | No physical presence ever expected                               |
+| `remote_with_quarterly_travel` | Remote with travel roughly quarterly or less                     |
+| `remote_with_monthly_travel`   | Remote with travel roughly monthly                               |
+| `remote_with_frequent_travel`  | Remote with frequent/material travel, e.g. >12 days/year or 25%+ |
+| `hybrid`                       | Regular in-office days expected                                  |
+| `onsite_disguised`             | Listed as remote but requires local/commuting presence           |
+| `location_restricted`          | Genuinely remote but restricted to specific geographies          |
+| `unclear`                      | Description and context do not provide enough signal             |
 
 Legacy labels may appear in old reviewed data, but the active model schema is the list above.
 
----
+______________________________________________________________________
 
 ## Filter logic
 
@@ -142,7 +142,7 @@ A posting is trashed if any configured policy rule rejects it:
 - hard timezone requirements match rejected timezone keywords
 - classification is `unclear` and `on_unclear_classification` is `reject`
 
----
+______________________________________________________________________
 
 ## Eval workflow
 

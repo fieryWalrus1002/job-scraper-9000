@@ -2,7 +2,7 @@
 
 This is the ingestion layer — it talks to job boards, normalises every posting into a common shape, scrubs PII, and writes append-only JSONL files that the rest of the pipeline reads.
 
----
+______________________________________________________________________
 
 ## How it fits in
 
@@ -18,24 +18,24 @@ skills scorer  →  dispatch
 
 You run the scraper, it dumps raw JSONL, and downstream routing/agent stages pick it up from there. Nothing is coupled — you can rerun any phase independently.
 
----
+______________________________________________________________________
 
 ## Scrapers
 
 There are five scraper backends. Each one implements the same two-method interface (`scrape() → list[JobPosting]`, `source_name → str`) so the rest of the pipeline treats them identically.
 
-| Backend | What it hits | Best for |
-|---|---|---|
-| **LinkedIn** | LinkedIn guest API (no login) | Keyword searches, remote filter built-in |
-| **JobSpy** | Indeed, ZipRecruiter, and others via [python-jobspy](https://github.com/Bunsly/JobSpy) | Broad multi-board keyword coverage |
-| **Greenhouse** | `boards.greenhouse.io/<token>/jobs` | Companies you specifically target |
-| **Lever** | `jobs.lever.co/<company>` | Companies you specifically target |
-| **Ashby** | `jobs.ashbyhq.com/<company>` | Companies you specifically target |
-| **SEL** | Workday CXS API (`selinc.wd1.myworkdayjobs.com`) | Schweitzer Engineering Laboratories — location/worker-type filtered |
+| Backend        | What it hits                                                                           | Best for                                                            |
+| -------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **LinkedIn**   | LinkedIn guest API (no login)                                                          | Keyword searches, remote filter built-in                            |
+| **JobSpy**     | Indeed, ZipRecruiter, and others via [python-jobspy](https://github.com/Bunsly/JobSpy) | Broad multi-board keyword coverage                                  |
+| **Greenhouse** | `boards.greenhouse.io/<token>/jobs`                                                    | Companies you specifically target                                   |
+| **Lever**      | `jobs.lever.co/<company>`                                                              | Companies you specifically target                                   |
+| **Ashby**      | `jobs.ashbyhq.com/<company>`                                                           | Companies you specifically target                                   |
+| **SEL**        | Workday CXS API (`selinc.wd1.myworkdayjobs.com`)                                       | Schweitzer Engineering Laboratories — location/worker-type filtered |
 
 The ATS scrapers (Greenhouse / Lever / Ashby) pull **all open roles** from a company board — no keyword filter. That's intentional: you see everything and the remote filter + scorer handle triage downstream.
 
----
+______________________________________________________________________
 
 ## The output: `JobPosting`
 
@@ -60,13 +60,13 @@ Every scraper returns a list of `JobPosting` dataclasses (defined in `models.py`
 
 `dedup_hash` is a SHA-256 of `source|source_job_id|company|title|location` (lowercased). It's what within-source dedup and the downstream analysis cache are keyed on. `source` and `source_job_id` are part of the key because re-posts of the same title at the same company/location for different teams or cohorts (notably SEL) are legitimately distinct postings; including them avoids stale-analysis collisions. Tradeoff: a single listing mirrored across multiple sources is no longer collapsed by this hash — a separate fuzzy-match step is the right place for cross-source dedup.
 
----
+______________________________________________________________________
 
 ## PII scrubbing
 
 Every description is passed through `pii.scrub()` before being written to disk. It redacts email addresses (`[EMAIL_REDACTED]`) and phone numbers (`[PHONE_REDACTED]`). The `scrub_counts` field records how many of each were removed — useful for spotting boards that leak contact info.
 
----
+______________________________________________________________________
 
 ## Running it
 
@@ -108,7 +108,7 @@ uv run job-scraper-9000 run-config config/search.yml --save --run-date 2026-05-1
 uv run job-scraper-9000 run-config config/search.yml --dry-run
 ```
 
----
+______________________________________________________________________
 
 ## YAML config format
 
@@ -157,7 +157,7 @@ companies:
 
 `${HOME_LOCATION}` and any other `${VAR}` references are expanded from environment variables at load time. If a variable isn't set, the config fails loudly rather than silently using a wrong value.
 
----
+______________________________________________________________________
 
 ## Finding which ATS a company uses
 
@@ -169,7 +169,7 @@ uv run job-scraper-9000 discover anthropic mistral cohere notion
 
 It prints a summary and writes to `config/company_boards.json`. After that you can use the `companies:` shorthand in your YAML config and the scraper picks the right backend automatically.
 
----
+______________________________________________________________________
 
 ## Permanent failure skip list
 
@@ -177,7 +177,7 @@ If a scraper hits a 403/404/410 response, it writes an entry to `config/known_fa
 
 Transient errors (rate limits, 5xx) are **not** recorded; they just get logged as warnings and the run moves on.
 
----
+______________________________________________________________________
 
 ## Module layout
 

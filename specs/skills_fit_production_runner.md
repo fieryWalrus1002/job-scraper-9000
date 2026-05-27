@@ -13,7 +13,7 @@ This spec covers the small focused implementation for GitHub issue #61:
 
 This spec does **not** require the broader Phase B follow-ons from `specs/skills_fit_agent_plan.md` such as the `job-scraper skills-fit` CLI subcommand, module README work, or dispatch UI.
 
----
+______________________________________________________________________
 
 ## Why this spec exists
 
@@ -28,7 +28,7 @@ The production skills-fit runner should follow that contract.
 
 Investigation found that the old flat files are no longer meaningful pipeline inputs. Real runs now land in dated partitions, so the production skills-fit runner should require either a `--run-date` or explicit path overrides rather than silently falling back to stale root-level files.
 
----
+______________________________________________________________________
 
 ## Scope
 
@@ -54,7 +54,7 @@ Investigation found that the old flat files are no longer meaningful pipeline in
 - `data/runs/<run_id>/...` pipeline professionalization
 - Dispatch/email/FastAPI delivery
 
----
+______________________________________________________________________
 
 ## Canonical pipeline position
 
@@ -67,7 +67,7 @@ data/filtered/<DATE>/remote_filter_pass.jsonl
 
 The runner consumes both sources because local jobs are still valid candidates for profile scoring.
 
----
+______________________________________________________________________
 
 ## Inputs
 
@@ -95,7 +95,7 @@ If neither `--run-date` nor a full set of explicit path overrides is provided, t
 - candidate profile: `config/profile/candidate_profile.yml`
 - prompt: resolved through the existing `skills_fit` utilities and recorded in provenance
 
----
+______________________________________________________________________
 
 ## CLI contract
 
@@ -114,10 +114,10 @@ Add a script entrypoint with a minimal CLI:
 Resolution rules:
 
 1. explicit path flags win
-2. otherwise `--run-date` resolves partitioned paths
-3. otherwise the runner errors clearly and exits non-zero
+1. otherwise `--run-date` resolves partitioned paths
+1. otherwise the runner errors clearly and exits non-zero
 
----
+______________________________________________________________________
 
 ## Processing rules
 
@@ -177,8 +177,8 @@ Recommended additional fields for downstream usefulness:
 Sort final output before writing:
 
 1. successfully scored records before failed/unscored records
-2. `_skills_fit_score` descending
-3. `dedup_hash` ascending
+1. `_skills_fit_score` descending
+1. `dedup_hash` ascending
 
 This makes ties deterministic across runs. `dedup_hash` is required on all input records, so the runner should validate that invariant before scoring begins.
 
@@ -188,7 +188,7 @@ This makes ties deterministic across runs. `dedup_hash` is required on all input
 - Write JSONL to the resolved output path
 - Overwrite the output file for a fresh run
 
----
+______________________________________________________________________
 
 ## Failure behavior
 
@@ -220,7 +220,7 @@ Behavior:
 
 This keeps the output auditable for record-level scoring failures without hiding upstream pipeline-shape problems.
 
----
+______________________________________________________________________
 
 ## Provenance contract
 
@@ -251,7 +251,7 @@ The metadata contract should follow existing provenance patterns from:
 - `scripts/run_skills_fit_eval.py`
 - other shared provenance helpers already present in the repo
 
----
+______________________________________________________________________
 
 ## Output contract
 
@@ -269,7 +269,7 @@ Output record shape is:
 - original upstream annotations (`_remote_analysis`, `_filter_metadata`, etc.) preserved
 - new `_skills_fit_*` annotations added by this runner
 
----
+______________________________________________________________________
 
 ## Logging / summary
 
@@ -288,7 +288,7 @@ Recommended summary counters:
 
 A short preview of the top-ranked jobs is nice to have but not required for #61.
 
----
+______________________________________________________________________
 
 ## Acceptance criteria
 
@@ -305,7 +305,7 @@ A short preview of the top-ranked jobs is nice to have but not required for #61.
 - equal-score jobs are ordered deterministically by `dedup_hash`
 - the run aborts with a clear error if any input record is missing `dedup_hash`
 
----
+______________________________________________________________________
 
 ## Notes for future follow-on work
 

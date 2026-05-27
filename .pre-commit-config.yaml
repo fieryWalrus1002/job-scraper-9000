@@ -17,3 +17,10 @@ repos:
     rev: v1.1.409
     hooks:
       - id: pyright
+
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        additional_dependencies: ['mdformat-gfm']
+        exclude: '^(\.github/ISSUE_TEMPLATE/|prompts/)'

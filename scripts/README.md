@@ -14,7 +14,7 @@ data/raw/*.jsonl                      ← scraped job records (Bronze)
     └─ eval/ground_truth.jsonl        ← human-verified records            (Gold)
 ```
 
----
+______________________________________________________________________
 
 ## Scripts
 
@@ -31,7 +31,7 @@ python scripts/prepare_batch.py
 
 After running, upload the output file to the OpenAI Batch API dashboard (or via API), wait for completion, and download the results file.
 
----
+______________________________________________________________________
 
 ### `merge_batch_results.py`
 
@@ -44,16 +44,16 @@ python scripts/merge_batch_results.py \
     --output  data/staging/to_review.jsonl
 ```
 
-| Flag | Default | Description |
-|---|---|---|
-| `--jobs` | `data/raw/scraped_jobs.jsonl` | Original jobs file fed to `prepare_batch.py` |
-| `--results` | `data/raw/gpt_teacher_results.jsonl` | Downloaded batch results from OpenAI |
-| `--output` | `data/staging/to_review.jsonl` | Merged output for the review UI |
-| `--append` | off | Append to output instead of overwriting |
+| Flag        | Default                              | Description                                  |
+| ----------- | ------------------------------------ | -------------------------------------------- |
+| `--jobs`    | `data/raw/scraped_jobs.jsonl`        | Original jobs file fed to `prepare_batch.py` |
+| `--results` | `data/raw/gpt_teacher_results.jsonl` | Downloaded batch results from OpenAI         |
+| `--output`  | `data/staging/to_review.jsonl`       | Merged output for the review UI              |
+| `--append`  | off                                  | Append to output instead of overwriting      |
 
 Items where the batch API returned an error are logged and skipped.
 
----
+______________________________________________________________________
 
 ### `sample_for_review.py`
 
@@ -68,7 +68,7 @@ python scripts/sample_for_review.py
 
 Edit `create_sample_batch()` arguments directly to change the source file or sample size (default `n=50`).
 
----
+______________________________________________________________________
 
 ### `job-scraper-9000 remote-filter`
 
@@ -89,7 +89,7 @@ python scripts/run_remote_filter.py
 
 Agent config is read from `config/agent/remote_agent.yml`. Set `USER_LOCATION` in your `.env` to filter by geography (default: `USA`).
 
----
+______________________________________________________________________
 
 ## Eval
 
@@ -106,25 +106,25 @@ uv run scripts/run_remote_filter_eval.py
 **Input:** `data/eval/ground_truth.jsonl`
 **Output:** `data/eval/runs.jsonl` (appended), `data/eval/mismatches_{run_id}.jsonl` (if any mismatches)
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--gold` | `data/eval/ground_truth.jsonl` | Gold JSONL to evaluate against |
-| `--config` | `config/agent/remote_agent.yml` | Agent config YAML |
-| `--runs-file` | `data/eval/runs.jsonl` | Run log to append to |
-| `--model` | _(from config)_ | Override `llm.model` in-memory — does not modify the YAML |
-| `--temperature` | _(from config)_ | Override `llm.temperature` in-memory |
-| `--provider` | _(from config)_ | Override `llm.provider` in-memory (`openai` or `ollama`) |
-| `--run-id` | _(auto-generated)_ | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
-| `--no-mismatches` | off | Skip writing the mismatch file |
-| `--workers` | `1` | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
+| Flag              | Default                         | Description                                                                                                                      |
+| ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `--gold`          | `data/eval/ground_truth.jsonl`  | Gold JSONL to evaluate against                                                                                                   |
+| `--config`        | `config/agent/remote_agent.yml` | Agent config YAML                                                                                                                |
+| `--runs-file`     | `data/eval/runs.jsonl`          | Run log to append to                                                                                                             |
+| `--model`         | _(from config)_                 | Override `llm.model` in-memory — does not modify the YAML                                                                        |
+| `--temperature`   | _(from config)_                 | Override `llm.temperature` in-memory                                                                                             |
+| `--provider`      | _(from config)_                 | Override `llm.provider` in-memory (`openai` or `ollama`)                                                                         |
+| `--run-id`        | _(auto-generated)_              | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique.                             |
+| `--no-mismatches` | off                             | Skip writing the mismatch file                                                                                                   |
+| `--workers`       | `1`                             | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
 
 The default provider is `openai` (model: `gpt-4o-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
 Recent smoke-test baseline on the 104-record gold set:
 
-| run_id | model | workers | accuracy | precision | recall | f1 |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `smoke_parallel_20260516_045209_a6da` | `gpt-4o-mini` | 4 | 0.8654 | 0.7073 | 0.9355 | 0.8056 |
+| run_id                                | model         | workers | accuracy | precision | recall |     f1 |
+| ------------------------------------- | ------------- | ------: | -------: | --------: | -----: | -----: |
+| `smoke_parallel_20260516_045209_a6da` | `gpt-4o-mini` |       4 |   0.8654 |    0.7073 | 0.9355 | 0.8056 |
 
 The current tuning target is reducing false positives: onsite or location-restricted jobs being predicted as pass.
 
@@ -148,7 +148,7 @@ uv run scripts/run_remote_filter_eval.py --workers 4 --run-id gpt4o_mini_paralle
 uv run scripts/compare_evals.py --diff gpt4o_mini_baseline qwen_14b
 ```
 
----
+______________________________________________________________________
 
 ### Batch eval — `submit_eval_batch.py` + `poll_eval_batch.py`
 
@@ -169,7 +169,7 @@ uv run python scripts/poll_eval_batch.py --sidecar data/eval/eval_batch_<run_id>
 
 `poll_eval_batch.py` verifies the gold-file hash before scoring, downloads completed batch results into `data/eval/batch/`, writes mismatch records if needed, and appends the normal eval run record to `data/eval/runs.jsonl`.
 
----
+______________________________________________________________________
 
 ### `compare_evals.py`
 
@@ -179,14 +179,14 @@ Reads `data/eval/runs.jsonl` and prints a comparison table. Exits cleanly if no 
 uv run scripts/compare_evals.py
 ```
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--runs-file` | `data/eval/runs.jsonl` | Run log to read |
-| `--last N` | _(all)_ | Show only the N most recent runs |
-| `--sort-by` | `timestamp` | Sort by `timestamp` or a scorer-specific metric |
-| `--diff <id_a> <id_b>` | — | Side-by-side metric comparison with `↑`/`↓`/`=` indicators |
-| `--against-champion <scorer>` | — | Resolve the left-hand diff run from `config/eval/champions.yml` |
-| `--per-record` | `false` | After aggregate diff, print a per-record markdown table (`skills_fit` only) |
+| Flag                          | Default                | Description                                                                 |
+| ----------------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `--runs-file`                 | `data/eval/runs.jsonl` | Run log to read                                                             |
+| `--last N`                    | _(all)_                | Show only the N most recent runs                                            |
+| `--sort-by`                   | `timestamp`            | Sort by `timestamp` or a scorer-specific metric                             |
+| `--diff <id_a> <id_b>`        | —                      | Side-by-side metric comparison with `↑`/`↓`/`=` indicators                  |
+| `--against-champion <scorer>` | —                      | Resolve the left-hand diff run from `config/eval/champions.yml`             |
+| `--per-record`                | `false`                | After aggregate diff, print a per-record markdown table (`skills_fit` only) |
 
 **Examples:**
 
@@ -207,19 +207,19 @@ uv run scripts/compare_evals.py \
   --per-record
 ```
 
----
+______________________________________________________________________
 
 ## Data Directory Reference
 
-| Path | Stage | Contents |
-|---|---|---|
-| `data/raw/` | Bronze | Untouched scraped JSONL from all sources |
+| Path                           | Stage  | Contents                                     |
+| ------------------------------ | ------ | -------------------------------------------- |
+| `data/raw/`                    | Bronze | Untouched scraped JSONL from all sources     |
 | `data/staging/to_review.jsonl` | Silver | Teacher-annotated jobs awaiting human review |
-| `data/eval/ground_truth.jsonl` | Gold | Human-verified records from the Streamlit UI |
-| `data/filtered/` | — | Student agent pass results |
-| `data/trash/` | — | Student agent trash results |
+| `data/eval/ground_truth.jsonl` | Gold   | Human-verified records from the Streamlit UI |
+| `data/filtered/`               | —      | Student agent pass results                   |
+| `data/trash/`                  | —      | Student agent trash results                  |
 
----
+______________________________________________________________________
 
 ## skills_fit — seed gold + eval workflow
 
@@ -263,15 +263,15 @@ Teacher LLM proposes labels and rationale for every template record. Calls `load
 uv run scripts/propose_skills_fit_seed.py --model gpt-5.5 --temperature 1.0
 ```
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--in` | `data/staging/skills_fit_seed_template.jsonl` | Template produced by `prepare_skills_fit_seed.py` |
-| `--out` | `data/staging/skills_fit_seed_proposed.jsonl` | Proposed-label output (appended, resume-safe) |
-| `--config` | `config/agent/skills_fit.yml` | Agent config (provides default LLM block) |
-| `--model` | _(from config)_ | Override the model |
-| `--temperature` | _(from config)_ | Override the temperature (ignored by reasoning models that lock it) |
-| `--prompt` | _(skills-fit prompt)_ | Override the system prompt file |
-| `--limit` | _(all)_ | Cap the number of records (smoke testing) |
+| Flag            | Default                                       | Description                                                         |
+| --------------- | --------------------------------------------- | ------------------------------------------------------------------- |
+| `--in`          | `data/staging/skills_fit_seed_template.jsonl` | Template produced by `prepare_skills_fit_seed.py`                   |
+| `--out`         | `data/staging/skills_fit_seed_proposed.jsonl` | Proposed-label output (appended, resume-safe)                       |
+| `--config`      | `config/agent/skills_fit.yml`                 | Agent config (provides default LLM block)                           |
+| `--model`       | _(from config)_                               | Override the model                                                  |
+| `--temperature` | _(from config)_                               | Override the temperature (ignored by reasoning models that lock it) |
+| `--prompt`      | _(skills-fit prompt)_                         | Override the system prompt file                                     |
+| `--limit`       | _(all)_                                       | Cap the number of records (smoke testing)                           |
 
 **Note on `gpt-5.5`:** the GPT-5 family rejects custom `temperature` and runs at its default (1.0). The flag is accepted but the API may ignore it for those models.
 
@@ -316,15 +316,15 @@ uv run scripts/run_skills_fit_eval.py --scorer keyword --run-id phase_r_keyword
 uv run scripts/run_skills_fit_eval.py --scorer llm     --run-id phase_r_llm_rubric
 ```
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--gold` | `data/eval/skills_fit_ground_truth.jsonl` | Gold JSONL to evaluate against |
-| `--config` | `config/agent/skills_fit.yml` | Agent config YAML |
-| `--scorer` | `llm` | `llm` or `keyword` |
-| `--model` / `--provider` / `--temperature` | _(from config)_ | In-memory overrides |
-| `--run-id` | _(auto-generated)_ | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
-| `--workers` | `1` | Concurrent inference workers for the LLM scorer |
-| `--no-mismatches` | off | Skip writing the mismatch file |
+| Flag                                       | Default                                   | Description                                                                                          |
+| ------------------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `--gold`                                   | `data/eval/skills_fit_ground_truth.jsonl` | Gold JSONL to evaluate against                                                                       |
+| `--config`                                 | `config/agent/skills_fit.yml`             | Agent config YAML                                                                                    |
+| `--scorer`                                 | `llm`                                     | `llm` or `keyword`                                                                                   |
+| `--model` / `--provider` / `--temperature` | _(from config)_                           | In-memory overrides                                                                                  |
+| `--run-id`                                 | _(auto-generated)_                        | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique. |
+| `--workers`                                | `1`                                       | Concurrent inference workers for the LLM scorer                                                      |
+| `--no-mismatches`                          | off                                       | Skip writing the mismatch file                                                                       |
 
 ### Re-running after a profile bump
 

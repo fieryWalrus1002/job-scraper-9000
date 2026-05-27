@@ -2,7 +2,7 @@
 
 **Status:** Planned — not yet implemented.
 
----
+______________________________________________________________________
 
 ## Problem
 
@@ -13,29 +13,30 @@ currently no automated check that catches this before the bad data flows downstr
 remote-filter and semantic-similarity pipelines.
 
 We already hit all three failure modes during the initial SEL bring-up:
+
 - Wrong HTTP method → 0 jobs ingested
 - Wrong JSON key path (`jobDescription` vs `jobPostingInfo.jobDescription`) → all descriptions empty
 - `total=0` pagination quirk mishandled → 40 of 94 jobs fetched, no error raised
 - `postedOn` returned as relative string → `"Posted Yesterday"` written verbatim as a date
 
----
+______________________________________________________________________
 
 ## What "good data" looks like for SEL
 
 Observed from the 2026-05-14 production scrape (94 jobs, Pullman WA filter):
 
-| Field | Expected |
-|---|---|
-| Job count | ≥ 50 (SEL Pullman typically 80–100 full-time regular roles) |
-| `description` non-empty | 100% |
-| `description` length | ≥ 500 chars (real postings are 2,300–6,300) |
-| `posted_at` format | ISO `YYYY-MM-DD`, not a relative string |
-| `location` | No `"N Locations"` values |
-| Salary mention in description | ≥ 80% (SEL publishes pay ranges consistently) |
+| Field                         | Expected                                                    |
+| ----------------------------- | ----------------------------------------------------------- |
+| Job count                     | ≥ 50 (SEL Pullman typically 80–100 full-time regular roles) |
+| `description` non-empty       | 100%                                                        |
+| `description` length          | ≥ 500 chars (real postings are 2,300–6,300)                 |
+| `posted_at` format            | ISO `YYYY-MM-DD`, not a relative string                     |
+| `location`                    | No `"N Locations"` values                                   |
+| Salary mention in description | ≥ 80% (SEL publishes pay ranges consistently)               |
 
 These thresholds should be tuned per-scraper as we add more sources.
 
----
+______________________________________________________________________
 
 ## Proposed two-layer approach
 
@@ -49,15 +50,15 @@ and checks the output list against per-source thresholds. If any check fails it 
 
 1. **Minimum job count** — if count drops below threshold, the facet GUIDs probably changed or
    the API returned an error body instead of postings.
-2. **Description completeness** — `% with non-empty description ≥ threshold`. Catches JSON key
+1. **Description completeness** — `% with non-empty description ≥ threshold`. Catches JSON key
    path regressions.
-3. **Description minimum length** — catches cases where description is technically non-empty
+1. **Description minimum length** — catches cases where description is technically non-empty
    but only contains boilerplate (e.g. a single whitespace or paragraph).
-4. **`posted_at` format** — all values must match `YYYY-MM-DD`. Catches cases where the
+1. **`posted_at` format** — all values must match `YYYY-MM-DD`. Catches cases where the
    relative-date parser fails on a new Workday string format.
-5. **Location validity** — no values matching `\d+ Locations`. Catches the multi-location
+1. **Location validity** — no values matching `\d+ Locations`. Catches the multi-location
    fallback breaking.
-6. **Salary mention rate** — warn if fewer than expected % of descriptions mention `$` or
+1. **Salary mention rate** — warn if fewer than expected % of descriptions mention `$` or
    `salary`. A sudden drop likely means the description body structure changed.
 
 **Where to put it:** `src/job_scraper/quality.py` — a `QualityReport` dataclass and a
@@ -67,7 +68,7 @@ returns, before writing the JSONL.
 **Per-source thresholds:** Define in a `THRESHOLDS` dict keyed by `source_name`, with a
 generic fallback for new scrapers. Could also be expressed in the YAML config.
 
----
+______________________________________________________________________
 
 ### Layer 2 — Fixture-based contract tests (catches code regressions in CI)
 
@@ -79,11 +80,13 @@ CI without hitting the network.
 
 The existing mocks in `test_sel.py` use hand-crafted minimal dicts. A fixture using a real
 response catches:
+
 - New fields Workday starts returning that break our parsing assumptions
 - Field renames (e.g. if `bulletFields` became `bulletField`)
 - Nested structure changes (e.g. if `jobPostingInfo` moved to a different key)
 
 **Where to put it:**
+
 - Fixture: `tests/fixtures/sel_jobs_response.json` + `tests/fixtures/sel_detail_response.json`
 - Test: `tests/job_scraper/test_sel_contract.py`
 
@@ -91,7 +94,7 @@ response catches:
 saves both the listing response and one detail response to the fixture files, and commits them.
 Re-capture periodically (or when a regression is detected) to keep the fixture fresh.
 
----
+______________________________________________________________________
 
 ## What is NOT in scope
 
@@ -100,7 +103,7 @@ Re-capture periodically (or when a regression is detected) to keep the fixture f
 - Comparing across scrape runs (dedup / delta detection) — separate concern, not part of this
   spec.
 
----
+______________________________________________________________________
 
 ## Where we left off
 

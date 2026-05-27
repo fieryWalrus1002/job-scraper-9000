@@ -2,14 +2,14 @@
 
 Known failure modes and ambiguous cases surfaced during eval runs.
 
----
+______________________________________________________________________
 
 ## EC-1 — Regional dialect requirement misread as local presence
 
-**Record:** `466e17c1`  
-**Job:** Data Annotation Specialist, Arabic Language Najdi/Hijazi Dialect @ Cohere  
-**Gold:** `pass` (fully_remote)  
-**Pred:** `trash` (reason: `requires_local_presence`)  
+**Record:** `466e17c1`
+**Job:** Data Annotation Specialist, Arabic Language Najdi/Hijazi Dialect @ Cohere
+**Gold:** `pass` (fully_remote)
+**Pred:** `trash` (reason: `requires_local_presence`)
 **First seen:** `gpt4o_mini_baseline`
 
 The agent read a regional dialect requirement ("Najdi/Hijazi") as implying the candidate must be physically located in the Najd/Hejaz region of Saudi Arabia. The human reviewer correctly identified it as a language skill requirement on a fully remote role.

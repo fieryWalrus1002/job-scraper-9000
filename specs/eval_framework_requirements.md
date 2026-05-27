@@ -1,13 +1,13 @@
 # Eval Framework Requirements
 
-**Date:** 2026-05-14  
+**Date:** 2026-05-14
 **Branch:** feature/remote-filter-eval
 
 ## Objective
 
 Implement a reproducible, file-based evaluation tracking system to measure LLM classification accuracy across different models, prompts, and hyperparameter configurations. Must use a modular logging interface to support future cloud tracking integrations without changes to eval logic.
 
----
+______________________________________________________________________
 
 ## Success Criteria
 
@@ -24,36 +24,36 @@ Evaluation scripts must not perform inline file I/O for telemetry.
 
 Every execution must produce a single JSONL record with all of the following fields:
 
-| Field | Description |
-| --- | --- |
-| `schema_version` | Semver string (e.g. `"1.0.0"`) — increment when fields are added or changed |
-| `run_id` | `YYYYMMDD_HHMMSS_<4-char hex>` — sortable and unique; when `--run-id` supplies a custom label, the logger must reject it if the value already exists in `runs.jsonl` |
-| `timestamp` | ISO 8601 UTC |
-| `git.commit` | Short SHA from `git rev-parse --short HEAD` — pins dependencies, config, and prompt files to a reproducible state |
-| `git.dirty` | Boolean — if `true`, the commit hash alone does not fully describe the run environment |
-| `gold_file` | Relative path to the gold JSONL used |
-| `gold_hash` | `sha256:<hex>` of the gold file bytes — detects silent dataset drift |
-| `prompt_hash` | `sha256:<hex>` of the **resolved system prompt string** passed to the LLM — not the source file, so dynamic composition is captured correctly (first 8 hex chars as display label) |
-| `config.provider` | LLM provider as resolved at runtime (after any CLI overrides) |
-| `config.model` | Model name as resolved at runtime |
-| `config.temperature` | Temperature as resolved at runtime |
-| `config.policy_thresholds` | Full `policy_thresholds` block from the config YAML |
-| `config.config_file` | Path to the YAML used |
-| `env.python_version` | Output of `platform.python_version()` — behavior can shift across minor versions independent of `uv.lock` |
-| `env.platform` | Output of `platform.platform()` — OS/architecture; `uv.lock` is cross-platform and does not capture this |
-| `env.uv_version` | Output of `uv --version` — resolver behavior can differ across UV versions even with the same lock; if `uv` is unavailable, log `null` and emit a warning without failing the run |
-| `env.uv_lock_hash` | `sha256:<hex>` of `uv.lock` — detects accidental edits to the lock without a corresponding code change; makes the record self-contained without requiring a git checkout |
-| `metrics.evaluated` | Records that completed inference and received a verdict |
-| `metrics.skipped` | Records dropped before inference (missing description, invalid verdict, agent error) |
-| `metrics.total` | `evaluated + skipped` |
-| `metrics.prevalence` | `(tp + fn) / evaluated` — positive-class rate in the gold set; flags dataset drift between runs |
-| `metrics.tp/fp/tn/fn` | Raw confusion matrix counts |
-| `metrics.accuracy` | `(tp + tn) / evaluated` — skipped records have no verdict and must not be in the denominator |
-| `metrics.precision` | `tp / (tp + fp)` — positive-class precision |
-| `metrics.recall` | `tp / (tp + fn)` — positive-class recall |
-| `metrics.f1` | `2 * precision * recall / (precision + recall)` — positive-class F1 |
-| `mismatch_file` | Relative path to the corresponding mismatch JSONL, or `null` if none |
-| `mismatch_schema_version` | Semver string for mismatch record format; bump when fields change |
+| Field                      | Description                                                                                                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`           | Semver string (e.g. `"1.0.0"`) — increment when fields are added or changed                                                                                                        |
+| `run_id`                   | `YYYYMMDD_HHMMSS_<4-char hex>` — sortable and unique; when `--run-id` supplies a custom label, the logger must reject it if the value already exists in `runs.jsonl`               |
+| `timestamp`                | ISO 8601 UTC                                                                                                                                                                       |
+| `git.commit`               | Short SHA from `git rev-parse --short HEAD` — pins dependencies, config, and prompt files to a reproducible state                                                                  |
+| `git.dirty`                | Boolean — if `true`, the commit hash alone does not fully describe the run environment                                                                                             |
+| `gold_file`                | Relative path to the gold JSONL used                                                                                                                                               |
+| `gold_hash`                | `sha256:<hex>` of the gold file bytes — detects silent dataset drift                                                                                                               |
+| `prompt_hash`              | `sha256:<hex>` of the **resolved system prompt string** passed to the LLM — not the source file, so dynamic composition is captured correctly (first 8 hex chars as display label) |
+| `config.provider`          | LLM provider as resolved at runtime (after any CLI overrides)                                                                                                                      |
+| `config.model`             | Model name as resolved at runtime                                                                                                                                                  |
+| `config.temperature`       | Temperature as resolved at runtime                                                                                                                                                 |
+| `config.policy_thresholds` | Full `policy_thresholds` block from the config YAML                                                                                                                                |
+| `config.config_file`       | Path to the YAML used                                                                                                                                                              |
+| `env.python_version`       | Output of `platform.python_version()` — behavior can shift across minor versions independent of `uv.lock`                                                                          |
+| `env.platform`             | Output of `platform.platform()` — OS/architecture; `uv.lock` is cross-platform and does not capture this                                                                           |
+| `env.uv_version`           | Output of `uv --version` — resolver behavior can differ across UV versions even with the same lock; if `uv` is unavailable, log `null` and emit a warning without failing the run  |
+| `env.uv_lock_hash`         | `sha256:<hex>` of `uv.lock` — detects accidental edits to the lock without a corresponding code change; makes the record self-contained without requiring a git checkout           |
+| `metrics.evaluated`        | Records that completed inference and received a verdict                                                                                                                            |
+| `metrics.skipped`          | Records dropped before inference (missing description, invalid verdict, agent error)                                                                                               |
+| `metrics.total`            | `evaluated + skipped`                                                                                                                                                              |
+| `metrics.prevalence`       | `(tp + fn) / evaluated` — positive-class rate in the gold set; flags dataset drift between runs                                                                                    |
+| `metrics.tp/fp/tn/fn`      | Raw confusion matrix counts                                                                                                                                                        |
+| `metrics.accuracy`         | `(tp + tn) / evaluated` — skipped records have no verdict and must not be in the denominator                                                                                       |
+| `metrics.precision`        | `tp / (tp + fp)` — positive-class precision                                                                                                                                        |
+| `metrics.recall`           | `tp / (tp + fn)` — positive-class recall                                                                                                                                           |
+| `metrics.f1`               | `2 * precision * recall / (precision + recall)` — positive-class F1                                                                                                                |
+| `mismatch_file`            | Relative path to the corresponding mismatch JSONL, or `null` if none                                                                                                               |
+| `mismatch_schema_version`  | Semver string for mismatch record format; bump when fields change                                                                                                                  |
 
 ### SC-3 — Deterministic Configuration
 
@@ -105,7 +105,7 @@ For scheduled regression testing where 24h turnaround is acceptable, the OpenAI 
 - OpenAI Batch API only — Ollama does not support batch submission; `submit_eval_batch.py` must exit with a clear error if `--provider ollama` is passed
 - The resulting `runs.jsonl` record is structurally identical to a synchronous eval run; downstream tools (`compare_evals.py`) require no changes
 
----
+______________________________________________________________________
 
 ## Examples
 
@@ -121,13 +121,13 @@ Example mismatch record (`mismatches_*.jsonl`):
 {"run_id":"20260514_193055_a7f3","record_id":"606ba385","gold":"pass","pred":"trash","reason":"Model rejected due to EST timezone requirement; human policy was fully_remote."}
 ```
 
----
+______________________________________________________________________
 
 ## Extensibility
 
 - Optional fields (e.g., `agent_latency_ms`, `token_usage`) may be added to run records without a schema bump, as long as existing required fields remain unchanged
 
----
+______________________________________________________________________
 
 ## Out of Scope
 
