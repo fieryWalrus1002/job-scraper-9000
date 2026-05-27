@@ -1,0 +1,87 @@
+# job-scraper-9000 search config example
+# cp config/search.yml.example config/search.yml
+# Edit config/search.yml to customize your job search parameters. See the
+# README and code comments for guidance on how to use this config effectively.
+
+global:
+  default_max_results: 50
+  hours_old: 48
+  linkedin_time: day            # day | week | month | any
+  salary_floor_k: 20
+
+companies:
+  # Consider activating this block for high-leverage targeted searches —
+  # pick 10-20 companies you'd actually want to work for and pull all their
+  # current postings. Far higher hit rate than generic keyword searches for
+  # someone new to broad job searching. Pair with greenhouse: block below
+  # for companies on Greenhouse ATS.
+  - notion
+  - mistral
+  - cohere
+  - harvey
+  - perplexity
+  - deepmind
+  - replit
+  - figma
+  - stripe
+
+greenhouse:
+  # Worth activating alongside companies: above. Greenhouse is the ATS for
+  # many tech companies that don't post comprehensively on LinkedIn.
+  # boards:
+    - anthropic
+    - openai
+    - microsoft
+    - amazon
+    - planet-labs
+    - descartes-labs
+    - scale-ai
+
+linkedin:
+  # Experience codes: 1=Intern, 2=Entry, 3=Associate, 4=Mid-Senior, 5=Director, 6=Executive
+  # v3 profile: not seeking junior (drops 2); Director/VP out (drops 5).
+  # 3,4 covers Associate (mid) through Mid-Senior (senior/staff/principal).
+  experience: "3,4"
+  workplace: remote
+  job_type: fulltime
+
+  searches:
+    - keywords: "systems engineer"
+    - keywords: "research engineer"
+    - keywords: "research software engineer"
+    - keywords: "scientific software engineer"
+    - keywords: "applied scientist"
+    - keywords: "machine learning engineer"
+    - keywords: "MLOps engineer"
+
+jobspy:
+  # LinkedIn is covered by the dedicated linkedin scraper; jobspy adds
+  # Indeed + ZipRecruiter coverage. Same niche terms as LinkedIn, plus
+  # broader terms for the local-only ${HOME_LOCATION} market (small pool
+  # tolerates broader terms without too much noise).
+  sites: linkedin, indeed  #,zip_recruiter <- is not working, 403 Forbidden, likely anti-scraping measures
+  no_remote: false
+
+  searches:
+    # Local (${HOME_LOCATION}) — small market, broader terms catch more here
+    - search_term: "research engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "software engineer"
+      location: "${HOME_LOCATION}"
+    - search_term: "data engineer"
+      location: "${HOME_LOCATION}"
+
+    # Remote — mirrors the LinkedIn niche terms for Indeed/ZipRecruiter
+    # coverage. More condensed than LinkedIn since jobspy is supplementary.
+    - search_term: "C++ engineer"
+      location: "United States"
+    - search_term: "embedded software engineer"
+      location: "United States"
+    - search_term: "research engineer"
+      location: "United States"
+    - search_term: "network automation engineer"
+      location: "United States"
+    - search_term: "platform engineer"
+      location: "United States"
+    - search_term: "MLOps engineer"
+      location: "United States"
