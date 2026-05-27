@@ -122,9 +122,22 @@ uv run job-scraper-9000 skills-fit --run-date $(date +%F)
 
 **Review the top matches and gaps for a specific run:**
 
+I added `--limit` and `--start` flags to the `view_top_x_jobs.py` script so you can paginate through results without hitting OOM on your local machine. For example, to view jobs 0-20 from the May 26 run:
+
 ```bash
-uv run scripts/view_top_20_jobs.py --run-date 2026-05-26
+uv run scripts/view_top_x_jobs.py --run-date 2026-05-26 --start 0 --limit 20
 ```
+
+Should it have been `--start 0 --end 20`? Yes, probably. Or done it as a slice `--range 0:20`. But here we are.
+
+**Schedule a run overnight:**
+
+``` bash
+at 12:30 AM -f scripts/run_overnight.sh
+```
+
+This will schedule the `scripts/run_overnight.sh` script to execute at 12:30 AM. The script should contain the necessary commands to run the full pipeline.
+
 
 ---
 
