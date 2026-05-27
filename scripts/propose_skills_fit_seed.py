@@ -64,14 +64,21 @@ def main() -> None:
     p.add_argument("--in", dest="input", default=str(DEFAULT_IN))
     p.add_argument("--out", default=str(DEFAULT_OUT))
     p.add_argument("--config", default=str(DEFAULT_CONFIG))
-    p.add_argument("--model", default=None, help="Override the model in the config (e.g. gpt-4o)")
+    p.add_argument(
+        "--model", default=None, help="Override the model in the config (e.g. gpt-4o)"
+    )
     p.add_argument("--temperature", type=float, default=None)
     p.add_argument(
         "--prompt",
         default=None,
         help=f"Override the system prompt file (default: {SKILLS_FIT_PROMPT_PATH})",
     )
-    p.add_argument("--limit", type=int, default=None, help="Cap the number of records (smoke testing)")
+    p.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Cap the number of records (smoke testing)",
+    )
     args = p.parse_args()
 
     in_path = Path(args.input)

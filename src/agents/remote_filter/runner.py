@@ -180,6 +180,7 @@ def run_remote_filter(
                     from_cache = False
                     cache_keyable = cache is not None and bool(dedup_key)
                     if cache_keyable:
+                        assert cache is not None
                         analysis = cache.get(
                             dedup_hash=dedup_key,
                             prompt_hash=prompt_hash,
@@ -214,6 +215,7 @@ def run_remote_filter(
                             run.increment_failures()
                             continue
                         if cache_keyable:
+                            assert cache is not None
                             cache.put(
                                 dedup_hash=dedup_key,
                                 prompt_hash=prompt_hash,
@@ -266,7 +268,7 @@ def run_remote_filter(
                 )
             run.update_llm_stats(calls_made=cache_misses)
             if provider == "openai":
-                breakdown = estimate_cost(model, **run.token_totals)
+                breakdown = estimate_cost(model, batch=False, **run.token_totals)
                 if breakdown is not None:
                     total = breakdown.pop("total")
                     run.set_cost(estimated_total=total, breakdown=breakdown)

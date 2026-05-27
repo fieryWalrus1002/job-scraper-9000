@@ -1,4 +1,10 @@
-from .models import DEFAULT_COUNTRY_ALIASES, PREFILTER_ROUTES, SCHEMA_VERSION, PrefilterConfig, PrefilterRoute
+from .models import (
+    DEFAULT_COUNTRY_ALIASES,
+    PREFILTER_ROUTES,
+    SCHEMA_VERSION,
+    PrefilterConfig,
+    PrefilterRoute,
+)
 from .router import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_INPUT_PATH,

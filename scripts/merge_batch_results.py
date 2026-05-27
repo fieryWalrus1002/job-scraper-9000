@@ -31,10 +31,7 @@ log = logging.getLogger(__name__)
 DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
 STAGING_FILE = "data/staging/to_review.jsonl"
 PROMPT_FILE = (
-    Path(__file__).parents[1]
-    / "prompts"
-    / "remote_agent_teacher"
-    / "system_prompt.txt"
+    Path(__file__).parents[1] / "prompts" / "remote_agent_teacher" / "system_prompt.txt"
 )
 
 

@@ -35,10 +35,7 @@ DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
 MODEL = "gpt-4o"
 
 PROMPT_FILE = (
-    Path(__file__).parents[1]
-    / "prompts"
-    / "remote_agent_teacher"
-    / "system_prompt.txt"
+    Path(__file__).parents[1] / "prompts" / "remote_agent_teacher" / "system_prompt.txt"
 )
 
 

@@ -12,12 +12,14 @@ from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)
 
+
 def _resolve_prompt_path() -> Path:
     """Return the active remote-filter prompt path in source trees or installed wheels."""
     relative = Path("prompts") / "remote_agent" / "system_prompt.txt"
     candidates = [
         Path(__file__).parents[3] / relative,  # repo root when running from src/
-        Path(__file__).parents[2] / relative,  # site-packages when prompts are wheel data
+        Path(__file__).parents[2]
+        / relative,  # site-packages when prompts are wheel data
         Path.cwd() / relative,
     ]
     for candidate in candidates:

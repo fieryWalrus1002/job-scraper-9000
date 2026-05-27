@@ -114,9 +114,7 @@ def test_deterministic_component_writes_no_llm_block(tmp_path: Path) -> None:
 
 def test_parent_run_id_link(tmp_path: Path) -> None:
     runs_path = tmp_path / "runs.jsonl"
-    with RunTracker(
-        component="prefilter", log_path=runs_path
-    ) as parent:
+    with RunTracker(component="prefilter", log_path=runs_path) as parent:
         parent_id = parent.run_id
     with RunTracker(
         component="remote_filter", log_path=runs_path, parent_run_id=parent_id

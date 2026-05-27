@@ -3,7 +3,12 @@
 from unittest.mock import MagicMock
 
 from job_scraper.query import SELSearchQuery
-from job_scraper.scrapers.sel import SELJobScraper, _JOBS_API, _PAGE_SIZE, _parse_posted_at
+from job_scraper.scrapers.sel import (
+    SELJobScraper,
+    _JOBS_API,
+    _PAGE_SIZE,
+    _parse_posted_at,
+)
 
 
 def _make_scraper(**kwargs) -> SELJobScraper:
@@ -105,7 +110,7 @@ def test_scrape_paginates_until_total_reached():
     scraper.session = MagicMock()
     scraper.session.post.side_effect = [
         _api_response(page1, total=total),
-        _api_response(page2, total=0),   # Workday: total=0 on pages 2+
+        _api_response(page2, total=0),  # Workday: total=0 on pages 2+
     ]
 
     jobs = scraper.scrape()
@@ -122,7 +127,7 @@ def test_scrape_second_page_uses_correct_offset():
     scraper.session = MagicMock()
     scraper.session.post.side_effect = [
         _api_response(page1, total=_PAGE_SIZE + 1),
-        _api_response(page2, total=0),   # Workday: total=0 on pages 2+
+        _api_response(page2, total=0),  # Workday: total=0 on pages 2+
     ]
 
     scraper.scrape()
@@ -175,7 +180,10 @@ def test_scrape_source_url_uses_domain_and_external_path():
 
     jobs = scraper.scrape()
 
-    assert jobs[0].source_url == "https://selinc.wd1.myworkdayjobs.com/job/Pullman-WA/Engineer_1_JR001"
+    assert (
+        jobs[0].source_url
+        == "https://selinc.wd1.myworkdayjobs.com/job/Pullman-WA/Engineer_1_JR001"
+    )
 
 
 def test_scrape_company_is_sel():
@@ -221,7 +229,12 @@ def test_scrape_fetches_description_per_job_when_enabled():
     detail_resp = MagicMock()
     detail_resp.status_code = 200
     # Real Workday API: description is under jobPostingInfo, not top-level
-    detail_resp.json.return_value = {"jobPostingInfo": {"jobDescription": "<p>Great job</p>", "postedOn": "2026-05-01"}}
+    detail_resp.json.return_value = {
+        "jobPostingInfo": {
+            "jobDescription": "<p>Great job</p>",
+            "postedOn": "2026-05-01",
+        }
+    }
     scraper.session.get.return_value = detail_resp
 
     jobs = scraper.scrape()
@@ -357,7 +370,12 @@ def test_scrape_posted_at_parsed_from_relative_string():
     scraper.session.post.return_value = _api_response([_posting(1)])
     detail_resp = MagicMock()
     detail_resp.status_code = 200
-    detail_resp.json.return_value = {"jobPostingInfo": {"jobDescription": "<p>ok</p>", "postedOn": "Posted Yesterday"}}
+    detail_resp.json.return_value = {
+        "jobPostingInfo": {
+            "jobDescription": "<p>ok</p>",
+            "postedOn": "Posted Yesterday",
+        }
+    }
     scraper.session.get.return_value = detail_resp
 
     jobs = scraper.scrape()
