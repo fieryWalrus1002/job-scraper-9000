@@ -13,7 +13,7 @@ This spec covers GitHub issue #62 as a tight follow-on to the production runner:
 
 The goal is not a UI. The goal is to quickly inspect the top jobs from a scored run.
 
----
+______________________________________________________________________
 
 ## Recommended implementation shape
 
@@ -30,7 +30,7 @@ Why:
 
 No new Streamlit app is needed for this issue.
 
----
+______________________________________________________________________
 
 ## Relationship to #61
 
@@ -42,7 +42,7 @@ Canonical scored input:
 
 The viewer never computes scores. It only reads and presents scored JSONL.
 
----
+______________________________________________________________________
 
 ## Scope
 
@@ -67,7 +67,7 @@ The viewer never computes scores. It only reads and presents scored JSONL.
 - Arbitrary sorting options
 - Browser-open integration
 
----
+______________________________________________________________________
 
 ## Input resolution
 
@@ -85,7 +85,7 @@ If `--input PATH` is provided, it wins over default resolution.
 
 If neither `--run-date` nor `--input` is provided, the viewer should fail fast with a clear error.
 
----
+______________________________________________________________________
 
 ## CLI contract
 
@@ -105,7 +105,7 @@ Validation rules:
 
 `--limit` applies after malformed lines are skipped and before rendering finishes; practically, it limits the number of displayed valid rows.
 
----
+______________________________________________________________________
 
 ## Display requirements
 
@@ -138,7 +138,7 @@ When `--show-rationale` is set, also print for each displayed job:
 
 No other expanded sections are required for this issue.
 
----
+______________________________________________________________________
 
 ## Record fields consumed
 
@@ -159,7 +159,7 @@ Useful behavior notes:
 
 The viewer should degrade gracefully when optional fields are absent.
 
----
+______________________________________________________________________
 
 ## Failure behavior
 
@@ -178,7 +178,7 @@ Per-record robustness:
 
 The viewer must remain read-only.
 
----
+______________________________________________________________________
 
 ## Example usage
 
@@ -206,7 +206,7 @@ Explicit input override:
 uv run scripts/view_skills_fit_results.py --input data/scored/2026-05-21/skills_fit_scored.jsonl
 ```
 
----
+______________________________________________________________________
 
 ## Acceptance criteria
 
@@ -222,7 +222,7 @@ uv run scripts/view_skills_fit_results.py --input data/scored/2026-05-21/skills_
 - empty scored files produce a clear warning without crashing
 - viewer remains read-only and does not mutate input files
 
----
+______________________________________________________________________
 
 ## Non-goals / future follow-ons
 

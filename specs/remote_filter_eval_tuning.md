@@ -8,7 +8,7 @@ The remote-filter eval framework is now implemented through SC-7. The next work 
 
 This note tracks the current baseline and the likely next sprint for improving remote-filter quality.
 
----
+______________________________________________________________________
 
 ## Current smoke baseline
 
@@ -33,12 +33,12 @@ data/eval/ground_truth.jsonl
 
 Metrics:
 
-| Metric | Value |
-| --- | ---: |
-| Accuracy | 0.8654 |
-| Precision | 0.7073 |
-| Recall | 0.9355 |
-| F1 | 0.8056 |
+| Metric            |            Value |
+| ----------------- | ---------------: |
+| Accuracy          |           0.8654 |
+| Precision         |           0.7073 |
+| Recall            |           0.9355 |
+| F1                |           0.8056 |
 | TP / FP / TN / FN | 29 / 12 / 61 / 2 |
 
 Mismatch file:
@@ -47,7 +47,7 @@ Mismatch file:
 data/eval/mismatches_smoke_parallel_20260516_045209_a6da.jsonl
 ```
 
----
+______________________________________________________________________
 
 ## Interpretation
 
@@ -70,43 +70,43 @@ There are also a small number of false negatives involving timezone policy:
 
 These may be policy decisions rather than model failures.
 
----
+______________________________________________________________________
 
 ## Review workflow
 
 For each mismatch in the smoke run, classify the cause as one of:
 
-| Category | Meaning |
-| --- | --- |
-| Gold label issue | Human label should be corrected in `data/eval/ground_truth.jsonl` |
-| Prompt failure | Model classified the remote policy incorrectly |
-| Policy failure | Model extracted reasonable fields, but `passes_remote_filter()` allowed/rejected incorrectly |
-| Ambiguous posting | Job text genuinely lacks enough signal; decide preferred policy |
-| Dataset coverage gap | Need more similar examples in the gold set |
+| Category             | Meaning                                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| Gold label issue     | Human label should be corrected in `data/eval/ground_truth.jsonl`                            |
+| Prompt failure       | Model classified the remote policy incorrectly                                               |
+| Policy failure       | Model extracted reasonable fields, but `passes_remote_filter()` allowed/rejected incorrectly |
+| Ambiguous posting    | Job text genuinely lacks enough signal; decide preferred policy                              |
+| Dataset coverage gap | Need more similar examples in the gold set                                                   |
 
 Recommended process:
 
 1. Open the mismatch JSONL.
-2. Find each `record_id` in `data/eval/ground_truth.jsonl` by `dedup_hash` prefix.
-3. Inspect:
+1. Find each `record_id` in `data/eval/ground_truth.jsonl` by `dedup_hash` prefix.
+1. Inspect:
    - original job location
    - job description
    - `_human_verdict`
    - `_human_policy`
    - model `_filter_reason` / predicted policy if available
-4. Decide whether to:
+1. Decide whether to:
    - correct the gold record through the review UI or direct append-only re-review
    - adjust `config/agent/remote_agent.yml`
    - adjust `prompts/remote_agent/system_prompt.txt`
    - add more examples to the gold set
-5. Rerun eval with a new run ID.
-6. Compare with:
+1. Rerun eval with a new run ID.
+1. Compare with:
 
 ```bash
 uv run scripts/compare_evals.py --last 10
 ```
 
----
+______________________________________________________________________
 
 ## Candidate tuning targets
 
@@ -152,21 +152,21 @@ Next target:
   - timezone-restricted remote
   - ambiguous location text
 
----
+______________________________________________________________________
 
 ## Success target for next sprint
 
 A reasonable next target on the 100+ record gold set:
 
-| Metric | Target |
-| --- | ---: |
+| Metric    | Target |
+| --------- | -----: |
 | Precision | ≥ 0.80 |
-| Recall | ≥ 0.90 |
-| F1 | ≥ 0.85 |
+| Recall    | ≥ 0.90 |
+| F1        | ≥ 0.85 |
 
 Prioritize precision improvement without materially harming recall.
 
----
+______________________________________________________________________
 
 ## Not in scope for this tuning sprint
 

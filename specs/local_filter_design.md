@@ -23,7 +23,7 @@ scraped jobs
 
 A job reaches Skills Fit scoring if it passes **either** filter. The filters are independent — a job can pass both (a remote role posted with a Pullman address).
 
----
+______________________________________________________________________
 
 ## Local Filter Spec
 
@@ -39,17 +39,18 @@ Pullman, WA and Moscow, ID — the two cities that make up the Palouse metro are
 
 A job is a **local pass** if its `location` field (case-insensitive) matches any of the following patterns:
 
-| Pattern | Rationale |
-| --- | --- |
-| `pullman` | Unambiguous city name; state qualifier optional |
+| Pattern                  | Rationale                                                       |
+| ------------------------ | --------------------------------------------------------------- |
+| `pullman`                | Unambiguous city name; state qualifier optional                 |
 | `moscow,?\s*(id\|idaho)` | State required — "Moscow" alone is ambiguous (Russia, PA, etc.) |
-| `palouse` | Covers "Palouse, WA" and "Palouse region" references |
+| `palouse`                | Covers "Palouse, WA" and "Palouse region" references            |
 
 Optionally extend to:
-| Pattern | Rationale |
-| --- | --- |
-| `lewiston,?\s*(id\|idaho)` | Lewiston–Clarkston metro, ~30 miles south |
-| `clarkston,?\s*(wa\|washington)` | Twin city to Lewiston |
+
+| Pattern                          | Rationale                                 |
+| -------------------------------- | ----------------------------------------- |
+| `lewiston,?\s*(id\|idaho)`       | Lewiston–Clarkston metro, ~30 miles south |
+| `clarkston,?\s*(wa\|washington)` | Twin city to Lewiston                     |
 
 These are off by default — enable via config if commute range is acceptable.
 
@@ -99,7 +100,7 @@ Local-pass records written to scoring should carry:
 
 This lets the Skills Fit agent and any downstream reporting distinguish local passes from remote passes.
 
----
+______________________________________________________________________
 
 ## Out of Scope
 

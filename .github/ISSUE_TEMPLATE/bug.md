@@ -1,9 +1,6 @@
----
-name: Bug
-about: Something is broken or behaving incorrectly
-title: 'bug: '
-labels: bug
----
+______________________________________________________________________
+
+## name: Bug about: Something is broken or behaving incorrectly title: 'bug: ' labels: bug
 
 ## Problem
 

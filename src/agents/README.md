@@ -12,10 +12,10 @@ python scripts/run_remote_filter.py   # remote filter
 
 ## Agents
 
-| Agent | Purpose |
-| --- | --- |
-| `remote-filter` | Classifies job postings by remote work policy using a structured-output LLM |
-| `skills_fit` | Scores remote-filter PASS jobs against a versioned candidate profile on a 1-5 ordinal scale (Phase R: eval harness + real rubric prompt landed; production runner / CLI subcommand land in Phase B). See [skills_fit/README.md](skills_fit/README.md). |
+| Agent           | Purpose                                                                                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `remote-filter` | Classifies job postings by remote work policy using a structured-output LLM                                                                                                                                                                            |
+| `skills_fit`    | Scores remote-filter PASS jobs against a versioned candidate profile on a 1-5 ordinal scale (Phase R: eval harness + real rubric prompt landed; production runner / CLI subcommand land in Phase B). See [skills_fit/README.md](skills_fit/README.md). |
 
 Future agents: `dispatcher`
 
@@ -23,12 +23,12 @@ Future agents: `dispatcher`
 
 Agents use OpenAI by default. Switch providers with env vars in `.env`:
 
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `LLM_PROVIDER` | `openai` | `openai` or `ollama` |
-| `LLM_MODEL` | `gpt-4o-mini` / `qwen2.5:14b` | Override the model for the active provider |
-| `OPENAI_API_KEY` | — | Required when `LLM_PROVIDER=openai` |
-| `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Override when Ollama is not on localhost |
+| Variable          | Default                       | Notes                                      |
+| ----------------- | ----------------------------- | ------------------------------------------ |
+| `LLM_PROVIDER`    | `openai`                      | `openai` or `ollama`                       |
+| `LLM_MODEL`       | `gpt-4o-mini` / `qwen2.5:14b` | Override the model for the active provider |
+| `OPENAI_API_KEY`  | —                             | Required when `LLM_PROVIDER=openai`        |
+| `OLLAMA_BASE_URL` | `http://localhost:11434/v1`   | Override when Ollama is not on localhost   |
 
 ## Data flow
 

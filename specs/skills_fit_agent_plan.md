@@ -7,9 +7,9 @@ Implement Phase 3 of the pipeline: score remote-filtered jobs against the candid
 This plan supersedes the earlier 0–100 fit-score draft. Two things changed from that version:
 
 1. **Score is ordinal 1–5, not continuous 0–100.** LLMs don't produce calibrated scalar scores. The 0–100 layer was theatre on top of what the model was actually doing (sorting into 4–5 bands). We make the band *be* the score and stop pretending precision exists where it doesn't.
-2. **Eval-forward sequencing.** No production runner code lands before the eval harness is roughed out. Schema → metrics → seed gold set → eval driver, *then* prompt and tuning, *then* productionize the runner. Red/green/refactor for agents.
+1. **Eval-forward sequencing.** No production runner code lands before the eval harness is roughed out. Schema → metrics → seed gold set → eval driver, *then* prompt and tuning, *then* productionize the runner. Red/green/refactor for agents.
 
----
+______________________________________________________________________
 
 ## Pipeline position
 
@@ -20,7 +20,7 @@ data/filtered/<DATE>/remote_filter_pass.jsonl
   → dispatch / shortlist UI
 ```
 
----
+______________________________________________________________________
 
 ## Schema
 
@@ -80,7 +80,7 @@ class SkillsFitAnalysis(BaseModel):
 
 **No per-axis sub-scores in v1.** Tempting (`tech_score`, `level_score`, `domain_score`), but YAGNI until we see whether 1–5 ordering produces a useful shortlist. Add only if intra-band sort becomes a real problem.
 
----
+______________________________________________________________________
 
 ## Metrics
 
@@ -88,23 +88,23 @@ The remote-filter eval is binary, so confusion-matrix metrics (accuracy/precisio
 
 **Ordinal agreement** — does the model agree with the human on a per-record basis?
 
-| Metric | Definition | Why it matters |
-| --- | --- | --- |
-| `exact_match_acc` | `% of preds where pred == gold` | Strict agreement; sanity check |
-| `off_by_one_acc` | `% of preds where abs(pred - gold) <= 1` | Tolerant agreement; catches "right neighborhood" |
-| `mae` | mean of `abs(pred - gold)` | Average score error in band units |
-| `bias` | mean of `(pred - gold)` | Is the model systematically high/low? |
-| `spearman_rho` | Spearman rank correlation between pred and gold | Rank fidelity across the whole gold; biased models can still rank well |
-| `confusion_5x5` | full 5×5 matrix | Where the off-by-twos happen — diagnostic, not headline |
+| Metric            | Definition                                      | Why it matters                                                         |
+| ----------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `exact_match_acc` | `% of preds where pred == gold`                 | Strict agreement; sanity check                                         |
+| `off_by_one_acc`  | `% of preds where abs(pred - gold) <= 1`        | Tolerant agreement; catches "right neighborhood"                       |
+| `mae`             | mean of `abs(pred - gold)`                      | Average score error in band units                                      |
+| `bias`            | mean of `(pred - gold)`                         | Is the model systematically high/low?                                  |
+| `spearman_rho`    | Spearman rank correlation between pred and gold | Rank fidelity across the whole gold; biased models can still rank well |
+| `confusion_5x5`   | full 5×5 matrix                                 | Where the off-by-twos happen — diagnostic, not headline                |
 
 **Top-of-list quality** — would the dispatcher's actual shortlist be worth applying to?
 
-| Metric | Definition | Why it matters |
-| --- | --- | --- |
-| `precision_at_5` | `% of pred-top-5 with gold >= 4` | Of the jobs the agent would show first, how many are actually good? |
-| `precision_at_10` | `% of pred-top-10 with gold >= 4` | Same, wider window |
-| `mean_gold_score_at_top_10` | mean gold score of the pred-top-10 | Absolute quality of the shortlist, not just precision |
-| `top_bucket_purity` | `% of pred-5s where gold >= 4` | Does "the agent thinks it's a 5" actually correspond to a strong job? |
+| Metric                      | Definition                         | Why it matters                                                        |
+| --------------------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| `precision_at_5`            | `% of pred-top-5 with gold >= 4`   | Of the jobs the agent would show first, how many are actually good?   |
+| `precision_at_10`           | `% of pred-top-10 with gold >= 4`  | Same, wider window                                                    |
+| `mean_gold_score_at_top_10` | mean gold score of the pred-top-10 | Absolute quality of the shortlist, not just precision                 |
+| `top_bucket_purity`         | `% of pred-5s where gold >= 4`     | Does "the agent thinks it's a 5" actually correspond to a strong job? |
 
 `precision_at_k` is the application-decision metric — it maps directly to the daily-application bandwidth constraint. `spearman_rho` is the per-record rank-fidelity metric. Both matter; neither is sufficient alone.
 
@@ -116,14 +116,14 @@ These land in `src/agent_eval/metrics.py` as `compute_ordinal_metrics(preds, gol
 
 `fit_score` gets full ordinal evaluation. The other schema fields are harder to evaluate against gold and need a per-field decision:
 
-| Field | Evaluation approach |
-| --- | --- |
-| `fit_score` | Full ordinal + top-k metrics (above) |
-| `confidence` | Agreement % vs `_human_confidence`; diagnostic, not headline |
-| `score_rationale` | Spot-check only in mismatch reviews; no automated metric |
-| `top_matches`, `gaps`, `hard_concerns` | TBD — see Open Question 4 |
+| Field                                  | Evaluation approach                                          |
+| -------------------------------------- | ------------------------------------------------------------ |
+| `fit_score`                            | Full ordinal + top-k metrics (above)                         |
+| `confidence`                           | Agreement % vs `_human_confidence`; diagnostic, not headline |
+| `score_rationale`                      | Spot-check only in mismatch reviews; no automated metric     |
+| `top_matches`, `gaps`, `hard_concerns` | TBD — see Open Question 4                                    |
 
----
+______________________________________________________________________
 
 ## Calibration: the laundry-list problem
 
@@ -137,13 +137,13 @@ The 1–5 bands describe coverage of *core* requirements, not line-by-line JD ov
 
 Expanded bands (this table is authoritative; the Pydantic field doc is the abbreviated version):
 
-| Score | Meaning |
-| --- | --- |
-| 5 | Core stack matches strongly. Level and domain aligned. Gaps only in nice-to-haves. |
-| 4 | Core stack matches. Level/domain aligned. Some non-trivial gaps the candidate could close on the job. |
-| 3 | Partial core match, OR aligned but in a stretched-adjacent domain. Real concerns alongside real matches. |
-| 2 | Core requirements largely missing, OR fundamental mismatch on level. |
-| 1 | Wrong kind of job entirely — different domain, different career track, hard disqualifier. |
+| Score | Meaning                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------- |
+| 5     | Core stack matches strongly. Level and domain aligned. Gaps only in nice-to-haves.                       |
+| 4     | Core stack matches. Level/domain aligned. Some non-trivial gaps the candidate could close on the job.    |
+| 3     | Partial core match, OR aligned but in a stretched-adjacent domain. Real concerns alongside real matches. |
+| 2     | Core requirements largely missing, OR fundamental mismatch on level.                                     |
+| 1     | Wrong kind of job entirely — different domain, different career track, hard disqualifier.                |
 
 ### The keyword-bait counterpart
 
@@ -151,13 +151,13 @@ JD aspirationality runs in both directions. Laundry-list inflates the listed *re
 
 The prompt should instruct the model to classify each mentioned skill or requirement by its role in the posting:
 
-| Role in posting | Weight |
-| --- | --- |
-| Core responsibility — what the person actually does day-to-day | Heavy |
-| Required qualification — listed as a gate (years, credential, level) | Heavy if material |
-| Preferred / nice-to-have — wishlist | Light; gaps acceptable for 4–5 |
-| Incidental keyword — mentioned in passing, tangential | Near-zero |
-| Company tech-stack decoration — "we use X internally" | Near-zero |
+| Role in posting                                                      | Weight                         |
+| -------------------------------------------------------------------- | ------------------------------ |
+| Core responsibility — what the person actually does day-to-day       | Heavy                          |
+| Required qualification — listed as a gate (years, credential, level) | Heavy if material              |
+| Preferred / nice-to-have — wishlist                                  | Light; gaps acceptable for 4–5 |
+| Incidental keyword — mentioned in passing, tangential                | Near-zero                      |
+| Company tech-stack decoration — "we use X internally"                | Near-zero                      |
 
 A candidate matching 3 of 5 *core responsibility* signals scores higher than one matching 8 of 10 *preferred / decoration* signals, even though the raw overlap count is lower. The system prompt and the gold-set notes both need to make this distinction explicit.
 
@@ -181,7 +181,7 @@ These notes are not commentary — they become the in-prompt examples that ancho
 
 The embedding-evidence variant (under "Operation: Smoosh, and what comes after") gets more compelling once we know how the model handles laundry-list JDs. Structured overlap evidence — "candidate matches 4 of 12 JD skills, those 4 are X Y Z W, weighted by frequency-in-posting" — lets the model reason explicitly about *which* matches happened, not just how many. That makes the calibration prompt more grounded. Still: defer the experiment until Phase G mismatch analysis confirms "model treated JD as a literal checklist" is a real failure mode in the runs.
 
----
+______________________________________________________________________
 
 ## Prerequisite: land issue 25 first
 
@@ -191,7 +191,7 @@ The embedding-evidence variant (under "Operation: Smoosh, and what comes after")
 
 After #25 is merged, skills-fit can import from `utils.batch_api` cleanly.
 
----
+______________________________________________________________________
 
 ## Sequencing: red → green → refactor
 
@@ -202,26 +202,30 @@ After #25 is merged, skills-fit can import from `utils.batch_api` cleanly.
 Land these in order, in one PR if small enough:
 
 1. **`src/agents/skills_fit/models.py`** — `SkillsFitAnalysis` Pydantic model and `SCHEMA_VERSION`. No runner code yet.
-2. **`src/agent_eval/metrics.py`** — add `compute_ordinal_metrics(preds: list[int], golds: list[int]) -> dict`. Unit tests with hand-built cases (perfect agreement, all-off-by-one, all-bias-+1, random).
-3. **Seed gold set** — hand-score 25 jobs **stratified across all five bands**, not randomly sampled. Target distribution:
 
-   | Count | Type |
-   | --- | --- |
-   | 5 | obvious 5s — clean strong fits |
-   | 5 | obvious 4s — solid fits with manageable gaps |
-   | 5 | ambiguous 3s — partial core match or stretched-adjacent domain |
-   | 5 | **deceptive 2s** — mention the candidate's stack but mismatch on level, credential, domain, or role type |
-   | 5 | hard-reject 1s — wrong kind of job entirely |
+1. **`src/agent_eval/metrics.py`** — add `compute_ordinal_metrics(preds: list[int], golds: list[int]) -> dict`. Unit tests with hand-built cases (perfect agreement, all-off-by-one, all-bias-+1, random).
+
+1. **Seed gold set** — hand-score 25 jobs **stratified across all five bands**, not randomly sampled. Target distribution:
+
+   | Count | Type                                                                                                     |
+   | ----- | -------------------------------------------------------------------------------------------------------- |
+   | 5     | obvious 5s — clean strong fits                                                                           |
+   | 5     | obvious 4s — solid fits with manageable gaps                                                             |
+   | 5     | ambiguous 3s — partial core match or stretched-adjacent domain                                           |
+   | 5     | **deceptive 2s** — mention the candidate's stack but mismatch on level, credential, domain, or role type |
+   | 5     | hard-reject 1s — wrong kind of job entirely                                                              |
 
    The deceptive 2s are the most important category and the easiest to miss with random sampling. Examples: a C++ role that's embedded automotive requiring AUTOSAR; a Python role that's mostly data-labeling ops; an ML role with a PhD research-scientist requirement; a "remote" role that's remote-within-Canada-only.
 
    Format mirrors the remote-filter gold, with the v1 schema fields:
+
    ```json
    {"dedup_hash": "...", "title": "...", "company": "...", "description": "...",
     "_human_fit_score": 4, "_human_confidence": "high",
     "_human_top_matches": [...], "_human_gaps": [...], "_human_hard_concerns": [...],
     "_human_notes": "..."}
    ```
+
    Lives at `data/eval/skills_fit_ground_truth.jsonl`. Gitignored like the remote-filter gold.
 
    Why hand-score and not teacher-batch yet: the seed defines *the rubric*. If you teacher-batch first, you're calibrating to the teacher's defaults, not your preferences. Score these yourself so your judgment anchors the gold.
@@ -232,17 +236,18 @@ Land these in order, in one PR if small enough:
 
    **External reviewer pipeline (optional but recommended).** For reviewers with limited HR-domain literacy, recruit a small panel (2–3 people) to spot-check a subset of the scored gold. The subset is targeted, not random: include (a) records where the human flipped the teacher's proposal — highest-signal disagreements, (b) the borderline bands (3s and deceptive 2s), and (c) 1–2 anchor cases per band as sanity checks. Reviewers don't see the teacher's proposal; they score independently. JSONL gold accumulates `_teacher_*`, `_human_*`, and `_consultant_*` field groups for a full audit trail. The reviewer-facing artifact (markdown doc, sheet, etc.) is a downstream rendering choice — JSONL stays the source of truth.
 
-4. **`scripts/run_skills_fit_eval.py`** — mirrors `run_remote_filter_eval.py`. Loads gold, calls `analyze_skills_fit()` (stub for now — see below), computes ordinal metrics, writes mismatch file and `runs.jsonl` record. Reuses `JsonlRunLogger`, `build_run_record`, `generate_run_id` unchanged. CLI: `--gold`, `--config`, `--model`, `--provider`, `--temperature`, `--run-id`, `--workers`, `--no-mismatches`.
+1. **`scripts/run_skills_fit_eval.py`** — mirrors `run_remote_filter_eval.py`. Loads gold, calls `analyze_skills_fit()` (stub for now — see below), computes ordinal metrics, writes mismatch file and `runs.jsonl` record. Reuses `JsonlRunLogger`, `build_run_record`, `generate_run_id` unchanged. CLI: `--gold`, `--config`, `--model`, `--provider`, `--temperature`, `--run-id`, `--workers`, `--no-mismatches`.
 
-5. **`src/agents/skills_fit/utils.py`** — minimal `analyze_skills_fit()` that *just makes the structured LLM call*. No business logic, no thresholding, no policy. The mirror of `analyze_remote()`. Prompt is a one-paragraph stub at this point — enough to return parseable output, not enough to score well.
+1. **`src/agents/skills_fit/utils.py`** — minimal `analyze_skills_fit()` that *just makes the structured LLM call*. No business logic, no thresholding, no policy. The mirror of `analyze_remote()`. Prompt is a one-paragraph stub at this point — enough to return parseable output, not enough to score well.
 
-6. **`src/agents/skills_fit/baselines.py`** — at least one non-LLM scorer the eval has to beat. Start with a keyword-overlap baseline: tokenize the candidate profile's `core_skills` list and the job description, score 1–5 by normalized overlap count with hand-tuned thresholds. ~30 lines, no LLM calls. Wire it into `run_skills_fit_eval.py` via `--scorer {llm,keyword}` so each run records which scorer produced the numbers.
+1. **`src/agents/skills_fit/baselines.py`** — at least one non-LLM scorer the eval has to beat. Start with a keyword-overlap baseline: tokenize the candidate profile's `core_skills` list and the job description, score 1–5 by normalized overlap count with hand-tuned thresholds. ~30 lines, no LLM calls. Wire it into `run_skills_fit_eval.py` via `--scorer {llm,keyword}` so each run records which scorer produced the numbers.
 
    Why this matters: without a baseline, "Spearman ρ = 0.7" looks fine in isolation but tells you nothing about whether gpt-4o-mini is earning its cost. If a 30-line keyword heuristic hits 0.65, the LLM had better do significantly better than that. The baseline number is also the floor against which Variant A (embedding evidence) should be measured later.
 
-7. **Run the eval.** Expect terrible numbers from the stub LLM scorer (intentionally — weak prompt). The keyword baseline will probably outperform it at this stage; that's fine and informative. Commit both to `runs.jsonl` — that's the red baseline pair.
+1. **Run the eval.** Expect terrible numbers from the stub LLM scorer (intentionally — weak prompt). The keyword baseline will probably outperform it at this stage; that's fine and informative. Commit both to `runs.jsonl` — that's the red baseline pair.
 
 **Done criteria for Phase R:**
+
 - `compute_ordinal_metrics` (both ordinal-agreement and top-of-list metrics) has tests and is wired into the driver
 - `data/eval/skills_fit_ground_truth.jsonl` has ≥25 hand-scored records, stratified across all five bands
 - `uv run scripts/run_skills_fit_eval.py --scorer llm` and `--scorer keyword` both produce `runs.jsonl` records with ordinal + top-k metrics
@@ -255,11 +260,15 @@ Land these in order, in one PR if small enough:
 **Prerequisite: profile audit.** `config/profile/candidate_profile.yml` is the scoring contract — the prompt iterates against it, and an unstable profile churns the prompt. Before drafting the system prompt, finalize the profile through a dedicated audit pass: collect cross-agent input (each agent has a different evidence window, so the union catches what any single one would miss), run per-repo evidence audits where applicable (commit history is auditable; conversation memory is reconstructive), then conduct an interview-style session that pushes back on aspirational listings *and* modest understatement. Bump `profile_version` to a non-stub label and capture non-obvious choices in a sibling rationale doc for future audits.
 
 1. **`prompts/skills_fit/system_prompt.txt`** — write the rubric. Include the calibration paragraph from "Calibration: the laundry-list problem" verbatim. Anchor each 1–5 band with what it means concretely. Lift 2–3 verbatim `_human_notes` examples from the gold set into the prompt as in-context calibration anchors.
-2. **`config/agent/skills_fit.yml`** — candidate profile (skills, domains, level, preferences) + `llm:` block (provider, model, temperature). Profile content is the second knob to tune; prompt is the first.
-3. **Iterate.** Re-run the eval after every prompt or profile change. Compare runs with `compare_evals.py` (will need a flag to switch metric set, or a sibling script — decide based on how messy the existing one gets).
-4. **Expand the gold via teacher-batch once rubric stabilizes.** Target ≥80 records total via teacher → HITL → gold flow, confirmed/corrected via the Streamlit reviewer (see step 5). Same pattern as remote_filter — reuse the pipeline, not the code. Teacher choice compounds here in a way it doesn't in Phase R (where every record is reviewed regardless), so pick deliberately.
+
+1. **`config/agent/skills_fit.yml`** — candidate profile (skills, domains, level, preferences) + `llm:` block (provider, model, temperature). Profile content is the second knob to tune; prompt is the first.
+
+1. **Iterate.** Re-run the eval after every prompt or profile change. Compare runs with `compare_evals.py` (will need a flag to switch metric set, or a sibling script — decide based on how messy the existing one gets).
+
+1. **Expand the gold via teacher-batch once rubric stabilizes.** Target ≥80 records total via teacher → HITL → gold flow, confirmed/corrected via the Streamlit reviewer (see step 5). Same pattern as remote_filter — reuse the pipeline, not the code. Teacher choice compounds here in a way it doesn't in Phase R (where every record is reviewed regardless), so pick deliberately.
 
    **Teacher model selection.** Phase R sampled three candidates (May 2026):
+
    - `gpt-4o @ temp 0.1` — deterministic, capable, but softened role-type/level mismatches (scored a stretched-adjacent role 4 where 3 was defensible).
    - `gpt-5.4 @ temp 0.1` — newer capability, deterministic, comparable quality to gpt-5.5 on the sample.
    - `gpt-5.5` (temperature locked, see caveat) — strongest deceptive-2 reasoning, caught role-type/level/domain mismatches the others softened, populated `hard_concerns` correctly and independently of fit_score, cited specific JD language.
@@ -267,9 +276,11 @@ Land these in order, in one PR if small enough:
    Before kicking off the Phase G batch, run ~5 records each through the candidates, eyeball the rationales, pick the winner. Don't formalize this as an eval — review-time is the bottleneck, not metrics. Recheck the candidate list against whatever's currently frontier; this list is May 2026.
 
    **Caveat: reasoning models lock temperature.** GPT-5 family models (e.g., `gpt-5.5`) reject `temperature` overrides and run at their default (1.0); the API returns a 400 if you pass `--temperature 0.1`. For one-shot teacher proposals the non-determinism doesn't matter (review absorbs it). For the production scorer where rerun-reproducibility matters across many runs, prefer a model that accepts low temperatures — `gpt-5.4 @ 0.1` is currently the sweet spot for the teacher; the production scorer (`config/agent/skills_fit.yml`) should similarly stay on a temperature-honoring model.
-5. **Build the skills_fit reviewer as a sibling app, not a refactor.** Copy `src/review_ui/app.py` to `src/review_ui/skills_fit_app.py` and modify in place. Do **not** refactor the existing remote-filter reviewer into a generic plugin framework — two example datasets is the minimum needed to spot the right abstraction, and one mature + one sketch will guess wrong about the variation points. Also rejected: a single-file dispatcher (`app.py -- --dataset skills_fit`); that just moves the same abstraction problem inside the file as `if/else` branches.
+
+1. **Build the skills_fit reviewer as a sibling app, not a refactor.** Copy `src/review_ui/app.py` to `src/review_ui/skills_fit_app.py` and modify in place. Do **not** refactor the existing remote-filter reviewer into a generic plugin framework — two example datasets is the minimum needed to spot the right abstraction, and one mature + one sketch will guess wrong about the variation points. Also rejected: a single-file dispatcher (`app.py -- --dataset skills_fit`); that just moves the same abstraction problem inside the file as `if/else` branches.
 
    `skills_fit_app.py` differs from `app.py` in these places:
+
    - Imports `agents.skills_fit.models` instead of `agents.remote_filter.models`
    - `STAGING = "data/staging/skills_fit_to_review.jsonl"`, `EVAL = "data/eval/skills_fit_ground_truth.jsonl"`
    - Right-column display: `score_rationale`, `fit_score` (1–5), `confidence`, `top_matches` chips, `gaps` chips, `hard_concerns` chips (red badge styling if non-empty)
@@ -287,12 +298,14 @@ Land these in order, in one PR if small enough:
    Run with `streamlit run src/review_ui/skills_fit_app.py`. Update `src/review_ui/README.md` to document both apps.
 
    **Deferred (not in this PR):**
+
    - Rename `app.py` → `remote_filter_app.py` for symmetry. Breaks the documented run command — park as a follow-up tidy.
    - Extract shared scaffolding (`status_dot`, `status_grid`, nav-bar, session-state init) into `src/review_ui/_shared.py`. Wait until a third reviewer exists before designing the shared layer.
 
-6. **`src/agents/skills_fit/validation.py`** — `validate_analysis_consistency(analysis: SkillsFitAnalysis) -> list[str]`. Pydantic ensures *shape*; this catches *semantic* inconsistencies Pydantic can't. Flag-not-reject: returns a list of warning strings, the eval driver logs them to the mismatch file as diagnostic signal.
+1. **`src/agents/skills_fit/validation.py`** — `validate_analysis_consistency(analysis: SkillsFitAnalysis) -> list[str]`. Pydantic ensures *shape*; this catches *semantic* inconsistencies Pydantic can't. Flag-not-reject: returns a list of warning strings, the eval driver logs them to the mismatch file as diagnostic signal.
 
    Initial rules:
+
    - score 1 with ≥5 `top_matches` (suspicious — claims weak fit but lists many overlaps)
    - score 5 with non-empty `hard_concerns` (a 5 shouldn't have blockers)
    - scores 4–5 with fewer than 2 `top_matches` (under-justified)
@@ -302,6 +315,7 @@ Land these in order, in one PR if small enough:
    The point isn't to reject imperfect output. The point is to surface suspicious patterns during prompt iteration. If the same rule keeps firing across many records, that's a prompt bug.
 
 **Done criteria for Phase G:**
+
 - Spearman ρ ≥ 0.7 on the gold set (placeholder target — revisit after first real numbers)
 - ±1 accuracy ≥ 0.75
 - `precision_at_5` ≥ 0.6 (≥3 of the predicted top 5 are actually gold ≥ 4)
@@ -320,13 +334,14 @@ Numbers above are *targets to debate after first real data*, not contracts. Adju
 Only after Phase G hits its baseline:
 
 1. **`src/agents/skills_fit/runner.py`** — `run_skills_fit()` mirroring `remote_filter/runner.py`. Reads `data/filtered/<DATE>/remote_filter_pass.jsonl`, writes `data/scored/<DATE>/skills_fit_scored.jsonl`. Enriches each record with `_skills_fit_analysis` and `_skills_fit_metadata`.
-2. **`scripts/run_skills_fit.py`** — thin entry point, same shape as `run_remote_filter.py`.
-3. **CLI integration** — `uv run job-scraper skills-fit --run-date <DATE>` subcommand.
-4. **`src/agents/skills_fit/README.md`** — docs for the module.
-5. **Update top-level `README.md`** — mark Phase 3 as implemented; update the quick-start block.
-6. **Pipeline shell snippet** in `specs/project.md` — append the `skills-fit` line to the v1 manual orchestration block.
+1. **`scripts/run_skills_fit.py`** — thin entry point, same shape as `run_remote_filter.py`.
+1. **CLI integration** — `uv run job-scraper skills-fit --run-date <DATE>` subcommand.
+1. **`src/agents/skills_fit/README.md`** — docs for the module.
+1. **Update top-level `README.md`** — mark Phase 3 as implemented; update the quick-start block.
+1. **Pipeline shell snippet** in `specs/project.md` — append the `skills-fit` line to the v1 manual orchestration block.
 
 **Done criteria for Phase B:**
+
 - `uv run job-scraper skills-fit --run-date $(date +%F)` scores a day's filtered output end-to-end
 - Output JSONL is correctly partitioned under `data/scored/<DATE>/`
 - README and project.md reflect Phase 3 done
@@ -336,7 +351,7 @@ Only after Phase G hits its baseline:
 
 After both `run_remote_filter_eval.py` and `run_skills_fit_eval.py` exist, look at what's genuinely shared (CLI scaffolding, gold loading, mismatch file writing, worker pool, run-record assembly) and what isn't (per-record evaluation function, metric set, mismatch record schema). Refactor into a shared driver only if the duplication is painful — not before. Two examples is the minimum needed to spot the right abstraction; one example is not.
 
----
+______________________________________________________________________
 
 ## Out of scope for this plan
 
@@ -360,7 +375,7 @@ Pairwise ranking ("is job A a better fit than job B?") is something LLMs do well
 
 The real product problem is rarely "is this a 4 or a 5?" — it's "I have twenty 4s, which five should I actually apply to today?" That's where pairwise earns its keep. Deferred to Phase 4 (dispatcher) work, not Phase 3.
 
----
+______________________________________________________________________
 
 ## Operation: Smoosh, and what comes after
 
@@ -373,8 +388,11 @@ The eval harness is invariant to what happens inside the agent — input is `(jo
 Pre-compute structured skill-overlap evidence and inject it into the user message before scoring:
 
 1. Extract a skill list from the job posting (LLM call or NER)
-2. Embed each job-skill and each profile-skill (`text-embedding-3-small`)
-3. Compute pairwise cosine similarity → structured object:
+
+1. Embed each job-skill and each profile-skill (`text-embedding-3-small`)
+
+1. Compute pairwise cosine similarity → structured object:
+
    ```json
    {
      "matched": [["C++", "C++", 0.98], ["PyTorch", "deep learning", 0.71]],
@@ -382,7 +400,8 @@ Pre-compute structured skill-overlap evidence and inject it into the user messag
      "unmatched_profile_skills": ["embedded systems"]
    }
    ```
-4. Pass that evidence to the LLM alongside the job text; LLM still produces the final 1–5.
+
+1. Pass that evidence to the LLM alongside the job text; LLM still produces the final 1–5.
 
 **Why it might help:** grounds the score in concrete evidence rather than vibes; catches skill-name normalization ("ML" ↔ "machine learning") that prompting alone misses; makes `score_rationale` inspectable against the evidence object.
 
@@ -402,11 +421,11 @@ Skip LLM scoring entirely; rank by cosine similarity between job and profile emb
 - **Multi-axis sub-scores** (`tech_score`, `level_score`, `domain_score` summed/weighted) — already noted as YAGNI in the Schema section. Revisit if intra-band sorting becomes a real product problem.
 - **Fine-tuning / distillation** — once the gold set is large enough (~200+ records), distill a local model on it. Pairs with `specs/teacher-student.md`.
 
----
+______________________________________________________________________
 
 ## Open questions to resolve before Phase R starts
 
 1. **~~Gold set seed source~~** — **Resolved.** Stratified across bands (5 per band, see Phase R step 3), not random sampling. Deceptive 2s are explicitly part of the seed.
-2. **~~Candidate profile location~~** — **Resolved.** Split into `config/profile/candidate_profile.yml` with its own version label, referenced from `config/agent/skills_fit.yml`. Hashed and recorded in every scored record's metadata (`profile_hash`, `profile_version`). The profile is part of the scoring contract, not just config — runs aren't comparable across profile changes unless we track it.
-3. **`compare_evals.py` extension vs. sibling script:** the existing tool assumes binary metrics columns. Cleanest is probably to add a `--metric-set {binary,ordinal}` flag and let it pick columns based on run record shape. Cheapest is a sibling `compare_skills_fit_evals.py`. Defer the decision to Phase G — by then we'll know which we want.
-4. **List-field eval strategy:** `top_matches`, `gaps`, and `hard_concerns` are freeform string lists. Evaluating predicted vs gold lists requires choosing among: (a) hand-normalized set overlap (slow but rigorous), (b) embedding-similarity overlap (cheap, fuzzy), (c) spot-check only with no automated metric (pragmatic, lower signal). The Phase G semantic validator (step 6) catches *presence/absence* sanity. Decide on a content-overlap metric — if any — during Phase G mismatch review, once we see what kinds of list disagreements actually show up.
+1. **~~Candidate profile location~~** — **Resolved.** Split into `config/profile/candidate_profile.yml` with its own version label, referenced from `config/agent/skills_fit.yml`. Hashed and recorded in every scored record's metadata (`profile_hash`, `profile_version`). The profile is part of the scoring contract, not just config — runs aren't comparable across profile changes unless we track it.
+1. **`compare_evals.py` extension vs. sibling script:** the existing tool assumes binary metrics columns. Cleanest is probably to add a `--metric-set {binary,ordinal}` flag and let it pick columns based on run record shape. Cheapest is a sibling `compare_skills_fit_evals.py`. Defer the decision to Phase G — by then we'll know which we want.
+1. **List-field eval strategy:** `top_matches`, `gaps`, and `hard_concerns` are freeform string lists. Evaluating predicted vs gold lists requires choosing among: (a) hand-normalized set overlap (slow but rigorous), (b) embedding-similarity overlap (cheap, fuzzy), (c) spot-check only with no automated metric (pragmatic, lower signal). The Phase G semantic validator (step 6) catches *presence/absence* sanity. Decide on a content-overlap metric — if any — during Phase G mismatch review, once we see what kinds of list disagreements actually show up.

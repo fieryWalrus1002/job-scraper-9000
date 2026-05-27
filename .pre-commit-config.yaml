@@ -17,3 +17,15 @@ repos:
     rev: v1.1.409
     hooks:
       - id: pyright
+
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        additional_dependencies: ['mdformat-gfm']
+
+  # - repo: https://github.com/igorshubovych/markdownlint-cli
+  #   rev: v0.48.0
+  #   hooks:
+  #     - id: markdownlint
+  #       args: ['--fix']

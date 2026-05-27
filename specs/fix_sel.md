@@ -2,7 +2,7 @@
 
 **Status:** scraper loads and runs but returns 0 jobs.
 
----
+______________________________________________________________________
 
 ## Root cause
 
@@ -17,7 +17,7 @@ GET https://selinc.wd1.myworkdayjobs.com/en-US/SEL
 → 200, `data-initial-state` not present, no job listings in HTML
 ```
 
----
+______________________________________________________________________
 
 ## What actually works
 
@@ -51,18 +51,18 @@ Content-Type: application/json
 Filters are passed as `{"facetParameter": ["id", ...]}`. The IDs match exactly what is
 already hardcoded in `SELSearchQuery`:
 
-| Facet parameter   | Descriptor | ID (already in SELSearchQuery) |
-|---|---|---|
-| `workerSubType`   | Regular    | `96e1096563ef1014e495031ab61a6dff` |
-| `workerSubType`   | Temporary  | `96e1096563ef1014e495069e83966e00` |
-| `timeType`        | Full Time  | `b0630d66f89e1013409e4b1a1a91c123` |
-| `timeType`        | Part Time  | `b0630d66f89e1013409e4ae8d2c9c122` |
-| `locations` | Washington - Pullman | `df72ee3ddefc1018ebf01de718624e22` |
+| Facet parameter | Descriptor           | ID (already in SELSearchQuery)     |
+| --------------- | -------------------- | ---------------------------------- |
+| `workerSubType` | Regular              | `96e1096563ef1014e495031ab61a6dff` |
+| `workerSubType` | Temporary            | `96e1096563ef1014e495069e83966e00` |
+| `timeType`      | Full Time            | `b0630d66f89e1013409e4b1a1a91c123` |
+| `timeType`      | Part Time            | `b0630d66f89e1013409e4ae8d2c9c122` |
+| `locations`     | Washington - Pullman | `df72ee3ddefc1018ebf01de718624e22` |
 
 Note: the location facet parameter is `locationMainGroup`, not `locations` as currently
 used in `SELSearchQuery.to_params()`. Need to confirm the GUID maps correctly.
 
----
+______________________________________________________________________
 
 ## Fix plan
 
@@ -159,6 +159,7 @@ and checking `locationsText` on returned jobs. If it doesn't filter correctly, c
 
 `test_scrape_uses_to_url_not_bare_base_url` and `test_scrape_url_contains_location_guid`
 will break because the scraper now POSTs instead of GETs. Replace them with:
+
 - `test_scrape_posts_to_cxs_api_url` — verify `session.post` is called (not `session.get`)
 - `test_scrape_passes_applied_facets` — verify the payload contains the expected facets
 - `test_scrape_paginates_until_total_reached` — mock two pages and verify both are fetched
@@ -166,7 +167,7 @@ will break because the scraper now POSTs instead of GETs. Replace them with:
 The `_mock_session` helper in `test_sel.py` should be updated to mock `session.post`
 instead of `session.get`.
 
----
+______________________________________________________________________
 
 ## Things not to break
 

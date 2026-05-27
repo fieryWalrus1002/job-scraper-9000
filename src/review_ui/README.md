@@ -2,7 +2,7 @@
 
 A Streamlit app for human-in-the-loop (HITL) verification of teacher model reasoning. You step through each teacher-annotated job, read the rationale, and either confirm the verdict or correct it. Confirmed/corrected records land in the gold layer used by remote-filter evals and future local-model distillation.
 
----
+______________________________________________________________________
 
 ## Where this fits in the pipeline
 
@@ -22,7 +22,7 @@ scripts/run_remote_filter_eval.py / scripts/submit_eval_batch.py
 
 See [`scripts/README.md`](../../scripts/README.md) for the full batch preparation and eval workflow.
 
----
+______________________________________________________________________
 
 ## Running
 
@@ -38,7 +38,7 @@ data/staging/to_review.jsonl
 
 If that file does not exist, run the teacher batch preparation/merge flow first.
 
----
+______________________________________________________________________
 
 ## What the app shows
 
@@ -56,19 +56,19 @@ Each record is displayed in two columns.
 - Remote policy classification
 - Key phrases cited by the teacher
 
----
+______________________________________________________________________
 
 ## Actions
 
-| Button | What it does |
-| --- | --- |
-| **Confirm Teacher** | Accepts the teacher verdict and policy as-is. Writes record to gold with `_corrected: false`. |
+| Button              | What it does                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Confirm Teacher** | Accepts the teacher verdict and policy as-is. Writes record to gold with `_corrected: false`.        |
 | **Save Correction** | Saves your chosen policy + verdict instead. Writes with `_corrected: true` and your correction note. |
-| **Skip** | Moves to the next record without writing anything. Use for ambiguous cases you want to revisit. |
+| **Skip**            | Moves to the next record without writing anything. Use for ambiguous cases you want to revisit.      |
 
 A progress bar shows how far through the staging file you are.
 
----
+______________________________________________________________________
 
 ## Gold layer output
 
@@ -104,7 +104,7 @@ Corrected records also include:
 
 The gold dataset is append-only. Eval loading treats later records with the same `dedup_hash` as overrides, so re-reviewing a job can supersede an earlier label.
 
----
+______________________________________________________________________
 
 ## Remote policy labels
 
@@ -112,23 +112,23 @@ The correction form uses the active schema plus legacy labels that may appear in
 
 Active labels:
 
-| Label | Meaning |
-| --- | --- |
-| `fully_remote` | No office requirement and no material travel |
-| `remote_with_quarterly_travel` | Remote with travel roughly quarterly or less |
-| `remote_with_monthly_travel` | Remote with travel roughly monthly |
-| `remote_with_frequent_travel` | Remote with frequent/material travel |
-| `hybrid` | Regular in-office days expected |
-| `onsite_disguised` | Listed as remote but requires local/commuting presence |
-| `location_restricted` | Genuinely remote but restricted to specific geographies |
-| `unclear` | Description and context do not provide enough signal |
+| Label                          | Meaning                                                 |
+| ------------------------------ | ------------------------------------------------------- |
+| `fully_remote`                 | No office requirement and no material travel            |
+| `remote_with_quarterly_travel` | Remote with travel roughly quarterly or less            |
+| `remote_with_monthly_travel`   | Remote with travel roughly monthly                      |
+| `remote_with_frequent_travel`  | Remote with frequent/material travel                    |
+| `hybrid`                       | Regular in-office days expected                         |
+| `onsite_disguised`             | Listed as remote but requires local/commuting presence  |
+| `location_restricted`          | Genuinely remote but restricted to specific geographies |
+| `unclear`                      | Description and context do not provide enough signal    |
 
 Legacy labels still available for old records:
 
 - `remote_with_occasional_travel`
 - `onsite`
 
----
+______________________________________________________________________
 
 ## Expected input format
 

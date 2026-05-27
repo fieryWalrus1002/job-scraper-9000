@@ -1,9 +1,6 @@
----
-name: Refactor / tech debt
-about: Improvement without new behavior — cleanup, restructuring, deduplication
-title: 'refactor: '
-labels: tech-debt
----
+______________________________________________________________________
+
+## name: Refactor / tech debt about: Improvement without new behavior — cleanup, restructuring, deduplication title: 'refactor: ' labels: tech-debt
 
 ## Current state
 
