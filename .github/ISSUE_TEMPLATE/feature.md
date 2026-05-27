@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: Feature about: A new capability or significant enhancement title: 'feat: ' labels: feature
+---
+name: Feature
+about: A new capability or significant enhancement
+title: 'feat: '
+labels: feature
+---
 
 ## Problem
 
@@ -12,8 +15,8 @@ ______________________________________________________________________
 
 ## Acceptance criteria
 
-- \[ \]
-- \[ \]
+- [ ]
+- [ ]
 
 ## Related
 

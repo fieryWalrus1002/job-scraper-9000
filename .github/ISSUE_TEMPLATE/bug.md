@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: Bug about: Something is broken or behaving incorrectly title: 'bug: ' labels: bug
+---
+name: Bug
+about: Something is broken or behaving incorrectly
+title: 'bug: '
+labels: bug
+---
 
 ## Problem
 

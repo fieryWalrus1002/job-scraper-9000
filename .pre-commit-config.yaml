@@ -23,9 +23,4 @@ repos:
     hooks:
       - id: mdformat
         additional_dependencies: ['mdformat-gfm']
-
-  # - repo: https://github.com/igorshubovych/markdownlint-cli
-  #   rev: v0.48.0
-  #   hooks:
-  #     - id: markdownlint
-  #       args: ['--fix']
+        exclude: '^(\.github/ISSUE_TEMPLATE/|prompts/)'

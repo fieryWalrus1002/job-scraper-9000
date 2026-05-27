@@ -1,6 +1,9 @@
-______________________________________________________________________
-
-## name: Investigation / spike about: Research a question before committing to a design title: 'spike: ' labels: investigation
+---
+name: Investigation / spike
+about: Research a question before committing to a design
+title: 'spike: '
+labels: investigation
+---
 
 ## Question
 
