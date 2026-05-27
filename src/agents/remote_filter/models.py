@@ -36,7 +36,7 @@ REMOTE_CLASSIFICATIONS: list[str] = list(get_args(RemoteClassification))
 
 LEGACY_CLASSIFICATIONS: list[str] = [
     "remote_with_occasional_travel",  # pre-2.0 teacher runs
-    "onsite",                          # pre-2.0 teacher runs
+    "onsite",  # pre-2.0 teacher runs
 ]
 
 

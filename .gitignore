@@ -34,4 +34,5 @@ config/profile/old_profiles/*.yml
 
 # Search configs have some PII
 config/search*.yml
+config/search.yml
 !config/search*.yml.example

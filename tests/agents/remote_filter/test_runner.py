@@ -164,7 +164,10 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
     assert (
         pass_records[0]["_remote_analysis"]["remote_classification"] == "fully_remote"
     )
-    assert pass_records[0]["_filter_metadata"] == {**FILTER_METADATA, "from_cache": False}
+    assert pass_records[0]["_filter_metadata"] == {
+        **FILTER_METADATA,
+        "from_cache": False,
+    }
 
     assert len(trash_records) == 1
     assert trash_records[0]["title"] == "Hybrid Engineer"

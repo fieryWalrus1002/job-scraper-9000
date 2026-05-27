@@ -27,11 +27,20 @@ def test_empty_inputs_return_zeros():
 def test_output_contains_all_required_keys():
     m = compute_ordinal_metrics([3, 4, 5], [3, 4, 5])["metrics"]
     required = {
-        "evaluated", "skipped", "total", "positive_threshold",
-        "exact_match_acc", "off_by_one_acc", "mae", "bias",
-        "spearman_rho", "confusion_5x5",
-        "precision_at_5", "precision_at_10",
-        "mean_gold_score_at_top_10", "top_bucket_purity",
+        "evaluated",
+        "skipped",
+        "total",
+        "positive_threshold",
+        "exact_match_acc",
+        "off_by_one_acc",
+        "mae",
+        "bias",
+        "spearman_rho",
+        "confusion_5x5",
+        "precision_at_5",
+        "precision_at_10",
+        "mean_gold_score_at_top_10",
+        "top_bucket_purity",
     }
     assert required.issubset(m.keys())
 
@@ -100,7 +109,9 @@ def test_confusion_5x5_diagonal_for_perfect_agreement():
     for i in range(5):
         for j in range(5):
             expected = 1 if i == j else 0
-            assert confusion[i][j] == expected, f"confusion[{i}][{j}] expected {expected}"
+            assert confusion[i][j] == expected, (
+                f"confusion[{i}][{j}] expected {expected}"
+            )
 
 
 def test_confusion_indexes_correctly():

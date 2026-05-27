@@ -112,9 +112,7 @@ def main() -> None:
                 project_ids=[args.project_id] if args.project_id else None,
             )
         except Exception as exc:
-            log.warning(
-                "Costs API query failed for day starting %d: %s", day_ts, exc
-            )
+            log.warning("Costs API query failed for day starting %d: %s", day_ts, exc)
             continue
 
         day_total = sum_cost_amounts(response)
@@ -127,8 +125,7 @@ def main() -> None:
 
         # Allocate day total by estimated share
         sum_estimated = sum(
-            float((r.get("cost") or {}).get("estimated_total") or 0)
-            for r in day_runs
+            float((r.get("cost") or {}).get("estimated_total") or 0) for r in day_runs
         )
         for run in day_runs:
             est = float((run.get("cost") or {}).get("estimated_total") or 0)

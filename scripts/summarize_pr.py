@@ -5,8 +5,7 @@ import sys
 from ci.summarizer import PRSummarizer, build_client_from_env
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 log = logging.getLogger("pr_summarizer_cli")
 
@@ -20,7 +19,10 @@ def main():
     try:
         context_path = pathlib.Path(context_file)
         if not context_path.exists():
-            log.error("Input file '%s' not found. Did the previous GH Action step fail?", context_file)
+            log.error(
+                "Input file '%s' not found. Did the previous GH Action step fail?",
+                context_file,
+            )
             sys.exit(1)
 
         git_delta = context_path.read_text()

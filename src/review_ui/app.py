@@ -7,7 +7,11 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 
-from agents.remote_filter.models import LEGACY_CLASSIFICATIONS, REMOTE_CLASSIFICATIONS, SCHEMA_VERSION
+from agents.remote_filter.models import (
+    LEGACY_CLASSIFICATIONS,
+    REMOTE_CLASSIFICATIONS,
+    SCHEMA_VERSION,
+)
 from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH
 from utils.git_info import get_git_metadata, get_prompt_hash
 
@@ -31,7 +35,7 @@ if "prompt_hash" not in st.session_state:
         get_prompt_hash(_PROMPT_FILE) if _PROMPT_FILE.exists() else "unknown"
     )
 if "skipped_idx" not in st.session_state:
-    st.session_state.skipped_idx = set()  # type: set[int]
+    st.session_state.skipped_idx = set()
 
 git_meta = st.session_state.git_meta
 prompt_hash = st.session_state.prompt_hash
@@ -68,7 +72,7 @@ def load_reviewed() -> dict[str, dict]:
 
 
 if "reviewed" not in st.session_state:
-    st.session_state.reviewed = load_reviewed()  # type: dict[str, dict]
+    st.session_state.reviewed = load_reviewed()
     st.session_state._resuming = True  # flag to auto-advance on first render
 
 # ── Build / save ──────────────────────────────────────────────────────────────
@@ -257,7 +261,9 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.subheader(f"{job.get('title', 'Untitled')} — {job.get('company', '')}")
     sp = job.get("search_params") or {}
-    sp_parts = [f"{k}={v}" for k, v in sp.items() if k in ("keywords", "workplace", "job_type")]
+    sp_parts = [
+        f"{k}={v}" for k, v in sp.items() if k in ("keywords", "workplace", "job_type")
+    ]
     search_ctx = f"  ·  search: {', '.join(sp_parts)}" if sp_parts else ""
     st.caption(f"{job.get('location', '')}  ·  {job.get('source', '')}{search_ctx}")
     st.divider()

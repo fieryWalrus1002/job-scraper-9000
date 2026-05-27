@@ -60,7 +60,9 @@ def test_context_fingerprint_changes_with_relevant_field():
     assert context_fingerprint(base) != context_fingerprint(
         {"keywords": "AI", "user_timezone": "EST"}
     )
-    assert context_fingerprint(base) != context_fingerprint({"keywords": "ML", "user_timezone": "PST"})
+    assert context_fingerprint(base) != context_fingerprint(
+        {"keywords": "ML", "user_timezone": "PST"}
+    )
 
 
 def test_context_fingerprint_stable_for_irrelevant_field():
