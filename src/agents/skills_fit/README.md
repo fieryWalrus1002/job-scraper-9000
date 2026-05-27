@@ -6,7 +6,7 @@ Phase 3 of the pipeline — scores remote-filtered jobs against the candidate pr
 
 See [specs/skills_fit_agent_plan.md](../../../specs/skills_fit_agent_plan.md) for the full plan, including the eval-forward sequencing (Phase R → G → B), the calibration discipline, and the architectural variants parked for later.
 
----
+______________________________________________________________________
 
 ## Layout
 
@@ -38,7 +38,7 @@ scripts/score_skills_fit_seed.py          # CLI scorer alternative — teacher-a
 scripts/run_skills_fit_eval.py            # eval driver — --scorer {llm,keyword}
 ```
 
----
+______________________________________________________________________
 
 ## Phase R — running the eval
 
@@ -82,13 +82,13 @@ Both paths write to the same gold file: `data/eval/skills_fit_ground_truth.jsonl
 
 **Target stratification — 25 records, 5 per band:**
 
-| Count | Type |
-| --- | --- |
-| 5 | obvious 5s |
-| 5 | obvious 4s |
-| 5 | ambiguous 3s |
-| 5 | **deceptive 2s** — mention your stack but mismatch on level/credential/domain/role type |
-| 5 | hard-reject 1s |
+| Count | Type                                                                                    |
+| ----- | --------------------------------------------------------------------------------------- |
+| 5     | obvious 5s                                                                              |
+| 5     | obvious 4s                                                                              |
+| 5     | ambiguous 3s                                                                            |
+| 5     | **deceptive 2s** — mention your stack but mismatch on level/credential/domain/role type |
+| 5     | hard-reject 1s                                                                          |
 
 `_human_notes` is **mandatory**, not optional — those notes become the in-context calibration examples in Phase G, and are especially load-bearing on flips (where you disagreed with the teacher). See the Calibration section of the spec.
 

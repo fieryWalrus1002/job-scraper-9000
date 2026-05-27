@@ -2,7 +2,7 @@
 
 _Status: Design — not yet implemented_
 
----
+______________________________________________________________________
 
 ## Purpose
 
@@ -10,7 +10,7 @@ Provide a daily-usable browser UI for reviewing scored job postings produced by 
 
 This is a read-only tool for Phase 4 MVP. Application status tracking, notes, and dispatch/email are out of scope here.
 
----
+______________________________________________________________________
 
 ## Relationship to prior work
 
@@ -18,7 +18,7 @@ This is a read-only tool for Phase 4 MVP. Application status tracking, notes, an
 - Does not re-score, modify, or write to scored files
 - The CLI viewer (`scripts/view_skills_fit_results.py`, spec `skills_fit_results_viewer.md`) covers single-run terminal inspection; this spec covers multi-run browser UI
 
----
+______________________________________________________________________
 
 ## Open question: data backend
 
@@ -29,16 +29,19 @@ How should the viewer load scored records? Two options:
 Load all `data/scored/*/skills_fit_scored.jsonl` files at startup (or on user interaction), concatenate into a DataFrame in memory, apply filters, and render.
 
 **Pros:**
+
 - No new infrastructure — no DB, no import step, no sync problem
 - Always reflects the current state of files on disk
 - Simple to implement and reason about
 
 **Cons:**
+
 - Full re-scan of all dated files on every page interaction (Streamlit re-runs the whole script on each widget change)
 - Slow once there are many run-dates or large files (341 records × N days)
 - No place to attach per-job metadata (status, notes) without adding a sidecar file
 
 **Mitigation if we go this route:**
+
 - `@st.cache_data` with `ttl` or manual invalidation to avoid re-reading files on every widget change
 - Cache keyed on file mtimes so a new run-date is picked up automatically
 
@@ -47,15 +50,18 @@ Load all `data/scored/*/skills_fit_scored.jsonl` files at startup (or on user in
 An import script reads all `data/scored/*/skills_fit_scored.jsonl` files and upserts into a local SQLite DB (`data/jobs.db`). The viewer queries the DB.
 
 **Pros:**
+
 - Fast cross-date queries (indexed by run_date, fit_score, dedup_hash)
 - Natural place to add per-job metadata tables later (status, notes)
 - Import script is separate from the viewer — no startup latency
 
 **Cons:**
+
 - Import step must be run after each new scored file lands; viewer can show stale data if import is forgotten
 - More moving parts: import script + DB file + viewer
 
 **Mitigation if we go this route:**
+
 - Import script is idempotent (upsert by dedup_hash + run_date); safe to re-run
 - Viewer detects when any scored file is newer than the DB and shows a banner prompting re-import
 - DB file lives in `data/` and is gitignored
@@ -66,7 +72,7 @@ Start with **Option A** (JSONL on demand with `st.cache_data`). It keeps Phase 4
 
 This spec is written for Option A. Option B differences are noted where they arise.
 
----
+______________________________________________________________________
 
 ## Scope
 
@@ -88,31 +94,31 @@ This spec is written for Option A. Option B differences are noted where they ari
 - Re-scoring or editing records
 - Any writes to scored JSONL files
 
----
+______________________________________________________________________
 
 ## Data model
 
 Each record in `data/scored/{DATE}/skills_fit_scored.jsonl` has (fields consumed by the viewer):
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `_skills_fit_score` | int 1–5 | Primary ranking key |
-| `_skills_fit_confidence` | str | low / medium / high |
-| `_skills_fit_rationale` | str | Shown in detail view |
-| `_skills_fit_top_matches` | list[str] | Shown in detail view |
-| `_skills_fit_gaps` | list[str] | Shown in detail view |
-| `_skills_fit_hard_concerns` | list[str] | Shown in list + detail |
-| `title` | str | Job title |
-| `company` | str | Company name |
-| `location` | str | Location string |
-| `job_url` | str | Link to original posting |
-| `description` | str | Full JD text (collapsed by default) |
-| `salary_range` | str | May be null |
-| `run_date` | str (YYYY-MM-DD) | Injected at load time from directory name |
+| Field                       | Type             | Notes                                     |
+| --------------------------- | ---------------- | ----------------------------------------- |
+| `_skills_fit_score`         | int 1–5          | Primary ranking key                       |
+| `_skills_fit_confidence`    | str              | low / medium / high                       |
+| `_skills_fit_rationale`     | str              | Shown in detail view                      |
+| `_skills_fit_top_matches`   | list[str]        | Shown in detail view                      |
+| `_skills_fit_gaps`          | list[str]        | Shown in detail view                      |
+| `_skills_fit_hard_concerns` | list[str]        | Shown in list + detail                    |
+| `title`                     | str              | Job title                                 |
+| `company`                   | str              | Company name                              |
+| `location`                  | str              | Location string                           |
+| `job_url`                   | str              | Link to original posting                  |
+| `description`               | str              | Full JD text (collapsed by default)       |
+| `salary_range`              | str              | May be null                               |
+| `run_date`                  | str (YYYY-MM-DD) | Injected at load time from directory name |
 
 The viewer injects `run_date` at load time from the directory name of each file (not from the record itself, since the field may not be present in all records).
 
----
+______________________________________________________________________
 
 ## UI layout
 
@@ -141,17 +147,18 @@ A table or card list showing all jobs that pass the active filters, sorted by fi
 
 Columns:
 
-| Column | Source | Notes |
-|--------|--------|-------|
-| Score | `_skills_fit_score` | Shown as 1–5 with color band |
-| Conf. | `_skills_fit_confidence` | low / med / high abbreviation |
-| Title | `title` | |
-| Company | `company` | |
-| Location | `location` | |
-| Date | `run_date` | YYYY-MM-DD |
+| Column   | Source                      | Notes                                   |
+| -------- | --------------------------- | --------------------------------------- |
+| Score    | `_skills_fit_score`         | Shown as 1–5 with color band            |
+| Conf.    | `_skills_fit_confidence`    | low / med / high abbreviation           |
+| Title    | `title`                     |                                         |
+| Company  | `company`                   |                                         |
+| Location | `location`                  |                                         |
+| Date     | `run_date`                  | YYYY-MM-DD                              |
 | Concerns | `_skills_fit_hard_concerns` | `⚠` badge if non-empty, blank otherwise |
 
 Score color banding:
+
 - 5 — green
 - 4 — light green
 - 3 — yellow
@@ -165,22 +172,25 @@ Row count shown above the list: `N jobs shown (M total across selected dates)`.
 Clicking a row (or an "expand" button) opens a detail panel below the list (or in a sidebar expander). Contents:
 
 **Header:**
+
 - Title, Company, Location, run_date
 - Fit score badge + confidence
 - Link to original posting (job_url)
 - Salary range (if present)
 
 **Fit analysis:**
+
 - `score_rationale` (full text)
 - Top matches (bulleted list)
 - Gaps (bulleted list)
 - Hard concerns (bulleted list, highlighted if non-empty)
 
 **Job description:**
+
 - Collapsed by default (`st.expander("Full job description")`)
 - Full `description` text inside
 
----
+______________________________________________________________________
 
 ## File layout
 
@@ -192,7 +202,7 @@ src/ui/
 
 Keeping loader logic in a separate module makes it easy to swap Option A for Option B later without touching viewer.py.
 
----
+______________________________________________________________________
 
 ## Data loading (Option A)
 
@@ -210,7 +220,7 @@ load_scored_jobs(data_dir: Path, min_date: date, max_date: date) -> pd.DataFrame
 
 If Option B (SQLite) is adopted later: `loader.py` is replaced with a SQL query; `viewer.py` is unchanged.
 
----
+______________________________________________________________________
 
 ## Launch
 
@@ -220,7 +230,7 @@ uv run streamlit run src/ui/viewer.py
 
 No CLI arguments; all configuration is via sidebar widgets. The app discovers available run-dates automatically from the `data/scored/` directory.
 
----
+______________________________________________________________________
 
 ## Failure behavior
 
@@ -229,7 +239,7 @@ No CLI arguments; all configuration is via sidebar widgets. The app discovers av
 - Malformed JSONL lines: skip with a `st.warning` summary (e.g., "3 malformed lines skipped across 2 files")
 - If a record is missing `_skills_fit_score`: include it with score rendered as `—` and sort it last
 
----
+______________________________________________________________________
 
 ## Non-goals / future follow-ons
 

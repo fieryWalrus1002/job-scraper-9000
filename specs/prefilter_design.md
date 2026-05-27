@@ -1,6 +1,6 @@
 # Prefilter Design
 
-_Last updated: 2026-05-25
+\_Last updated: 2026-05-25
 
 This spec defines a deterministic routing layer that sits between raw scraping and the paid remote-filter LLM. It is intentionally **not** an agent and does **not** use an LLM.
 
@@ -170,9 +170,9 @@ Reject jobs that clearly violate routing policy, such as:
 If signals conflict:
 
 1. explicit job text wins
-2. location beats description when both are present
-3. search params are weak tie-breakers only
-4. job text beats search intent
+1. location beats description when both are present
+1. search params are weak tie-breakers only
+1. job text beats search intent
 
 ## Config
 

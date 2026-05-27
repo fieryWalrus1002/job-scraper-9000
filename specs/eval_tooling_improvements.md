@@ -5,32 +5,33 @@
 **Track:** B (calibration support), does **not** block A
 **Implementation sequence:** three small changes, sequential
 
----
+______________________________________________________________________
 
 ## Motivation
 
 After landing the v5 profile-reframe eval, investigating the "no diff" outcome was harder than it needed to be. The friction has two distinct sources:
 
 1. **Stale docs.** `notes/skills_fit_phase_g/iteration_cycle.md` and `eval_harness.md` document a manual `jq` workflow. Meanwhile `scripts/compare_evals.py --diff <A> <B>` already exists (#44) and does the aggregate-metric side-by-side cleanly. The docs point at the wrong tool.
-2. **Real tooling gaps.** Two pieces don't exist regardless of docs:
+1. **Real tooling gaps.** Two pieces don't exist regardless of docs:
    - **Per-record diff.** `compare_evals.py --diff` shows aggregate metrics only. For the v5 case, confirming "no records flipped" required manually opening `mismatches_*.jsonl`. No tool reconstructs `gold | A.pred | B.pred` for every record.
    - **Profile snapshots.** `candidate_profile.yml` is gitignored (PII). `runs.jsonl` records `profile_version` + `profile_hash`, but the profile **content** at the time of v5 lives only on the active workstation. Bumping to v6 makes v5 unreproducible.
 
 This spec assumes the current Phase G workflow:
+
 - calibration exploration happens locally or on scratch branches,
 - every meaningful experiment is logged,
 - PRs are reserved for promotion-worthy winners and structural changes.
 
 ## Implementation status
 
-| Change | Status | Notes |
-|---|---|---|
-| Change 1: docs + `champions.yml` | Done | Docs now point to `compare_evals.py`; champion registry lives in `config/eval/champions.yml`. |
-| Change 2: per-record diff | Done | `compare_evals.py` supports `--against-champion` and `--per-record` for `skills_fit`. |
-| Change 3: profile auto-snapshot | Done | `run_skills_fit_eval.py` snapshots `candidate_profile.yml` by `profile_version` before scoring. |
-| Next tooling work | Pending | No additional tooling is defined in this spec yet. Future work should be added as a new change block rather than inferred from old text. |
+| Change                           | Status  | Notes                                                                                                                                    |
+| -------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Change 1: docs + `champions.yml` | Done    | Docs now point to `compare_evals.py`; champion registry lives in `config/eval/champions.yml`.                                            |
+| Change 2: per-record diff        | Done    | `compare_evals.py` supports `--against-champion` and `--per-record` for `skills_fit`.                                                    |
+| Change 3: profile auto-snapshot  | Done    | `run_skills_fit_eval.py` snapshots `candidate_profile.yml` by `profile_version` before scoring.                                          |
+| Next tooling work                | Pending | No additional tooling is defined in this spec yet. Future work should be added as a new change block rather than inferred from old text. |
 
----
+______________________________________________________________________
 
 ## Out of scope (deliberately)
 
@@ -39,21 +40,21 @@ This spec assumes the current Phase G workflow:
 - Holdout splits, multi-reviewer IRR, gold expansion — separate workstreams.
 - Storing per-record predictions in `runs.jsonl` directly — not necessary; matched records can be inferred.
 
----
+______________________________________________________________________
 
 ## Decisions (all confirmed)
 
-| Question | Decision |
-|---|---|
-| Champion run-ID location | `config/eval/champions.yml` — per-scorer YAML, single canonical source |
-| `current_state.md` | Retire entirely |
-| Stage 2 scope | All in — build both Component A and Component B |
+| Question                  | Decision                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| Champion run-ID location  | `config/eval/champions.yml` — per-scorer YAML, single canonical source                          |
+| `current_state.md`        | Retire entirely                                                                                 |
+| Stage 2 scope             | All in — build both Component A and Component B                                                 |
 | Profile archive directory | Use existing `config/profile/old_profiles/`, do not create a new `data/eval/profile_snapshots/` |
-| Archive trigger | Auto-snapshot at eval time, not at edit time |
-| Archive filename | `candidate_profile_<profile_version>.yml` (version strings already have dates baked in) |
-| Hash validation | Skip for now — single-user workflow, not worth the paranoia |
+| Archive trigger           | Auto-snapshot at eval time, not at edit time                                                    |
+| Archive filename          | `candidate_profile_<profile_version>.yml` (version strings already have dates baked in)         |
+| Hash validation           | Skip for now — single-user workflow, not worth the paranoia                                     |
 
----
+______________________________________________________________________
 
 ## Change 1 — doc refresh + champions.yml (no code)
 
@@ -75,18 +76,19 @@ remote_filter: null  # not yet established
 ### Doc edits
 
 1. **`notes/skills_fit_phase_g/iteration_cycle.md`** — replace the `jq` block in step 4 with:
+
    ```bash
    # Look up the current champion in config/eval/champions.yml, then:
    uv run scripts/compare_evals.py --diff <champion_run_id> <your_new_run_id>
    ```
 
-2. **`notes/skills_fit_phase_g/eval_harness.md`** — same substitution. Also remove the hardcoded run-IDs in "Current reference runs"; replace with a pointer to `config/eval/champions.yml`.
+1. **`notes/skills_fit_phase_g/eval_harness.md`** — same substitution. Also remove the hardcoded run-IDs in "Current reference runs"; replace with a pointer to `config/eval/champions.yml`.
 
-3. **`notes/skills_fit_phase_g/current_state.md`** — delete the file.
+1. **`notes/skills_fit_phase_g/current_state.md`** — delete the file.
 
-4. **`notes/skills_fit_phase_g/README.md`** — remove hardcoded run-IDs from "Current status" (point to champions.yml + runs.jsonl); remove the `current_state.md` entry from the doc map.
+1. **`notes/skills_fit_phase_g/README.md`** — remove hardcoded run-IDs from "Current status" (point to champions.yml + runs.jsonl); remove the `current_state.md` entry from the doc map.
 
-5. **`notes/skills_fit_phase_g/governance.md`** — already generic ("the baseline run"); no change needed. Verify on read.
+1. **`notes/skills_fit_phase_g/governance.md`** — already generic ("the baseline run"); no change needed. Verify on read.
 
 ### Acceptance
 
@@ -95,7 +97,7 @@ remote_filter: null  # not yet established
 - The champion run-ID is defined in exactly **one** place (the YAML), referenced from elsewhere.
 - `current_state.md` is removed and not referenced by any other doc.
 
----
+______________________________________________________________________
 
 ## Change 2 — Stage 2 Component A: per-record diff
 
@@ -182,7 +184,7 @@ Title truncated to ~28 chars by default. Sort by `|Δ_A| + |Δ_B|` descending.
 - `--per-record` fails clearly if either run has skipped rows or if the scorer is not `skills_fit`.
 - Output is markdown-formatted and useful both for local calibration analysis and PR descriptions.
 
----
+______________________________________________________________________
 
 ## Change 3 — Stage 2 Component B: profile auto-snapshot
 
@@ -224,20 +226,20 @@ The two existing legacy files (`candidate_profile.yml`, `candidate_profile_b.yml
 ### Acceptance
 
 1. After running `run_skills_fit_eval.py`, `config/profile/old_profiles/candidate_profile_<profile_version>.yml` exists and matches the in-flight profile.
-2. Re-running with the same profile is a no-op (idempotent).
-3. The v5 archive exists (`candidate_profile_2026-05-22-v5-llm-reframe.yml`).
-4. `.gitignore` blocks accidental commits.
-5. `~25 LOC` added to `run_skills_fit_eval.py`.
+1. Re-running with the same profile is a no-op (idempotent).
+1. The v5 archive exists (`candidate_profile_2026-05-22-v5-llm-reframe.yml`).
+1. `.gitignore` blocks accidental commits.
+1. `~25 LOC` added to `run_skills_fit_eval.py`.
 
----
+______________________________________________________________________
 
 ## Implementation order
 
 Sequential, three small changes. Each independently shippable. They may land as separate PRs, but that is an implementation choice, not a requirement of the calibration loop.
 
 1. **Change 1 (Stage 1)** — docs + champions.yml. ~15 minutes.
-2. **Change 2 (Component A)** — per-record diff. ~2 hours.
-3. **Change 3 (Component B)** — auto-snapshot + migration. ~30 minutes.
+1. **Change 2 (Component A)** — per-record diff. ~2 hours.
+1. **Change 3 (Component B)** — auto-snapshot + migration. ~30 minutes.
 
 ## Relationship to Phase G workflow
 

@@ -15,8 +15,8 @@ labels: feature
 
 ## Acceptance criteria
 
-- [ ] 
-- [ ] 
+- [ ]
+- [ ]
 
 ## Related
 

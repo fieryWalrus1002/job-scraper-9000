@@ -6,7 +6,7 @@ This package is intentionally agent-agnostic: it handles run logging, provenance
 
 Working from the spec: [`../../specs/eval_framework_requirements.md`](../../specs/eval_framework_requirements.md). Implementation status: SC-1 through SC-7 complete.
 
----
+______________________________________________________________________
 
 ## What it provides
 
@@ -30,24 +30,24 @@ scripts/compare_evals.py            # reads data/eval/runs.jsonl
 scripts/run_skills_fit_eval.py      # skills-fit eval driver (--scorer {llm,keyword})
 ```
 
----
+______________________________________________________________________
 
 ## Data artifacts
 
 Eval data lives under `data/eval/`:
 
-| Path | Purpose |
-| --- | --- |
-| `data/eval/ground_truth.jsonl` | Remote-filter human-verified gold from the HITL review UI |
+| Path                                      | Purpose                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `data/eval/ground_truth.jsonl`            | Remote-filter human-verified gold from the HITL review UI                   |
 | `data/eval/skills_fit_ground_truth.jsonl` | Skills-fit human-verified gold from the teacher-first markdown / CLI review |
-| `data/eval/runs.jsonl` | Append-only eval run history (both agents) |
-| `data/eval/mismatches_<run_id>.jsonl` | Per-run mismatch records |
-| `data/eval/batch/` | OpenAI Batch API request/result files |
-| `data/eval/eval_batch_<run_id>.json` | Batch eval sidecar metadata |
+| `data/eval/runs.jsonl`                    | Append-only eval run history (both agents)                                  |
+| `data/eval/mismatches_<run_id>.jsonl`     | Per-run mismatch records                                                    |
+| `data/eval/batch/`                        | OpenAI Batch API request/result files                                       |
+| `data/eval/eval_batch_<run_id>.json`      | Batch eval sidecar metadata                                                 |
 
 `data/**/*.jsonl` is gitignored so local eval artifacts are not committed.
 
----
+______________________________________________________________________
 
 ## Run-record provenance
 
@@ -67,7 +67,7 @@ Each eval run records:
 
 This makes prompt, model, profile, config, and dataset changes comparable across runs.
 
----
+______________________________________________________________________
 
 ## Current baseline
 
@@ -88,7 +88,7 @@ f1:          0.8056
 
 Primary tuning target: reduce false positives where onsite or location-restricted jobs are predicted as pass.
 
----
+______________________________________________________________________
 
 ## Design note
 
