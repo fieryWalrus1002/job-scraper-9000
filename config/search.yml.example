@@ -28,7 +28,7 @@ companies:
 greenhouse:
   # Worth activating alongside companies: above. Greenhouse is the ATS for
   # many tech companies that don't post comprehensively on LinkedIn.
-  # boards:
+  boards:
     - anthropic
     - openai
     - microsoft
