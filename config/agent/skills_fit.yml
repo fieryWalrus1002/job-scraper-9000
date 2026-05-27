@@ -1,8 +1,8 @@
 llm:
   provider: openai        # openai | ollama
-  model: gpt-4o-mini
+  model: gpt-5.4-mini
   temperature: 0.1
-  # base_url: http://localhost:11434/v1   # uncomment for ollama
+  api_key_env: OPENAI_API_KEY_SKILLS_FIT  # Optional override for API key environment variable
 
 profile_file: config/profile/candidate_profile.yml
 

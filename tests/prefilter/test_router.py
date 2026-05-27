@@ -39,7 +39,7 @@ routing:
   reject_non_us: true
   prefer_search_params_as_weak_signal: true
 filter_terms:
-  ai_factory_keywords:
+  banned_anywhere:
     - toxic-company
 """,
         encoding="utf-8",

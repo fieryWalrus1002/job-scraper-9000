@@ -38,6 +38,7 @@ class SELSearchQuery:
     worker_sub_types: list[str] = field(default_factory=lambda: ["regular"])
     time_types: list[str] = field(default_factory=lambda: ["full_time"])
     fetch_descriptions: bool = True
+    allowed_title_keywords: list[str] = field(default_factory=list)
 
     def to_params(self) -> list[tuple[str, str]]:
         """

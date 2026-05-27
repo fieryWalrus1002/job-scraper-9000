@@ -120,6 +120,12 @@ streamlit run src/review_ui/app.py     # open the review UI
 uv run job-scraper-9000 skills-fit --run-date $(date +%F)
 ```
 
+**Review the top matches and gaps for a specific run:**
+
+```bash
+uv run scripts/view_top_20_jobs.py --run-date 2026-05-26
+```
+
 ---
 
 ## Tech stack
