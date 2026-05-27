@@ -7,12 +7,12 @@ Job descriptions are aspirational in two directions:
 1. **They over-list requirements.** A typical posting lists 8-15 skills; strong candidates match 50-70%, not 100%. Treating the JD as a literal checklist collapses every hireable role to a 2 or 3.
 2. **They over-mention skills that aren't core.** Keyword bait and tech-stack decoration inflate the apparent overlap. A posting listing "C++, Python, ML, Kubernetes" could be a real ML infrastructure role or a generic IT support job with buzzwords pasted in.
 
-**Before scoring**, classify each mentioned skill or requirement by its role in the posting:
+**Before scoring**, classify each mentioned skill or requirement by its role in the posting. This are the **Core Job Duties**.
 
 | Role in posting | Weight |
 | --- | --- |
 | Core responsibility — what the person actually does day-to-day | Heavy |
-| Required qualification — listed as a gate (years, credential, level) | Heavy if material |
+| Required qualification — listed as a gate (years, credential, level) | Moderate if material |
 | Preferred / nice-to-have — wishlist | Light; gaps acceptable for 4-5 |
 | Incidental keyword — mentioned in passing | Near-zero |
 | Company tech-stack decoration — "we use X internally" | Near-zero |
@@ -28,8 +28,10 @@ A score of 4-5 requires matching **core** requirements with relevant adjacent ex
 | 5 | Core stack matches strongly. Level and domain aligned. Gaps only in nice-to-haves or decoration. |
 | 4 | Core stack matches. Level/domain aligned. Some non-trivial gaps the candidate could close on the job. |
 | 3 | Partial core match, OR aligned but in a stretched-adjacent domain. Real concerns alongside real matches. |
-| 2 | Core requirements largely missing, OR fundamental mismatch on level/credential/domain/role type. The candidate's stack may be *mentioned* but the actual job is elsewhere — e.g., a Python role that's mostly data-labeling ops, a C++ role that's embedded automotive requiring AUTOSAR, a "remote" role restricted to a single time zone or country. |
+| 2 | Core requirements largely missing, OR fundamental mismatch on level/credential/domain/role type. The candidate's stack may be *mentioned* but the actual job is elsewhere — e.g., a Python role that's mostly web front-end, a C++ role that's embedded automotive requiring AUTOSAR. |
 | 1 | Wrong kind of job entirely — different domain, different career track, hard disqualifier. |
+
+**Note**: Take into account only the skills, not location, salary, etc. when determining a fit.
 
 ## Output fields
 
@@ -38,8 +40,9 @@ A score of 4-5 requires matching **core** requirements with relevant adjacent ex
 - **score_rationale** — 2-4 sentences of evidence-based explanation. Identify the core matches, the material gaps, and why this band. Auditable summary, not step-by-step reasoning. Cite specific JD language where useful.
 - **top_matches** (2-5 items) — specific overlaps between posting and profile. "Python data pipelines" beats "Python."
 - **gaps** (2-5 items, required for scores 1-4) — missing requirements, weak matches, or role misalignments. Distinguish *material* gaps from JD-bloat; only material gaps justify a score reduction.
-- **hard_concerns** — hard or near-hard blockers, *independent of fit_score*. Examples: clearance requirements, location or time-zone restrictions on "remote" roles, credential gates, seniority mismatches, salary clearly below the candidate's stated floor, contract-type mismatch, work-authorization restrictions. A `fit_score=4` with `hard_concerns=["requires TS/SCI clearance"]` is genuinely different from a clean 4 — the dispatcher routes them differently. Don't collapse blockers into the score.
+- **hard_concerns** — hard or near-hard blockers, *independent of fit_score*. Examples: clearance requirements, credential gates, seniority mismatches, contract-type mismatch, work-authorization restrictions. A `fit_score=4` with `hard_concerns=["requires TS/SCI clearance"]` is genuinely different from a clean 4 — the dispatcher routes them differently. Don't collapse blockers into the score.
+- **core_job_duties** - Top 4-5 list of identified Core Job Duties you used to match against the candidate's skills in order to determine the fit.
 
 ## Be terse
 
-Reviewers read many of these. Keep `score_rationale` to 2-4 sentences, lists at 2-5 items. No filler, no hedging.
+Keep `score_rationale` to 2-4 sentences, lists at 2-5 items. No filler, no hedging.

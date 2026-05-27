@@ -107,14 +107,18 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
 
                 description_html = detail.get("jobDescription", "")
                 description_raw = (
-                    BeautifulSoup(description_html, "html.parser").get_text("\n", strip=True)
+                    BeautifulSoup(description_html, "html.parser").get_text(
+                        "\n", strip=True
+                    )
                     if description_html
                     else ""
                 )
                 description, scrub_counts = scrub(description_raw)
 
                 bullet_fields = item.get("bulletFields") or []
-                source_job_id = bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
+                source_job_id = (
+                    bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
+                )
 
                 raw_location = item.get("locationsText", "")
                 location = (
@@ -138,6 +142,20 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     scrub_counts=scrub_counts,
                 )
                 job.compute_hash()
+
+                # Post-fetch Validation Gate: Only append if it hits your target software domains
+                # This prevents the scraper from ingesting all those SEL jobs that I have no interest in,
+                # and cost me mad rubels in OpenAI calls.
+                if self.query.allowed_title_keywords:
+                    title_lower = title.lower()
+                    is_relevant = any(
+                        kw.lower() in title_lower
+                        for kw in self.query.allowed_title_keywords
+                    )
+                    if not is_relevant:
+                        log.debug("SEL: Dropping non-software role: %s", title)
+                        continue
+
                 all_jobs.append(job)
 
             offset += len(postings)

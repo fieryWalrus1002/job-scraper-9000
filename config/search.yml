@@ -150,3 +150,17 @@ sel:
   location: pullman_wa
   job_type: regular
   fetch_descriptions: true
+  allowed_title_keywords:
+    - software
+    - firmware
+    - embedded
+    - computer
+    - developer
+    - machine learning
+    - ai
+    - data scientist
+    - data engineer
+    - systems
+    - devops
+    - cloud
+    - infra
