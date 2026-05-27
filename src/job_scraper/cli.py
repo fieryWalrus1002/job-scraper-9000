@@ -322,6 +322,7 @@ def _cmd_sel(args) -> None:
         location_key=args.location,
         worker_sub_types=[args.job_type],
         fetch_descriptions=not args.no_descriptions,
+        allowed_title_keywords=args.allowed_title_keywords,
     )
     log.info(
         "SEL: location=%s | job_type=%s | descriptions=%s",

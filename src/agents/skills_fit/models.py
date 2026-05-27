@@ -66,3 +66,11 @@ class SkillsFitAnalysis(BaseModel):
             "work authorization, contract type. Dispatcher uses this to filter/flag even high-scoring matches."
         ),
     )
+
+    core_job_duties: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The 4-5 most important job duties or responsibilities, ideally quoted verbatim from the JD. Used in"
+            "mismatch analysis and review UI to focus attention on the heart of the role."
+        ),
+    )

@@ -97,6 +97,8 @@ def _format_profile_block(profile: dict) -> str:
         lines.append("Core skills: " + ", ".join(core))
     if adj := _to_list(profile.get("adjacent_skills")):
         lines.append("Adjacent skills: " + ", ".join(adj))
+    if aspirational := _to_list(profile.get("growth_skills")):
+        lines.append("Growth skills: " + ", ".join(aspirational))
     if domains := _to_list(profile.get("preferred_domains")):
         lines.append("Preferred domains: " + ", ".join(domains))
     if avoid := _to_list(profile.get("avoided_domains")):

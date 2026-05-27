@@ -38,6 +38,7 @@ class _SELSection:
     location: str = "pullman_wa"
     job_type: str = "regular"
     fetch_descriptions: bool = True
+    allowed_title_keywords: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -151,6 +152,7 @@ def _parse_sel_section(raw: dict) -> _SELSection | None:
         location=str(sec.get("location", "pullman_wa")),
         job_type=str(sec.get("job_type", "regular")),
         fetch_descriptions=bool(sec.get("fetch_descriptions", True)),
+        allowed_title_keywords=[str(k) for k in sec.get("allowed_title_keywords", [])],
     )
 
 
@@ -262,6 +264,7 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
             location_key=sl.location,
             worker_sub_types=[sl.job_type],
             fetch_descriptions=sl.fetch_descriptions,
+            allowed_title_keywords=sl.allowed_title_keywords,
         )
         scrapers.append(SELJobScraper(query))
 
