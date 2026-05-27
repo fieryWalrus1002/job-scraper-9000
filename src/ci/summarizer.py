@@ -39,7 +39,10 @@ class PRSummarizer:
                 max_tokens=self.config["llm"]["max_tokens"],
                 messages=[
                     {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": f"Please summarize the following git delta:\n\n{git_diff}"},
+                    {
+                        "role": "user",
+                        "content": f"Please summarize the following git delta:\n\n{git_diff}",
+                    },
                 ],
             )
             if not response.choices or not response.choices[0].message.content:

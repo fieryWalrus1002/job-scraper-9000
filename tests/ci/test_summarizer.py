@@ -64,6 +64,7 @@ def _make_completion(content: str) -> MagicMock:
 
 def test_loads_config(tmp_path):
     from ci.summarizer import PRSummarizer
+
     s = PRSummarizer(_write_config(tmp_path), _write_prompt(tmp_path), MagicMock())
     assert s.config["llm"]["model"] == "gpt-4o-mini"
     assert s.config["llm"]["temperature"] == 0.2
@@ -71,6 +72,7 @@ def test_loads_config(tmp_path):
 
 def test_strips_frontmatter_from_prompt(tmp_path):
     from ci.summarizer import PRSummarizer
+
     s = PRSummarizer(_write_config(tmp_path), _write_prompt(tmp_path), MagicMock())
     assert "---" not in s.system_prompt
     assert "You are a helpful assistant." in s.system_prompt
@@ -78,6 +80,7 @@ def test_strips_frontmatter_from_prompt(tmp_path):
 
 def test_prompt_without_frontmatter_passes_through(tmp_path):
     from ci.summarizer import PRSummarizer
+
     s = PRSummarizer(
         _write_config(tmp_path),
         _write_prompt(tmp_path, PROMPT_WITHOUT_FRONTMATTER),
@@ -93,6 +96,7 @@ def test_prompt_without_frontmatter_passes_through(tmp_path):
 
 def test_generate_returns_content(tmp_path):
     from ci.summarizer import PRSummarizer
+
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = _make_completion("Great PR!")
     s = PRSummarizer(_write_config(tmp_path), _write_prompt(tmp_path), mock_client)
@@ -101,6 +105,7 @@ def test_generate_returns_content(tmp_path):
 
 def test_generate_passes_correct_params(tmp_path):
     from ci.summarizer import PRSummarizer
+
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = _make_completion("ok")
     s = PRSummarizer(_write_config(tmp_path), _write_prompt(tmp_path), mock_client)
@@ -113,6 +118,7 @@ def test_generate_passes_correct_params(tmp_path):
 
 def test_generate_raises_on_empty_response(tmp_path):
     from ci.summarizer import PRSummarizer
+
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = _make_completion("")
     s = PRSummarizer(_write_config(tmp_path), _write_prompt(tmp_path), mock_client)
@@ -128,14 +134,22 @@ def test_generate_raises_on_empty_response(tmp_path):
 def test_missing_api_key_raises(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     from ci.summarizer import build_client_from_env
-    with patch("ci.summarizer.load_dotenv"), pytest.raises(ValueError, match="OPENAI_API_KEY"):
+
+    with (
+        patch("ci.summarizer.load_dotenv"),
+        pytest.raises(ValueError, match="OPENAI_API_KEY"),
+    ):
         build_client_from_env(_write_config(tmp_path))
 
 
 def test_openai_client_built_with_api_key(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     from ci.summarizer import build_client_from_env
-    with patch("ci.summarizer.load_dotenv"), patch("ci.summarizer.OpenAI") as mock_openai:
+
+    with (
+        patch("ci.summarizer.load_dotenv"),
+        patch("ci.summarizer.OpenAI") as mock_openai,
+    ):
         build_client_from_env(_write_config(tmp_path))
     mock_openai.assert_called_once_with(api_key="test-key")
 
@@ -147,7 +161,11 @@ def test_openai_client_built_with_api_key(tmp_path, monkeypatch):
 
 def test_ollama_provider_does_not_require_api_key(tmp_path):
     from ci.summarizer import build_client_from_env
-    with patch("ci.summarizer.load_dotenv"), patch("ci.summarizer.OpenAI") as mock_openai:
+
+    with (
+        patch("ci.summarizer.load_dotenv"),
+        patch("ci.summarizer.OpenAI") as mock_openai,
+    ):
         build_client_from_env(_write_config(tmp_path, MINIMAL_CONFIG_OLLAMA))
     mock_openai.assert_called_once_with(
         base_url="http://localhost:11434/v1", api_key="ollama"
@@ -163,7 +181,11 @@ llm:
   max_tokens: 512
 """
     from ci.summarizer import build_client_from_env
-    with patch("ci.summarizer.load_dotenv"), patch("ci.summarizer.OpenAI") as mock_openai:
+
+    with (
+        patch("ci.summarizer.load_dotenv"),
+        patch("ci.summarizer.OpenAI") as mock_openai,
+    ):
         build_client_from_env(_write_config(tmp_path, config_no_url))
     mock_openai.assert_called_once_with(
         base_url="http://localhost:11434/v1", api_key="ollama"

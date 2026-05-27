@@ -66,7 +66,10 @@ def test_dedup_jobs_falls_back_to_source_job_id_when_no_dedup_hash():
 
 
 def test_dedup_jobs_passes_through_jobs_missing_both_keys():
-    jobs = [_job(source_job_id="", dedup_hash=""), _job(source_job_id="", dedup_hash="")]
+    jobs = [
+        _job(source_job_id="", dedup_hash=""),
+        _job(source_job_id="", dedup_hash=""),
+    ]
     deduped, dropped = dedup_jobs(jobs)
     assert dropped == 0
     assert len(deduped) == 2

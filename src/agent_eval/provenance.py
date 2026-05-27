@@ -54,9 +54,11 @@ def generate_run_id(prefix: str | None = None) -> str:
 
 def _uv_version() -> str | None:
     try:
-        return subprocess.check_output(
-            ["uv", "--version"], stderr=subprocess.DEVNULL
-        ).decode().strip()
+        return (
+            subprocess.check_output(["uv", "--version"], stderr=subprocess.DEVNULL)
+            .decode()
+            .strip()
+        )
     except Exception:
         log.warning("uv not found; env.uv_version will be null in the run record")
         return None
