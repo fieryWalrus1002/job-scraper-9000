@@ -31,6 +31,7 @@ config/known_failures.json
 config/profile/*.yml
 config/profile/old_profiles/*.yml
 !config/profile/*.yml.example
+config/profile/CHANGELOG.md
 
 # Search configs have some PII
 config/search*.yml
