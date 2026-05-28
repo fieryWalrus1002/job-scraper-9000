@@ -138,6 +138,22 @@ at 12:30 AM -f scripts/run_overnight.sh
 
 This will schedule the `scripts/run_overnight.sh` script to execute at 12:30 AM. The script should contain the necessary commands to run the full pipeline.
 
+**Run the gold-expansion HITL loop (after reviewing markdown files):**
+
+```bash
+# Ingest filled-in review files into the gold set
+uv run scripts/parse_skills_fit_review_md.py \
+  --review-dir data/staging/skills_fit_review_<date>/ \
+  --in data/staging/skills_fit_review_template.jsonl
+
+# Re-run eval on the expanded gold to establish the new baseline
+uv run scripts/run_skills_fit_eval.py --scorer llm --run-id "phase_g_v6_gold_expand_<date>"
+
+# Compare against the previous champion
+uv run scripts/compare_evals.py --against-champion skills_fit \
+  --diff <run-id-from-above> --per-record
+```
+
 ______________________________________________________________________
 
 ## Tech stack
