@@ -21,3 +21,17 @@ pipeline:
     just prefilter
     just filter-remote
     just filter-skills
+
+frontend:
+    cd frontend && npm run dev -- --port 5173
+
+backend:
+    @echo "Starting FastAPI backend on port 8000..."
+    uv run uvicorn src.api.main:app --reload --port 8000
+
+dev:
+    uv run honcho start
+
+build-images:
+    docker build --target backend -t job-api -f docker/app.Dockerfile .
+    docker build --target scraper -t job-scraper -f docker/app.Dockerfile .
