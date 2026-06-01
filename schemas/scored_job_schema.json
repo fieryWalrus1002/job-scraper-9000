@@ -1,161 +1,200 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$defs": {
+    "JobMetadata": {
+      "description": "Operational provenance for a single scored job: which run, model, prompt, and profile produced this record.",
+      "properties": {
+        "run_id": { "title": "Run Id", "type": "string" },
+        "scored_at": { "format": "date-time", "title": "Scored At", "type": "string" },
+        "config_file": { "title": "Config File", "type": "string" },
+        "prompt_file": { "title": "Prompt File", "type": "string" },
+        "prompt_hash": { "title": "Prompt Hash", "type": "string" },
+        "profile_file": { "title": "Profile File", "type": "string" },
+        "profile_hash": { "title": "Profile Hash", "type": "string" },
+        "profile_version": { "title": "Profile Version", "type": "string" },
+        "provider": { "title": "Provider", "type": "string" },
+        "model": { "title": "Model", "type": "string" },
+        "temperature": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }],
+          "default": null,
+          "title": "Temperature"
+        },
+        "skills_fit_schema_version": {
+          "default": "1.0.0",
+          "title": "Skills Fit Schema Version",
+          "type": "string"
+        },
+        "commit": { "title": "Commit", "type": "string" },
+        "dirty": { "title": "Dirty", "type": "boolean" },
+        "input_source": {
+          "enum": ["remote_filter_pass", "local_candidate"],
+          "title": "Input Source",
+          "type": "string"
+        },
+        "input_path": { "title": "Input Path", "type": "string" },
+        "failure_reason": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "title": "Failure Reason"
+        }
+      },
+      "required": [
+        "run_id", "scored_at", "config_file", "prompt_file", "prompt_hash",
+        "profile_file", "profile_hash", "profile_version", "provider", "model",
+        "commit", "dirty", "input_source", "input_path"
+      ],
+      "title": "JobMetadata",
+      "type": "object"
+    },
+    "SkillsFitAnalysis": {
+      "description": "Structured LLM analysis of how well a job posting matches the candidate profile.",
+      "properties": {
+        "fit_score": {
+          "description": "1 = reject; 2 = weak fit; 3 = possible fit; 4 = good fit; 5 = strong fit.",
+          "enum": [1, 2, 3, 4, 5],
+          "title": "Fit Score",
+          "type": "integer"
+        },
+        "confidence": {
+          "description": "How confident the model is that the JD contains enough information to judge fit.",
+          "enum": ["low", "medium", "high"],
+          "title": "Confidence",
+          "type": "string"
+        },
+        "score_rationale": {
+          "description": "Concise evidence-based explanation of the score.",
+          "title": "Score Rationale",
+          "type": "string"
+        },
+        "top_matches": {
+          "description": "2-5 specific overlaps between the posting and the candidate profile.",
+          "items": { "type": "string" },
+          "title": "Top Matches",
+          "type": "array"
+        },
+        "gaps": {
+          "description": "2-5 missing requirements, weak matches, or role misalignments.",
+          "items": { "type": "string" },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "hard_concerns": {
+          "description": "Hard blockers: clearance, location, credential, seniority, salary, work authorization.",
+          "items": { "type": "string" },
+          "title": "Hard Concerns",
+          "type": "array"
+        },
+        "core_job_duties": {
+          "description": "The 4-5 most important job duties, ideally quoted verbatim from the JD.",
+          "items": { "type": "string" },
+          "title": "Core Job Duties",
+          "type": "array"
+        }
+      },
+      "required": ["fit_score", "confidence", "score_rationale"],
+      "title": "SkillsFitAnalysis",
+      "type": "object"
+    }
+  },
   "title": "ScoredJobPosting",
-  "description": "Schema for scraped job postings enriched with pre-filter location routing and AI skills fit alignment analysis.",
+  "description": "A scraped job posting enriched with remote-filter classification and AI skills-fit analysis.",
   "type": "object",
-  "required": [
-    "source",
-    "source_job_id",
-    "source_url",
-    "title",
-    "company",
-    "location",
-    "posted_at",
-    "description",
-    "scraped_at",
-    "scrub_counts",
-    "dedup_hash",
-    "_prefilter_result",
-    "_prefilter_reason",
-    "_prefilter_metadata",
-    "_skills_fit_score",
-    "_skills_fit_confidence",
-    "_skills_fit_rationale",
-    "_skills_fit_top_matches",
-    "_skills_fit_gaps",
-    "_skills_fit_hard_concerns",
-    "_skills_fit_analysis",
-    "_skills_fit_metadata"
-  ],
+  "required": ["dedup_hash", "metadata"],
   "properties": {
+    "dedup_hash": {
+      "description": "Deterministic SHA-256 hash used for deduplication across batches.",
+      "title": "Dedup Hash",
+      "type": "string"
+    },
     "source": {
-      "type": "string",
-      "description": "The platform source of the job listing (e.g., 'sel', 'linkedin')."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Scraper source platform (e.g. 'linkedin', 'indeed').",
+      "title": "Source"
     },
     "source_job_id": {
-      "type": "string",
-      "description": "The unique job identifier assigned by the source platform."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Platform-assigned job identifier.",
+      "title": "Source Job Id"
     },
     "source_url": {
-      "type": "string",
-      "format": "uri",
-      "description": "Direct canonical URL link to the original job posting."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Canonical URL to the original job posting.",
+      "title": "Source Url"
     },
     "title": {
-      "type": "string",
-      "description": "Job title as specified by the employer."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Job title as listed by the employer.",
+      "title": "Title"
     },
     "company": {
-      "type": "string",
-      "description": "The company or organization hiring for the position."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Hiring company or organisation name.",
+      "title": "Company"
     },
     "location": {
-      "type": "string",
-      "description": "Text description of the location from the posting."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Free-text location from the posting.",
+      "title": "Location"
     },
     "posted_at": {
-      "type": "string",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-      "description": "The date the job was posted, formatted as YYYY-MM-DD."
+      "anyOf": [{ "format": "date", "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Date the job was posted (YYYY-MM-DD).",
+      "title": "Posted At"
     },
     "description": {
-      "type": "string",
-      "description": "Full, unfiltered markdown or raw text body of the job description."
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "Full raw text body of the job description.",
+      "title": "Description"
     },
     "scraped_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 timestamp indicating when the job was ingested."
+      "anyOf": [{ "format": "date-time", "type": "string" }, { "type": "null" }],
+      "default": null,
+      "description": "ISO 8601 timestamp of when this posting was ingested.",
+      "title": "Scraped At"
     },
-    "scrub_counts": {
-      "type": "object",
-      "description": "Metrics capturing the reduction or masking of PII.",
-      "required": [
-        "email",
-        "phone"
-      ],
-      "properties": {
-        "email": {
-          "type": "integer",
-          "minimum": 0
+    "remote_classification": {
+      "anyOf": [
+        {
+          "enum": [
+            "fully_remote",
+            "remote_with_quarterly_travel",
+            "remote_with_monthly_travel",
+            "remote_with_frequent_travel",
+            "hybrid",
+            "onsite_disguised",
+            "location_restricted",
+            "unclear"
+          ],
+          "type": "string"
         },
-        "phone": {
-          "type": "integer",
-          "minimum": 0
-        }
-      }
-    },
-    "search_params": {
-      "type": "object",
-      "description": "Arbitrary key-value parameters passed to the scraper query engine."
-    },
-    "dedup_hash": {
-      "type": "string",
-      "description": "Deterministic SHA-256 hash generated to deduplicate incoming data frames."
-    },
-    "_prefilter_result": {
-      "type": "string",
-      "description": "Result of geographic compliance checks (e.g., 'local_candidate')."
-    },
-    "_prefilter_reason": {
-      "type": "string",
-      "description": "Human-readable explanation of why the prefilter classification was made."
-    },
-    "_prefilter_metadata": {
-      "type": "object",
-      "description": "Tracing parameters detailing pipeline ingestion state, config file revisions, and geo rules."
-    },
-    "_skills_fit_score": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 5,
-      "description": "LLM evaluation score matching the candidate profile to the job description requirements."
-    },
-    "_skills_fit_confidence": {
-      "type": "string",
-      "enum": [
-        "low",
-        "medium",
-        "high"
+        { "type": "null" }
       ],
-      "description": "The model's internal self-assessed evaluation confidence level."
+      "default": null,
+      "description": "Remote-work classification produced by the remote-filter agent.",
+      "title": "Remote Classification"
     },
-    "_skills_fit_rationale": {
-      "type": "string",
-      "description": "Comprehensive qualitative summary explaining the computed skills score."
+    "pipeline_metadata": {
+      "additionalProperties": true,
+      "description": "JSONB blob of pipeline-internal keys: prefilter, remote-filter, scrub counts, search params.",
+      "title": "Pipeline Metadata",
+      "type": "object"
     },
-    "_skills_fit_top_matches": {
-      "type": "array",
-      "description": "Key elements of strong overlap between the candidate's core competencies and the job specifications.",
-      "items": {
-        "type": "string"
-      }
+    "ai_fit": {
+      "anyOf": [{ "$ref": "#/$defs/SkillsFitAnalysis" }, { "type": "null" }],
+      "default": null,
+      "description": "Skills-fit analysis produced by the LLM agent. Null when scoring failed or was skipped."
     },
-    "_skills_fit_gaps": {
-      "type": "array",
-      "description": "Identified discrepancies, missing framework knowledge, or career alignment gaps.",
-      "items": {
-        "type": "string"
-      }
-    },
-    "_skills_fit_hard_concerns": {
-      "type": "array",
-      "description": "Strict prerequisites, structural mismatches, or critical red-flag factors.",
-      "items": {
-        "type": "string"
-      }
-    },
-    "_skills_fit_input_source": {
-      "type": "string",
-      "description": "Identifier tracking which candidate configuration or profile vector was used."
-    },
-    "_skills_fit_analysis": {
-      "type": "object",
-      "description": "The raw structured payload returned from the LLM parsing block."
-    },
-    "_skills_fit_metadata": {
-      "type": "object",
-      "description": "Operational run-state data tracking model strings, hyper-parameters, timestamps, and active prompt versions."
+    "metadata": {
+      "$ref": "#/$defs/JobMetadata",
+      "description": "Operational provenance: run ID, model, prompt hash, profile hash, timestamps."
     }
   }
 }
