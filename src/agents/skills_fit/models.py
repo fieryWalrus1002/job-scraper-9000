@@ -1,6 +1,6 @@
-from typing import Literal, get_args
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from datetime import date, datetime
+from typing import Any, Literal, get_args
 
 # Bump SCHEMA_VERSION (semver) when SkillsFitAnalysis fields change in a way
 # that makes old eval records structurally incompatible with new ones.
@@ -14,6 +14,17 @@ SCHEMA_VERSION = "1.0.0"
 
 FitScore = Literal[1, 2, 3, 4, 5]
 Confidence = Literal["low", "medium", "high"]
+InputSource = Literal["remote_filter_pass", "local_candidate"]
+RemoteClassification = Literal[
+    "fully_remote",
+    "remote_with_quarterly_travel",
+    "remote_with_monthly_travel",
+    "remote_with_frequent_travel",
+    "hybrid",
+    "onsite_disguised",
+    "location_restricted",
+    "unclear",
+]
 
 FIT_SCORES: list[int] = list(get_args(FitScore))
 CONFIDENCE_LEVELS: list[str] = list(get_args(Confidence))
@@ -31,7 +42,7 @@ class SkillsFitAnalysis(BaseModel):
             "1 = reject; 2 = weak fit; 3 = possible fit; "
             "4 = good fit; 5 = strong fit. "
             "Score core-requirement coverage, not raw JD-line overlap."
-        ),
+        )
     )
 
     confidence: Confidence = Field(
@@ -74,3 +85,50 @@ class SkillsFitAnalysis(BaseModel):
             "mismatch analysis and review UI to focus attention on the heart of the role."
         ),
     )
+
+
+class JobMetadata(BaseModel):
+    run_id: str
+    scored_at: datetime
+    config_file: str
+    prompt_file: str
+    prompt_hash: str
+    profile_file: str
+    profile_hash: str
+    profile_version: str
+    provider: str
+    model: str
+    temperature: float | None = None
+    skills_fit_schema_version: str = SCHEMA_VERSION
+    commit: str
+    dirty: bool
+    input_source: InputSource
+    input_path: str
+    failure_reason: str | None = None
+
+
+class ScoredJobPosting(BaseModel):
+    dedup_hash: str
+    source: str | None = None
+    source_job_id: str | None = None
+    source_url: str | None = None
+    title: str | None = None
+    company: str | None = None
+    location: str | None = None
+    posted_at: date | None = None
+    description: str | None = None
+    scraped_at: datetime | None = None
+    remote_classification: RemoteClassification | None = None
+    pipeline_metadata: dict[str, Any] = Field(default_factory=dict)
+    ai_fit: SkillsFitAnalysis | None = None
+    metadata: JobMetadata
+
+    @field_validator("posted_at", mode="before")
+    @classmethod
+    def coerce_nan_date(cls, v: object) -> object:
+        return None if v in (None, "", "nan") else v
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def coerce_empty_location(cls, v: object) -> object:
+        return v if v else None

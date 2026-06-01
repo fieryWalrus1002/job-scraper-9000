@@ -85,27 +85,27 @@ def existing_output_row(
     failure_reason: str | None = None,
     title: str = "Existing",
 ) -> dict:
-    metadata = {
-        "run_id": "prior_run",
-        "failure_reason": failure_reason,
-    }
-    if failure_reason is None:
-        metadata.pop("failure_reason")
-    return {
+    metadata: dict = {"run_id": "prior_run"}
+    if failure_reason is not None:
+        metadata["failure_reason"] = failure_reason
+    record: dict = {
         "dedup_hash": dedup_hash,
         "title": title,
         "company": "ExistingCo",
         "location": "Remote",
-        "_skills_fit_score": score,
-        "_skills_fit_rationale": f"Existing rationale for {title}",
-        "_skills_fit_hard_concerns": [],
-        "_skills_fit_top_matches": [],
-        "_skills_fit_analysis": None,
-        "_skills_fit_gaps": [],
-        "_skills_fit_confidence": None,
-        "_skills_fit_input_source": "remote_filter_pass",
-        "_skills_fit_metadata": metadata,
+        "metadata": metadata,
     }
+    if score is not None:
+        record["ai_fit"] = {
+            "fit_score": score,
+            "confidence": "high",
+            "score_rationale": f"Existing rationale for {title}",
+            "top_matches": [],
+            "gaps": [],
+            "hard_concerns": [],
+            "core_job_duties": [],
+        }
+    return record
 
 
 def test_run_skills_fit_partitioned_mode_dedupes_sorts_and_enriches(
@@ -265,40 +265,31 @@ def test_run_skills_fit_partitioned_mode_dedupes_sorts_and_enriches(
 
     alpha = rows[0]
     assert alpha["company"] == "LocalCo"
-    assert alpha["_skills_fit_score"] == 5
-    assert alpha["_skills_fit_rationale"] == "Rationale for Alpha"
-    assert alpha["_skills_fit_top_matches"] == ["match-Alpha"]
-    assert alpha["_skills_fit_gaps"] == ["gap-Alpha"]
-    assert alpha["_skills_fit_hard_concerns"] == ["concern-Alpha"]
-    assert alpha["_skills_fit_confidence"] == "high"
-    assert alpha["_skills_fit_analysis"]["fit_score"] == 5
-    assert alpha["_skills_fit_input_source"] == "local_candidate"
-    assert alpha["_skills_fit_metadata"]["run_id"] == "skillsfit_fixed"
-    assert alpha["_skills_fit_metadata"]["profile_version"] == "test-v1"
-    assert alpha["_skills_fit_metadata"]["profile_hash"].startswith("sha256:")
-    assert alpha["_skills_fit_metadata"]["provider"] == "ollama"
-    assert alpha["_skills_fit_metadata"]["model"] == "qwen2.5:14b"
-    assert alpha["_skills_fit_metadata"]["temperature"] == 0.3
-    assert alpha["_skills_fit_metadata"]["prompt_file"] == str(prompt_path)
-    assert alpha["_skills_fit_metadata"]["input_source"] == "local_candidate"
-    assert alpha["_skills_fit_metadata"]["input_path"] == str(
+    assert alpha["ai_fit"]["fit_score"] == 5
+    assert alpha["ai_fit"]["score_rationale"] == "Rationale for Alpha"
+    assert alpha["ai_fit"]["top_matches"] == ["match-Alpha"]
+    assert alpha["ai_fit"]["gaps"] == ["gap-Alpha"]
+    assert alpha["ai_fit"]["hard_concerns"] == ["concern-Alpha"]
+    assert alpha["ai_fit"]["confidence"] == "high"
+    assert alpha["metadata"]["run_id"] == "skillsfit_fixed"
+    assert alpha["metadata"]["profile_version"] == "test-v1"
+    assert alpha["metadata"]["profile_hash"].startswith("sha256:")
+    assert alpha["metadata"]["provider"] == "ollama"
+    assert alpha["metadata"]["model"] == "qwen2.5:14b"
+    assert alpha["metadata"]["temperature"] == 0.3
+    assert alpha["metadata"]["prompt_file"] == str(prompt_path)
+    assert alpha["metadata"]["input_source"] == "local_candidate"
+    assert alpha["metadata"]["input_path"] == str(
         Path("data/local") / run_date / "local_jobs.jsonl"
     )
 
     missing_description = rows[3]
-    assert missing_description["_skills_fit_score"] is None
-    assert missing_description["_skills_fit_analysis"] is None
-    assert missing_description["_skills_fit_top_matches"] == []
-    assert (
-        missing_description["_skills_fit_metadata"]["failure_reason"]
-        == "missing_description"
-    )
+    assert missing_description.get("ai_fit") is None
+    assert missing_description["metadata"]["failure_reason"] == "missing_description"
 
     agent_failed = rows[4]
-    assert agent_failed["_skills_fit_score"] is None
-    assert agent_failed["_skills_fit_analysis"] is None
-    assert agent_failed["_skills_fit_gaps"] == []
-    assert agent_failed["_skills_fit_metadata"]["failure_reason"] == "agent_failed"
+    assert agent_failed.get("ai_fit") is None
+    assert agent_failed["metadata"]["failure_reason"] == "agent_failed"
 
 
 def test_run_skills_fit_override_mode_works_without_run_date(tmp_path, monkeypatch):
@@ -356,9 +347,9 @@ def test_run_skills_fit_override_mode_works_without_run_date(tmp_path, monkeypat
     rows = [json.loads(line) for line in output.read_text().splitlines()]
     assert len(rows) == 1
     assert rows[0]["dedup_hash"] == "hash-z"
-    assert rows[0]["_skills_fit_score"] == 4
-    assert rows[0]["_skills_fit_metadata"]["input_source"] == "remote_filter_pass"
-    assert rows[0]["_skills_fit_metadata"]["input_path"] == str(remote_input)
+    assert rows[0]["ai_fit"]["fit_score"] == 4
+    assert rows[0]["metadata"]["input_source"] == "remote_filter_pass"
+    assert rows[0]["metadata"]["input_path"] == str(remote_input)
 
     runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
     assert len(runs) == 1
@@ -641,8 +632,8 @@ def test_run_skills_fit_reuses_existing_processed_rows_and_drops_stale_ones(
 
     rows = [json.loads(line) for line in output_path.read_text().splitlines()]
     assert [row["dedup_hash"] for row in rows] == ["hash-a", "hash-b"]
-    assert rows[0]["_skills_fit_metadata"]["run_id"] == "prior_run"
-    assert rows[1]["_skills_fit_metadata"]["run_id"] == "resume_run"
+    assert rows[0]["metadata"]["run_id"] == "prior_run"
+    assert rows[1]["metadata"]["run_id"] == "resume_run"
 
 
 def test_run_skills_fit_treats_failure_reason_rows_as_processed(tmp_path, monkeypatch):
@@ -678,7 +669,7 @@ def test_run_skills_fit_treats_failure_reason_rows_as_processed(tmp_path, monkey
     assert summary["scored_successfully"] == 0
     rows = [json.loads(line) for line in output_path.read_text().splitlines()]
     assert len(rows) == 1
-    assert rows[0]["_skills_fit_metadata"]["failure_reason"] == "agent_failed"
+    assert rows[0]["metadata"]["failure_reason"] == "agent_failed"
 
 
 def test_run_skills_fit_uses_analysis_cache_across_outputs(tmp_path, monkeypatch):
@@ -765,7 +756,7 @@ def test_run_skills_fit_retries_unscored_rows_without_failure_reason_and_warns_o
     assert "Skipping malformed existing output line 1" in caplog.text
     rows = [json.loads(line) for line in output_path.read_text().splitlines()]
     assert len(rows) == 1
-    assert rows[0]["_skills_fit_score"] == 4
+    assert rows[0]["ai_fit"]["fit_score"] == 4
 
 
 def test_run_skills_fit_flushes_partial_results_on_keyboard_interrupt(
@@ -822,7 +813,7 @@ def test_run_skills_fit_flushes_partial_results_on_keyboard_interrupt(
     rows = [json.loads(line) for line in output_path.read_text().splitlines()]
     assert len(rows) == 1
     assert rows[0]["dedup_hash"] == "hash-a"
-    assert rows[0]["_skills_fit_score"] == 5
+    assert rows[0]["ai_fit"]["fit_score"] == 5
 
 
 def test_run_skills_fit_writes_run_tracker_record(tmp_path, monkeypatch):

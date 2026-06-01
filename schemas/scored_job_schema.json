@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ScoredJobPosting",
+  "description": "Schema for scraped job postings enriched with pre-filter location routing and AI skills fit alignment analysis.",
+  "type": "object",
+  "required": [
+    "source",
+    "source_job_id",
+    "source_url",
+    "title",
+    "company",
+    "location",
+    "posted_at",
+    "description",
+    "scraped_at",
+    "scrub_counts",
+    "dedup_hash",
+    "_prefilter_result",
+    "_prefilter_reason",
+    "_prefilter_metadata",
+    "_skills_fit_score",
+    "_skills_fit_confidence",
+    "_skills_fit_rationale",
+    "_skills_fit_top_matches",
+    "_skills_fit_gaps",
+    "_skills_fit_hard_concerns",
+    "_skills_fit_analysis",
+    "_skills_fit_metadata"
+  ],
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "The platform source of the job listing (e.g., 'sel', 'linkedin')."
+    },
+    "source_job_id": {
+      "type": "string",
+      "description": "The unique job identifier assigned by the source platform."
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Direct canonical URL link to the original job posting."
+    },
+    "title": {
+      "type": "string",
+      "description": "Job title as specified by the employer."
+    },
+    "company": {
+      "type": "string",
+      "description": "The company or organization hiring for the position."
+    },
+    "location": {
+      "type": "string",
+      "description": "Text description of the location from the posting."
+    },
+    "posted_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "The date the job was posted, formatted as YYYY-MM-DD."
+    },
+    "description": {
+      "type": "string",
+      "description": "Full, unfiltered markdown or raw text body of the job description."
+    },
+    "scraped_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp indicating when the job was ingested."
+    },
+    "scrub_counts": {
+      "type": "object",
+      "description": "Metrics capturing the reduction or masking of PII.",
+      "required": [
+        "email",
+        "phone"
+      ],
+      "properties": {
+        "email": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phone": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "search_params": {
+      "type": "object",
+      "description": "Arbitrary key-value parameters passed to the scraper query engine."
+    },
+    "dedup_hash": {
+      "type": "string",
+      "description": "Deterministic SHA-256 hash generated to deduplicate incoming data frames."
+    },
+    "_prefilter_result": {
+      "type": "string",
+      "description": "Result of geographic compliance checks (e.g., 'local_candidate')."
+    },
+    "_prefilter_reason": {
+      "type": "string",
+      "description": "Human-readable explanation of why the prefilter classification was made."
+    },
+    "_prefilter_metadata": {
+      "type": "object",
+      "description": "Tracing parameters detailing pipeline ingestion state, config file revisions, and geo rules."
+    },
+    "_skills_fit_score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "LLM evaluation score matching the candidate profile to the job description requirements."
+    },
+    "_skills_fit_confidence": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "description": "The model's internal self-assessed evaluation confidence level."
+    },
+    "_skills_fit_rationale": {
+      "type": "string",
+      "description": "Comprehensive qualitative summary explaining the computed skills score."
+    },
+    "_skills_fit_top_matches": {
+      "type": "array",
+      "description": "Key elements of strong overlap between the candidate's core competencies and the job specifications.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "_skills_fit_gaps": {
+      "type": "array",
+      "description": "Identified discrepancies, missing framework knowledge, or career alignment gaps.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "_skills_fit_hard_concerns": {
+      "type": "array",
+      "description": "Strict prerequisites, structural mismatches, or critical red-flag factors.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "_skills_fit_input_source": {
+      "type": "string",
+      "description": "Identifier tracking which candidate configuration or profile vector was used."
+    },
+    "_skills_fit_analysis": {
+      "type": "object",
+      "description": "The raw structured payload returned from the LLM parsing block."
+    },
+    "_skills_fit_metadata": {
+      "type": "object",
+      "description": "Operational run-state data tracking model strings, hyper-parameters, timestamps, and active prompt versions."
+    }
+  }
+}
