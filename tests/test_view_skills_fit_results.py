@@ -49,9 +49,9 @@ def test_view_results_renders_ranked_table_and_limit(tmp_path, monkeypatch):
         scored_path,
         "\n".join(
             [
-                '{"_skills_fit_score": 5, "_skills_fit_hard_concerns": [], "title": "Alpha", "company": "Acme", "location": "Remote"}',
-                '{"_skills_fit_score": 4, "_skills_fit_hard_concerns": ["onsite"], "title": "Beta", "company": "BetaCo", "location": "Seattle"}',
-                '{"_skills_fit_score": null, "_skills_fit_hard_concerns": [], "title": "Gamma", "company": "GammaCo", "location": null}',
+                '{"ai_fit": {"fit_score": 5, "hard_concerns": []}, "title": "Alpha", "company": "Acme", "location": "Remote"}',
+                '{"ai_fit": {"fit_score": 4, "hard_concerns": ["onsite"]}, "title": "Beta", "company": "BetaCo", "location": "Seattle"}',
+                '{"title": "Gamma", "company": "GammaCo", "location": null}',
             ]
         )
         + "\n",
@@ -80,7 +80,7 @@ def test_view_results_show_rationale_prints_details(tmp_path, monkeypatch):
     scored_path = tmp_path / "custom/scored.jsonl"
     write_text(
         scored_path,
-        '{"_skills_fit_score": 5, "_skills_fit_rationale": "Strong overlap", "_skills_fit_hard_concerns": ["Hybrid"], "title": "Alpha", "company": "Acme", "location": "Remote"}\n',
+        '{"ai_fit": {"fit_score": 5, "score_rationale": "Strong overlap", "hard_concerns": ["Hybrid"]}, "title": "Alpha", "company": "Acme", "location": "Remote"}\n',
     )
 
     out = io.StringIO()
@@ -111,9 +111,9 @@ def test_view_results_warns_and_skips_malformed_lines(tmp_path, monkeypatch, cap
     write_text(
         scored_path,
         "{"
-        '"_skills_fit_score": 5, "_skills_fit_hard_concerns": [], "title": "Alpha", "company": "Acme", "location": "Remote"}'
+        '"ai_fit": {"fit_score": 5, "hard_concerns": []}, "title": "Alpha", "company": "Acme", "location": "Remote"}'
         "\nnot json\n"
-        '{"_skills_fit_score": 4, "_skills_fit_hard_concerns": ["Visa"], "title": "Beta", "company": "BetaCo", "location": "NYC"}\n',
+        '{"ai_fit": {"fit_score": 4, "hard_concerns": ["Visa"]}, "title": "Beta", "company": "BetaCo", "location": "NYC"}\n',
     )
 
     out = io.StringIO()

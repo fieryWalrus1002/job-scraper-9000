@@ -1,24 +1,44 @@
-import argparse
-import json
+import functools
 import logging
 import os
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
 
 import yaml
 from dotenv import load_dotenv
 
 from agent_eval.provenance import generate_run_id, hash_file
 from agents.skills_fit.cache import DEFAULT_CACHE_PATH, AnalysisCache
-from agents.skills_fit.models import SCHEMA_VERSION
+from agents.skills_fit.models import (
+    InputSource,
+    JobMetadata,
+    SkillsFitAnalysis,
+    ScoredJobPosting,
+)
 from agents.skills_fit.utils import (
     SKILLS_FIT_PROMPT_PATH,
     analyze_skills_fit,
     load_candidate_profile,
 )
+from agents.skills_fit.cli import (
+    DEFAULT_CONFIG_PATH,
+    resolve_paths,
+    apply_llm_overrides,
+    configure_logging,
+    parse_args,
+)
+
+from agents.skills_fit.io import (
+    is_processed_output_record,
+    load_existing_output_records,
+    load_tagged_inputs,
+    validate_dedup_hashes,
+    write_output,
+)
+
 from utils.dedup import dedup_jobs
 from utils.git_info import get_git_metadata
 from utils.openai_pricing import estimate_cost
@@ -28,85 +48,6 @@ load_dotenv()
 
 log = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path("config/agent/skills_fit.yml")
-
-
-@dataclass(frozen=True)
-class ResolvedPaths:
-    remote_input: Path
-    local_input: Path
-    output: Path
-
-
-def configure_logging() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Score live jobs against the candidate profile and write a ranked shortlist."
-    )
-    parser.add_argument("--run-date", help="Partition date in YYYY-MM-DD form")
-    parser.add_argument("--remote-input", help="Override remote input JSONL path")
-    parser.add_argument("--local-input", help="Override local input JSONL path")
-    parser.add_argument("--output", help="Override output JSONL path")
-    parser.add_argument(
-        "--config",
-        default=str(DEFAULT_CONFIG_PATH),
-        help=f"Agent config YAML (default: {DEFAULT_CONFIG_PATH})",
-    )
-    parser.add_argument("--provider", help="Override llm.provider in-memory")
-    parser.add_argument("--model", help="Override llm.model in-memory")
-    parser.add_argument(
-        "--temperature", type=float, help="Override llm.temperature in-memory"
-    )
-    parser.add_argument("--limit", type=int, help="Limit deduped records for testing")
-    args = parser.parse_args(argv)
-    if args.limit is not None and args.limit < 1:
-        parser.error("--limit must be >= 1")
-    return args
-
-
-def resolve_paths(
-    *,
-    run_date: str | None,
-    remote_input: str | Path | None,
-    local_input: str | Path | None,
-    output: str | Path | None,
-) -> ResolvedPaths:
-    if remote_input is not None:
-        resolved_remote = Path(remote_input)
-    elif run_date:
-        resolved_remote = Path("data/filtered") / run_date / "remote_filter_pass.jsonl"
-    else:
-        raise ValueError(
-            "--run-date is required unless --remote-input, --local-input, and --output are all provided"
-        )
-
-    if local_input is not None:
-        resolved_local = Path(local_input)
-    elif run_date:
-        resolved_local = Path("data/local") / run_date / "local_jobs.jsonl"
-    else:
-        raise ValueError(
-            "--run-date is required unless --remote-input, --local-input, and --output are all provided"
-        )
-
-    if output is not None:
-        resolved_output = Path(output)
-    elif run_date:
-        resolved_output = Path("data/scored") / run_date / "skills_fit_scored.jsonl"
-    else:
-        raise ValueError(
-            "--run-date is required unless --remote-input, --local-input, and --output are all provided"
-        )
-
-    return ResolvedPaths(
-        remote_input=resolved_remote,
-        local_input=resolved_local,
-        output=resolved_output,
-    )
-
 
 def load_config(config_path: str | Path) -> dict[str, Any]:
     path = Path(config_path)
@@ -114,24 +55,6 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Config file not found: {path}")
     with path.open(encoding="utf-8") as f:
         return yaml.safe_load(os.path.expandvars(f.read())) or {}
-
-
-def apply_llm_overrides(
-    config: dict[str, Any],
-    *,
-    provider: str | None = None,
-    model: str | None = None,
-    temperature: float | None = None,
-) -> dict[str, Any]:
-    resolved = json.loads(json.dumps(config))
-    llm = resolved.setdefault("llm", {})
-    if provider:
-        llm["provider"] = provider
-    if model:
-        llm["model"] = model
-    if temperature is not None:
-        llm["temperature"] = temperature
-    return resolved
 
 
 def resolve_provider_and_model(llm_config: dict[str, Any] | None) -> tuple[str, str]:
@@ -154,125 +77,50 @@ def infer_run_date(*paths: Path) -> str | None:
     return None
 
 
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
-
-
-def is_processed_output_record(record: dict[str, Any]) -> bool:
-    metadata = record.get("_skills_fit_metadata")
-    if not isinstance(metadata, dict):
-        return False
-    if record.get("_skills_fit_score") is not None:
-        return True
-    return metadata.get("failure_reason") is not None
-
-
-def load_existing_output_records(path: Path) -> dict[str, dict[str, Any]]:
-    records: dict[str, dict[str, Any]] = {}
-    if not path.exists():
-        return records
-
-    with path.open(encoding="utf-8") as f:
-        for line_number, raw_line in enumerate(f, start=1):
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                log.warning(
-                    "Skipping malformed existing output line %d in %s: %s",
-                    line_number,
-                    path,
-                    exc,
-                )
-                continue
-            if not isinstance(record, dict):
-                log.warning(
-                    "Skipping non-object existing output line %d in %s",
-                    line_number,
-                    path,
-                )
-                continue
-            dedup_hash = record.get("dedup_hash")
-            if not dedup_hash:
-                log.warning(
-                    "Skipping existing output line %d in %s with missing dedup_hash",
-                    line_number,
-                    path,
-                )
-                continue
-            records[str(dedup_hash)] = record
-    return records
-
-
-def load_tagged_inputs(
-    *, remote_input: Path, local_input: Path
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    if not remote_input.exists():
-        raise FileNotFoundError(f"Remote input file not found: {remote_input}")
-
-    remote_records = [
-        {
-            **record,
-            "__input_source": "remote_filter_pass",
-            "__input_path": str(remote_input),
-        }
-        for record in read_jsonl(remote_input)
-    ]
-
-    local_records: list[dict[str, Any]] = []
-    if local_input.exists():
-        local_records = [
-            {
-                **record,
-                "__input_source": "local_candidate",
-                "__input_path": str(local_input),
-            }
-            for record in read_jsonl(local_input)
-        ]
-    else:
-        log.info("Local input not found; continuing without it: %s", local_input)
-
-    return remote_records, local_records
-
-
-def validate_dedup_hashes(records: list[dict[str, Any]]) -> None:
-    missing_examples: list[str] = []
-    missing_count = 0
-    for i, record in enumerate(records):
-        if record.get("dedup_hash"):
-            continue
-        missing_count += 1
-        if len(missing_examples) < 5:
-            label = record.get("title") or record.get("source_url") or f"index={i}"
-            missing_examples.append(str(label))
-    if missing_count:
-        examples = ", ".join(missing_examples)
-        raise ValueError(
-            "Input contract failure: every record must include dedup_hash "
-            f"({missing_count} missing; examples: {examples})"
-        )
-
-
-def clean_job_record(job: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in job.items()
-        if key not in {"__input_source", "__input_path"}
+_PIPELINE_KEYS = frozenset(
+    {
+        "scrub_counts",
+        "search_params",
+        "_prefilter_result",
+        "_prefilter_reason",
+        "_prefilter_metadata",
+        "_remote_analysis",
+        "_filter_result",
+        "_filter_reason",
+        "_filter_metadata",
     }
+)
+
+
+def _build_scored_posting(
+    job: dict[str, Any],
+    *,
+    ai_fit: SkillsFitAnalysis | None,
+    metadata: JobMetadata,
+) -> dict[str, Any]:
+    remote_analysis = job.get("_remote_analysis") or {}
+    return ScoredJobPosting(
+        dedup_hash=job["dedup_hash"],
+        source=job.get("source"),
+        source_job_id=job.get("source_job_id"),
+        source_url=job.get("source_url"),
+        title=job.get("title"),
+        company=job.get("company"),
+        location=job.get("location"),
+        posted_at=job.get("posted_at"),
+        description=job.get("description"),
+        scraped_at=job.get("scraped_at"),
+        remote_classification=remote_analysis.get("remote_classification"),
+        pipeline_metadata={k: v for k, v in job.items() if k in _PIPELINE_KEYS},
+        ai_fit=ai_fit,
+        metadata=metadata,
+    ).model_dump(mode="json", exclude_none=True)
 
 
 def build_record_metadata(
     *,
     run_id: str,
-    scored_at: str,
+    scored_at: datetime,
     config_file: Path,
     prompt_file: Path,
     prompt_hash: str,
@@ -283,44 +131,28 @@ def build_record_metadata(
     model: str,
     temperature: float | None,
     git_metadata: dict[str, Any],
-    input_source: str,
+    input_source: InputSource,
     input_path: str,
     failure_reason: str | None = None,
-) -> dict[str, Any]:
-    metadata = {
-        "run_id": run_id,
-        "scored_at": scored_at,
-        "config_file": str(config_file),
-        "prompt_file": str(prompt_file),
-        "prompt_hash": prompt_hash,
-        "profile_file": str(profile_file),
-        "profile_hash": profile_hash,
-        "profile_version": profile_version,
-        "provider": provider,
-        "model": model,
-        "temperature": temperature,
-        "skills_fit_schema_version": SCHEMA_VERSION,
-        "commit": git_metadata["commit"],
-        "dirty": git_metadata["dirty"],
-        "input_source": input_source,
-        "input_path": input_path,
-    }
-    if failure_reason is not None:
-        metadata["failure_reason"] = failure_reason
-    return metadata
-
-
-def rank_key(record: dict[str, Any]) -> tuple[bool, int, str]:
-    score = record.get("_skills_fit_score")
-    return (score is None, -(score or 0), record["dedup_hash"])
-
-
-def write_output(records: list[dict[str, Any]], output_path: Path) -> None:
-    records.sort(key=rank_key)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as f:
-        for record in records:
-            f.write(json.dumps(record) + "\n")
+) -> JobMetadata:
+    return JobMetadata(
+        run_id=run_id,
+        scored_at=scored_at,
+        config_file=str(config_file),
+        prompt_file=str(prompt_file),
+        prompt_hash=prompt_hash,
+        profile_file=str(profile_file),
+        profile_hash=profile_hash,
+        profile_version=profile_version,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        commit=git_metadata["commit"],
+        dirty=git_metadata["dirty"],
+        input_source=input_source,
+        input_path=input_path,
+        failure_reason=failure_reason,
+    )
 
 
 def run_skills_fit(
@@ -413,7 +245,23 @@ def run_skills_fit(
         provider_name, model_name = resolve_provider_and_model(llm_config)
         resolved_temperature = llm_config.get("temperature")
         git_metadata = get_git_metadata()
+        scored_at = datetime.fromisoformat(git_metadata["timestamp"])
         cache = AnalysisCache(cache_path)
+        _build_metadata = functools.partial(
+            build_record_metadata,
+            run_id=run_id,
+            scored_at=scored_at,
+            config_file=config_file,
+            prompt_file=prompt_file,
+            prompt_hash=prompt_hash,
+            profile_file=profile_file,
+            profile_hash=profile_hash,
+            profile_version=profile_version,
+            provider=provider_name,
+            model=model_name,
+            temperature=resolved_temperature,
+            git_metadata=git_metadata,
+        )
 
         run.set_config(
             agent_config_path=str(config_file),
@@ -489,12 +337,11 @@ def run_skills_fit(
                         resumed_existing += 1
                         continue
 
-                    input_source = job["__input_source"]
+                    input_source: InputSource = job["__input_source"]
                     input_path = job["__input_path"]
                     title = job.get("title") or None
                     location = job.get("location") or None
                     description = job.get("description") or ""
-                    scored_at = git_metadata["timestamp"]
 
                     if not description:
                         log.warning(
@@ -502,36 +349,13 @@ def run_skills_fit(
                             title or job["dedup_hash"],
                         )
                         skipped_missing_description += 1
-                        metadata = build_record_metadata(
-                            run_id=run_id,
-                            scored_at=scored_at,
-                            config_file=config_file,
-                            prompt_file=prompt_file,
-                            prompt_hash=prompt_hash,
-                            profile_file=profile_file,
-                            profile_hash=profile_hash,
-                            profile_version=profile_version,
-                            provider=provider_name,
-                            model=model_name,
-                            temperature=resolved_temperature,
-                            git_metadata=git_metadata,
+                        metadata = _build_metadata(
                             input_source=input_source,
                             input_path=input_path,
                             failure_reason="missing_description",
                         )
                         enriched_records.append(
-                            {
-                                **clean_job_record(job),
-                                "_skills_fit_score": None,
-                                "_skills_fit_rationale": None,
-                                "_skills_fit_hard_concerns": [],
-                                "_skills_fit_top_matches": [],
-                                "_skills_fit_analysis": None,
-                                "_skills_fit_gaps": [],
-                                "_skills_fit_confidence": None,
-                                "_skills_fit_input_source": input_source,
-                                "_skills_fit_metadata": metadata,
-                            }
+                            _build_scored_posting(job, ai_fit=None, metadata=metadata)
                         )
                         continue
 
@@ -570,68 +394,22 @@ def run_skills_fit(
                         log.warning("Agent failed on %s", title or job["dedup_hash"])
                         failed_agent += 1
                         run.increment_failures()
-                        metadata = build_record_metadata(
-                            run_id=run_id,
-                            scored_at=scored_at,
-                            config_file=config_file,
-                            prompt_file=prompt_file,
-                            prompt_hash=prompt_hash,
-                            profile_file=profile_file,
-                            profile_hash=profile_hash,
-                            profile_version=profile_version,
-                            provider=provider_name,
-                            model=model_name,
-                            temperature=resolved_temperature,
-                            git_metadata=git_metadata,
+                        metadata = _build_metadata(
                             input_source=input_source,
                             input_path=input_path,
                             failure_reason="agent_failed",
                         )
                         enriched_records.append(
-                            {
-                                **clean_job_record(job),
-                                "_skills_fit_score": None,
-                                "_skills_fit_rationale": None,
-                                "_skills_fit_hard_concerns": [],
-                                "_skills_fit_top_matches": [],
-                                "_skills_fit_analysis": None,
-                                "_skills_fit_gaps": [],
-                                "_skills_fit_confidence": None,
-                                "_skills_fit_input_source": input_source,
-                                "_skills_fit_metadata": metadata,
-                            }
+                            _build_scored_posting(job, ai_fit=None, metadata=metadata)
                         )
                         continue
 
-                    metadata = build_record_metadata(
-                        run_id=run_id,
-                        scored_at=scored_at,
-                        config_file=config_file,
-                        prompt_file=prompt_file,
-                        prompt_hash=prompt_hash,
-                        profile_file=profile_file,
-                        profile_hash=profile_hash,
-                        profile_version=profile_version,
-                        provider=provider_name,
-                        model=model_name,
-                        temperature=resolved_temperature,
-                        git_metadata=git_metadata,
+                    metadata = _build_metadata(
                         input_source=input_source,
                         input_path=input_path,
                     )
                     enriched_records.append(
-                        {
-                            **clean_job_record(job),
-                            "_skills_fit_score": analysis.fit_score,
-                            "_skills_fit_rationale": analysis.score_rationale,
-                            "_skills_fit_hard_concerns": analysis.hard_concerns,
-                            "_skills_fit_top_matches": analysis.top_matches,
-                            "_skills_fit_analysis": analysis.model_dump(),
-                            "_skills_fit_gaps": analysis.gaps,
-                            "_skills_fit_confidence": analysis.confidence,
-                            "_skills_fit_input_source": input_source,
-                            "_skills_fit_metadata": metadata,
-                        }
+                        _build_scored_posting(job, ai_fit=analysis, metadata=metadata)
                     )
                     scored_successfully += 1
             except KeyboardInterrupt:
