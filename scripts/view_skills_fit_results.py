@@ -73,8 +73,13 @@ def _display_score(value: Any) -> str:
     return "-" if value is None else str(value)
 
 
+def _ai_fit_dict(row: dict[str, Any]) -> dict[str, Any]:
+    val = row.get("ai_fit")
+    return val if isinstance(val, dict) else {}
+
+
 def _hard_concerns(row: dict[str, Any]) -> list[str]:
-    value = (row.get("ai_fit") or {}).get("hard_concerns")
+    value = _ai_fit_dict(row).get("hard_concerns")
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
@@ -92,7 +97,7 @@ def format_table_row(rank: int, row: dict[str, Any]) -> str:
     blockers = "BLOCKERS" if _hard_concerns(row) else ""
     columns = (
         str(rank),
-        _display_score((row.get("ai_fit") or {}).get("fit_score")),
+        _display_score(_ai_fit_dict(row).get("fit_score")),
         blockers,
         _truncate(_display_text(row.get("title")), 40),
         _truncate(_display_text(row.get("company")), 24),
@@ -120,7 +125,7 @@ def render_rows(
         print(format_table_row(rank, row), file=out)
         if show_rationale:
             concerns = _hard_concerns(row)
-            rationale = _display_text((row.get("ai_fit") or {}).get("score_rationale"))
+            rationale = _display_text(_ai_fit_dict(row).get("score_rationale"))
             concerns_text = "; ".join(concerns) if concerns else "-"
             print(f"      rationale: {rationale}", file=out)
             print(f"      hard concerns: {concerns_text}", file=out)
