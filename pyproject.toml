@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.136.3",
     "openai>=2.36.0",
     "pandas>=2.3.3",
+    "psycopg[binary]>=3.2",
     "pydantic>=2.13.4",
     "python-dotenv>=1.0.0",
     "python-jobspy>=1.1.82",
