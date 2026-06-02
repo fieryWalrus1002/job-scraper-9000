@@ -28,6 +28,7 @@ def test_job_summary_allows_null_optional_fields() -> None:
     minimal = {
         "dedup_hash": "abc",
         "scored_at": datetime(2026, 6, 1),
+        "source": None,
         "source_url": None,
         "title": None,
         "company": None,

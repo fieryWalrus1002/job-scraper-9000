@@ -1,5 +1,6 @@
 export interface JobSummary {
   dedup_hash: string
+  source: string | null
   source_url: string | null
   title: string | null
   company: string | null
