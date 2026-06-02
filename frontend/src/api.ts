@@ -8,9 +8,10 @@ export async function fetchJobs(filters: Filters): Promise<JobListResponse> {
   const params = new URLSearchParams()
   if (filters.minScore) params.set('min_score', filters.minScore)
   if (filters.maxScore) params.set('max_score', filters.maxScore)
-  if (filters.remoteClassification) params.set('remote_classification', filters.remoteClassification)
+  filters.remoteClassification.forEach((v) => params.append('remote_classification', v))
   if (filters.minPostedAt) params.set('min_posted_at', filters.minPostedAt)
   if (filters.maxPostedAt) params.set('max_posted_at', filters.maxPostedAt)
+  if (filters.company) params.set('company', filters.company)
   params.set('limit', '1000')
 
   const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`)

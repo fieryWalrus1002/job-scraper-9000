@@ -23,7 +23,8 @@ export interface JobListResponse {
 export interface Filters {
   minScore: string
   maxScore: string
-  remoteClassification: string
+  remoteClassification: string[]
   minPostedAt: string
   maxPostedAt: string
+  company: string
 }
