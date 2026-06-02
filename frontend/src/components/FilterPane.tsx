@@ -25,7 +25,9 @@ export default function FilterPane({
   const [colsOpen, setColsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(true)
 
-  function set(field: keyof Filters, value: string) {
+  type StringFilterKey = 'minScore' | 'maxScore' | 'minPostedAt' | 'maxPostedAt' | 'company'
+
+  function set(field: StringFilterKey, value: string) {
     onFiltersChange({ ...filters, [field]: value })
   }
 

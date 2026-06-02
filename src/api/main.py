@@ -102,9 +102,10 @@ async def list_jobs(
                 "location_restricted",
                 "unclear",
             ]
-        ],
+        ]
+        | None,
         Query(),
-    ] = [],
+    ] = None,
     min_posted_at: Annotated[date | None, Query()] = None,
     max_posted_at: Annotated[date | None, Query()] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
@@ -122,7 +123,9 @@ async def list_jobs(
         filters.append("fit_score <= %(max_score)s")
         params["max_score"] = max_score
     if remote_classification:
-        filters.append("remote_classification::TEXT = ANY(%(remote_classification)s)")
+        filters.append(
+            "remote_classification = ANY(%(remote_classification)s::raw.remote_classification[])"
+        )
         params["remote_classification"] = list(remote_classification)
     if min_posted_at is not None:
         filters.append("posted_at >= %(min_posted_at)s")
@@ -133,9 +136,9 @@ async def list_jobs(
     if search is not None:
         filters.append("(title ILIKE %(search)s OR description ILIKE %(search)s)")
         params["search"] = f"%{search}%"
-    if company is not None:
+    if company and company.strip():
         filters.append("company ILIKE %(company)s")
-        params["company"] = f"%{company}%"
+        params["company"] = f"%{company.strip()}%"
 
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
