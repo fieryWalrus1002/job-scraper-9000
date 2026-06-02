@@ -52,10 +52,10 @@ INSERT INTO raw.scored_job_postings (
     %(dedup_hash)s, %(source)s, %(source_job_id)s, %(source_url)s,
     %(title)s, %(company)s, %(location)s, %(posted_at)s, %(description)s, %(scraped_at)s,
     %(remote_classification)s,
-    %(fit_score)s, %(confidence)s, %(score_rationale)s, %(ai_fit_detail)s,
-    %(pipeline_metadata)s,
+    %(fit_score)s, %(confidence)s, %(score_rationale)s, %(ai_fit_detail)s::jsonb,
+    %(pipeline_metadata)s::jsonb,
     %(run_id)s, %(scored_at)s, %(model)s, %(provider)s, %(profile_version)s, %(failure_reason)s,
-    %(metadata)s
+    %(metadata)s::jsonb
 )
 ON CONFLICT (dedup_hash) DO NOTHING
 """

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 from datetime import date
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,7 +90,16 @@ async def list_jobs(
     pool: Pool,
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
-    remote_classification: Annotated[str | None, Query()] = None,
+    remote_classification: Annotated[
+        Literal[
+            "fully_remote",
+            "location_restricted",
+            "remote_with_occasional_travel",
+            "remote_with_frequent_travel",
+        ]
+        | None,
+        Query(),
+    ] = None,
     min_posted_at: Annotated[date | None, Query()] = None,
     max_posted_at: Annotated[date | None, Query()] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,

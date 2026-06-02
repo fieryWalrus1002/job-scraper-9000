@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import type { JobSummary } from '../types'
 import { COLUMNS } from '../lib/columns'
 
@@ -115,9 +115,8 @@ export default function JobTable({ items, visibleColumns }: Props) {
               const rank = globalOffset + i + 1
               const expanded = expandedHash === job.dedup_hash
               return (
-                <>
+                <Fragment key={job.dedup_hash}>
                   <tr
-                    key={job.dedup_hash}
                     className={`job-row${expanded ? ' job-row--expanded' : ''}`}
                     onClick={() => toggleExpand(job.dedup_hash)}
                   >
@@ -129,7 +128,7 @@ export default function JobTable({ items, visibleColumns }: Props) {
                     ))}
                   </tr>
                   {expanded && (
-                    <tr key={`${job.dedup_hash}-expanded`} className="rationale-row">
+                    <tr className="rationale-row">
                       <td colSpan={visibleCols.length + 1}>
                         <div className="rationale-content">
                           {job.failure_reason ? (
@@ -143,7 +142,7 @@ export default function JobTable({ items, visibleColumns }: Props) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>
@@ -165,7 +164,7 @@ export default function JobTable({ items, visibleColumns }: Props) {
   )
 }
 
-function renderCell(key: string, job: JobSummary): React.ReactNode {
+function renderCell(key: string, job: JobSummary): ReactNode {
   switch (key) {
     case 'fit_score':
       return <ScoreBadge score={job.fit_score} />
