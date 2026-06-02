@@ -182,7 +182,7 @@ def test_scrape_source_url_uses_domain_and_external_path():
 
     assert (
         jobs[0].source_url
-        == "https://selinc.wd1.myworkdayjobs.com/job/Pullman-WA/Engineer_1_JR001"
+        == "https://selinc.wd1.myworkdayjobs.com/SEL/job/Pullman-WA/Engineer_1_JR001"
     )
 
 
