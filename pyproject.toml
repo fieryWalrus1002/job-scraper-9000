@@ -34,6 +34,7 @@ packages = [
     "src/prefilter",
     "src/agents",
     "src/agent_eval",
+    "src/api",
     "src/ci",
     "src/review_ui",
     "src/utils",
@@ -45,6 +46,9 @@ packages = [
 [tool.hatch.build.targets.sdist.force-include]
 "prompts" = "prompts"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
@@ -55,9 +59,11 @@ exclude = [".venv", "data", "dist", "build", "scripts", "tests"]
 [dependency-groups]
 dev = [
     "honcho>=2.0.0",
+    "httpx>=0.28",
     "pre-commit>=4.0.0",
     "pydeps>=3.0.6",
     "pyright>=1.1.389",
     "pytest>=9.0.3",
+    "pytest-asyncio>=0.25",
     "ruff>=0.11.0",
 ]
