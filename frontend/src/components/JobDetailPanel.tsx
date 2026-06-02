@@ -125,7 +125,7 @@ export default function JobDetailPanel({ dedupHash, onClose }: Props) {
         {/* ── Header ───────────────────────────────── */}
         <div className="job-detail-header">
           <div className="job-detail-header-main">
-            <h2 className="job-detail-title">{data?.title ?? '—'}</h2>
+            <h2 id="job-detail-title" className="job-detail-title">{data?.title ?? '—'}</h2>
             <div className="job-detail-meta">
               <span>{data?.company ?? '—'}</span>
               {data?.location && <><span className="text-muted">·</span><span>{data.location}</span></>}
