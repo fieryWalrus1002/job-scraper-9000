@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 class JobSummary(BaseModel):
     dedup_hash: str
+    source: str | None
     source_url: str | None
     title: str | None
     company: str | None
