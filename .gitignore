@@ -1,10 +1,45 @@
+# Python / FastAPI backend
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# TypeScript / React / Vite frontend
+node_modules/
+frontend/node_modules/
 dist/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/.vite-temp/
+*.tsbuildinfo
+
+# Logs and local env
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 .env
+.env.*
+*.local
+!.env.example
+!**/.env.example
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Editors / OS
 .vscode/
+.idea/
+.DS_Store
 
 # Data files — keep directory placeholders (.gitkeep) but ignore all content
 data/**/*.jsonl

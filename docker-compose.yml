@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jobscraper
+      POSTGRES_PASSWORD: jobscraper
+      POSTGRES_DB: jobscraper
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobscraper"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=postgresql://jobscraper:jobscraper@db:5432/jobscraper
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  scraper:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: scraper
+    profiles:
+      - pipeline
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  postgres_data:

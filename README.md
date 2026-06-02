@@ -38,10 +38,11 @@ The full pipeline has four phases, plus a deterministic routing step between ing
   - **Domain context** — engineering, automation, scientific instrumentation, or deep learning?
 - Returns structured JSON with `fit_score` (1-5), `confidence`, `score_rationale`, `top_matches`, `gaps`, and `hard_concerns`. `fit_score` is the verdict; there is no separate `verdict` field.
 
-### 4. Dispatch
+### 4. Dispatch & UI
 
-- Deliver the hot list via email or a custom web GUI (FastAPI).
-- Future: browser extension calling a backend LLM agent to fill DOM fields for applications.
+- Deliver the daily hotlist through a dedicated full-stack web dashboard.
+- Serve processed data via a RESTful **FastAPI** layer, consumed by a modern **React + TypeScript** frontend.
+- Review LLM reasoning, view metrics, and inspect skills-fit gap analyses visually rather than parsing raw text streams.
 
 ______________________________________________________________________
 
@@ -154,18 +155,38 @@ uv run scripts/compare_evals.py --against-champion skills_fit \
   --diff <run-id-from-above> --per-record
 ```
 
+**Run the Full Stack Local Dev Environment:**
+
+Spins up the FastAPI backend (port 8000) and the Vite frontend (port 5173) concurrently using `honcho`, streaming prefix-labeled logs to a single shell.
+
+```bash
+just dev
+```
+
+**Run Local Integration Testing (Docker Containers):**
+
+Simulates the multi-target isolated cloud environment using a localized Nginx static asset server and Uvicorn process wrapper.
+
+```bash
+docker compose up               # Starts Backend (port 8000) + Production-built Frontend (port 8080)
+docker compose run --rm scraper # Triggers a one-off pipeline ingestion run against local data volumes
+```
+
 ______________________________________________________________________
 
 ## Tech stack
 
 | Layer           | Tools                                                                                                             |
 | --------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Scraping        | [python-jobspy](https://github.com/Bunsly/JobSpy), direct ATS APIs (Greenhouse, Lever, Ashby), LinkedIn guest API |
-| Local inference | Ollama — Qwen 2.5 14B, Llama 3.1 8B (RTX 4090)                                                                    |
-| Cloud inference | OpenAI API (gpt-4o-mini default; gpt-4o for teacher)                                                              |
-| Review UI       | Streamlit                                                                                                         |
-| Data            | Append-only JSONL, medallion layout (raw → prefiltered/local/trash → staging → eval)                              |
 | Runtime         | Python 3.13, `uv`, Pydantic v2                                                                                    |
+| Scraping        | [python-jobspy](https://github.com/Bunsly/JobSpy), direct ATS APIs (Greenhouse, Lever, Ashby), LinkedIn guest API |
+| Local inference | llama.cpp — Qwen 3.6 27B (RTX 4090)                                                                               |
+| Cloud inference | OpenAI API (gpt-5-mini default; gpt-5.4 for teacher)                                                              |
+| Review UI       | Streamlit (HITL Evaluation Interface)                                                                             |
+| Data            | Append-only JSONL, medallion layout (raw → prefiltered/local/trash → staging → eval)                              |
+| Orchestration   | Docker Compose, `just`, `honcho` (process stream supervisor)                                                      |
+| Frontend        | React 19, TypeScript, Vite, shadcn/ui, TanStack Query                                                             |
+| Backend API     | FastAPI, Uvicorn (One-process-per-container cloud architecture)                                                   |
 
 ______________________________________________________________________
 
@@ -187,6 +208,7 @@ ______________________________________________________________________
 | Batch pipeline scripts — prepare, merge, sample                            | [scripts/README.md](scripts/README.md)                                           |
 | Eval scripts — running evals, CLI flags, comparing runs                    | [scripts/README.md#eval](scripts/README.md#eval)                                 |
 | HITL review UI — how it works, input format, gold layer output             | [src/review_ui/README.md](src/review_ui/README.md)                               |
+| Containerization & Local Integration                                       | [docker/README.md](docker/README.md)                                             |
 
 ______________________________________________________________________
 
@@ -200,18 +222,22 @@ ______________________________________________________________________
 
 ## Project structure
 
-```text
-src/
-  job_scraper/        # scraper library + CLI
-  prefilter/          # deterministic routing layer (no LLM)
-  agents/             # LLM agents (remote_filter, skills_fit)
-  agent_eval/         # eval framework (metrics, run logger)
-  review_ui/          # Streamlit HITL review app
-
-scripts/              # one-off data pipeline scripts (prepare, merge, sample)
-prompts/              # LLM system prompts
-config/               # search configs, agent policy, candidate profile
-specs/                # design docs
+```Plaintext
+job-scraper-9000/
+├── config/           # Search configs, agent policy, candidate profile
+├── data/             # Local pipeline file-based medallion workspace
+├── docker/           # Multi-target application Dockerfiles (backend, scraper, frontend)
+├── frontend/         # Standalone Vite + React client application (TS + shadcn/ui)
+├── prompts/          # LLM system prompts
+├── specs/            # Architecture blueprints and implementation plans
+├── scripts/          # Ingestion pipelines and offline evaluation harnesses
+└── src/
+    ├── api/          # FastAPI web application layer (endpoints, schemas)
+    ├── job_scraper/  # Core scraping framework and custom parsers
+    ├── prefilter/    # Deterministic static routing layer (no LLM overhead)
+    ├── agents/       # Multi-agent intelligence layers (remote_filter, skills_fit)
+    ├── agent_eval/   # Automated grading, metric aggregations, run logging
+    └── review_ui/    # Streamlit HITL gold-standard evaluation app
 ```
 
 `data/` is the local pipeline workspace — directory layout, writers, and schemas are documented in [data/README.md](data/README.md).

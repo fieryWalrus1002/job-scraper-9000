@@ -16,8 +16,32 @@ filter-remote:
 filter-skills:
     uv run job-scraper-9000 skills-fit --run-date {{DATE}}
 
+ingest:
+    uv run scripts/db_ingest.py --run-date {{DATE}}
+
 pipeline:
     just scrape
     just prefilter
     just filter-remote
     just filter-skills
+    just ingest
+
+frontend:
+    cd frontend && npm run dev -- --port 5173
+
+backend:
+    @echo "Starting FastAPI backend on port 8000..."
+    uv run uvicorn src.api.main:app --reload --port 8000
+
+db-up:
+    docker compose up db -d
+
+db-down:
+    docker compose down
+
+dev:
+    uv run honcho start
+
+build-images:
+    docker build --target backend -t job-api -f docker/app.Dockerfile .
+    docker build --target scraper -t job-scraper -f docker/app.Dockerfile .
