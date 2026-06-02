@@ -34,11 +34,14 @@ function Section({
   )
 }
 
-function BulletList({ items, className }: { items: string[]; className?: string }) {
-  if (!items.length) return <span className="text-muted">None</span>
+function BulletList({ items, className }: { items: unknown; className?: string }) {
+  const arr = Array.isArray(items)
+    ? items.filter((v): v is string => typeof v === 'string')
+    : []
+  if (arr.length === 0) return <span className="text-muted">None</span>
   return (
     <ul className={`detail-bullet-list ${className ?? ''}`}>
-      {items.map((item, i) => <li key={i}>{item}</li>)}
+      {arr.map((item, i) => <li key={`${i}-${item}`}>{item}</li>)}
     </ul>
   )
 }
