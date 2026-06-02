@@ -98,8 +98,9 @@ export default function JobDetailPanel({ dedupHash, onClose }: Props) {
 
   // Lock body scroll while open
   useEffect(() => {
+    const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
+    return () => { document.body.style.overflow = prevOverflow }
   }, [])
 
   if (!dedupHash) return null
