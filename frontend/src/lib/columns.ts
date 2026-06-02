@@ -12,9 +12,9 @@ export const COLUMNS: ColumnDef[] = [
   { key: 'title', label: 'Title', defaultVisible: true },
   { key: 'company', label: 'Company', defaultVisible: true, width: '160px' },
   { key: 'location', label: 'Location', defaultVisible: true, width: '180px' },
-  { key: 'remote_classification', label: 'Remote', defaultVisible: true, width: '160px' },
+  { key: 'remote_classification', label: 'Remote', defaultVisible: false, width: '160px' },
   { key: 'posted_at', label: 'Posted', defaultVisible: true, width: '100px' },
-  { key: 'confidence', label: 'Confidence', defaultVisible: true, width: '100px' },
+  { key: 'confidence', label: 'Confidence', defaultVisible: false, width: '100px' },
   { key: 'source', label: 'Source', defaultVisible: false, width: '100px' },
 ]
 
