@@ -5,7 +5,8 @@ on:
     branches:
       - main
       - feature/**
-      - bug/**
+      - feat/**
+      - fix/**
       - chore/**
   pull_request:
     branches: [main]
@@ -21,7 +22,7 @@ jobs:
           enable-cache: true
           python-version: "3.13"
 
-      - run: uv sync --extra dev
+      - run: uv sync --group dev
 
       - run: uv run ruff check .
 

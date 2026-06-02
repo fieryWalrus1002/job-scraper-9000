@@ -324,12 +324,15 @@ def _annotate_job(
         "country_hits": decision.country_hits,
         "country_alias_hits": decision.country_alias_hits,
     }
-    return {
+    annotated: dict[str, Any] = {
         **job,
         "_prefilter_result": decision.route,
         "_prefilter_reason": decision.reason,
         "_prefilter_metadata": metadata,
     }
+    if decision.route == "local_candidate":
+        annotated["remote_classification"] = "location_restricted"
+    return annotated
 
 
 def run_prefilter(

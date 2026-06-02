@@ -5,14 +5,18 @@ description = "Job scraper for LinkedIn and other sources"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "fastapi>=0.136.3",
     "openai>=2.36.0",
     "pandas>=2.3.3",
+    "psycopg-pool>=3.2",
+    "psycopg[binary]>=3.2",
     "pydantic>=2.13.4",
     "python-dotenv>=1.0.0",
     "python-jobspy>=1.1.82",
     "pyyaml>=6.0.3",
     "requests>=2.33.1",
     "streamlit>=1.57.0",
+    "uvicorn>=0.46.0",
 ]
 
 [project.scripts]
@@ -30,6 +34,7 @@ packages = [
     "src/prefilter",
     "src/agents",
     "src/agent_eval",
+    "src/api",
     "src/ci",
     "src/review_ui",
     "src/utils",
@@ -41,14 +46,8 @@ packages = [
 [tool.hatch.build.targets.sdist.force-include]
 "prompts" = "prompts"
 
-[project.optional-dependencies]
-dev = [
-    "pre-commit>=4.0.0",
-    "pydeps>=3.0.6",
-    "pyright>=1.1.389",
-    "pytest>=9.0.3",
-    "ruff>=0.11.0",
-]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [tool.pyright]
 pythonVersion = "3.13"
@@ -56,3 +55,15 @@ typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
 exclude = [".venv", "data", "dist", "build", "scripts", "tests"]
+
+[dependency-groups]
+dev = [
+    "honcho>=2.0.0",
+    "httpx>=0.28",
+    "pre-commit>=4.0.0",
+    "pydeps>=3.0.6",
+    "pyright>=1.1.389",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.11.0",
+]

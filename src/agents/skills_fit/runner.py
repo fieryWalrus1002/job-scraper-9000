@@ -110,7 +110,8 @@ def _build_scored_posting(
         posted_at=job.get("posted_at"),
         description=job.get("description"),
         scraped_at=job.get("scraped_at"),
-        remote_classification=remote_analysis.get("remote_classification"),
+        remote_classification=remote_analysis.get("remote_classification")
+        or job.get("remote_classification"),
         pipeline_metadata={k: v for k, v in job.items() if k in _PIPELINE_KEYS},
         ai_fit=ai_fit,
         metadata=metadata,
