@@ -146,7 +146,7 @@ export default function JobDetailPanel({ dedupHash, onClose }: Props) {
                 View posting ↗
               </a>
             )}
-            <button className="btn btn--ghost" onClick={onClose}>✕</button>
+            <button className="btn btn--ghost" onClick={onClose} aria-label="Close job detail panel">✕</button>
           </div>
         </div>
 
