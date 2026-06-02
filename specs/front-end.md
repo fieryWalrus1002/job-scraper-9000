@@ -6,6 +6,8 @@ The idea is to have a clean separation between the backend (FastAPI) and the fro
 
 We have used Python & FastAPI for the backend because thats where we're best. For the frontend, I want to use TypeScript + React with Vite for a modern, fast development experience. We'll also use shadcn/ui for pre-built components like tables and cards to display the job listings and their scores.
 
+> **UI library status (updated 2026-06-01):** The MVP was built with plain CSS and a plain HTML table — no Tailwind, no shadcn/ui, no TanStack Table, no Recharts. The component count didn't justify the toolchain overhead at that scale. Revisit shadcn/ui when the app grows beyond a single table + summary view, or when consistent component styling across multiple pages becomes a maintenance burden.
+
 Here's a rough directory structure to visualize how the frontend and API will be organized. Its a monorepo setup, but the frontend and backend are still clearly separated:
 
 ```Plaintext
@@ -61,9 +63,9 @@ dev:
     just backend & just frontend
 ```
 
-### CORS Configuration
+### Vite Proxy (primary) and CORS (fallback)
 
-Because Vite defaults to localhost:5173 and FastAPI defaults to localhost:8000, the browser will block requests by default due to Same-Origin Policy. We will configure fastapi.middleware.cors.CORSMiddleware in main.py to explicitly allow requests from the frontend development origin during local testing.
+In local dev, Vite's `server.proxy` forwards `/api/*` to `http://localhost:8000`. Frontend code uses same-origin relative paths (`/api/jobs`), which mirrors the Azure SWA production routing. FastAPI CORS headers are kept as a fallback for direct API access (curl, Postman) but are not the primary development path.
 
 ## Migration to Azure Cloud
 
@@ -90,3 +92,12 @@ We will split our backend into two distinct execution environments inside Azure 
 ### 3. Eliminating Production CORS
 
 Azure Static Web Apps allows us to configure a `staticwebapp.config.json` file to route traffic sent to `/api/*` directly to our backend Container App. This allows the frontend to talk to the backend on the *same domain* in production, completely eliminating the need to expose open CORS headers in the production API.
+
+### 4. Database architecture
+
+Two-schema Postgres approach, chosen over Azure Blob Storage for the pipeline data:
+
+- **`raw` schema** — append-only landing zone for scored job postings. DDL owned by `scripts/db_ingest.py` (`db/schema.sql`). dbt treats these tables as read-only Sources. No Alembic migrations here — the ingest script applies DDL directly and rebuilds are safe.
+- **`app` schema** — user application state (tracked jobs, notes, status). Owned by Alembic + SQLModel. Safe, incremental migrations. Never touched during pipeline rebuilds.
+
+In Azure: the ACA Job writes to `raw` via the ingest script. The ACA App (FastAPI) reads `raw` and reads/writes `app`. Both point at the same Azure Database for PostgreSQL instance.
