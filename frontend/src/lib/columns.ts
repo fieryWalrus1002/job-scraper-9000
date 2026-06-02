@@ -15,6 +15,7 @@ export const COLUMNS: ColumnDef[] = [
   { key: 'remote_classification', label: 'Remote', defaultVisible: true, width: '160px' },
   { key: 'posted_at', label: 'Posted', defaultVisible: true, width: '100px' },
   { key: 'confidence', label: 'Confidence', defaultVisible: true, width: '100px' },
+  { key: 'source', label: 'Source', defaultVisible: false, width: '100px' },
 ]
 
 const STORAGE_KEY = 'job9000-columns'

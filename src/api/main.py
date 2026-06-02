@@ -64,7 +64,7 @@ async def get_pool() -> AsyncConnectionPool:
 Pool = Annotated[AsyncConnectionPool, Depends(get_pool)]
 
 _LIST_COLS = """
-    dedup_hash, source_url, title, company, location, posted_at,
+    dedup_hash, source, source_url, title, company, location, posted_at,
     remote_classification::TEXT,
     fit_score, confidence::TEXT, score_rationale, failure_reason, scored_at
 """
