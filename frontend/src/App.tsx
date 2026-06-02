@@ -1,81 +1,89 @@
-import { useState, useEffect } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useJobs } from './hooks/useJobs'
+import { useColumnConfig } from './hooks/useColumnConfig'
+import { filtersFromParams, filtersToParams } from './lib/filters'
+import type { Filters } from './types'
+import FilterBar from './components/FilterBar'
+import JobTable from './components/JobTable'
+import SummaryTab from './components/SummaryTab'
 
-function App() {
-  const [backendStatus, setBackendStatus] = useState<string>('Connecting...')
-  const [isHealthy, setIsHealthy] = useState<boolean | null>(null)
+export default function App() {
+  const [urlParams, setUrlParams] = useSearchParams()
+  const tab = urlParams.get('tab') ?? 'jobs'
+  const filters = filtersFromParams(urlParams)
+  const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    // Hit our local FastAPI endpoint wiht some basic health check
-    fetch('http://localhost:8000/health')
-      .then((res) => {
-        if (!res.ok) throw new Error('Server error')
-        return res.json()
+  const { data, isLoading, isError, error } = useJobs(filters)
+  const { visible, toggle } = useColumnConfig()
+
+  function setFilters(next: Filters) {
+    const p = filtersToParams(next)
+    if (tab !== 'jobs') p.set('tab', tab)
+    setUrlParams(p)
+  }
+
+  function setTab(t: string) {
+    const p = filtersToParams(filters)
+    if (t !== 'jobs') p.set('tab', t)
+    setUrlParams(p)
+  }
+
+  const allItems = data?.items ?? []
+  const filteredItems = search
+    ? allItems.filter((j) => {
+        const hay = `${j.title ?? ''} ${j.company ?? ''} ${j.score_rationale ?? ''}`.toLowerCase()
+        return hay.includes(search.toLowerCase())
       })
-      .then((data) => {
-        if (data.status === 'healthy') {
-          setBackendStatus('+1 Health for backend')
-          setIsHealthy(true)
-        } else {
-          setBackendStatus(`Unexpected status: ${data.status}`)
-          setIsHealthy(false)
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to connect to backend:', err)
-        setBackendStatus('Disconnected (x_x)')
-        setIsHealthy(false)
-      })
-  }, [])
+    : allItems
+
+  const displayTotal = search ? filteredItems.length : data?.total
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="Job Scraper" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="app">
+      <header className="app-header">
+        <span className="app-title">Job Scraper 9000</span>
+        <nav className="tabs">
+          <button className={`tab${tab === 'jobs' ? ' tab--active' : ''}`} onClick={() => setTab('jobs')}>
+            Jobs{data ? ` (${displayTotal?.toLocaleString()})` : ''}
+          </button>
+          <button className={`tab${tab === 'summary' ? ' tab--active' : ''}`} onClick={() => setTab('summary')}>
+            Summary
+          </button>
+        </nav>
+      </header>
 
-        <div>
-          <h1>Job Scraper 9000</h1>
-          <p>Local Management Dashboard</p>
-        </div>
+      <div className="app-body">
+        {tab === 'jobs' && (
+          <>
+            <FilterBar
+              filters={filters}
+              search={search}
+              onFiltersChange={setFilters}
+              onSearchChange={setSearch}
+              visibleColumns={visible}
+              onToggleColumn={toggle}
+              total={displayTotal}
+            />
+            {isLoading && <div className="status-msg">Loading…</div>}
+            {isError && (
+              <div className="status-msg status-msg--error">
+                Failed to load jobs: {(error as Error).message}
+              </div>
+            )}
+            {!isLoading && !isError && (
+              <JobTable items={filteredItems} visibleColumns={visible} />
+            )}
+          </>
+        )}
 
-        <div
-          className="counter"
-          style={{
-            backgroundColor: isHealthy === true ? '#1b4332' : isHealthy === false ? '#641111' : '#242424',
-            color: '#ffffff',
-            padding: '12px 24px',
-            borderRadius: '8px',
-            fontWeight: 'bold',
-            marginTop: '20px',
-            display: 'inline-block'
-          }}
-        >
-          API Status: {backendStatus}
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs" style={{ width: '100%', maxWidth: '600px', margin: '0 auto' }}>
-          <h2>Integration Verified</h2>
-          <p>
-            The frontend layer is cleanly consuming the backend API. Next up, we can transition this static check into a TanStack Query hook to pull real, scraped rows from our local <code>data/</code> partition!
-          </p>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+        {tab === 'summary' && (
+          <>
+            {isLoading && <div className="status-msg">Loading…</div>}
+            {!isLoading && !isError && <SummaryTab items={filteredItems} />}
+          </>
+        )}
+      </div>
+    </div>
   )
 }
-
-export default App
