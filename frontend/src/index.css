@@ -66,9 +66,62 @@ body { min-height: 100svh; }
 .tab:hover { background: var(--bg-hover); color: var(--text); }
 .tab--active { background: var(--bg-hover); color: var(--text); font-weight: 500; }
 
-.app-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.app-body { flex: 1; display: flex; flex-direction: row; overflow: hidden; }
 
-/* ── Filter bar ──────────────────────────────── */
+.app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Filter pane ─────────────────────────────── */
+
+.filter-pane {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-card);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.filter-pane .filter-input,
+.filter-pane .filter-select { width: 100%; }
+
+.filter-pane .filter-range .filter-input,
+.filter-pane .filter-range .filter-select { width: auto; flex: 1; }
+
+.filter-group--disabled { opacity: 0.4; }
+.filter-input:disabled,
+.filter-select:disabled { cursor: not-allowed; }
+
+.filter-label-note {
+  font-size: 10px;
+  font-weight: normal;
+  opacity: 0.6;
+  margin-left: 4px;
+}
+
+.col-check-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  padding: 3px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.col-check-item input { accent-color: var(--accent); }
+
+.filter-pane-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* ── Filter bar (legacy, kept for reference) ─── */
 
 .filter-bar {
   padding: 12px 20px 8px;
@@ -82,6 +135,8 @@ body { min-height: 100svh; }
 .filter-group { display: flex; flex-direction: column; gap: 3px; }
 
 .filter-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.filter-label--toggle { background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0; width: 100%; }
+.filter-toggle-arrow { font-size: 9px; }
 
 .filter-input {
   height: 30px;

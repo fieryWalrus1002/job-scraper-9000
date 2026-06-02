@@ -4,7 +4,7 @@ import { useJobs } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { filtersFromParams, filtersToParams } from './lib/filters'
 import type { Filters } from './types'
-import FilterBar from './components/FilterBar'
+import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
 import SummaryTab from './components/SummaryTab'
 
@@ -54,35 +54,38 @@ export default function App() {
       </header>
 
       <div className="app-body">
-        {tab === 'jobs' && (
-          <>
-            <FilterBar
-              filters={filters}
-              search={search}
-              onFiltersChange={setFilters}
-              onSearchChange={setSearch}
-              visibleColumns={visible}
-              onToggleColumn={toggle}
-              total={displayTotal}
-            />
-            {isLoading && <div className="status-msg">Loading…</div>}
-            {isError && (
-              <div className="status-msg status-msg--error">
-                Failed to load jobs: {(error as Error).message}
-              </div>
-            )}
-            {!isLoading && !isError && (
-              <JobTable items={filteredItems} visibleColumns={visible} />
-            )}
-          </>
-        )}
+        <FilterPane
+          filters={filters}
+          search={search}
+          onFiltersChange={setFilters}
+          onSearchChange={setSearch}
+          visibleColumns={visible}
+          onToggleColumn={toggle}
+          total={displayTotal}
+        />
 
-        {tab === 'summary' && (
-          <>
-            {isLoading && <div className="status-msg">Loading…</div>}
-            {!isLoading && !isError && <SummaryTab items={filteredItems} />}
-          </>
-        )}
+        <div className="app-main">
+          {tab === 'jobs' && (
+            <>
+              {isLoading && <div className="status-msg">Loading…</div>}
+              {isError && (
+                <div className="status-msg status-msg--error">
+                  Failed to load jobs: {(error as Error).message}
+                </div>
+              )}
+              {!isLoading && !isError && (
+                <JobTable items={filteredItems} visibleColumns={visible} />
+              )}
+            </>
+          )}
+
+          {tab === 'summary' && (
+            <>
+              {isLoading && <div className="status-msg">Loading…</div>}
+              {!isLoading && !isError && <SummaryTab items={filteredItems} />}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

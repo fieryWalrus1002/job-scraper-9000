@@ -91,11 +91,17 @@ async def list_jobs(
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     remote_classification: Annotated[
-        Literal[
-            "fully_remote",
-            "location_restricted",
-            "remote_with_occasional_travel",
-            "remote_with_frequent_travel",
+        list[
+            Literal[
+                "fully_remote",
+                "remote_with_quarterly_travel",
+                "remote_with_monthly_travel",
+                "remote_with_frequent_travel",
+                "hybrid",
+                "onsite_disguised",
+                "location_restricted",
+                "unclear",
+            ]
         ]
         | None,
         Query(),
@@ -103,6 +109,7 @@ async def list_jobs(
     min_posted_at: Annotated[date | None, Query()] = None,
     max_posted_at: Annotated[date | None, Query()] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
+    company: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -115,11 +122,11 @@ async def list_jobs(
     if max_score is not None:
         filters.append("fit_score <= %(max_score)s")
         params["max_score"] = max_score
-    if remote_classification is not None:
+    if remote_classification:
         filters.append(
-            "remote_classification = %(remote_classification)s::raw.remote_classification"
+            "remote_classification = ANY(%(remote_classification)s::raw.remote_classification[])"
         )
-        params["remote_classification"] = remote_classification
+        params["remote_classification"] = list(remote_classification)
     if min_posted_at is not None:
         filters.append("posted_at >= %(min_posted_at)s")
         params["min_posted_at"] = min_posted_at
@@ -129,6 +136,9 @@ async def list_jobs(
     if search is not None:
         filters.append("(title ILIKE %(search)s OR description ILIKE %(search)s)")
         params["search"] = f"%{search}%"
+    if company and company.strip():
+        filters.append("company ILIKE %(company)s")
+        params["company"] = f"%{company.strip()}%"
 
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
