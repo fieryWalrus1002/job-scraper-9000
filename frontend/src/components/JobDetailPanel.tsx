@@ -113,8 +113,14 @@ export default function JobDetailPanel({ dedupHash, onClose }: Props) {
     : 'badge--muted'
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="job-detail-panel" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        className="job-detail-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="job-detail-title"
+        onClick={(e) => e.stopPropagation()}
+      >
 
         {/* ── Header ───────────────────────────────── */}
         <div className="job-detail-header">
