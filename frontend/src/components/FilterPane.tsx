@@ -47,7 +47,7 @@ export default function FilterPane({
         <input
           className="filter-input"
           type="text"
-          placeholder="title, description…"
+          placeholder="title, company, rationale…"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
@@ -158,6 +158,12 @@ export default function FilterPane({
       </div>
 
       <div className="filter-pane-actions">
+        {total !== undefined && (
+          <div className="filter-count">
+            {total.toLocaleString()} job{total !== 1 ? 's' : ''}
+            {active ? ' matching' : ' total'}
+          </div>
+        )}
         {active && (
           <button
             className="btn btn--ghost"
@@ -167,13 +173,6 @@ export default function FilterPane({
           </button>
         )}
       </div>
-
-      {total !== undefined && (
-        <div className="filter-count">
-          {total.toLocaleString()} job{total !== 1 ? 's' : ''}
-          {active ? ' matching' : ' total'}
-        </div>
-      )}
     </aside>
   )
 }

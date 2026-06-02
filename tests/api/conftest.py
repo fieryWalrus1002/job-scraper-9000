@@ -23,6 +23,7 @@ from api.main import app, get_pool
 
 FAKE_JOB_ROW: dict[str, Any] = {
     "dedup_hash": "deadbeef" * 8,
+    "source": "linkedin",
     "source_url": "https://example.com/jobs/1",
     "title": "Senior Software Engineer",
     "company": "Acme Corp",
