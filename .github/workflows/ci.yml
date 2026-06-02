@@ -21,7 +21,7 @@ jobs:
           enable-cache: true
           python-version: "3.13"
 
-      - run: uv sync --extra dev
+      - run: uv sync --group dev
 
       - run: uv run ruff check .
 
