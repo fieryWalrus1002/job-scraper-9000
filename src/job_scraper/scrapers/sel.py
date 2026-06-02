@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 _JOBS_API = "https://selinc.wd1.myworkdayjobs.com/wday/cxs/selinc/SEL/jobs"
 _DETAIL_API = "https://selinc.wd1.myworkdayjobs.com/wday/cxs/selinc/SEL/job"
-_DOMAIN = "https://selinc.wd1.myworkdayjobs.com"
+_DOMAIN = "https://selinc.wd1.myworkdayjobs.com/SEL"
 _PAGE_SIZE = 20
 
 _LOCATION_DISPLAY: dict[str, str] = {
