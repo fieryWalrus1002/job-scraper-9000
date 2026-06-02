@@ -158,6 +158,7 @@ function renderCell(key: string, job: JobSummary): ReactNode {
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               title="Open job posting"
+              aria-label="Open job posting in a new tab"
             >↗</a>
           )}
         </div>
