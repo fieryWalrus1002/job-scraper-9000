@@ -1,4 +1,4 @@
-import type { Filters, JobListResponse } from './types'
+import type { Filters, JobDetail, JobListResponse } from './types'
 
 // Empty in dev/prod (Vite proxy + Azure SWA both handle /api/* routing).
 // Set VITE_API_URL only if calling the backend directly without a proxy.
@@ -17,4 +17,10 @@ export async function fetchJobs(filters: Filters): Promise<JobListResponse> {
   const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`)
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<JobListResponse>
+}
+
+export async function fetchJobDetail(dedupHash: string): Promise<JobDetail> {
+  const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(dedupHash)}`)
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<JobDetail>
 }

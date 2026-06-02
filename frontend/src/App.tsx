@@ -6,6 +6,7 @@ import { filtersFromParams, filtersToParams } from './lib/filters'
 import type { Filters } from './types'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
+import JobDetailPanel from './components/JobDetailPanel'
 import SummaryTab from './components/SummaryTab'
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
   const tab = urlParams.get('tab') ?? 'jobs'
   const filters = filtersFromParams(urlParams)
   const [search, setSearch] = useState('')
+  const [selectedHash, setSelectedHash] = useState<string | null>(null)
 
   const { data, isLoading, isError, error } = useJobs(filters)
   const { visible, toggle } = useColumnConfig()
@@ -74,7 +76,7 @@ export default function App() {
                 </div>
               )}
               {!isLoading && !isError && (
-                <JobTable items={filteredItems} visibleColumns={visible} />
+                <JobTable items={filteredItems} visibleColumns={visible} onSelect={setSelectedHash} />
               )}
             </>
           )}
@@ -87,6 +89,10 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {selectedHash && (
+        <JobDetailPanel dedupHash={selectedHash} onClose={() => setSelectedHash(null)} />
+      )}
     </div>
   )
 }
