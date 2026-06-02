@@ -4,9 +4,39 @@ import { COLUMNS } from '../lib/columns'
 
 const PAGE_SIZE = 50
 
+type SortKey = keyof JobSummary
+type SortDir = 'asc' | 'desc'
+
+interface SortState {
+  key: SortKey
+  dir: SortDir
+}
+
 interface Props {
   items: JobSummary[]
   visibleColumns: Set<string>
+}
+
+function compareValues(a: unknown, b: unknown, dir: SortDir): number {
+  // nulls always last regardless of direction
+  if (a === null && b === null) return 0
+  if (a === null) return 1
+  if (b === null) return -1
+  const mul = dir === 'asc' ? 1 : -1
+  if (typeof a === 'number' && typeof b === 'number') return (a - b) * mul
+  return String(a).localeCompare(String(b)) * mul
+}
+
+function sortItems(items: JobSummary[], sort: SortState): JobSummary[] {
+  return [...items].sort((a, b) => compareValues(a[sort.key], b[sort.key], sort.dir))
+}
+
+function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
+  return (
+    <span className={`sort-indicator${active ? ' sort-indicator--active' : ''}`}>
+      {active ? (dir === 'desc' ? ' ↓' : ' ↑') : ' ↕'}
+    </span>
+  )
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
@@ -35,10 +65,16 @@ function ConfidenceBadge({ value }: { value: string | null }) {
 export default function JobTable({ items, visibleColumns }: Props) {
   const [page, setPage] = useState(0)
   const [expandedHash, setExpandedHash] = useState<string | null>(null)
+  const [sort, setSort] = useState<SortState>({ key: 'fit_score', dir: 'desc' })
 
-  const totalPages = Math.ceil(items.length / PAGE_SIZE)
-  const pageItems = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const globalOffset = page * PAGE_SIZE
+  function handleSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+        : { key, dir: 'desc' }
+    )
+    setPage(0)
+  }
 
   function toggleExpand(hash: string) {
     setExpandedHash((prev) => (prev === hash ? null : hash))
@@ -49,6 +85,10 @@ export default function JobTable({ items, visibleColumns }: Props) {
   }
 
   const visibleCols = COLUMNS.filter((c) => visibleColumns.has(c.key))
+  const sorted = sortItems(items, sort)
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+  const pageItems = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const globalOffset = page * PAGE_SIZE
 
   return (
     <div className="table-outer">
@@ -58,8 +98,14 @@ export default function JobTable({ items, visibleColumns }: Props) {
             <tr>
               <th className="col-rank">#</th>
               {visibleCols.map((col) => (
-                <th key={col.key} style={col.width ? { width: col.width } : undefined}>
+                <th
+                  key={col.key}
+                  className="col-sortable"
+                  style={col.width ? { width: col.width } : undefined}
+                  onClick={() => handleSort(col.key as SortKey)}
+                >
                   {col.label}
+                  <SortIndicator active={sort.key === col.key} dir={sort.dir} />
                 </th>
               ))}
             </tr>

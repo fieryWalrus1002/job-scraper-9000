@@ -201,6 +201,12 @@ body { min-height: 100svh; }
 
 .col-rank { width: 44px; text-align: right; }
 
+.col-sortable { cursor: pointer; user-select: none; }
+.col-sortable:hover { color: var(--text); }
+
+.sort-indicator { color: var(--text-muted); font-size: 10px; }
+.sort-indicator--active { color: var(--accent); }
+
 .job-row { cursor: pointer; transition: background 0.08s; }
 .job-row:hover { background: var(--bg-hover); }
 .job-row--expanded { background: var(--bg-hover); }
