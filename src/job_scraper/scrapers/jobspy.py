@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -106,6 +107,11 @@ def _id_from_url(url: str) -> str:
 def _date_str(value) -> str | None:
     if value is None:
         return None
+    # pandas yields float NaN for missing datetime columns
+    if isinstance(value, float):
+        return None if math.isnan(value) else str(value)
     if hasattr(value, "isoformat"):
         return value.isoformat()
-    return str(value)
+    s = str(value)
+    # guard against pandas NaT stringifying to "NaT"
+    return None if s in ("nan", "NaT") else s
