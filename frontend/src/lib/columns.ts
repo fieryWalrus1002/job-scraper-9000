@@ -24,7 +24,9 @@ export function loadColumnVisibility(): Set<string> {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) return new Set(JSON.parse(saved) as string[])
-  } catch {}
+  } catch (e) {
+    console.warn('Failed to load column visibility:', e)
+  }
   return new Set(COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key))
 }
 
