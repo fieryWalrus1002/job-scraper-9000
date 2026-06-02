@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { JobSummary } from '../types'
 import { COLUMNS } from '../lib/columns'
 
@@ -15,10 +15,10 @@ interface SortState {
 interface Props {
   items: JobSummary[]
   visibleColumns: Set<string>
+  onSelect: (hash: string) => void
 }
 
 function compareValues(a: unknown, b: unknown, dir: SortDir): number {
-  // nulls always last regardless of direction
   if (a === null && b === null) return 0
   if (a === null) return 1
   if (b === null) return -1
@@ -62,9 +62,8 @@ function ConfidenceBadge({ value }: { value: string | null }) {
   return <span className={`conf ${cls}`}>{value}</span>
 }
 
-export default function JobTable({ items, visibleColumns }: Props) {
+export default function JobTable({ items, visibleColumns, onSelect }: Props) {
   const [page, setPage] = useState(0)
-  const [expandedHash, setExpandedHash] = useState<string | null>(null)
   const [sort, setSort] = useState<SortState>({ key: 'fit_score', dir: 'desc' })
 
   function handleSort(key: SortKey) {
@@ -74,10 +73,6 @@ export default function JobTable({ items, visibleColumns }: Props) {
         : { key, dir: 'desc' }
     )
     setPage(0)
-  }
-
-  function toggleExpand(hash: string) {
-    setExpandedHash((prev) => (prev === hash ? null : hash))
   }
 
   if (items.length === 0) {
@@ -113,36 +108,19 @@ export default function JobTable({ items, visibleColumns }: Props) {
           <tbody>
             {pageItems.map((job, i) => {
               const rank = globalOffset + i + 1
-              const expanded = expandedHash === job.dedup_hash
               return (
-                <Fragment key={job.dedup_hash}>
-                  <tr
-                    className={`job-row${expanded ? ' job-row--expanded' : ''}`}
-                    onClick={() => toggleExpand(job.dedup_hash)}
-                  >
-                    <td className="col-rank text-muted">{rank}</td>
-                    {visibleCols.map((col) => (
-                      <td key={col.key}>
-                        {renderCell(col.key, job)}
-                      </td>
-                    ))}
-                  </tr>
-                  {expanded && (
-                    <tr className="rationale-row">
-                      <td colSpan={visibleCols.length + 1}>
-                        <div className="rationale-content">
-                          {job.failure_reason ? (
-                            <span className="text-error">Failed: {job.failure_reason}</span>
-                          ) : job.score_rationale ? (
-                            job.score_rationale
-                          ) : (
-                            <span className="text-muted">No rationale available.</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                <tr
+                  key={job.dedup_hash}
+                  className="job-row"
+                  onClick={() => onSelect(job.dedup_hash)}
+                >
+                  <td className="col-rank text-muted">{rank}</td>
+                  {visibleCols.map((col) => (
+                    <td key={col.key}>
+                      {renderCell(col.key, job)}
+                    </td>
+                  ))}
+                </tr>
               )
             })}
           </tbody>
@@ -169,18 +147,20 @@ function renderCell(key: string, job: JobSummary): ReactNode {
     case 'fit_score':
       return <ScoreBadge score={job.fit_score} />
     case 'title':
-      return job.source_url ? (
-        <a
-          className="job-link"
-          href={job.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {job.title ?? '—'}
-        </a>
-      ) : (
-        <span>{job.title ?? '—'}</span>
+      return (
+        <div className="title-cell">
+          <span className="title-text">{job.title ?? '—'}</span>
+          {job.source_url && (
+            <a
+              className="title-ext-link"
+              href={job.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open job posting"
+            >↗</a>
+          )}
+        </div>
       )
     case 'remote_classification':
       return <ClassificationBadge value={job.remote_classification} />
