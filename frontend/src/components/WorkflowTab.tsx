@@ -115,10 +115,16 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                   </div>
                   <span className="text-muted" style={{ fontSize: 11 }}>{app.company ?? '—'}</span>
                 </td>
-                <td className="text-muted" style={{ fontSize: 11 }}>
-                  {new Date(app.updated_at).toLocaleDateString()}
+                <td>
+                  <span className="workflow-cell-truncate text-muted" style={{ fontSize: 11 }}>
+                    {new Date(app.updated_at).toLocaleDateString()}
+                  </span>
                 </td>
-                <td className="rationale-preview">{app.notes ?? '—'}</td>
+                <td>
+                  <span className="workflow-cell-truncate" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {app.notes ?? '—'}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

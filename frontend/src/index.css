@@ -652,14 +652,13 @@ body { min-height: 100svh; }
 
 .workflow-table td {
   max-width: unset;
+}
+
+.workflow-cell-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.workflow-table td:nth-child(4) {
-  color: var(--text-muted);
-  font-size: 12px;
+  display: block;
 }
 
 .workflow-status-select {
