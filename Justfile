@@ -26,6 +26,10 @@ pipeline:
     just filter-skills
     just ingest
 
+sync-types:
+    uv run scripts/export_openapi.py --out frontend/openapi.json
+    cd frontend && npx openapi-typescript openapi.json -o src/schema.gen.ts
+
 frontend:
     cd frontend && npm run dev -- --port 5173
 

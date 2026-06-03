@@ -55,7 +55,7 @@ class JobDetail(BaseModel):
     fit_score: int | None
     confidence: str | None
     score_rationale: str | None
-    ai_fit_detail: dict[str, Any] | None
+    ai_fit_detail: AiFitDetail | None
     pipeline_metadata: dict[str, Any]
     run_id: str
     scored_at: datetime
