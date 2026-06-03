@@ -17,6 +17,7 @@ export default function App() {
   const filters = filtersFromParams(urlParams)
   const [search, setSearch] = useState('')
   const [selectedHash, setSelectedHash] = useState<string | null>(null)
+  const [paneOpen, setPaneOpen] = useState(true)
 
   const { data, isLoading, isError, error } = useJobs(filters)
   const { visible, toggle } = useColumnConfig()
@@ -63,15 +64,24 @@ export default function App() {
       </header>
 
       <div className="app-body">
-        <FilterPane
-          filters={filters}
-          search={search}
-          onFiltersChange={setFilters}
-          onSearchChange={setSearch}
-          visibleColumns={visible}
-          onToggleColumn={toggle}
-          total={displayTotal}
-        />
+        <div className={`filter-pane-wrapper${paneOpen ? '' : ' filter-pane-wrapper--collapsed'}`}>
+          <FilterPane
+            filters={filters}
+            search={search}
+            onFiltersChange={setFilters}
+            onSearchChange={setSearch}
+            visibleColumns={visible}
+            onToggleColumn={toggle}
+            total={displayTotal}
+          />
+          <button
+            className="pane-toggle"
+            onClick={() => setPaneOpen((v) => !v)}
+            title={paneOpen ? 'Collapse filters' : 'Expand filters'}
+          >
+            {paneOpen ? '‹' : '›'}
+          </button>
+        </div>
 
         <div className="app-main">
           {tab === 'jobs' && (

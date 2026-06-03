@@ -72,8 +72,52 @@ body { min-height: 100svh; }
 
 /* ── Filter pane ─────────────────────────────── */
 
+.filter-pane-wrapper {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  position: relative;
+  transition: width 0.2s ease;
+  width: 212px;
+}
+
+.filter-pane-wrapper--collapsed {
+  width: 20px;
+}
+
+.filter-pane-wrapper--collapsed .filter-pane {
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  padding: 0;
+  border: none;
+}
+
+.pane-toggle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 48px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  padding: 0;
+}
+.pane-toggle:hover { color: var(--text); background: var(--bg-hover); }
+
 .filter-pane {
-  width: 200px;
+  width: 196px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   background: var(--bg-card);
@@ -82,6 +126,7 @@ body { min-height: 100svh; }
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
+  transition: opacity 0.15s ease, width 0.2s ease;
 }
 
 .filter-pane .filter-input,
