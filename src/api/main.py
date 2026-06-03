@@ -111,7 +111,6 @@ async def list_jobs(
     min_posted_at: Annotated[date | None, Query()] = None,
     max_posted_at: Annotated[date | None, Query()] = None,
     min_salary_usd: Annotated[int | None, Query(ge=0)] = None,
-    max_salary_usd: Annotated[int | None, Query(ge=0)] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
     company: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
@@ -142,11 +141,6 @@ async def list_jobs(
             "(salary_min_usd >= %(min_salary_usd)s OR salary_min_usd IS NULL)"
         )
         params["min_salary_usd"] = min_salary_usd
-    if max_salary_usd is not None:
-        filters.append(
-            "(COALESCE(salary_max_usd, salary_min_usd) <= %(max_salary_usd)s OR salary_min_usd IS NULL)"
-        )
-        params["max_salary_usd"] = max_salary_usd
     if search is not None:
         filters.append("(title ILIKE %(search)s OR description ILIKE %(search)s)")
         params["search"] = f"%{search}%"

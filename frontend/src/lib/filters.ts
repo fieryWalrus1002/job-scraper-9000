@@ -8,7 +8,6 @@ export const EMPTY_FILTERS: Filters = {
   maxPostedAt: '',
   company: '',
   minSalaryK: '',
-  maxSalaryK: '',
 }
 
 export function filtersFromParams(params: URLSearchParams): Filters {
@@ -20,7 +19,6 @@ export function filtersFromParams(params: URLSearchParams): Filters {
     maxPostedAt: params.get('to') ?? '',
     company: params.get('co') ?? '',
     minSalaryK: params.get('salMin') ?? '',
-    maxSalaryK: params.get('salMax') ?? '',
   }
 }
 
@@ -33,7 +31,6 @@ export function filtersToParams(filters: Filters): URLSearchParams {
   if (filters.maxPostedAt) p.set('to', filters.maxPostedAt)
   if (filters.company) p.set('co', filters.company)
   if (filters.minSalaryK) p.set('salMin', filters.minSalaryK)
-  if (filters.maxSalaryK) p.set('salMax', filters.maxSalaryK)
   return p
 }
 
@@ -45,8 +42,7 @@ export function hasActiveFilters(filters: Filters): boolean {
     Boolean(filters.minPostedAt) ||
     Boolean(filters.maxPostedAt) ||
     Boolean(filters.company) ||
-    Boolean(filters.minSalaryK) ||
-    Boolean(filters.maxSalaryK)
+    Boolean(filters.minSalaryK)
   )
 }
 

@@ -25,7 +25,7 @@ export default function FilterPane({
   const [colsOpen, setColsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(true)
 
-  type StringFilterKey = 'minScore' | 'maxScore' | 'minPostedAt' | 'maxPostedAt' | 'company' | 'minSalaryK' | 'maxSalaryK'
+  type StringFilterKey = 'minScore' | 'maxScore' | 'minPostedAt' | 'maxPostedAt' | 'company' | 'minSalaryK'
 
   function set(field: StringFilterKey, value: string) {
     onFiltersChange({ ...filters, [field]: value })
@@ -128,26 +128,15 @@ export default function FilterPane({
       </div>
 
       <div className="filter-group">
-        <label className="filter-label">Salary ($k/yr)</label>
-        <div className="filter-range">
-          <input
-            className="filter-input"
-            type="number"
-            placeholder="min"
-            min={0}
-            value={filters.minSalaryK}
-            onChange={(e) => set('minSalaryK', e.target.value)}
-          />
-          <span className="filter-range-sep">–</span>
-          <input
-            className="filter-input"
-            type="number"
-            placeholder="max"
-            min={0}
-            value={filters.maxSalaryK}
-            onChange={(e) => set('maxSalaryK', e.target.value)}
-          />
-        </div>
+        <label className="filter-label">Min salary ($k/yr)</label>
+        <input
+          className="filter-input"
+          type="number"
+          placeholder="e.g. 120"
+          min={0}
+          value={filters.minSalaryK}
+          onChange={(e) => set('minSalaryK', e.target.value)}
+        />
       </div>
 
       <div className="filter-group">

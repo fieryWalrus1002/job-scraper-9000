@@ -13,7 +13,6 @@ export async function fetchJobs(filters: Filters): Promise<JobListResponse> {
   if (filters.maxPostedAt) params.set('max_posted_at', filters.maxPostedAt)
   if (filters.company) params.set('company', filters.company)
   if (filters.minSalaryK) params.set('min_salary_usd', String(Number(filters.minSalaryK) * 1000))
-  if (filters.maxSalaryK) params.set('max_salary_usd', String(Number(filters.maxSalaryK) * 1000))
   params.set('limit', '1000')
 
   const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`)

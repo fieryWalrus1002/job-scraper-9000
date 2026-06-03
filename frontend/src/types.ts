@@ -73,5 +73,4 @@ export interface Filters {
   maxPostedAt: string
   company: string
   minSalaryK: string
-  maxSalaryK: string
 }
