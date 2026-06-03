@@ -1,11 +1,80 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchJobDetail } from '../api'
-import type { AiFitDetail } from '../types'
+import type { AiFitDetail, Application, ApplicationStatus } from '../types'
+import { APPLICATION_STATUSES } from '../types'
+import { useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
 
 interface Props {
   dedupHash: string | null
   onClose: () => void
+  application?: Application
+}
+
+function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: string; application: Application | undefined }) {
+  const mark = useMarkApplication()
+  const update = useUpdateApplication()
+  const [notes, setNotes] = useState(application?.notes ?? '')
+  const isPending = mark.isPending || update.isPending
+
+  // Sync textarea when the application record changes (e.g. after a refetch).
+  useEffect(() => {
+    setNotes(application?.notes ?? '')
+  }, [application?.notes, dedupHash])
+
+  function handleStatusChange(status: ApplicationStatus) {
+    if (application) {
+      update.mutate({ dedupHash, update: { status } })
+    } else {
+      mark.mutate({ dedupHash, status })
+    }
+  }
+
+  function handleNotesBlur() {
+    if (notes === (application?.notes ?? '')) return
+    if (application) {
+      update.mutate({ dedupHash, update: { notes } })
+    } else if (notes.trim()) {
+      mark.mutate({ dedupHash, status: 'saved', notes })
+    }
+  }
+
+  return (
+    <div className="app-tracking">
+      <div className="detail-field">
+        <div className="detail-field-label">Status</div>
+        <div className="app-status-buttons">
+          {APPLICATION_STATUSES.map((s) => (
+            <button
+              key={s}
+              className={`app-status-btn${application?.status === s ? ' app-status-btn--active' : ''}`}
+              disabled={isPending}
+              onClick={() => handleStatusChange(s)}
+            >
+              {s.replace(/_/g, ' ')}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="detail-field">
+        <div className="detail-field-label">Notes</div>
+        <textarea
+          className="app-notes"
+          value={notes}
+          rows={4}
+          placeholder="Add notes…"
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={handleNotesBlur}
+        />
+      </div>
+      {application && (
+        <div className="detail-meta-row" style={{ marginTop: 8 }}>
+          <span className="detail-meta-label">Last updated</span>
+          <span className="detail-meta-value text-muted">{application.updated_at}</span>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Section({
@@ -84,7 +153,7 @@ function SkillsFitSection({ ai }: { ai: AiFitDetail | null }) {
   )
 }
 
-export default function JobDetailPanel({ dedupHash, onClose }: Props) {
+export default function JobDetailPanel({ dedupHash, onClose, application }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
     queryFn: () => fetchJobDetail(dedupHash!),
@@ -194,10 +263,7 @@ export default function JobDetailPanel({ dedupHash, onClose }: Props) {
               </Section>
 
               <Section title="Application Tracking" defaultOpen={false}>
-                <div className="detail-placeholder">
-                  Track application status, dates, and notes.
-                  <span className="filter-label-note" style={{ marginLeft: 6 }}>coming soon</span>
-                </div>
+                <ApplicationTrackingSection dedupHash={data.dedup_hash} application={application} />
               </Section>
 
               <Section title="Dev Metadata" defaultOpen={false}>

@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import type { JobSummary } from '../types'
+import type { Application, ApplicationStatus, JobSummary } from '../types'
 import { COLUMNS } from '../lib/columns'
+import { useMarkApplication } from '../hooks/useApplications'
+import ContextMenu from './ContextMenu'
 
 const PAGE_SIZE = 50
 
@@ -16,6 +18,7 @@ interface Props {
   items: JobSummary[]
   visibleColumns: Set<string>
   onSelect: (hash: string) => void
+  applications?: Map<string, Application>
 }
 
 function compareValues(a: unknown, b: unknown, dir: SortDir): number {
@@ -62,9 +65,41 @@ function ConfidenceBadge({ value }: { value: string | null }) {
   return <span className={`conf ${cls}`}>{value}</span>
 }
 
-export default function JobTable({ items, visibleColumns, onSelect }: Props) {
+function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
+  const { mutate, isPending } = useMarkApplication()
+  const buttons: { status: ApplicationStatus; label: string }[] = [
+    { status: 'saved', label: 'Save' },
+    { status: 'maybe', label: 'Maybe' },
+    { status: 'to_apply', label: 'To Apply' },
+  ]
+  return (
+    <div className="quick-mark" onClick={(e) => e.stopPropagation()}>
+      {buttons.map(({ status, label }) => (
+        <button
+          key={status}
+          className={`quick-mark-btn${current === status ? ' quick-mark-btn--active' : ''}`}
+          disabled={isPending}
+          onClick={() => mutate({ dedupHash, status })}
+          title={label}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+interface ContextState {
+  x: number
+  y: number
+  job: JobSummary
+}
+
+export default function JobTable({ items, visibleColumns, onSelect, applications }: Props) {
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<SortState>({ key: 'fit_score', dir: 'desc' })
+  const [ctx, setCtx] = useState<ContextState | null>(null)
+  const { mutate: mark } = useMarkApplication()
 
   function handleSort(key: SortKey) {
     setSort((prev) =>
@@ -103,16 +138,19 @@ export default function JobTable({ items, visibleColumns, onSelect }: Props) {
                   <SortIndicator active={sort.key === col.key} dir={sort.dir} />
                 </th>
               ))}
+              <th className="col-track">Track</th>
             </tr>
           </thead>
           <tbody>
             {pageItems.map((job, i) => {
               const rank = globalOffset + i + 1
+              const appStatus = applications?.get(job.dedup_hash)?.status
               return (
                 <tr
                   key={job.dedup_hash}
-                  className="job-row"
+                  className={`job-row${appStatus ? ' job-row--tracked' : ''}`}
                   onClick={() => onSelect(job.dedup_hash)}
+                  onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, job }) }}
                 >
                   <td className="col-rank text-muted">{rank}</td>
                   {visibleCols.map((col) => (
@@ -120,12 +158,29 @@ export default function JobTable({ items, visibleColumns, onSelect }: Props) {
                       {renderCell(col.key, job)}
                     </td>
                   ))}
+                  <td className="col-track">
+                    <QuickMark dedupHash={job.dedup_hash} current={appStatus} />
+                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
+
+      {ctx && (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={[
+            { label: 'Save', active: applications?.get(ctx.job.dedup_hash)?.status === 'saved', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'saved' }) },
+            { label: 'Maybe', active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe' }) },
+            { label: 'To Apply', active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }) },
+            { label: 'Applied', active: applications?.get(ctx.job.dedup_hash)?.status === 'applied', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied' }) },
+          ]}
+        />
+      )}
 
       {totalPages > 1 && (
         <div className="pagination">
