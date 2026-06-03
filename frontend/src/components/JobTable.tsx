@@ -141,15 +141,20 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
     state: { sorting, pagination, columnOrder, columnSizing, columnVisibility },
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
+    getRowId: (row) => row.dedup_hash,
     onColumnOrderChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(columnOrder) : updater
-      setColumnOrder(next)
-      saveColumnOrder(next)
+      setColumnOrder((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveColumnOrder(next)
+        return next
+      })
     },
     onColumnSizingChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(columnSizing) : updater
-      setColumnSizing(next)
-      saveColumnSizing(next)
+      setColumnSizing((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        saveColumnSizing(next)
+        return next
+      })
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -180,7 +185,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                   <th
                     key={header.id}
                     style={header.column.id === 'title'
-                      ? { position: 'relative', minWidth: header.getSize() }
+                      ? { position: 'relative' }
                       : { position: 'relative', width: header.getSize(), maxWidth: header.getSize() }}
                     className="col-sortable"
                     draggable
@@ -191,11 +196,11 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                       const order = table.getState().columnOrder
                       const from = order.indexOf(dragCol.current)
                       const to   = order.indexOf(header.column.id)
+                      if (from === -1 || to === -1) { dragCol.current = null; return }
                       const next = [...order]
                       next.splice(from, 1)
                       next.splice(to, 0, dragCol.current)
                       table.setColumnOrder(next)
-                      saveColumnOrder(next)
                       dragCol.current = null
                     }}
                     onClick={header.column.getToggleSortingHandler()}
@@ -231,7 +236,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                   <td className="col-rank text-muted">{rank}</td>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} style={cell.column.id === 'title'
-                      ? { minWidth: cell.column.getSize() }
+                      ? {}
                       : { width: cell.column.getSize(), maxWidth: cell.column.getSize() }}>
                       {renderCell(cell.column.id, job)}
                     </td>

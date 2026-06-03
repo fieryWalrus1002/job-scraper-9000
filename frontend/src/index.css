@@ -276,6 +276,7 @@ body { min-height: 100svh; }
 
 .job-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -300,7 +301,7 @@ body { min-height: 100svh; }
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
-  max-width: 0;
+  overflow: hidden;
 }
 
 .col-rank { width: 44px; max-width: 44px; text-align: right; }

@@ -38,6 +38,9 @@ const STORAGE_KEY = 'job9000-columns'
 const ORDER_KEY   = 'job9000-column-order'
 const SIZING_KEY  = 'job9000-column-sizing'
 
+const VALID_KEYS = new Set<string>(COLUMNS.map((c) => c.key as string))
+const DEFAULT_ORDER = COLUMNS.map((c) => c.key as string)
+
 function tryParse<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key)
@@ -58,7 +61,11 @@ export function saveColumnVisibility(visible: Set<string>): void {
 }
 
 export function loadColumnOrder(): string[] {
-  return tryParse<string[]>(ORDER_KEY, COLUMNS.map((c) => c.key))
+  const saved = tryParse<unknown>(ORDER_KEY, null)
+  if (!Array.isArray(saved)) return [...DEFAULT_ORDER]
+  const known = saved.filter((id): id is string => typeof id === 'string' && VALID_KEYS.has(id))
+  const missing = DEFAULT_ORDER.filter((k) => !known.includes(k))
+  return [...known, ...missing]
 }
 
 export function saveColumnOrder(order: string[]): void {
@@ -66,7 +73,15 @@ export function saveColumnOrder(order: string[]): void {
 }
 
 export function loadColumnSizing(): Record<string, number> {
-  return tryParse<Record<string, number>>(SIZING_KEY, {})
+  const saved = tryParse<unknown>(SIZING_KEY, null)
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {}
+  const result: Record<string, number> = {}
+  for (const [k, v] of Object.entries(saved as Record<string, unknown>)) {
+    if (VALID_KEYS.has(k) && typeof v === 'number' && isFinite(v) && v > 0) {
+      result[k] = v
+    }
+  }
+  return result
 }
 
 export function saveColumnSizing(sizing: Record<string, number>): void {
