@@ -15,7 +15,7 @@ export type ApplicationStatus = NonNullable<Application['status']>
 export const APPLICATION_STATUSES = [
   'saved', 'maybe', 'to_apply', 'applied',
   'screening', 'interview', 'offer',
-  'rejected', 'withdrawn', 'hired',
+  'rejected', 'withdrawn', 'hired', 'ghosted',
 ] as const satisfies readonly ApplicationStatus[]
 
 // Frontend-only — not part of the API schema.

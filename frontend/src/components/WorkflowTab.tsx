@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApplications, useDeleteApplication, useUpdateApplication } from '../hooks/useApplications'
 import { APPLICATION_STATUSES, type ApplicationStatus } from '../types'
 
-const ARCHIVED_STATUSES: ApplicationStatus[] = ['rejected', 'withdrawn', 'hired']
+const ARCHIVED_STATUSES: ApplicationStatus[] = ['rejected', 'withdrawn', 'hired', 'ghosted']
 
 const STATUS_LABELS: Record<string, string> = {
   saved: 'Saved',
@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
   hired: 'Hired!',
+  ghosted: 'Ghosted',
 }
 
 interface Props {
