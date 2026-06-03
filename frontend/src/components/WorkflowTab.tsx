@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApplications, useDeleteApplication, useUpdateApplication } from '../hooks/useApplications'
-import { APPLICATION_STATUSES, type ApplicationStatus } from '../types'
+import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from '../types'
 
 const ARCHIVED_STATUSES: ApplicationStatus[] = ['rejected', 'withdrawn', 'hired', 'ghosted']
 
@@ -18,6 +18,23 @@ const STATUS_LABELS: Record<string, string> = {
   ghosted: 'Ghosted',
 }
 
+type SortCol = 'status' | 'title' | 'score' | 'updated'
+type SortDir = 'asc' | 'desc'
+
+function sortApplications(rows: Application[], col: SortCol, dir: SortDir): Application[] {
+  const sorted = [...rows].sort((a, b) => {
+    let cmp = 0
+    switch (col) {
+      case 'status':  cmp = (a.status ?? '').localeCompare(b.status ?? ''); break
+      case 'title':   cmp = (a.title ?? '').localeCompare(b.title ?? ''); break
+      case 'score':   cmp = (b.fit_score ?? -1) - (a.fit_score ?? -1); break
+      case 'updated': cmp = a.updated_at.localeCompare(b.updated_at); break
+    }
+    return dir === 'asc' ? cmp : -cmp
+  })
+  return sorted
+}
+
 interface Props {
   onSelectJob: (hash: string) => void
 }
@@ -28,18 +45,35 @@ export default function WorkflowTab({ onSelectJob }: Props) {
   const del = useDeleteApplication()
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all')
   const [showArchived, setShowArchived] = useState(false)
+  const [sortCol, setSortCol] = useState<SortCol>('updated')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   if (isLoading) return <div className="status-msg">Loading…</div>
 
   const all = Array.from(applications?.values() ?? [])
   const active = showArchived ? all : all.filter((a) => !ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
-  const visible = filter === 'all' ? active : active.filter((a) => a.status === filter)
+  const filtered = filter === 'all' ? active : active.filter((a) => a.status === filter)
+  const visible = sortApplications(filtered, sortCol, sortDir)
 
   const counts = APPLICATION_STATUSES.reduce<Record<string, number>>((acc, s) => {
     acc[s] = active.filter((a) => a.status === s).length
     return acc
   }, {})
   const archivedCount = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus)).length
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) {
+      setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir(col === 'updated' ? 'desc' : 'asc')
+    }
+  }
+
+  function sortIndicator(col: SortCol) {
+    if (sortCol !== col) return <span className="sort-indicator"> ↕</span>
+    return sortDir === 'asc' ? ' ↑' : ' ↓'
+  }
 
   return (
     <div className="workflow-tab">
@@ -80,15 +114,25 @@ export default function WorkflowTab({ onSelectJob }: Props) {
           <colgroup>
             <col style={{ width: '160px' }} />
             <col style={{ width: '40%' }} />
+            <col style={{ width: '70px' }} />
             <col style={{ width: '100px' }} />
             <col />
             <col style={{ width: '44px' }} />
           </colgroup>
           <thead>
             <tr>
-              <th>Status</th>
-              <th>Job</th>
-              <th>Updated</th>
+              <th className="col-sortable" onClick={() => handleSort('status')}>
+                Status{sortIndicator('status')}
+              </th>
+              <th className="col-sortable" onClick={() => handleSort('title')}>
+                Job{sortIndicator('title')}
+              </th>
+              <th className="col-sortable" onClick={() => handleSort('score')}>
+                Score{sortIndicator('score')}
+              </th>
+              <th className="col-sortable" onClick={() => handleSort('updated')}>
+                Updated{sortIndicator('updated')}
+              </th>
               <th>Notes</th>
               <th></th>
             </tr>
@@ -130,6 +174,11 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                     )}
                   </div>
                   <span className="text-muted" style={{ fontSize: 11 }}>{app.company ?? '—'}</span>
+                </td>
+                <td>
+                  <span className="text-muted" style={{ fontSize: 12 }}>
+                    {app.fit_score ?? '—'}
+                  </span>
                 </td>
                 <td>
                   <span className="workflow-cell-truncate text-muted" style={{ fontSize: 11 }}>
