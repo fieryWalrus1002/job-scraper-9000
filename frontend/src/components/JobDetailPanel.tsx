@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchJobDetail } from '../api'
 import type { AiFitDetail, Application, ApplicationStatus } from '../types'
 import { APPLICATION_STATUSES } from '../types'
-import { useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
+import { useDeleteApplication, useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
 
 interface Props {
   dedupHash: string | null
@@ -14,8 +14,9 @@ interface Props {
 function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: string; application: Application | undefined }) {
   const mark = useMarkApplication()
   const update = useUpdateApplication()
+  const del = useDeleteApplication()
   const [notes, setNotes] = useState(application?.notes ?? '')
-  const isPending = mark.isPending || update.isPending
+  const isPending = mark.isPending || update.isPending || del.isPending
 
   // Sync textarea when the application record or job changes (server → local state).
   useEffect(() => {
@@ -72,6 +73,14 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
         <div className="detail-meta-row" style={{ marginTop: 8 }}>
           <span className="detail-meta-label">Last updated</span>
           <span className="detail-meta-value text-muted">{application.updated_at}</span>
+          <button
+            className="btn btn--danger btn--sm"
+            disabled={isPending}
+            onClick={() => del.mutate(dedupHash)}
+            style={{ marginLeft: 'auto' }}
+          >
+            Remove tracking
+          </button>
         </div>
       )}
     </div>

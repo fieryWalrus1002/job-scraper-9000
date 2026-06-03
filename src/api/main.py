@@ -237,6 +237,17 @@ async def create_application(body: ApplicationCreate, pool: Pool):
     return Application.model_validate(row)
 
 
+@router.delete("/applications/{dedup_hash}", status_code=204)
+async def delete_application(dedup_hash: str, pool: Pool):
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "DELETE FROM app.user_applications WHERE dedup_hash = %(dedup_hash)s",
+            {"dedup_hash": dedup_hash},
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+
 @router.patch("/applications/{dedup_hash}", response_model=Application)
 async def update_application(dedup_hash: str, body: ApplicationUpdate, pool: Pool):
     updates = body.model_dump(exclude_unset=True)

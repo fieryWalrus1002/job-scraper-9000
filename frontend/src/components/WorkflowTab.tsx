@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { useApplications, useUpdateApplication } from '../hooks/useApplications'
+import { useApplications, useDeleteApplication, useUpdateApplication } from '../hooks/useApplications'
 import { APPLICATION_STATUSES, type ApplicationStatus } from '../types'
+
+const ARCHIVED_STATUSES: ApplicationStatus[] = ['rejected', 'withdrawn', 'hired']
 
 const STATUS_LABELS: Record<string, string> = {
   saved: 'Saved',
@@ -22,17 +24,21 @@ interface Props {
 export default function WorkflowTab({ onSelectJob }: Props) {
   const { data: applications, isLoading } = useApplications()
   const update = useUpdateApplication()
+  const del = useDeleteApplication()
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all')
+  const [showArchived, setShowArchived] = useState(false)
 
   if (isLoading) return <div className="status-msg">Loading…</div>
 
   const all = Array.from(applications?.values() ?? [])
-  const visible = filter === 'all' ? all : all.filter((a) => a.status === filter)
+  const active = showArchived ? all : all.filter((a) => !ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
+  const visible = filter === 'all' ? active : active.filter((a) => a.status === filter)
 
   const counts = APPLICATION_STATUSES.reduce<Record<string, number>>((acc, s) => {
-    acc[s] = all.filter((a) => a.status === s).length
+    acc[s] = active.filter((a) => a.status === s).length
     return acc
   }, {})
+  const archivedCount = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus)).length
 
   return (
     <div className="workflow-tab">
@@ -41,7 +47,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
           className={`workflow-filter-btn${filter === 'all' ? ' workflow-filter-btn--active' : ''}`}
           onClick={() => setFilter('all')}
         >
-          All ({all.length})
+          All ({active.length})
         </button>
         {APPLICATION_STATUSES.filter((s) => counts[s] > 0).map((s) => (
           <button
@@ -52,6 +58,14 @@ export default function WorkflowTab({ onSelectJob }: Props) {
             {STATUS_LABELS[s]} ({counts[s]})
           </button>
         ))}
+        {archivedCount > 0 && (
+          <button
+            className={`workflow-filter-btn workflow-filter-btn--archive${showArchived ? ' workflow-filter-btn--active' : ''}`}
+            onClick={() => { setShowArchived((v) => !v); setFilter('all') }}
+          >
+            {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+          </button>
+        )}
       </div>
 
       {visible.length === 0 ? (
@@ -68,6 +82,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
             <col style={{ width: '40%' }} />
             <col style={{ width: '100px' }} />
             <col />
+            <col style={{ width: '44px' }} />
           </colgroup>
           <thead>
             <tr>
@@ -75,6 +90,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
               <th>Job</th>
               <th>Updated</th>
               <th>Notes</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -124,6 +140,14 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                   <span className="workflow-cell-truncate" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {app.notes ?? '—'}
                   </span>
+                </td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="btn btn--icon btn--danger"
+                    title="Remove tracking"
+                    disabled={del.isPending}
+                    onClick={() => del.mutate(app.dedup_hash)}
+                  >×</button>
                 </td>
               </tr>
             ))}

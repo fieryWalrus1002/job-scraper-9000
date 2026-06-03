@@ -17,7 +17,7 @@ import {
   saveColumnSizing,
   tableColumns,
 } from '../lib/columns'
-import { useMarkApplication } from '../hooks/useApplications'
+import { useDeleteApplication, useMarkApplication } from '../hooks/useApplications'
 import ContextMenu from './ContextMenu'
 
 const PAGE_SIZE = 50
@@ -128,6 +128,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
   const [ctx, setCtx] = useState<ContextState | null>(null)
   const { mutate: mark } = useMarkApplication()
+  const { mutate: del } = useDeleteApplication()
 
   const columnVisibility = Object.fromEntries(
     tableColumns.map((col) => [col.id!, visibleColumns.has(col.id!)])
@@ -247,10 +248,13 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
           y={ctx.y}
           onClose={() => setCtx(null)}
           items={[
-            { label: 'Save',     active: applications?.get(ctx.job.dedup_hash)?.status === 'saved',     onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'saved'     }) },
-            { label: 'Maybe',    active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe',    onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe'    }) },
-            { label: 'To Apply', active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }) },
-            { label: 'Applied',  active: applications?.get(ctx.job.dedup_hash)?.status === 'applied',  onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied'  }) },
+            { label: 'Save',             active: applications?.get(ctx.job.dedup_hash)?.status === 'saved',     onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'saved'     }) },
+            { label: 'Maybe',            active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe',    onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe'    }) },
+            { label: 'To Apply',         active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }) },
+            { label: 'Applied',          active: applications?.get(ctx.job.dedup_hash)?.status === 'applied',  onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied'  }) },
+            ...(applications?.has(ctx.job.dedup_hash)
+              ? [{ label: 'Remove tracking', active: false, onClick: () => del(ctx.job.dedup_hash) }]
+              : []),
           ]}
         />
       )}
