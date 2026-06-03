@@ -33,6 +33,12 @@ sync-types:
 frontend:
     cd frontend && npm run dev -- --port 5173
 
+frontend-build:
+    cd frontend && npm run build
+
+frontend-lint:
+    cd frontend && npm run lint
+
 backend:
     @echo "Starting FastAPI backend on port 8000..."
     uv run uvicorn src.api.main:app --reload --port 8000
