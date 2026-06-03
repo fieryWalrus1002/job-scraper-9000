@@ -158,3 +158,27 @@ async def test_update_application_clears_notes(
     )
     assert resp.status_code == 200
     assert resp.json()["notes"] is None
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/applications/{dedup_hash}
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_application(client: AsyncClient, fake_conn: AsyncMock) -> None:
+    cur = _make_cursor()
+    cur.rowcount = 1
+    fake_conn.execute = AsyncMock(return_value=cur)
+    resp = await client.delete(f"/api/applications/{FAKE_JOB_ROW['dedup_hash']}")
+    assert resp.status_code == 204
+    assert resp.content == b""
+
+
+async def test_delete_application_not_found(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    cur = _make_cursor()
+    cur.rowcount = 0
+    fake_conn.execute = AsyncMock(return_value=cur)
+    resp = await client.delete("/api/applications/nonexistent")
+    assert resp.status_code == 404

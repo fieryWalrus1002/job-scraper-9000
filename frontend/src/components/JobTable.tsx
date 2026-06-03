@@ -201,6 +201,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                         if (isResizing.current) { e.preventDefault(); return }
                         dragCol.current = header.column.id
                       }}
+                      onDragEnd={() => { dragCol.current = null }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
                         if (!dragCol.current || dragCol.current === header.column.id) return

@@ -27,7 +27,7 @@ function sortApplications(rows: Application[], col: SortCol, dir: SortDir): Appl
     switch (col) {
       case 'status':  cmp = (a.status ?? '').localeCompare(b.status ?? ''); break
       case 'title':   cmp = (a.title ?? '').localeCompare(b.title ?? ''); break
-      case 'score':   cmp = (b.fit_score ?? -1) - (a.fit_score ?? -1); break
+      case 'score':   cmp = (a.fit_score ?? -1) - (b.fit_score ?? -1); break
       case 'updated': cmp = a.updated_at.localeCompare(b.updated_at); break
     }
     return dir === 'asc' ? cmp : -cmp
@@ -192,8 +192,10 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <button
+                    type="button"
                     className="btn btn--icon btn--danger"
                     title="Remove tracking"
+                    aria-label="Remove tracking"
                     disabled={del.isPending}
                     onClick={() => { if (window.confirm('Remove tracking for this job?')) del.mutate(app.dedup_hash) }}
                   >×</button>
