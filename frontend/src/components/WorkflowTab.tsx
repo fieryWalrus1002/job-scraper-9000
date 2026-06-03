@@ -61,7 +61,14 @@ export default function WorkflowTab({ onSelectJob }: Props) {
             : `No jobs with status "${STATUS_LABELS[filter]}".`}
         </div>
       ) : (
-        <table className="job-table">
+        <div className="table-wrapper">
+        <table className="job-table workflow-table">
+          <colgroup>
+            <col style={{ width: '160px' }} />
+            <col style={{ width: '40%' }} />
+            <col style={{ width: '100px' }} />
+            <col />
+          </colgroup>
           <thead>
             <tr>
               <th>Status</th>
@@ -116,6 +123,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )

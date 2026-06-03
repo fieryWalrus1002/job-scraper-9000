@@ -646,6 +646,22 @@ body { min-height: 100svh; }
 .workflow-filter-btn:hover { border-color: var(--accent); color: var(--text); }
 .workflow-filter-btn--active { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
 
+.workflow-table {
+  table-layout: fixed;
+}
+
+.workflow-table td {
+  max-width: unset;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-table td:nth-child(4) {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .workflow-status-select {
   background: var(--bg-card);
   border: 1px solid var(--border);
