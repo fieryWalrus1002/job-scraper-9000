@@ -6,6 +6,17 @@ export type JobSummary = components['schemas']['JobSummary']
 export type JobDetail = components['schemas']['JobDetail']
 export type JobListResponse = components['schemas']['JobListResponse']
 export type AiFitDetail = components['schemas']['AiFitDetail']
+export type Application = components['schemas']['Application']
+export type ApplicationCreate = components['schemas']['ApplicationCreate']
+export type ApplicationUpdate = components['schemas']['ApplicationUpdate']
+
+// Derived from the generated schema — TS will error if this list diverges from the backend.
+export type ApplicationStatus = NonNullable<Application['status']>
+export const APPLICATION_STATUSES = [
+  'saved', 'maybe', 'to_apply', 'applied',
+  'screening', 'interview', 'offer',
+  'rejected', 'withdrawn', 'hired',
+] as const satisfies readonly ApplicationStatus[]
 
 // Frontend-only — not part of the API schema.
 export interface Filters {

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -72,3 +72,58 @@ class JobListResponse(BaseModel):
     limit: int
     offset: int
     items: list[JobSummary]
+
+
+ApplicationStatus = Literal[
+    "saved",
+    "maybe",
+    "to_apply",
+    "applied",
+    "screening",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
+    "hired",
+]
+
+# Keep as a tuple for the SQL CHECK constraint in migrations.
+APPLICATION_STATUSES: tuple[str, ...] = (
+    "saved",
+    "maybe",
+    "to_apply",
+    "applied",
+    "screening",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
+    "hired",
+)
+
+
+class Application(BaseModel):
+    dedup_hash: str
+    status: ApplicationStatus
+    applied_at: date | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+    # joined from raw.scored_job_postings
+    title: str | None = None
+    company: str | None = None
+    fit_score: int | None = None
+    source_url: str | None = None
+
+
+class ApplicationCreate(BaseModel):
+    dedup_hash: str
+    status: ApplicationStatus = "saved"
+    applied_at: date | None = None
+    notes: str | None = None
+
+
+class ApplicationUpdate(BaseModel):
+    status: ApplicationStatus | None = None
+    applied_at: date | None = None
+    notes: str | None = None

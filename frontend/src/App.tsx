@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useJobs } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
+import { useApplications } from './hooks/useApplications'
 import { filtersFromParams, filtersToParams } from './lib/filters'
 import type { Filters } from './types'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
 import JobDetailPanel from './components/JobDetailPanel'
 import SummaryTab from './components/SummaryTab'
+import WorkflowTab from './components/WorkflowTab'
 
 export default function App() {
   const [urlParams, setUrlParams] = useSearchParams()
@@ -15,9 +17,11 @@ export default function App() {
   const filters = filtersFromParams(urlParams)
   const [search, setSearch] = useState('')
   const [selectedHash, setSelectedHash] = useState<string | null>(null)
+  const [paneOpen, setPaneOpen] = useState(true)
 
   const { data, isLoading, isError, error } = useJobs(filters)
   const { visible, toggle } = useColumnConfig()
+  const { data: applications } = useApplications()
 
   function setFilters(next: Filters) {
     const p = filtersToParams(next)
@@ -40,6 +44,7 @@ export default function App() {
     : allItems
 
   const displayTotal = search ? filteredItems.length : data?.total
+  const trackedCount = applications?.size ?? 0
 
   return (
     <div className="app">
@@ -49,6 +54,9 @@ export default function App() {
           <button className={`tab${tab === 'jobs' ? ' tab--active' : ''}`} onClick={() => setTab('jobs')}>
             Jobs{data ? ` (${displayTotal?.toLocaleString()})` : ''}
           </button>
+          <button className={`tab${tab === 'workflow' ? ' tab--active' : ''}`} onClick={() => setTab('workflow')}>
+            Workflow{trackedCount > 0 ? ` (${trackedCount})` : ''}
+          </button>
           <button className={`tab${tab === 'summary' ? ' tab--active' : ''}`} onClick={() => setTab('summary')}>
             Summary
           </button>
@@ -56,15 +64,24 @@ export default function App() {
       </header>
 
       <div className="app-body">
-        <FilterPane
-          filters={filters}
-          search={search}
-          onFiltersChange={setFilters}
-          onSearchChange={setSearch}
-          visibleColumns={visible}
-          onToggleColumn={toggle}
-          total={displayTotal}
-        />
+        <div className={`filter-pane-wrapper${paneOpen ? '' : ' filter-pane-wrapper--collapsed'}`}>
+          <FilterPane
+            filters={filters}
+            search={search}
+            onFiltersChange={setFilters}
+            onSearchChange={setSearch}
+            visibleColumns={visible}
+            onToggleColumn={toggle}
+            total={displayTotal}
+          />
+          <button
+            className="pane-toggle"
+            onClick={() => setPaneOpen((v) => !v)}
+            title={paneOpen ? 'Collapse filters' : 'Expand filters'}
+          >
+            {paneOpen ? '‹' : '›'}
+          </button>
+        </div>
 
         <div className="app-main">
           {tab === 'jobs' && (
@@ -76,9 +93,18 @@ export default function App() {
                 </div>
               )}
               {!isLoading && !isError && (
-                <JobTable items={filteredItems} visibleColumns={visible} onSelect={setSelectedHash} />
+                <JobTable
+                  items={filteredItems}
+                  visibleColumns={visible}
+                  onSelect={setSelectedHash}
+                  applications={applications}
+                />
               )}
             </>
+          )}
+
+          {tab === 'workflow' && (
+            <WorkflowTab onSelectJob={setSelectedHash} />
           )}
 
           {tab === 'summary' && (
@@ -91,7 +117,11 @@ export default function App() {
       </div>
 
       {selectedHash && (
-        <JobDetailPanel dedupHash={selectedHash} onClose={() => setSelectedHash(null)} />
+        <JobDetailPanel
+          dedupHash={selectedHash}
+          onClose={() => setSelectedHash(null)}
+          application={applications?.get(selectedHash)}
+        />
       )}
     </div>
   )
