@@ -7,6 +7,9 @@ export interface JobSummary {
   location: string | null
   posted_at: string | null
   remote_classification: string | null
+  salary_min_usd: number | null
+  salary_max_usd: number | null
+  salary_period: string | null
   fit_score: number | null
   confidence: string | null
   score_rationale: string | null
@@ -44,6 +47,9 @@ export interface JobDetail {
   description: string | null
   scraped_at: string | null
   remote_classification: string | null
+  salary_min_usd: number | null
+  salary_max_usd: number | null
+  salary_period: string | null
   fit_score: number | null
   confidence: string | null
   score_rationale: string | null
@@ -66,4 +72,6 @@ export interface Filters {
   minPostedAt: string
   maxPostedAt: string
   company: string
+  minSalaryK: string
+  maxSalaryK: string
 }

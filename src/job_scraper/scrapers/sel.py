@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 import requests
 from bs4 import BeautifulSoup
 
+from utils.salary import extract_salary
+
 from ..models import JobPosting
 from ..pii import scrub
 from ..query import SELSearchQuery
@@ -129,6 +131,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
 
                 title = item.get("title", "").strip()
 
+                salary = extract_salary(description)
                 job = JobPosting(
                     source=self.source_name,
                     source_job_id=source_job_id,
@@ -140,6 +143,9 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     description=description,
                     scraped_at=scraped_at,
                     scrub_counts=scrub_counts,
+                    salary_min_usd=salary.salary_min_usd if salary else None,
+                    salary_max_usd=salary.salary_max_usd if salary else None,
+                    salary_period=salary.salary_period if salary else None,
                 )
                 job.compute_hash()
 
