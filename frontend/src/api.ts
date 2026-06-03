@@ -1,4 +1,4 @@
-import type { Application, ApplicationCreate, ApplicationUpdate, Filters, JobDetail, JobListResponse } from './types'
+import type { Application, ApplicationCreate, ApplicationUpdate, Filters, JobDetail, JobListResponse, ManualJobCreate } from './types'
 
 // Empty in dev/prod (Vite proxy + Azure SWA both handle /api/* routing).
 // Set VITE_API_URL only if calling the backend directly without a proxy.
@@ -47,6 +47,17 @@ export async function deleteApplication(dedupHash: string): Promise<void> {
     method: 'DELETE',
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+}
+
+export async function createManualJob(body: ManualJobCreate): Promise<Application> {
+  const res = await fetch(`${API_BASE}/api/jobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 409) throw new Error('409: Job already exists')
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<Application>
 }
 
 export async function updateApplication(dedupHash: string, body: ApplicationUpdate): Promise<Application> {

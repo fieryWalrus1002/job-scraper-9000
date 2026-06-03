@@ -125,6 +125,17 @@ class ApplicationCreate(BaseModel):
     notes: str | None = None
 
 
+class ManualJobCreate(BaseModel):
+    title: str
+    fit_score: int
+    company: str | None = None
+    source_url: str | None = None
+    description: str | None = None
+    location: str | None = None
+    posted_at: date | None = None
+    status: ApplicationStatus = "saved"
+
+
 class ApplicationUpdate(BaseModel):
     status: ApplicationStatus | None = None
     applied_at: date | None = None

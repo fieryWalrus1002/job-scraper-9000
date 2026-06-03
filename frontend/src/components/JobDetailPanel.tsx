@@ -4,6 +4,8 @@ import { fetchJobDetail } from '../api'
 import type { AiFitDetail, Application, ApplicationStatus } from '../types'
 import { APPLICATION_STATUSES } from '../types'
 import { useDeleteApplication, useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
+import styles from './JobDetailPanel.module.css'
+
 
 interface Props {
   dedupHash: string | null
@@ -42,10 +44,10 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
   }
 
   return (
-    <div className="app-tracking">
-      <div className="detail-field">
-        <div className="detail-field-label">Status</div>
-        <div className="app-status-buttons">
+    <div className={styles['app-tracking']}>
+      <div className={styles['detail-field']}>
+        <div className={styles['detail-field-label']}>Status</div>
+        <div className={styles['app-status-buttons']}>
           {APPLICATION_STATUSES.map((s) => (
             <button
               key={s}
@@ -58,10 +60,10 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
           ))}
         </div>
       </div>
-      <div className="detail-field">
-        <div className="detail-field-label">Notes</div>
+      <div className={styles['detail-field']}>
+        <div className={styles['detail-field-label']}>Notes</div>
         <textarea
-          className="app-notes"
+          className={"app-notes"}
           value={notes}
           rows={4}
           placeholder="Add notes…"
@@ -70,9 +72,9 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
         />
       </div>
       {application && (
-        <div className="detail-meta-row" style={{ marginTop: 8 }}>
-          <span className="detail-meta-label">Last updated</span>
-          <span className="detail-meta-value text-muted">{application.updated_at}</span>
+        <div className={styles['detail-meta-row']} style={{ marginTop: 8 }}>
+          <span className={styles['detail-meta-label']}>Last updated</span>
+          <span className={styles['detail-meta-value']}>{application.updated_at}</span>
           <button
             className="btn btn--danger btn--sm"
             disabled={isPending}
@@ -100,15 +102,15 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="detail-section">
-      <button className="detail-section-header" onClick={() => setOpen((v) => !v)}>
+    <div className={styles['detail-section']}>
+      <button className={styles['detail-section-header']} onClick={() => setOpen((v) => !v)}>
         <span>{title}</span>
-        <span className="detail-section-header-right">
+        <span className={styles['detail-section-header-right']}>
           {badge}
-          <span className="filter-toggle-arrow">{open ? '▴' : '▾'}</span>
+          <span className={styles['filter-toggle-arrow']}>{open ? '▴' : '▾'}</span>
         </span>
       </button>
-      {open && <div className="detail-section-body">{children}</div>}
+      {open && <div className={styles['detail-section-body']}>{children}</div>}
     </div>
   )
 }
@@ -117,7 +119,7 @@ function BulletList({ items, className }: { items: unknown; className?: string }
   const arr = Array.isArray(items)
     ? items.filter((v): v is string => typeof v === 'string')
     : []
-  if (arr.length === 0) return <span className="text-muted">None</span>
+  if (arr.length === 0) return <span className={"text-muted"}>None</span>
   return (
     <ul className={`detail-bullet-list ${className ?? ''}`}>
       {arr.map((item, i) => <li key={`${i}-${item}`}>{item}</li>)}
@@ -126,37 +128,37 @@ function BulletList({ items, className }: { items: unknown; className?: string }
 }
 
 function SkillsFitSection({ ai }: { ai: AiFitDetail | null }) {
-  if (!ai) return <p className="text-muted">No skills fit data available.</p>
+  if (!ai) return <p className={"text-muted"}>No skills fit data available.</p>
   return (
-    <div className="detail-skills-fit">
+    <div className={styles['detail-skills-fit']}>
       {ai.score_rationale && (
-        <div className="detail-field">
-          <div className="detail-field-label">Rationale</div>
-          <div className="detail-rationale">{ai.score_rationale}</div>
+        <div className={styles['detail-field']}>
+          <div className={styles['detail-field-label']}>Rationale</div>
+          <div className={styles['detail-rationale']}>{ai.score_rationale}</div>
         </div>
       )}
       {!!ai.core_job_duties?.length && (
-        <div className="detail-field">
-          <div className="detail-field-label">Core Duties</div>
+        <div className={styles['detail-field']}>
+          <div className={styles['detail-field-label']}>Core Duties</div>
           <BulletList items={ai.core_job_duties} />
         </div>
       )}
       {!!ai.top_matches?.length && (
-        <div className="detail-field">
-          <div className="detail-field-label">Matches</div>
-          <BulletList items={ai.top_matches} className="detail-bullet-list--good" />
+        <div className={styles['detail-field']}>
+          <div className={styles['detail-field-label']}>Matches</div>
+          <BulletList items={ai.top_matches} className={styles['detail-bullet-list--good']} />
         </div>
       )}
       {!!ai.gaps?.length && (
-        <div className="detail-field">
-          <div className="detail-field-label">Gaps</div>
-          <BulletList items={ai.gaps} className="detail-bullet-list--warn" />
+        <div className={styles['detail-field']}>
+          <div className={styles['detail-field-label']}>Gaps</div>
+          <BulletList items={ai.gaps} className={styles['detail-bullet-list--warn']} />
         </div>
       )}
       {!!ai.hard_concerns?.length && (
-        <div className="detail-field">
-          <div className="detail-field-label">Hard Concerns</div>
-          <BulletList items={ai.hard_concerns} className="detail-bullet-list--bad" />
+        <div className={styles['detail-field']}>
+          <div className={styles['detail-field-label']}>Hard Concerns</div>
+          <BulletList items={ai.hard_concerns} className={styles['detail-bullet-list--bad']} />
         </div>
       )}
     </div>
@@ -192,9 +194,9 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
     : 'badge--muted'
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="presentation">
+    <div className={styles['modal-overlay']} onClick={onClose} role="presentation">
       <div
-        className="job-detail-panel"
+        className={styles['job-detail-panel']}
         role="dialog"
         aria-modal="true"
         aria-labelledby="job-detail-title"
@@ -202,15 +204,15 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
       >
 
         {/* ── Header ───────────────────────────────── */}
-        <div className="job-detail-header">
-          <div className="job-detail-header-main">
-            <h2 id="job-detail-title" className="job-detail-title">{data?.title ?? '—'}</h2>
-            <div className="job-detail-meta">
+        <div className={styles['job-detail-header']}>
+          <div className={styles['job-detail-header-main']}>
+            <h2 id="job-detail-title" className={styles['job-detail-title']}>{data?.title ?? '—'}</h2>
+            <div className={styles['job-detail-meta']}>
               <span>{data?.company ?? '—'}</span>
               {data?.location && <><span className="text-muted">·</span><span>{data.location}</span></>}
               {data?.posted_at && <><span className="text-muted">·</span><span className="text-muted">{data.posted_at}</span></>}
             </div>
-            <div className="job-detail-badges">
+            <div className={styles['job-detail-badges']}>
               {data?.fit_score != null && (
                 <span className={`badge ${scoreClass}`}>Score {data.fit_score}</span>
               )}
@@ -234,7 +236,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               )}
             </div>
           </div>
-          <div className="job-detail-header-actions">
+          <div className={styles['job-detail-header-actions']}>
             {data?.source_url && (
               <a
                 className="btn"
@@ -250,7 +252,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
         </div>
 
         {/* ── Body ─────────────────────────────────── */}
-        <div className="job-detail-body">
+        <div className={styles['job-detail-body']}>
           {isLoading && <div className="status-msg">Loading…</div>}
           {isError && (
             <div className="status-msg status-msg--error">
@@ -261,8 +263,8 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
           {data && (
             <>
               <Section title="Description">
-                <pre className="detail-description">
-                  {data.description ?? <span className="text-muted">No description available.</span>}
+                <pre className={styles['detail-description']}>
+                  {data.description ?? <span className={"text-muted"}>No description available.</span>}
                 </pre>
               </Section>
 
@@ -276,7 +278,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               </Section>
 
               <Section title="Eval Correction" defaultOpen={false}>
-                <div className="detail-placeholder">
+                <div className={styles['detail-placeholder']}>
                   Mark scoring errors and add corrections for gold dataset export.
                   <span className="filter-label-note" style={{ marginLeft: 6 }}>coming soon</span>
                 </div>
@@ -287,7 +289,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               </Section>
 
               <Section title="Dev Metadata" defaultOpen={false}>
-                <div className="detail-meta-grid">
+                <div className={styles['detail-meta-grid']}>
                   {[
                     ['Model', data.model],
                     ['Provider', data.provider],
@@ -298,9 +300,9 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                     ['Source', data.source],
                     ['Source job ID', data.source_job_id],
                   ].map(([label, value]) => (
-                    <div key={label} className="detail-meta-row">
-                      <span className="detail-meta-label">{label}</span>
-                      <span className="detail-meta-value">{value ?? '—'}</span>
+                    <div key={label} className={styles['detail-meta-row']}>
+                      <span className={styles['detail-meta-label']}>{label}</span>
+                      <span className={styles['detail-meta-value']}>{value ?? '—'}</span>
                     </div>
                   ))}
                 </div>

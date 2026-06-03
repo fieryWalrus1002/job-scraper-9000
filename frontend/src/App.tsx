@@ -9,7 +9,8 @@ import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
 import JobDetailPanel from './components/JobDetailPanel'
 import SummaryTab from './components/SummaryTab'
-import WorkflowTab from './components/WorkflowTab'
+import WorkflowTab from './components/WorkflowTab/WorkflowTab'
+import AddJobModal from './components/AddJobModal'
 
 export default function App() {
   const [urlParams, setUrlParams] = useSearchParams()
@@ -18,6 +19,7 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [selectedHash, setSelectedHash] = useState<string | null>(null)
   const [paneOpen, setPaneOpen] = useState(true)
+  const [addJobOpen, setAddJobOpen] = useState(false)
 
   const { data, isLoading, isError, error } = useJobs(filters)
   const { visible, toggle } = useColumnConfig()
@@ -61,6 +63,7 @@ export default function App() {
             Summary
           </button>
         </nav>
+        <button className="btn btn--sm" onClick={() => setAddJobOpen(true)}>+ Add job</button>
       </header>
 
       <div className="app-body">
@@ -121,6 +124,13 @@ export default function App() {
           dedupHash={selectedHash}
           onClose={() => setSelectedHash(null)}
           application={applications?.get(selectedHash)}
+        />
+      )}
+
+      {addJobOpen && (
+        <AddJobModal
+          onClose={() => setAddJobOpen(false)}
+          onSuccess={() => { setAddJobOpen(false); setTab('workflow') }}
         />
       )}
     </div>

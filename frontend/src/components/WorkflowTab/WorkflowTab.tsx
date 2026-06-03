@@ -1,65 +1,74 @@
 import { useState } from 'react'
-import { useApplications, useDeleteApplication, useUpdateApplication } from '../hooks/useApplications'
-import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from '../types'
+import { useApplications, useDeleteApplication, useUpdateApplication } from '../../hooks/useApplications'
+import { APPLICATION_STATUSES, type Application, type ApplicationStatus, STATUS_LABELS } from '../../types'
+import { FilterBar } from './FilterBar'
+import styles from './WorkflowTab.module.css'
 
 const ARCHIVED_STATUSES: ApplicationStatus[] = ['rejected', 'withdrawn', 'hired', 'ghosted']
-
-const STATUS_LABELS: Record<string, string> = {
-  saved: 'Saved',
-  maybe: 'Maybe',
-  to_apply: 'To Apply',
-  applied: 'Applied',
-  screening: 'Screening',
-  interview: 'Interview',
-  offer: 'Offer',
-  rejected: 'Rejected',
-  withdrawn: 'Withdrawn',
-  hired: 'Hired!',
-  ghosted: 'Ghosted',
-}
+const IN_PROGRESS_STATUSES: ApplicationStatus[] = ['applied', 'screening', 'interview', 'offer']
 
 type SortCol = 'status' | 'title' | 'score' | 'updated'
 type SortDir = 'asc' | 'desc'
 
+interface Props {
+  onSelectJob: (hash: string) => void
+}
+
 function sortApplications(rows: Application[], col: SortCol, dir: SortDir): Application[] {
-  const sorted = [...rows].sort((a, b) => {
+  return [...rows].sort((a, b) => {
     let cmp = 0
     switch (col) {
       case 'status':  cmp = (a.status ?? '').localeCompare(b.status ?? ''); break
       case 'title':   cmp = (a.title ?? '').localeCompare(b.title ?? ''); break
       case 'score':   cmp = (a.fit_score ?? -1) - (b.fit_score ?? -1); break
-      case 'updated': cmp = a.updated_at.localeCompare(b.updated_at); break
+      case 'updated': cmp = (a.updated_at ?? '').localeCompare(b.updated_at ?? ''); break
     }
     return dir === 'asc' ? cmp : -cmp
   })
-  return sorted
-}
-
-interface Props {
-  onSelectJob: (hash: string) => void
 }
 
 export default function WorkflowTab({ onSelectJob }: Props) {
   const { data: applications, isLoading } = useApplications()
   const update = useUpdateApplication()
   const del = useDeleteApplication()
+
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all')
   const [showArchived, setShowArchived] = useState(false)
+  const [showOnlyInProgress, setShowOnlyInProgress] = useState(false)
   const [sortCol, setSortCol] = useState<SortCol>('updated')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   if (isLoading) return <div className="status-msg">Loading…</div>
 
-  const all = Array.from(applications?.values() ?? [])
-  const active = showArchived ? all : all.filter((a) => !ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
-  const filtered = filter === 'all' ? active : active.filter((a) => a.status === filter)
-  const visible = sortApplications(filtered, sortCol, sortDir)
+  // const all = Array.from(applications?.values() ?? [])
+  const all = Array.from(applications?.values() ?? []) as Application[]
 
+  // 1. Calculate overall global pool metrics for button counts
+  const archivedCount = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus)).length
+  const inProgressCount = all.filter((a) => IN_PROGRESS_STATUSES.includes(a.status as ApplicationStatus)).length
+
+  // 2. Core Data Pipeline: Determine the base bucket array based on active toggle state
+  let bucketFiltered = all
+  if (showArchived) {
+    // If showing archived view, isolate to archived statuses
+    bucketFiltered = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
+  } else if (showOnlyInProgress) {
+    // If showing "In Progress" view, isolate strictly to active tracking pipeline
+    bucketFiltered = all.filter((a) => IN_PROGRESS_STATUSES.includes(a.status as ApplicationStatus))
+  } else {
+    // Default base view: Show all active, unarchived listings
+    bucketFiltered = all.filter((a) => !ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
+  }
+
+  // 3. Calculate dynamic sub-counts relative ONLY to the currently selected context pool
   const counts = APPLICATION_STATUSES.reduce<Record<string, number>>((acc, s) => {
-    acc[s] = active.filter((a) => a.status === s).length
+    acc[s] = bucketFiltered.filter((a) => a.status === s).length
     return acc
   }, {})
-  const archivedCount = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus)).length
+
+  // 4. Final step: Apply specific sub-tab selection matching, then sort the array
+  const filtered = filter === 'all' ? bucketFiltered : bucketFiltered.filter((a) => a.status === filter)
+  const visible = sortApplications(filtered, sortCol, sortDir)
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {
@@ -76,31 +85,20 @@ export default function WorkflowTab({ onSelectJob }: Props) {
   }
 
   return (
-    <div className="workflow-tab">
-      <div className="workflow-filters">
-        <button
-          className={`workflow-filter-btn${filter === 'all' ? ' workflow-filter-btn--active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All ({active.length})
-        </button>
-        {APPLICATION_STATUSES.filter((s) => counts[s] > 0).map((s) => (
-          <button
-            key={s}
-            className={`workflow-filter-btn${filter === s ? ' workflow-filter-btn--active' : ''}`}
-            onClick={() => setFilter(s as ApplicationStatus)}
-          >
-            {STATUS_LABELS[s]} ({counts[s]})
-          </button>
-        ))}
-        <button
-          className={`workflow-filter-btn workflow-filter-btn--archive${showArchived ? ' workflow-filter-btn--active' : ''}`}
-          disabled={archivedCount === 0}
-          onClick={() => { setShowArchived((v) => !v); setFilter('all') }}
-        >
-          {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
-        </button>
-      </div>
+    <div className={styles['workflow-tab']}>
+
+      <FilterBar
+        filter={filter}
+        setFilter={setFilter}
+        showArchived={showArchived}
+        setShowArchived={setShowArchived}
+        showOnlyInProgress={showOnlyInProgress}
+        setShowOnlyInProgress={setShowOnlyInProgress}
+        counts={counts}
+        allCount={all.length}
+        archivedCount={archivedCount}
+        inProgressCount={inProgressCount}
+      />
 
       {visible.length === 0 ? (
         <div className="empty-state">
@@ -110,7 +108,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
         </div>
       ) : (
         <div className="table-wrapper">
-        <table className="job-table workflow-table">
+        <table className={`job-table ${styles['workflow-table']}`}>
           <colgroup>
             <col style={{ width: '160px' }} />
             <col style={{ width: '40%' }} />
@@ -146,7 +144,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
               >
                 <td>
                   <select
-                    className="workflow-status-select"
+                    className={styles['workflow-status-select']}
                     value={app.status}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
@@ -181,12 +179,12 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                   </span>
                 </td>
                 <td>
-                  <span className="workflow-cell-truncate text-muted" style={{ fontSize: 11 }}>
+                  <span className={styles['workflow-cell-truncate'] + ' ' + styles['text-muted']} style={{ fontSize: 11 }}>
                     {new Date(app.updated_at).toLocaleDateString()}
                   </span>
                 </td>
                 <td>
-                  <span className="workflow-cell-truncate" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <span className={styles['workflow-cell-truncate']} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {app.notes ?? '—'}
                   </span>
                 </td>
