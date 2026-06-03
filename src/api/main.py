@@ -10,7 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from .schemas import JobDetail, JobListResponse, JobSummary
+from .schemas import (
+    APPLICATION_STATUSES,
+    Application,
+    ApplicationCreate,
+    ApplicationUpdate,
+    JobDetail,
+    JobListResponse,
+    JobSummary,
+)
 
 _pool: AsyncConnectionPool | None = None
 
@@ -191,6 +199,67 @@ async def get_job(dedup_hash: str, pool: Pool):
         raise HTTPException(status_code=404, detail="Job not found")
 
     return JobDetail.model_validate(row)
+
+
+@router.get("/applications", response_model=list[Application])
+async def list_applications(pool: Pool):
+    sql = """
+        SELECT
+            a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
+            j.title, j.company, j.fit_score, j.source_url
+        FROM app.user_applications a
+        LEFT JOIN raw.scored_job_postings j USING (dedup_hash)
+        ORDER BY a.updated_at DESC
+    """
+    async with pool.connection() as conn:
+        cur = await conn.execute(sql)
+        rows = await cur.fetchall()
+    return [Application.model_validate(r) for r in rows]
+
+
+@router.post("/applications", response_model=Application, status_code=201)
+async def create_application(body: ApplicationCreate, pool: Pool):
+    if body.status not in APPLICATION_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status: {body.status}")
+    sql = """
+        INSERT INTO app.user_applications (dedup_hash, status, applied_at, notes)
+        VALUES (%(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
+        ON CONFLICT (dedup_hash) DO UPDATE
+            SET status     = EXCLUDED.status,
+                applied_at = EXCLUDED.applied_at,
+                notes      = EXCLUDED.notes,
+                updated_at = now()
+        RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+    """
+    async with pool.connection() as conn:
+        cur = await conn.execute(sql, body.model_dump())
+        row = await cur.fetchone()
+    return Application.model_validate(row)
+
+
+@router.patch("/applications/{dedup_hash}", response_model=Application)
+async def update_application(dedup_hash: str, body: ApplicationUpdate, pool: Pool):
+    if body.status is not None and body.status not in APPLICATION_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status: {body.status}")
+
+    updates: dict = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=422, detail="No fields to update")
+
+    set_clause = ", ".join(f"{k} = %({k})s" for k in updates)
+    updates["dedup_hash"] = dedup_hash
+    sql = f"""
+        UPDATE app.user_applications
+        SET {set_clause}, updated_at = now()
+        WHERE dedup_hash = %(dedup_hash)s
+        RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+    """
+    async with pool.connection() as conn:
+        cur = await conn.execute(sql, updates)  # type: ignore[arg-type]
+        row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return Application.model_validate(row)
 
 
 app.include_router(router)

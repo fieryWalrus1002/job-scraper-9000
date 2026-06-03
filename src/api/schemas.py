@@ -72,3 +72,44 @@ class JobListResponse(BaseModel):
     limit: int
     offset: int
     items: list[JobSummary]
+
+
+APPLICATION_STATUSES = [
+    "saved",
+    "maybe",
+    "to_apply",
+    "applied",
+    "screening",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
+    "hired",
+]
+
+
+class Application(BaseModel):
+    dedup_hash: str
+    status: str
+    applied_at: date | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+    # joined from raw.scored_job_postings
+    title: str | None = None
+    company: str | None = None
+    fit_score: int | None = None
+    source_url: str | None = None
+
+
+class ApplicationCreate(BaseModel):
+    dedup_hash: str
+    status: str = "saved"
+    applied_at: date | None = None
+    notes: str | None = None
+
+
+class ApplicationUpdate(BaseModel):
+    status: str | None = None
+    applied_at: date | None = None
+    notes: str | None = None

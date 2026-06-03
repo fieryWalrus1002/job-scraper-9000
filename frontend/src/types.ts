@@ -6,6 +6,16 @@ export type JobSummary = components['schemas']['JobSummary']
 export type JobDetail = components['schemas']['JobDetail']
 export type JobListResponse = components['schemas']['JobListResponse']
 export type AiFitDetail = components['schemas']['AiFitDetail']
+export type Application = components['schemas']['Application']
+export type ApplicationCreate = components['schemas']['ApplicationCreate']
+export type ApplicationUpdate = components['schemas']['ApplicationUpdate']
+
+export const APPLICATION_STATUSES = [
+  'saved', 'maybe', 'to_apply', 'applied',
+  'screening', 'interview', 'offer',
+  'rejected', 'withdrawn', 'hired',
+] as const
+export type ApplicationStatus = typeof APPLICATION_STATUSES[number]
 
 // Frontend-only — not part of the API schema.
 export interface Filters {

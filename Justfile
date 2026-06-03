@@ -43,6 +43,9 @@ backend:
     @echo "Starting FastAPI backend on port 8000..."
     uv run uvicorn src.api.main:app --reload --port 8000
 
+migrate:
+    uv run alembic upgrade head
+
 db-up:
     docker compose up db -d
 
