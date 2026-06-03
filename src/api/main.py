@@ -144,7 +144,7 @@ async def list_jobs(
         params["min_salary_usd"] = min_salary_usd
     if max_salary_usd is not None:
         filters.append(
-            "(salary_min_usd <= %(max_salary_usd)s OR salary_min_usd IS NULL)"
+            "(COALESCE(salary_max_usd, salary_min_usd) <= %(max_salary_usd)s OR salary_min_usd IS NULL)"
         )
         params["max_salary_usd"] = max_salary_usd
     if search is not None:
