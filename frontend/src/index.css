@@ -234,6 +234,10 @@ body { min-height: 100svh; }
 .btn:disabled { opacity: 0.4; cursor: default; }
 .btn--ghost { background: transparent; border-color: transparent; }
 .btn--ghost:hover { background: var(--bg-hover); border-color: var(--border); }
+.btn--sm { height: 24px; padding: 0 8px; font-size: 12px; }
+.btn--icon { height: 24px; width: 24px; padding: 0; font-size: 14px; line-height: 1; }
+.btn--danger { color: var(--text-muted); }
+.btn--danger:hover { color: #e05252; border-color: #e05252; background: var(--bg); }
 
 /* ── Column toggle ───────────────────────────── */
 
@@ -272,6 +276,7 @@ body { min-height: 100svh; }
 
 .job-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -296,13 +301,32 @@ body { min-height: 100svh; }
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
-  max-width: 0;
+  overflow: hidden;
 }
 
-.col-rank { width: 44px; text-align: right; }
+.col-rank { width: 44px; max-width: 44px; text-align: right; }
 
 .col-sortable { cursor: pointer; user-select: none; }
 .col-sortable:hover { color: var(--text); }
+
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 6px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+  z-index: 1;
+}
+.col-resize-handle--left {
+  right: auto;
+  left: -3px;
+  width: 6px;
+}
+.col-resize-handle:hover,
+.col-resize-handle:active { background: var(--accent); opacity: 0.5; }
 
 .sort-indicator { color: var(--text-muted); font-size: 10px; }
 .sort-indicator--active { color: var(--accent); }
@@ -589,7 +613,7 @@ body { min-height: 100svh; }
 
 /* quick-mark buttons on job rows */
 
-.col-track { width: 180px; }
+.col-track { width: 220px; min-width: 220px; max-width: 220px; }
 
 .quick-mark { display: flex; gap: 4px; }
 
@@ -690,6 +714,7 @@ body { min-height: 100svh; }
 }
 .workflow-filter-btn:hover { border-color: var(--accent); color: var(--text); }
 .workflow-filter-btn--active { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
+.workflow-filter-btn--archive { opacity: 0.6; font-style: italic; }
 
 .workflow-table {
   table-layout: fixed;

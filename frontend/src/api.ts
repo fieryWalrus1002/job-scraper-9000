@@ -42,6 +42,13 @@ export async function createApplication(body: ApplicationCreate): Promise<Applic
   return res.json() as Promise<Application>
 }
 
+export async function deleteApplication(dedupHash: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+}
+
 export async function updateApplication(dedupHash: string, body: ApplicationUpdate): Promise<Application> {
   const res = await fetch(`${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}`, {
     method: 'PATCH',
