@@ -23,7 +23,7 @@ export default function FilterPane({
   total,
 }: Props) {
   const [colsOpen, setColsOpen] = useState(false)
-  const [remoteOpen, setRemoteOpen] = useState(true)
+  const [remoteOpen, setRemoteOpen] = useState(false)
 
   type StringFilterKey = 'minScore' | 'maxScore' | 'minPostedAt' | 'maxPostedAt' | 'company' | 'minSalaryK'
 

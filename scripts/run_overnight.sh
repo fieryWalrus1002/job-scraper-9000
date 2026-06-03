@@ -40,4 +40,6 @@ uv run job-scraper-9000 prefilter --run-date "$RUN_DATE"
 uv run job-scraper-9000 remote-filter --run-date "$RUN_DATE"
 uv run job-scraper-9000 skills-fit --run-date "$RUN_DATE"
 
+uv run scripts/db_ingest.py --run-date "$RUN_DATE"
+
 echo "=== Pipeline finished successfully at $(date) ==="
