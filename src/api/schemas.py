@@ -15,6 +15,9 @@ class JobSummary(BaseModel):
     location: str | None
     posted_at: date | None
     remote_classification: str | None
+    salary_min_usd: int | None
+    salary_max_usd: int | None
+    salary_period: str | None
     fit_score: int | None
     confidence: str | None
     score_rationale: str | None
@@ -46,6 +49,9 @@ class JobDetail(BaseModel):
     description: str | None
     scraped_at: datetime | None
     remote_classification: str | None
+    salary_min_usd: int | None
+    salary_max_usd: int | None
+    salary_period: str | None
     fit_score: int | None
     confidence: str | None
     score_rationale: str | None

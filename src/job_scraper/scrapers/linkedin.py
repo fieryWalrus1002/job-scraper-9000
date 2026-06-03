@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import requests
 from bs4 import BeautifulSoup
 
+from utils.salary import extract_salary
+
 from ..models import JobPosting
 from ..pii import scrub
 from ..query import LinkedInSearchQuery
@@ -110,6 +112,7 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
                     description, scrub_counts = scrub(raw)
                     self._sleep()
 
+                salary = extract_salary(description)
                 job = JobPosting(
                     source=self.source_name,
                     source_job_id=stub["source_job_id"],
@@ -122,6 +125,9 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
                     scraped_at=datetime.now(timezone.utc).isoformat(),
                     scrub_counts=scrub_counts,
                     search_params=_search_params(self.query),
+                    salary_min_usd=salary.salary_min_usd if salary else None,
+                    salary_max_usd=salary.salary_max_usd if salary else None,
+                    salary_period=salary.salary_period if salary else None,
                 )
                 job.compute_hash()
                 all_jobs.append(job)

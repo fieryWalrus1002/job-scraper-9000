@@ -81,6 +81,15 @@ CREATE INDEX IF NOT EXISTS idx_scored_jobs_scored_at
 CREATE INDEX IF NOT EXISTS idx_scored_jobs_run_id
     ON raw.scored_job_postings (run_id);
 
+-- Salary columns added after initial schema; ALTER is idempotent on existing DBs.
+ALTER TABLE raw.scored_job_postings
+    ADD COLUMN IF NOT EXISTS salary_min_usd  INTEGER,
+    ADD COLUMN IF NOT EXISTS salary_max_usd  INTEGER,
+    ADD COLUMN IF NOT EXISTS salary_period   TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_scored_jobs_salary_min
+    ON raw.scored_job_postings (salary_min_usd);
+
 COMMENT ON TABLE raw.scored_job_postings IS
     'Append-only landing table for ScoredJobPosting records from the skills-fit pipeline. '
     'Written by scripts/db_ingest.py; read-only for dbt (declared as a source in sources.yml).';

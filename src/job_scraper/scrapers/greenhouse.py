@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 import requests
 
+from utils.salary import extract_salary
+
 from ..models import JobPosting
 from ..pii import scrub
 from .base import BaseScraper
@@ -56,6 +58,7 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
             elif isinstance(loc, str):
                 location = loc
 
+            salary = extract_salary(description)
             job = JobPosting(
                 source=self.source_name,
                 source_job_id=str(item.get("id", "")),
@@ -68,6 +71,9 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
                 search_params={"board_token": self.query.board_token},
+                salary_min_usd=salary.salary_min_usd if salary else None,
+                salary_max_usd=salary.salary_max_usd if salary else None,
+                salary_period=salary.salary_period if salary else None,
             )
             job.compute_hash()
             jobs.append(job)

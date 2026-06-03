@@ -119,6 +119,9 @@ class ScoredJobPosting(BaseModel):
     description: str | None = None
     scraped_at: datetime | None = None
     remote_classification: RemoteClassification | None = None
+    salary_min_usd: int | None = None
+    salary_max_usd: int | None = None
+    salary_period: str | None = None
     pipeline_metadata: dict[str, Any] = Field(default_factory=dict)
     ai_fit: SkillsFitAnalysis | None = None
     metadata: JobMetadata
