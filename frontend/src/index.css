@@ -303,7 +303,7 @@ body { min-height: 100svh; }
   max-width: 0;
 }
 
-.col-rank { width: 44px; text-align: right; }
+.col-rank { width: 44px; max-width: 44px; text-align: right; }
 
 .col-sortable { cursor: pointer; user-select: none; }
 .col-sortable:hover { color: var(--text); }
@@ -606,7 +606,7 @@ body { min-height: 100svh; }
 
 /* quick-mark buttons on job rows */
 
-.col-track { width: 220px; min-width: 220px; }
+.col-track { width: 220px; min-width: 220px; max-width: 220px; }
 
 .quick-mark { display: flex; gap: 4px; }
 
