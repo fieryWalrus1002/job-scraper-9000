@@ -138,10 +138,14 @@ async def list_jobs(
         filters.append("posted_at <= %(max_posted_at)s")
         params["max_posted_at"] = max_posted_at
     if min_salary_usd is not None:
-        filters.append("salary_min_usd >= %(min_salary_usd)s")
+        filters.append(
+            "(salary_min_usd >= %(min_salary_usd)s OR salary_min_usd IS NULL)"
+        )
         params["min_salary_usd"] = min_salary_usd
     if max_salary_usd is not None:
-        filters.append("salary_min_usd <= %(max_salary_usd)s")
+        filters.append(
+            "(salary_min_usd <= %(max_salary_usd)s OR salary_min_usd IS NULL)"
+        )
         params["max_salary_usd"] = max_salary_usd
     if search is not None:
         filters.append("(title ILIKE %(search)s OR description ILIKE %(search)s)")
