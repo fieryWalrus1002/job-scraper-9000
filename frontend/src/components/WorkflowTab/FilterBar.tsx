@@ -1,6 +1,6 @@
+
 import { APPLICATION_STATUSES, type ApplicationStatus, STATUS_LABELS} from '../../types'
-
-
+import { cn } from '@/lib/utils'
 
 interface FilterBarProps {
   filter: ApplicationStatus | 'all'
@@ -15,6 +15,13 @@ interface FilterBarProps {
   inProgressCount: number
 }
 
+const filterBtn =
+  'h-[28px] px-2.5 bg-transparent border border-transparent rounded-md text-muted text-[12px] font-medium cursor-pointer whitespace-nowrap transition-all ' +
+  'hover:bg-hover hover:text-fg disabled:opacity-30 disabled:cursor-default'
+const filterBtnActive = 'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+const countCls = 'ml-1 text-[11px] font-mono text-faint'
+const countActive = 'text-primary-hov/80'
+
 export function FilterBar({
   filter,
   setFilter,
@@ -28,49 +35,54 @@ export function FilterBar({
   inProgressCount,
 }: FilterBarProps) {
   return (
-    <div className="workflow-filters">
+    <div className="flex items-center gap-1 px-4 py-2.5 border-b border-border shrink-0 bg-card/30">
       {/* 1. All Active View Button */}
       <button
-        className={`workflow-filter-btn${(!showOnlyInProgress && !showArchived) ? ' workflow-filter-btn--active' : ''}`}
+        className={cn(filterBtn, !showOnlyInProgress && !showArchived && filterBtnActive)}
         onClick={() => {
           setShowOnlyInProgress(false)
           setShowArchived(false)
           setFilter('all')
         }}
       >
-        Active ({allCount - archivedCount})
+        Active
+        <span className={cn(countCls, !showOnlyInProgress && !showArchived && countActive)}>
+          {allCount - archivedCount}
+        </span>
       </button>
 
       {/* 2. In Progress View Button */}
       <button
-        className={`workflow-filter-btn${showOnlyInProgress ? ' workflow-filter-btn--active' : ''}`}
+        className={cn(filterBtn, showOnlyInProgress && filterBtnActive)}
         onClick={() => {
           setShowOnlyInProgress(true)
           setShowArchived(false)
           setFilter('all')
         }}
       >
-        In Progress ({inProgressCount})
+        In Progress
+        <span className={cn(countCls, showOnlyInProgress && countActive)}>
+          {inProgressCount}
+        </span>
       </button>
 
-      {/* Visual Divider Segment */}
-      <span style={{ borderLeft: '1px solid var(--border)', margin: '0 4px', height: '24px' }} />
+      <span className="border-l border-border mx-1.5 h-5" />
 
       {/* 3. Dynamic Sub-tabs for specific statuses */}
       {APPLICATION_STATUSES.filter((s) => counts[s] > 0).map((s) => (
         <button
           key={s}
-          className={`workflow-filter-btn${filter === s ? ' workflow-filter-btn--active' : ''}`}
+          className={cn(filterBtn, filter === s && filterBtnActive)}
           onClick={() => setFilter(s as ApplicationStatus)}
         >
-          {STATUS_LABELS[s]} ({counts[s]})
+          {STATUS_LABELS[s]}
+          <span className={cn(countCls, filter === s && countActive)}>{counts[s]}</span>
         </button>
       ))}
 
       {/* 4. Archived View Button (Floated Right) */}
       <button
-        className={`workflow-filter-btn workflow-filter-btn--archive${showArchived ? ' workflow-filter-btn--active' : ''}`}
-        style={{ marginLeft: 'auto' }}
+        className={cn(filterBtn, 'ml-auto', showArchived ? filterBtnActive : 'opacity-70')}
         disabled={archivedCount === 0}
         onClick={() => {
           setShowArchived(true)
@@ -78,7 +90,8 @@ export function FilterBar({
           setFilter('all')
         }}
       >
-        Archive ({archivedCount})
+        Archive
+        <span className={cn(countCls, showArchived && countActive)}>{archivedCount}</span>
       </button>
     </div>
   )

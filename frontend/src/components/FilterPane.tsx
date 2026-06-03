@@ -2,6 +2,9 @@ import { useState } from 'react'
 import type { Filters } from '../types'
 import { EMPTY_FILTERS, REMOTE_OPTIONS, hasActiveFilters } from '../lib/filters'
 import { COLUMNS } from '../lib/columns'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface Props {
   filters: Filters
@@ -11,19 +14,63 @@ interface Props {
   visibleColumns: Set<string>
   onToggleColumn: (key: string) => void
   total: number | undefined
+  collapsed?: boolean
 }
 
 const getRelativeDateString = (daysOffset: number) => {
-  const targetDate = new Date();
-  // Shift the date by the offset (e.g., -7 for a week ago)
-  targetDate.setDate(targetDate.getDate() + daysOffset);
+  const targetDate = new Date()
+  targetDate.setDate(targetDate.getDate() + daysOffset)
+  const year = targetDate.getFullYear()
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0')
+  const day = String(targetDate.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-  const year = targetDate.getFullYear();
-  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-  const day = String(targetDate.getDate()).padStart(2, '0');
+const labelCls = 'text-[10px] font-semibold text-muted uppercase tracking-[0.08em]'
+const nativeSelect =
+  'h-8 px-2 bg-bg-elevated border border-border rounded-md text-fg text-[13px] outline-none cursor-pointer ' +
+  'hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 ' +
+  'transition-[color,border-color,box-shadow]'
 
-  return `${year}-${month}-${day}`; // Formats to "YYYY-MM-DD"
-};
+function Section({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('flex flex-col gap-1.5', className)}>{children}</div>
+}
+
+function Disclosure({
+  label,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        className={cn(
+          labelCls,
+          'bg-transparent border-none cursor-pointer flex items-center justify-between gap-1 p-0 w-full text-left hover:text-fg transition-colors',
+        )}
+        onClick={onToggle}
+      >
+        <span>{label}</span>
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          className={cn('transition-transform duration-200', open && 'rotate-90')}
+          aria-hidden="true"
+        >
+          <path d="M3.5 2 L6.5 5 L3.5 8" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && <div className="flex flex-col gap-0.5 pl-px">{children}</div>}
+    </div>
+  )
+}
 
 export default function FilterPane({
   filters,
@@ -33,6 +80,7 @@ export default function FilterPane({
   visibleColumns,
   onToggleColumn,
   total,
+  collapsed = false,
 }: Props) {
   const [colsOpen, setColsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(false)
@@ -51,38 +99,41 @@ export default function FilterPane({
   }
 
   const active = hasActiveFilters(filters) || search.length > 0
-  const defaultMinPostedAt = getRelativeDateString(-14); // Two-week default window
-  const defaultMaxPostedAt = getRelativeDateString(0); // Today
+  const defaultMinPostedAt = getRelativeDateString(-14)
+  const defaultMaxPostedAt = getRelativeDateString(0)
 
   return (
-    <aside className="filter-pane">
-      <div className="filter-group">
-        <label className="filter-label">Search</label>
-        <input
-          className="filter-input"
+    <aside
+      className={cn(
+        'w-[212px] shrink-0 border-r border-border bg-card/40 backdrop-blur-sm px-3 py-3 flex flex-col gap-3 overflow-y-auto transition-[opacity,width] duration-150 ease',
+        collapsed && 'overflow-hidden opacity-0 pointer-events-none w-0 p-0 border-none',
+      )}
+    >
+      <Section>
+        <label className={labelCls}>Search</label>
+        <Input
           type="text"
-          placeholder="title, company, rationale…"
+          placeholder="title, company…"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
-      </div>
+      </Section>
 
-      <div className="filter-group">
-        <label className="filter-label">Company</label>
-        <input
-          className="filter-input"
+      <Section>
+        <label className={labelCls}>Company</label>
+        <Input
           type="text"
           placeholder="e.g. SEL, Google…"
           value={filters.company}
           onChange={(e) => set('company', e.target.value)}
         />
-      </div>
+      </Section>
 
-      <div className="filter-group">
-        <label className="filter-label">Score</label>
-        <div className="filter-range">
+      <Section>
+        <label className={labelCls}>Score</label>
+        <div className="flex items-center gap-1.5">
           <select
-            className="filter-select"
+            className={cn(nativeSelect, 'flex-1')}
             value={filters.minScore}
             onChange={(e) => set('minScore', e.target.value)}
           >
@@ -91,9 +142,9 @@ export default function FilterPane({
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
-          <span className="filter-range-sep">–</span>
+          <span className="text-faint text-xs">–</span>
           <select
-            className="filter-select"
+            className={cn(nativeSelect, 'flex-1')}
             value={filters.maxScore}
             onChange={(e) => set('maxScore', e.target.value)}
           >
@@ -103,89 +154,88 @@ export default function FilterPane({
             ))}
           </select>
         </div>
-      </div>
+      </Section>
 
-      <div className="filter-group">
-        <button
-          className="filter-label filter-label--toggle"
-          onClick={() => setRemoteOpen((v) => !v)}
-        >
-          Remote <span className="filter-toggle-arrow">{remoteOpen ? '▴' : '▾'}</span>
-        </button>
-        {remoteOpen && REMOTE_OPTIONS.filter((o) => o.value).map((o) => (
-          <label key={o.value} className="col-check-item">
+      <Disclosure label="Remote" open={remoteOpen} onToggle={() => setRemoteOpen((v) => !v)}>
+        {REMOTE_OPTIONS.filter((o) => o.value).map((o) => (
+          <label
+            key={o.value}
+            className="flex items-center gap-2 text-[13px] text-fg py-1 cursor-pointer select-none rounded hover:text-fg group"
+          >
             <input
               type="checkbox"
+              className="accent-primary size-3.5"
               checked={filters.remoteClassification.includes(o.value)}
               onChange={() => toggleRemote(o.value)}
             />
-            {o.label}
+            <span className="text-muted group-hover:text-fg transition-colors">{o.label}</span>
           </label>
         ))}
-      </div>
+      </Disclosure>
 
-      <div className="filter-group">
-        <label className="filter-label">Posted from</label>
-        <input
-          className="filter-input"
+      <Section>
+        <label className={labelCls}>Posted</label>
+        <Input
           type="date"
           value={filters.minPostedAt || defaultMinPostedAt}
           onChange={(e) => set('minPostedAt', e.target.value)}
         />
-        <label className="filter-label" style={{ marginTop: 6 }}>to</label>
-        <input
-          className="filter-input"
-          type="date"
-          value={filters.maxPostedAt || defaultMaxPostedAt}
-          onChange={(e) => set('maxPostedAt', e.target.value)}
-        />
-      </div>
+        <div className="flex items-center gap-2 mt-1">
+          <span className={cn(labelCls, 'shrink-0')}>to</span>
+          <Input
+            type="date"
+            value={filters.maxPostedAt || defaultMaxPostedAt}
+            onChange={(e) => set('maxPostedAt', e.target.value)}
+          />
+        </div>
+      </Section>
 
-      <div className="filter-group">
-        <label className="filter-label">Min salary ($k/yr)</label>
-        <input
-          className="filter-input"
+      <Section>
+        <label className={labelCls}>Min salary <span className="text-faint normal-case font-normal">($k/yr)</span></label>
+        <Input
           type="number"
           placeholder="e.g. 120"
           min={0}
           value={filters.minSalaryK}
           onChange={(e) => set('minSalaryK', e.target.value)}
         />
-      </div>
+      </Section>
 
-      <div className="filter-group">
-        <button
-          className="filter-label filter-label--toggle"
-          onClick={() => setColsOpen((v) => !v)}
-        >
-          Columns <span className="filter-toggle-arrow">{colsOpen ? '▴' : '▾'}</span>
-        </button>
-        {colsOpen && COLUMNS.map((col) => (
-          <label key={col.key} className="col-check-item">
+      <div className="border-t border-border/60 -mx-3" />
+
+      <Disclosure label="Columns" open={colsOpen} onToggle={() => setColsOpen((v) => !v)}>
+        {COLUMNS.map((col) => (
+          <label
+            key={col.key}
+            className="flex items-center gap-2 text-[13px] py-1 cursor-pointer select-none group"
+          >
             <input
               type="checkbox"
+              className="accent-primary size-3.5"
               checked={visibleColumns.has(col.key)}
               onChange={() => onToggleColumn(col.key)}
             />
-            {col.label}
+            <span className="text-muted group-hover:text-fg transition-colors">{col.label}</span>
           </label>
         ))}
-      </div>
+      </Disclosure>
 
-      <div className="filter-pane-actions">
+      <div className="flex flex-col gap-1.5 mt-auto pt-2 border-t border-border/60 -mx-3 px-3">
         {total !== undefined && (
-          <div className="filter-count">
-            {total.toLocaleString()} job{total !== 1 ? 's' : ''}
-            {active ? ' matching' : ' total'}
+          <div className="text-[11px] text-muted flex items-baseline gap-1.5 mt-2">
+            <span className="font-mono text-fg tabular-nums">{total.toLocaleString()}</span>
+            <span>job{total !== 1 ? 's' : ''} {active ? 'matching' : 'total'}</span>
           </div>
         )}
         {active && (
-          <button
-            className="btn btn--ghost"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
             onClick={() => { onFiltersChange(EMPTY_FILTERS); onSearchChange('') }}
           >
             Clear filters
-          </button>
+          </Button>
         )}
       </div>
     </aside>
