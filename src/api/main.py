@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal, cast
 
 from dotenv import load_dotenv
@@ -19,6 +20,7 @@ from .schemas import (
     JobDetail,
     JobListResponse,
     JobSummary,
+    ManualJobCreate,
 )
 
 load_dotenv()
@@ -185,6 +187,67 @@ async def list_jobs(
         offset=offset,
         items=[JobSummary.model_validate(r) for r in rows],
     )
+
+
+@router.post("/jobs", response_model=Application, status_code=201)
+async def create_manual_job(body: ManualJobCreate, pool: Pool):
+    key = "|".join(
+        [
+            (body.title or "").lower().strip(),
+            (body.company or "").lower().strip(),
+            (body.source_url or "").lower().strip(),
+        ]
+    )
+    dedup_hash = hashlib.sha256(key.encode()).hexdigest()
+    now = datetime.now(UTC)
+    run_id = f"manual-{now.strftime('%Y-%m-%d-%H%M%S')}"
+
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            """
+            INSERT INTO raw.scored_job_postings
+                (dedup_hash, title, company, source_url, description, location, posted_at,
+                 fit_score, run_id, scored_at, model, provider, profile_version)
+            VALUES
+                (%(dedup_hash)s, %(title)s, %(company)s, %(source_url)s,
+                %(description)s, %(location)s, %(posted_at)s,
+                 %(fit_score)s, %(run_id)s, %(scored_at)s,
+                 'user', 'user', 'user')
+            ON CONFLICT (dedup_hash) DO NOTHING
+            """,
+            {
+                "dedup_hash": dedup_hash,
+                "title": body.title,
+                "company": body.company,
+                "source_url": body.source_url,
+                "description": body.description,
+                "location": body.location,
+                "posted_at": body.posted_at,
+                "fit_score": body.fit_score,
+                "run_id": run_id,
+                "scored_at": now,
+            },
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=409, detail="Job already exists")
+
+        cur = await conn.execute(
+            """
+            INSERT INTO app.user_applications (dedup_hash, status)
+            VALUES (%(dedup_hash)s, %(status)s)
+            ON CONFLICT (dedup_hash) DO UPDATE
+                SET status = EXCLUDED.status, updated_at = now()
+            RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+            """,
+            {"dedup_hash": dedup_hash, "status": body.status},
+        )
+        app_row = cast(dict[str, Any], await cur.fetchone())
+
+    app_row["title"] = body.title
+    app_row["company"] = body.company
+    app_row["fit_score"] = body.fit_score
+    app_row["source_url"] = body.source_url
+    return Application.model_validate(app_row)
 
 
 @router.get("/jobs/{dedup_hash}", response_model=JobDetail)

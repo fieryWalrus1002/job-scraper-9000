@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createApplication, deleteApplication, fetchApplications, updateApplication } from '../api'
-import type { Application, ApplicationStatus, ApplicationUpdate } from '../types'
+import { createApplication, createManualJob, deleteApplication, fetchApplications, updateApplication } from '../api'
+import type { Application, ApplicationStatus, ApplicationUpdate, ManualJobCreate } from '../types'
 
 export function useApplications() {
-  return useQuery({
+  return useQuery<Application[], Error, Map<string, Application>>({
     queryKey: ['applications'],
     queryFn: fetchApplications,
-    select: (data): Map<string, Application> =>
-      new Map(data.map((a) => [a.dedup_hash, a])),
+    select: (data: Application[]) => new Map(data.map((a) => [a.dedup_hash, a])),
   })
 }
 
@@ -33,6 +32,14 @@ export function useDeleteApplication() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (dedupHash: string) => deleteApplication(dedupHash),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['applications'] }),
+  })
+}
+
+export function useCreateManualJob() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ManualJobCreate) => createManualJob(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['applications'] }),
   })
 }
