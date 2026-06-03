@@ -253,7 +253,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
             { label: 'To Apply',         active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }) },
             { label: 'Applied',          active: applications?.get(ctx.job.dedup_hash)?.status === 'applied',  onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied'  }) },
             ...(applications?.has(ctx.job.dedup_hash)
-              ? [{ label: 'Remove tracking', active: false, onClick: () => del(ctx.job.dedup_hash) }]
+              ? [{ label: 'Remove tracking', active: false, onClick: () => { if (window.confirm('Remove tracking for this job?')) del(ctx.job.dedup_hash) } }]
               : []),
           ]}
         />

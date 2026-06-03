@@ -146,7 +146,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                     className="btn btn--icon btn--danger"
                     title="Remove tracking"
                     disabled={del.isPending}
-                    onClick={() => del.mutate(app.dedup_hash)}
+                    onClick={() => { if (window.confirm('Remove tracking for this job?')) del.mutate(app.dedup_hash) }}
                   >×</button>
                 </td>
               </tr>

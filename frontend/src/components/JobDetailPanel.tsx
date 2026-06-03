@@ -76,7 +76,7 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
           <button
             className="btn btn--danger btn--sm"
             disabled={isPending}
-            onClick={() => del.mutate(dedupHash)}
+            onClick={() => { if (window.confirm('Remove tracking for this job?')) del.mutate(dedupHash) }}
             style={{ marginLeft: 'auto' }}
           >
             Remove tracking
