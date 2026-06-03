@@ -17,8 +17,9 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
   const [notes, setNotes] = useState(application?.notes ?? '')
   const isPending = mark.isPending || update.isPending
 
-  // Sync textarea when the application record changes (e.g. after a refetch).
+  // Sync textarea when the application record or job changes (server → local state).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotes(application?.notes ?? '')
   }, [application?.notes, dedupHash])
 

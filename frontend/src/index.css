@@ -304,6 +304,19 @@ body { min-height: 100svh; }
 .col-sortable { cursor: pointer; user-select: none; }
 .col-sortable:hover { color: var(--text); }
 
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+.col-resize-handle:hover,
+.col-resize-handle:active { background: var(--accent); opacity: 0.5; }
+
 .sort-indicator { color: var(--text-muted); font-size: 10px; }
 .sort-indicator--active { color: var(--accent); }
 
