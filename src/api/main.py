@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import date
 from typing import Annotated, Any, Literal, cast
 
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
@@ -19,6 +20,8 @@ from .schemas import (
     JobListResponse,
     JobSummary,
 )
+
+load_dotenv()
 
 _pool: AsyncConnectionPool | None = None
 
