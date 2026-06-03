@@ -13,6 +13,18 @@ interface Props {
   total: number | undefined
 }
 
+const getRelativeDateString = (daysOffset: number) => {
+  const targetDate = new Date();
+  // Shift the date by the offset (e.g., -7 for a week ago)
+  targetDate.setDate(targetDate.getDate() + daysOffset);
+
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const day = String(targetDate.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`; // Formats to "YYYY-MM-DD"
+};
+
 export default function FilterPane({
   filters,
   search,
@@ -39,6 +51,8 @@ export default function FilterPane({
   }
 
   const active = hasActiveFilters(filters) || search.length > 0
+  const oneWeekAgoStr = getRelativeDateString(-7); // Defaults to 7 days ago
+  const todayStr = getRelativeDateString(0);      // Defaults to today
 
   return (
     <aside className="filter-pane">
@@ -115,14 +129,16 @@ export default function FilterPane({
         <input
           className="filter-input"
           type="date"
-          value={filters.minPostedAt}
+          // Falls back to exactly one week ago if empty
+          value={filters.minPostedAt || oneWeekAgoStr}
           onChange={(e) => set('minPostedAt', e.target.value)}
         />
         <label className="filter-label" style={{ marginTop: 6 }}>to</label>
         <input
           className="filter-input"
           type="date"
-          value={filters.maxPostedAt}
+          // Falls back to today if empty
+          value={filters.maxPostedAt || todayStr}
           onChange={(e) => set('maxPostedAt', e.target.value)}
         />
       </div>

@@ -162,7 +162,8 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
     columnResizeMode: 'onChange',
   })
 
-  const dragCol = useRef<string | null>(null)
+  const dragCol    = useRef<string | null>(null)
+  const isResizing = useRef(false)
   const { pageIndex } = table.getState().pagination
   const totalPages = table.getPageCount()
 
@@ -181,42 +182,63 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 <th className="col-rank">#</th>
-                {hg.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    style={header.column.id === 'title'
-                      ? { position: 'relative' }
-                      : { position: 'relative', width: header.getSize(), maxWidth: header.getSize() }}
-                    className="col-sortable"
-                    draggable
-                    onDragStart={() => { dragCol.current = header.column.id }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (!dragCol.current || dragCol.current === header.column.id) return
-                      const order = table.getState().columnOrder
-                      const from = order.indexOf(dragCol.current)
-                      const to   = order.indexOf(header.column.id)
-                      if (from === -1 || to === -1) { dragCol.current = null; return }
-                      const next = [...order]
-                      next.splice(from, 1)
-                      next.splice(to, 0, dragCol.current)
-                      table.setColumnOrder(next)
-                      dragCol.current = null
-                    }}
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    {header.column.getIsSorted() === 'desc' ? ' ↓' : header.column.getIsSorted() === 'asc' ? ' ↑' : <span className="sort-indicator"> ↕</span>}
-                    {header.column.getCanResize() && (
-                      <div
-                        className="col-resize-handle"
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    )}
-                  </th>
-                ))}
+                {hg.headers.map((header, i) => {
+                  const prevHeader = i > 0 ? hg.headers[i - 1] : null
+                  const isLast     = i === hg.headers.length - 1
+                  const startResize = (h: typeof header) => (e: React.MouseEvent) => {
+                    isResizing.current = true
+                    h.getResizeHandler()(e)
+                    const reset = () => { isResizing.current = false; window.removeEventListener('mouseup', reset) }
+                    window.addEventListener('mouseup', reset)
+                  }
+                  return (
+                    <th
+                      key={header.id}
+                      style={{ position: 'relative', width: header.getSize() }}
+                      className="col-sortable"
+                      draggable
+                      onDragStart={(e) => {
+                        if (isResizing.current) { e.preventDefault(); return }
+                        dragCol.current = header.column.id
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (!dragCol.current || dragCol.current === header.column.id) return
+                        const order = table.getState().columnOrder
+                        const from = order.indexOf(dragCol.current)
+                        const to   = order.indexOf(header.column.id)
+                        if (from === -1 || to === -1) { dragCol.current = null; return }
+                        const next = [...order]
+                        next.splice(from, 1)
+                        next.splice(to, 0, dragCol.current)
+                        table.setColumnOrder(next)
+                        dragCol.current = null
+                      }}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      {/* Left-edge handle: resizes the PREVIOUS column — lives inside this th so it's always on top */}
+                      {prevHeader?.column.getCanResize() && (
+                        <div
+                          className="col-resize-handle col-resize-handle--left"
+                          onMouseDown={startResize(prevHeader)}
+                          onTouchStart={(e) => prevHeader.getResizeHandler()(e as unknown as React.MouseEvent)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.column.getIsSorted() === 'desc' ? ' ↓' : header.column.getIsSorted() === 'asc' ? ' ↑' : <span className="sort-indicator"> ↕</span>}
+                      {/* Right-edge handle only on the last visible column (no next th to host a left-edge handle) */}
+                      {isLast && header.column.getCanResize() && (
+                        <div
+                          className="col-resize-handle"
+                          onMouseDown={startResize(header)}
+                          onTouchStart={header.getResizeHandler()}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                    </th>
+                  )
+                })}
                 <th className="col-track">Track</th>
               </tr>
             ))}
@@ -235,9 +257,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                 >
                   <td className="col-rank text-muted">{rank}</td>
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} style={cell.column.id === 'title'
-                      ? {}
-                      : { width: cell.column.getSize(), maxWidth: cell.column.getSize() }}>
+                    <td key={cell.id} style={{ width: cell.column.getSize(), maxWidth: cell.column.getSize() }}>
                       {renderCell(cell.column.id, job)}
                     </td>
                   ))}

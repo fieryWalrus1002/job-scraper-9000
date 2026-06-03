@@ -222,6 +222,16 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                   {data.remote_classification.replace(/_/g, ' ')}
                 </span>
               )}
+              {(data?.salary_min_usd || data?.salary_max_usd) && (
+                <span className="badge badge--muted" style={{ fontSize: 11 }}>
+                  {data.salary_min_usd && data.salary_max_usd
+                    ? `$${(data.salary_min_usd / 1000).toFixed(0)}–$${(data.salary_max_usd / 1000).toFixed(0)}K`
+                    : data.salary_min_usd
+                    ? `$${(data.salary_min_usd / 1000).toFixed(0)}K+`
+                    : `Up to $${(data.salary_max_usd! / 1000).toFixed(0)}K`}
+                  {data.salary_period ? ` / ${data.salary_period}` : ''}
+                </span>
+              )}
             </div>
           </div>
           <div className="job-detail-header-actions">

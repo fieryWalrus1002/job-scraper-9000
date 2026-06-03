@@ -9,11 +9,11 @@ export interface ColumnMeta {
 }
 
 export const COLUMNS: ColumnMeta[] = [
-  { key: 'fit_score',             label: 'Score',      defaultVisible: true,  defaultWidth: 70  },
-  { key: 'title',                 label: 'Title',      defaultVisible: true,  defaultWidth: 280 },
-  { key: 'company',               label: 'Company',    defaultVisible: true,  defaultWidth: 160 },
-  { key: 'location',              label: 'Location',   defaultVisible: true,  defaultWidth: 180 },
-  { key: 'remote_classification', label: 'Remote',     defaultVisible: false, defaultWidth: 160 },
+  { key: 'fit_score',             label: 'Score',      defaultVisible: true,  defaultWidth: 100  },
+  { key: 'title',                 label: 'Title',      defaultVisible: true,  defaultWidth: 100 },
+  { key: 'company',               label: 'Company',    defaultVisible: true,  defaultWidth: 100 },
+  { key: 'location',              label: 'Location',   defaultVisible: true,  defaultWidth: 100 },
+  { key: 'remote_classification', label: 'Remote',     defaultVisible: false, defaultWidth: 100 },
   { key: 'posted_at',             label: 'Posted',     defaultVisible: true,  defaultWidth: 100 },
   { key: 'confidence',            label: 'Confidence', defaultVisible: false, defaultWidth: 100 },
   { key: 'source',                label: 'Source',     defaultVisible: false, defaultWidth: 100 },
