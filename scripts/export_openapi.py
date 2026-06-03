@@ -28,6 +28,7 @@ def main() -> int:
 
     schema = app.openapi()
     out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote OpenAPI schema to {out}")
     return 0
