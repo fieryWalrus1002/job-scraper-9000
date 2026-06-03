@@ -58,14 +58,13 @@ export default function WorkflowTab({ onSelectJob }: Props) {
             {STATUS_LABELS[s]} ({counts[s]})
           </button>
         ))}
-        {archivedCount > 0 && (
-          <button
-            className={`workflow-filter-btn workflow-filter-btn--archive${showArchived ? ' workflow-filter-btn--active' : ''}`}
-            onClick={() => { setShowArchived((v) => !v); setFilter('all') }}
-          >
-            {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
-          </button>
-        )}
+        <button
+          className={`workflow-filter-btn workflow-filter-btn--archive${showArchived ? ' workflow-filter-btn--active' : ''}`}
+          disabled={archivedCount === 0}
+          onClick={() => { setShowArchived((v) => !v); setFilter('all') }}
+        >
+          {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+        </button>
       </div>
 
       {visible.length === 0 ? (
