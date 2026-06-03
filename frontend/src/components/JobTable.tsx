@@ -170,7 +170,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
       <div className="table-wrapper">
         <table
           className="job-table"
-          style={{ minWidth: table.getTotalSize(), width: '100%' }}
+          style={{ tableLayout: 'fixed', minWidth: table.getTotalSize(), width: '100%' }}
         >
           <thead>
             {table.getHeaderGroups().map((hg) => (
@@ -179,7 +179,9 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    style={{ [header.column.id === 'title' ? 'minWidth' : 'width']: header.getSize(), position: 'relative' }}
+                    style={header.column.id === 'title'
+                      ? { position: 'relative', minWidth: header.getSize() }
+                      : { position: 'relative', width: header.getSize() }}
                     className="col-sortable"
                     draggable
                     onDragStart={() => { dragCol.current = header.column.id }}
@@ -228,7 +230,9 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                 >
                   <td className="col-rank text-muted">{rank}</td>
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} style={{ [cell.column.id === 'title' ? 'minWidth' : 'width']: cell.column.getSize() }}>
+                    <td key={cell.id} style={cell.column.id === 'title'
+                      ? { minWidth: cell.column.getSize() }
+                      : { width: cell.column.getSize() }}>
                       {renderCell(cell.column.id, job)}
                     </td>
                   ))}
