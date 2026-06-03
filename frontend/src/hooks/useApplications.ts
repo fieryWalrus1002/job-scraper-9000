@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createApplication, fetchApplications, updateApplication } from '../api'
-import type { Application, ApplicationUpdate } from '../types'
+import type { Application, ApplicationStatus, ApplicationUpdate } from '../types'
 
 export function useApplications() {
   return useQuery({
@@ -14,8 +14,8 @@ export function useApplications() {
 export function useMarkApplication() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ dedupHash, status }: { dedupHash: string; status: string }) =>
-      createApplication({ dedup_hash: dedupHash, status }),
+    mutationFn: ({ dedupHash, status, notes }: { dedupHash: string; status: ApplicationStatus; notes?: string }) =>
+      createApplication({ dedup_hash: dedupHash, status, notes }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['applications'] }),
   })
 }

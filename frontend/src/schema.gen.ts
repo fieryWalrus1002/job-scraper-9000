@@ -129,8 +129,11 @@ export interface components {
         Application: {
             /** Dedup Hash */
             dedup_hash: string;
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired";
             /** Applied At */
             applied_at: string | null;
             /** Notes */
@@ -161,8 +164,9 @@ export interface components {
             /**
              * Status
              * @default saved
+             * @enum {string}
              */
-            status: string;
+            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired";
             /** Applied At */
             applied_at?: string | null;
             /** Notes */
@@ -171,7 +175,7 @@ export interface components {
         /** ApplicationUpdate */
         ApplicationUpdate: {
             /** Status */
-            status?: string | null;
+            status?: ("saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired") | null;
             /** Applied At */
             applied_at?: string | null;
             /** Notes */

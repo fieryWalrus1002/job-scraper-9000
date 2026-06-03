@@ -91,7 +91,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       e.stopPropagation()
-                      update.mutate({ dedupHash: app.dedup_hash, update: { status: e.target.value } })
+                      update.mutate({ dedupHash: app.dedup_hash, update: { status: e.target.value as ApplicationStatus } })
                     }}
                   >
                     {APPLICATION_STATUSES.map((s) => (

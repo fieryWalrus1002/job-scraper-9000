@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { Application, JobSummary } from '../types'
+import type { Application, ApplicationStatus, JobSummary } from '../types'
 import { COLUMNS } from '../lib/columns'
 import { useMarkApplication } from '../hooks/useApplications'
 import ContextMenu from './ContextMenu'
@@ -67,7 +67,7 @@ function ConfidenceBadge({ value }: { value: string | null }) {
 
 function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
   const { mutate, isPending } = useMarkApplication()
-  const buttons: { status: string; label: string }[] = [
+  const buttons: { status: ApplicationStatus; label: string }[] = [
     { status: 'saved', label: 'Save' },
     { status: 'maybe', label: 'Maybe' },
     { status: 'to_apply', label: 'To Apply' },

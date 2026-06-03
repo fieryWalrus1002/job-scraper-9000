@@ -38,5 +38,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP INDEX IF EXISTS app.idx_user_applications_status")
     op.execute("DROP TABLE IF EXISTS app.user_applications")
-    op.execute("DROP SCHEMA IF EXISTS app")

@@ -12,7 +12,6 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from .schemas import (
-    APPLICATION_STATUSES,
     Application,
     ApplicationCreate,
     ApplicationUpdate,
@@ -222,8 +221,6 @@ async def list_applications(pool: Pool):
 
 @router.post("/applications", response_model=Application, status_code=201)
 async def create_application(body: ApplicationCreate, pool: Pool):
-    if body.status not in APPLICATION_STATUSES:
-        raise HTTPException(status_code=422, detail=f"Invalid status: {body.status}")
     sql = """
         INSERT INTO app.user_applications (dedup_hash, status, applied_at, notes)
         VALUES (%(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
@@ -242,10 +239,9 @@ async def create_application(body: ApplicationCreate, pool: Pool):
 
 @router.patch("/applications/{dedup_hash}", response_model=Application)
 async def update_application(dedup_hash: str, body: ApplicationUpdate, pool: Pool):
-    if body.status is not None and body.status not in APPLICATION_STATUSES:
-        raise HTTPException(status_code=422, detail=f"Invalid status: {body.status}")
-
-    updates: dict = {k: v for k, v in body.model_dump().items() if v is not None}
+    updates = body.model_dump(exclude_unset=True)
+    if "status" in updates and updates["status"] is None:
+        raise HTTPException(status_code=422, detail="status cannot be null")
     if not updates:
         raise HTTPException(status_code=422, detail="No fields to update")
 

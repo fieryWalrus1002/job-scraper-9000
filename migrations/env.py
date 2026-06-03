@@ -14,7 +14,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Build the SQLAlchemy URL from DATABASE_URL, switching to the psycopg3 driver.
-_raw_url = os.environ["DATABASE_URL"]
+_raw_url = os.environ.get("DATABASE_URL")
+if not _raw_url:
+    raise RuntimeError(
+        "DATABASE_URL is not set — create a .env file or export it before running migrations"
+    )
 _sa_url = _raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
 config.set_main_option("sqlalchemy.url", _sa_url)
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchJobDetail } from '../api'
-import type { AiFitDetail, Application } from '../types'
+import type { AiFitDetail, Application, ApplicationStatus } from '../types'
 import { APPLICATION_STATUSES } from '../types'
 import { useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
 
@@ -17,7 +17,12 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
   const [notes, setNotes] = useState(application?.notes ?? '')
   const isPending = mark.isPending || update.isPending
 
-  function handleStatusChange(status: string) {
+  // Sync textarea when the application record changes (e.g. after a refetch).
+  useEffect(() => {
+    setNotes(application?.notes ?? '')
+  }, [application?.notes, dedupHash])
+
+  function handleStatusChange(status: ApplicationStatus) {
     if (application) {
       update.mutate({ dedupHash, update: { status } })
     } else {
@@ -30,7 +35,7 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
     if (application) {
       update.mutate({ dedupHash, update: { notes } })
     } else if (notes.trim()) {
-      mark.mutate({ dedupHash, status: 'saved' })
+      mark.mutate({ dedupHash, status: 'saved', notes })
     }
   }
 

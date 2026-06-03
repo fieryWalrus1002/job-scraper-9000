@@ -10,12 +10,13 @@ export type Application = components['schemas']['Application']
 export type ApplicationCreate = components['schemas']['ApplicationCreate']
 export type ApplicationUpdate = components['schemas']['ApplicationUpdate']
 
+// Derived from the generated schema — TS will error if this list diverges from the backend.
+export type ApplicationStatus = NonNullable<Application['status']>
 export const APPLICATION_STATUSES = [
   'saved', 'maybe', 'to_apply', 'applied',
   'screening', 'interview', 'offer',
   'rejected', 'withdrawn', 'hired',
-] as const
-export type ApplicationStatus = typeof APPLICATION_STATUSES[number]
+] as const satisfies readonly ApplicationStatus[]
 
 // Frontend-only — not part of the API schema.
 export interface Filters {
