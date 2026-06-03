@@ -16,6 +16,9 @@ class JobPosting:
     scrub_counts: dict = field(default_factory=dict)
     search_params: dict = field(default_factory=dict)
     dedup_hash: str = ""
+    salary_min_usd: int | None = None
+    salary_max_usd: int | None = None
+    salary_period: str | None = None  # 'yearly' | 'hourly' | 'monthly' etc.
 
     def compute_hash(self) -> None:
         # source_job_id distinguishes legitimately distinct postings that share

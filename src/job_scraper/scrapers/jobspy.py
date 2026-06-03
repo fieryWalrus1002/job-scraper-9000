@@ -4,6 +4,8 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from utils.salary import SalaryResult, annualise, extract_salary
+
 from ..models import JobPosting
 from ..pii import scrub
 from .base import BaseScraper
@@ -73,6 +75,8 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
             raw_desc = str(row.get("description") or "")
             description, scrub_counts = scrub(raw_desc)
 
+            salary = _salary_from_row(row) or extract_salary(description)
+
             url = str(row.get("job_url") or "")
             job = JobPosting(
                 source=str(row.get("site") or self.source_name),
@@ -92,6 +96,9 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
                     "is_remote": self.query.is_remote,
                     "job_type": self.query.job_type,
                 },
+                salary_min_usd=salary.salary_min_usd if salary else None,
+                salary_max_usd=salary.salary_max_usd if salary else None,
+                salary_period=salary.salary_period if salary else None,
             )
             job.compute_hash()
             jobs.append(job)
@@ -102,6 +109,36 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
 
 def _id_from_url(url: str) -> str:
     return hashlib.sha1(url.encode()).hexdigest()[:16] if url else ""
+
+
+_JOBSPY_PERIOD_MAP = {
+    "yearly": "yearly",
+    "monthly": "monthly",
+    "weekly": "weekly",
+    "daily": "daily",
+    "hourly": "hourly",
+}
+
+
+def _salary_from_row(row) -> SalaryResult | None:
+    """Extract structured salary from a jobspy DataFrame row."""
+    min_amt = row.get("min_amount")
+    max_amt = row.get("max_amount")
+    interval = str(row.get("interval") or "").lower()
+
+    if not isinstance(min_amt, (int, float)) or math.isnan(float(min_amt)):
+        return None
+
+    period = _JOBSPY_PERIOD_MAP.get(interval, "yearly")
+    return SalaryResult(
+        salary_min_usd=annualise(float(min_amt), period),
+        salary_max_usd=(
+            annualise(float(max_amt), period)
+            if isinstance(max_amt, (int, float)) and not math.isnan(float(max_amt))
+            else None
+        ),
+        salary_period=period,
+    )
 
 
 def _date_str(value) -> str | None:

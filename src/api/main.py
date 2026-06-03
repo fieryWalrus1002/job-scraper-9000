@@ -66,6 +66,7 @@ Pool = Annotated[AsyncConnectionPool, Depends(get_pool)]
 _LIST_COLS = """
     dedup_hash, source, source_url, title, company, location, posted_at,
     remote_classification::TEXT,
+    salary_min_usd, salary_max_usd, salary_period,
     fit_score, confidence::TEXT, score_rationale, failure_reason, scored_at
 """
 
@@ -73,6 +74,7 @@ _DETAIL_COLS = """
     dedup_hash, source, source_job_id, source_url,
     title, company, location, posted_at, description, scraped_at,
     remote_classification::TEXT,
+    salary_min_usd, salary_max_usd, salary_period,
     fit_score, confidence::TEXT, score_rationale,
     ai_fit_detail, pipeline_metadata,
     run_id, scored_at, model, provider, profile_version, failure_reason,
@@ -108,6 +110,7 @@ async def list_jobs(
     ] = None,
     min_posted_at: Annotated[date | None, Query()] = None,
     max_posted_at: Annotated[date | None, Query()] = None,
+    min_salary_usd: Annotated[int | None, Query(ge=0)] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
     company: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
@@ -133,6 +136,11 @@ async def list_jobs(
     if max_posted_at is not None:
         filters.append("posted_at <= %(max_posted_at)s")
         params["max_posted_at"] = max_posted_at
+    if min_salary_usd is not None:
+        filters.append(
+            "(salary_min_usd >= %(min_salary_usd)s OR salary_min_usd IS NULL)"
+        )
+        params["min_salary_usd"] = min_salary_usd
     if search is not None:
         filters.append("(title ILIKE %(search)s OR description ILIKE %(search)s)")
         params["search"] = f"%{search}%"
