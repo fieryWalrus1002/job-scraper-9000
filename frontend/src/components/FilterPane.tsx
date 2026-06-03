@@ -13,6 +13,17 @@ interface Props {
   total: number | undefined
 }
 
+const getRelativeDateString = (daysOffset: number) => {
+  const targetDate = new Date();
+  // Shift the date by the offset (e.g., -7 for a week ago)
+  targetDate.setDate(targetDate.getDate() + daysOffset);
+
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const day = String(targetDate.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`; // Formats to "YYYY-MM-DD"
+};
 
 export default function FilterPane({
   filters,
@@ -40,6 +51,8 @@ export default function FilterPane({
   }
 
   const active = hasActiveFilters(filters) || search.length > 0
+  const defaultMinPostedAt = getRelativeDateString(-14); // Two-week default window
+  const defaultMaxPostedAt = getRelativeDateString(0); // Today
 
   return (
     <aside className="filter-pane">
@@ -116,14 +129,14 @@ export default function FilterPane({
         <input
           className="filter-input"
           type="date"
-          value={filters.minPostedAt}
+          value={filters.minPostedAt || defaultMinPostedAt}
           onChange={(e) => set('minPostedAt', e.target.value)}
         />
         <label className="filter-label" style={{ marginTop: 6 }}>to</label>
         <input
           className="filter-input"
           type="date"
-          value={filters.maxPostedAt}
+          value={filters.maxPostedAt || defaultMaxPostedAt}
           onChange={(e) => set('maxPostedAt', e.target.value)}
         />
       </div>
