@@ -83,7 +83,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Application */
+        delete: operations["delete_application_api_applications__dedup_hash__delete"];
         options?: never;
         head?: never;
         /** Update Application */
@@ -133,7 +134,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired";
+            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted";
             /** Applied At */
             applied_at: string | null;
             /** Notes */
@@ -166,7 +167,7 @@ export interface components {
              * @default saved
              * @enum {string}
              */
-            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired";
+            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted";
             /** Applied At */
             applied_at?: string | null;
             /** Notes */
@@ -175,7 +176,7 @@ export interface components {
         /** ApplicationUpdate */
         ApplicationUpdate: {
             /** Status */
-            status?: ("saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired") | null;
+            status?: ("saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted") | null;
             /** Applied At */
             applied_at?: string | null;
             /** Notes */
@@ -455,6 +456,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Application"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_application_api_applications__dedup_hash__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

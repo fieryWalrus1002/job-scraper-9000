@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchJobDetail } from '../api'
 import type { AiFitDetail, Application, ApplicationStatus } from '../types'
 import { APPLICATION_STATUSES } from '../types'
-import { useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
+import { useDeleteApplication, useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
 
 interface Props {
   dedupHash: string | null
@@ -14,11 +14,13 @@ interface Props {
 function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: string; application: Application | undefined }) {
   const mark = useMarkApplication()
   const update = useUpdateApplication()
+  const del = useDeleteApplication()
   const [notes, setNotes] = useState(application?.notes ?? '')
-  const isPending = mark.isPending || update.isPending
+  const isPending = mark.isPending || update.isPending || del.isPending
 
-  // Sync textarea when the application record changes (e.g. after a refetch).
+  // Sync textarea when the application record or job changes (server → local state).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotes(application?.notes ?? '')
   }, [application?.notes, dedupHash])
 
@@ -71,6 +73,14 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
         <div className="detail-meta-row" style={{ marginTop: 8 }}>
           <span className="detail-meta-label">Last updated</span>
           <span className="detail-meta-value text-muted">{application.updated_at}</span>
+          <button
+            className="btn btn--danger btn--sm"
+            disabled={isPending}
+            onClick={() => { if (window.confirm('Remove tracking for this job?')) del.mutate(dedupHash) }}
+            style={{ marginLeft: 'auto' }}
+          >
+            Remove tracking
+          </button>
         </div>
       )}
     </div>
@@ -210,6 +220,16 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               {data?.remote_classification && (
                 <span className="badge badge--muted" style={{ fontSize: 11 }}>
                   {data.remote_classification.replace(/_/g, ' ')}
+                </span>
+              )}
+              {(data?.salary_min_usd || data?.salary_max_usd) && (
+                <span className="badge badge--muted" style={{ fontSize: 11 }}>
+                  {data.salary_min_usd && data.salary_max_usd
+                    ? `$${(data.salary_min_usd / 1000).toFixed(0)}–$${(data.salary_max_usd / 1000).toFixed(0)}K`
+                    : data.salary_min_usd
+                    ? `$${(data.salary_min_usd / 1000).toFixed(0)}K+`
+                    : `Up to $${(data.salary_max_usd! / 1000).toFixed(0)}K`}
+                  {data.salary_period ? ` / ${data.salary_period}` : ''}
                 </span>
               )}
             </div>

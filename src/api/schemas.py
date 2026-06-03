@@ -85,6 +85,7 @@ ApplicationStatus = Literal[
     "rejected",
     "withdrawn",
     "hired",
+    "ghosted",
 ]
 
 # Keep as a tuple for the SQL CHECK constraint in migrations.
@@ -99,6 +100,7 @@ APPLICATION_STATUSES: tuple[str, ...] = (
     "rejected",
     "withdrawn",
     "hired",
+    "ghosted",
 )
 
 

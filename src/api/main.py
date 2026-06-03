@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal, cast
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
@@ -235,6 +236,18 @@ async def create_application(body: ApplicationCreate, pool: Pool):
         cur = await conn.execute(sql, body.model_dump())
         row = await cur.fetchone()
     return Application.model_validate(row)
+
+
+@router.delete("/applications/{dedup_hash}", status_code=204, response_class=Response)
+async def delete_application(dedup_hash: str, pool: Pool):
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "DELETE FROM app.user_applications WHERE dedup_hash = %(dedup_hash)s",
+            {"dedup_hash": dedup_hash},
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Application not found")
+    return Response(status_code=204)
 
 
 @router.patch("/applications/{dedup_hash}", response_model=Application)
