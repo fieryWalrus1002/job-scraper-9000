@@ -26,8 +26,18 @@ pipeline:
     just filter-skills
     just ingest
 
+sync-types:
+    uv run scripts/export_openapi.py --out frontend/openapi.json
+    cd frontend && npx --no-install openapi-typescript openapi.json -o src/schema.gen.ts
+
 frontend:
     cd frontend && npm run dev -- --port 5173
+
+frontend-build:
+    cd frontend && npm run build
+
+frontend-lint:
+    cd frontend && npm run lint
 
 backend:
     @echo "Starting FastAPI backend on port 8000..."

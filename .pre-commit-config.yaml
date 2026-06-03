@@ -24,3 +24,12 @@ repos:
       - id: mdformat
         additional_dependencies: ['mdformat-gfm']
         exclude: '^(\.github/ISSUE_TEMPLATE/|prompts/)'
+
+  - repo: local
+    hooks:
+      - id: frontend-build
+        name: Frontend TypeScript build
+        language: system
+        entry: bash -c 'cd frontend && npm run build'
+        files: ^frontend/
+        pass_filenames: false

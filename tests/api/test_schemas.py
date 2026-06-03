@@ -77,7 +77,8 @@ def test_job_detail_validates_full_row() -> None:
     assert d.dedup_hash == FAKE_DETAIL_ROW["dedup_hash"]
     assert d.source == "linkedin"
     assert d.model == "claude-sonnet-4-6"
-    assert isinstance(d.ai_fit_detail, dict)
+    assert d.ai_fit_detail is not None
+    assert d.ai_fit_detail.top_matches == ["Python", "data pipelines"]
     assert isinstance(d.pipeline_metadata, dict)
     assert isinstance(d.metadata, dict)
 

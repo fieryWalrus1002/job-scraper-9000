@@ -74,3 +74,4 @@ config/profile/CHANGELOG.md
 config/search*.yml
 config/search.yml
 !config/search*.yml.example
+frontend/openapi.json
