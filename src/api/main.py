@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
     )
     await _pool.open()
 
-    if os.environ.get(_auth.BYPASS_VAR):
+    if os.environ.get(_auth.BYPASS_VAR) == "1":
         log.warning("auth: bypass (dev) — do not use in production")
     else:
         emails = _auth.load_auth_config()
