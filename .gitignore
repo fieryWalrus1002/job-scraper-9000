@@ -79,3 +79,7 @@ config/search.yml
 config/auth.yml
 !config/auth.yml.example
 frontend/openapi.json
+
+# Infra configs with PII (Azure Object IDs, etc.)
+infra/*.bicepparam
+infra/*.json
