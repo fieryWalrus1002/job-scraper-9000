@@ -65,6 +65,7 @@ Self-contained backend slice. No frontend changes. No conflict with the in-fligh
   - Save / Clear buttons (shadcn `Button`)
 - Visual signal on the panel header when a correction exists — small "corrected" badge next to the AI score
 - OpenAPI types regen if Phase 2.5 codegen is wired by then; otherwise hand-add to `frontend/src/types.ts`
+- **Expose `dedup_hash` in the Dev Metadata section.** Currently hidden — only `model`, `provider`, `profile_version`, `run_id`, `scored_at`, `ingested_at`, `source`, `source_job_id` are shown. Without `dedup_hash` visible, manual API testing (curl against `/api/eval/corrections`) requires grep-ing JSONL files to find a real hash. Add `['Dedup hash', data.dedup_hash]` to the metadata list, ideally with click-to-copy.
 
 ### PR 3 — Export script + eval-harness handshake
 
