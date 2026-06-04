@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request
 
 log = logging.getLogger(__name__)
 
-BYPASS_VAR = "AUTH_BYPASS_DEV"
+BYPASS_VAR = "AUTH_BYPASS"
 _CONFIG_PATH = Path("config/auth.yml")
 
 _allowed_emails: frozenset[str] = frozenset()
