@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal, cast
@@ -35,18 +36,23 @@ log = logging.getLogger(__name__)
 _pool: AsyncConnectionPool | None = None
 
 
-def _database_url() -> str:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL environment variable is not set")
-    return url
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _pool
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        sys.stderr.write("\n" + "=" * 60 + "\n")
+        sys.stderr.write("CRITICAL CONFIGURATION ERROR:\n")
+        sys.stderr.write("DATABASE_URL environment variable is missing or empty.\n")
+        sys.stderr.write(
+            "The application cannot start without a database connection.\n"
+        )
+        sys.stderr.write("=" * 60 + "\n\n")
+        sys.stderr.flush()
+        sys.exit(3)
+
     _pool = AsyncConnectionPool(
-        _database_url(),
+        url,
         kwargs={"row_factory": dict_row},
         min_size=2,
         max_size=10,
