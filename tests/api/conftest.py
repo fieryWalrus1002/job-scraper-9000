@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from api import auth
 from api.main import app, get_pool
 
 # ---------------------------------------------------------------------------
@@ -101,7 +102,8 @@ def fake_pool(fake_conn: AsyncMock) -> _FakePool:
 
 
 @pytest.fixture
-async def client(fake_pool: _FakePool) -> AsyncClient:  # type: ignore[misc]
+async def client(fake_pool: _FakePool, monkeypatch) -> AsyncClient:  # type: ignore[misc]
+    monkeypatch.setenv(auth.BYPASS_VAR, "1")
     app.dependency_overrides[get_pool] = lambda: fake_pool
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
