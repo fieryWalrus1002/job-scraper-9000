@@ -51,3 +51,21 @@ def test_email_and_phone_together():
     assert counts["phone"] == 1
     assert "jobs@acme.com" not in text
     assert "212-555-9999" not in text
+
+
+def test_excessive_newlines_collapsed():
+    raw = "Section A\n\n\n\nSection B\n\n\n\n\nSection C"
+    text, _ = scrub(raw)
+    assert text == "Section A\n\nSection B\n\nSection C"
+
+
+def test_newlines_with_whitespace_collapsed():
+    raw = "Section A\n   \n  \nSection B"
+    text, _ = scrub(raw)
+    assert text == "Section A\n\nSection B"
+
+
+def test_leading_trailing_whitespace_stripped():
+    raw = "\n\nContent here\n\n"
+    text, _ = scrub(raw)
+    assert text == "Content here"
