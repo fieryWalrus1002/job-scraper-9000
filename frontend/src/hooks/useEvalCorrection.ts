@@ -1,0 +1,31 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { deleteEvalCorrection, fetchEvalCorrection, upsertEvalCorrection } from '../api'
+import type { EvalCorrectionIn, EvalCorrectionOut } from '../types'
+
+export function useEvalCorrection(dedupHash: string | null) {
+  return useQuery<EvalCorrectionOut | null, Error>({
+    queryKey: ['eval-correction', dedupHash],
+    queryFn: () => fetchEvalCorrection(dedupHash!),
+    enabled: !!dedupHash,
+  })
+}
+
+export function useSetEvalCorrection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EvalCorrectionIn) => upsertEvalCorrection(body),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['eval-correction', data.dedup_hash] })
+    },
+  })
+}
+
+export function useDeleteEvalCorrection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dedupHash: string) => deleteEvalCorrection(dedupHash),
+    onSuccess: (_data, dedupHash) => {
+      qc.invalidateQueries({ queryKey: ['eval-correction', dedupHash] })
+    },
+  })
+}

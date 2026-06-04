@@ -1,4 +1,4 @@
-import type { Application, ApplicationCreate, ApplicationUpdate, Filters, JobDetail, JobListResponse, ManualJobCreate } from './types'
+import type { Application, ApplicationCreate, ApplicationUpdate, EvalCorrectionIn, EvalCorrectionOut, Filters, JobDetail, JobListResponse, ManualJobCreate } from './types'
 
 // Empty in dev/prod (Vite proxy + Azure SWA both handle /api/* routing).
 // Set VITE_API_URL only if calling the backend directly without a proxy.
@@ -68,4 +68,33 @@ export async function updateApplication(dedupHash: string, body: ApplicationUpda
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<Application>
+}
+
+// ───── Eval corrections ─────
+
+export async function fetchEvalCorrection(dedupHash: string): Promise<EvalCorrectionOut | null> {
+  const res = await fetch(`${API_BASE}/api/eval/corrections/${encodeURIComponent(dedupHash)}`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<EvalCorrectionOut>
+}
+
+export async function upsertEvalCorrection(body: EvalCorrectionIn): Promise<EvalCorrectionOut> {
+  const res = await fetch(`${API_BASE}/api/eval/corrections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<EvalCorrectionOut>
+}
+
+export async function deleteEvalCorrection(dedupHash: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/eval/corrections/${encodeURIComponent(dedupHash)}`, {
+    method: 'DELETE',
+  })
+  // Idempotent: 404 means it's already gone, which is the desired end state.
+  // The UI "Clear" flow can race with stale state or concurrent deletes.
+  if (res.status === 404) return
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
 }
