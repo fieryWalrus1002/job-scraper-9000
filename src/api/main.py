@@ -54,11 +54,11 @@ async def lifespan(app: FastAPI):
     )
     await _pool.open()
 
-    emails = _auth.load_auth_config()
-    _auth.init(emails)
     if os.environ.get(_auth.BYPASS_VAR):
         log.warning("auth: bypass (dev) — do not use in production")
     else:
+        emails = _auth.load_auth_config()
+        _auth.init(emails)
         log.info("auth: enforced (allowlist=%d entries)", len(emails))
 
     yield

@@ -36,7 +36,10 @@ def load_auth_config() -> list[str]:
         raise RuntimeError(
             f"Auth config must be a YAML mapping, got: {type(data).__name__}"
         )
-    return [e.lower() for e in (data.get("allowed_emails") or [])]
+    raw = data.get("allowed_emails") or []
+    if not isinstance(raw, list):
+        raise RuntimeError(f"allowed_emails must be a list, got: {type(raw).__name__}")
+    return [e.lower() for e in raw if isinstance(e, str) and e.strip()]
 
 
 def init(emails: list[str]) -> None:
@@ -60,8 +63,15 @@ def current_principal(request: Request) -> Principal:
     if not isinstance(claims, dict):
         raise HTTPException(status_code=401, detail="Malformed authentication header")
 
-    email = (claims.get("userDetails") or "").lower()
-    roles = claims.get("userRoles") or []
+    user_details = claims.get("userDetails")
+    if not isinstance(user_details, str):
+        raise HTTPException(status_code=401, detail="Malformed authentication header")
+    email = user_details.lower()
+
+    user_roles = claims.get("userRoles") or []
+    if not isinstance(user_roles, list):
+        raise HTTPException(status_code=401, detail="Malformed authentication header")
+    roles = [r for r in user_roles if isinstance(r, str)]
 
     if email not in _allowed_emails:
         raise HTTPException(status_code=403, detail="Access denied")
