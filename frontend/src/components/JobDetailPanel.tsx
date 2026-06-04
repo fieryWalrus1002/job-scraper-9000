@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchJobDetail } from '../api'
-import type { AiFitDetail, Application, ApplicationStatus } from '../types'
+import type { AiFitDetail, Application, ApplicationStatus, EvalCorrectionOut } from '../types'
 import { APPLICATION_STATUSES, STATUS_LABELS } from '../types'
 import { useDeleteApplication, useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
+import { useDeleteEvalCorrection, useEvalCorrection, useSetEvalCorrection } from '../hooks/useEvalCorrection'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -118,6 +119,117 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
   )
 }
 
+function EvalCorrectionSection({
+  dedupHash,
+  existing,
+}: {
+  dedupHash: string
+  existing: EvalCorrectionOut | null | undefined
+}) {
+  const upsert = useSetEvalCorrection()
+  const del = useDeleteEvalCorrection()
+  const [correctedScore, setCorrectedScore] = useState<number | null>(
+    existing?.corrected_score ?? null,
+  )
+  const [reason, setReason] = useState(existing?.correction_reason ?? '')
+  const isPending = upsert.isPending || del.isPending
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCorrectedScore(existing?.corrected_score ?? null)
+    setReason(existing?.correction_reason ?? '')
+  }, [existing?.corrected_score, existing?.correction_reason, dedupHash])
+
+  function handleSave() {
+    if (correctedScore == null) return
+    upsert.mutate({
+      dedup_hash: dedupHash,
+      corrected_score: correctedScore,
+      correction_reason: reason.trim() || null,
+    })
+  }
+
+  function handleClear() {
+    if (existing) del.mutate(dedupHash)
+    setCorrectedScore(null)
+    setReason('')
+  }
+
+  const isDirty =
+    correctedScore !== (existing?.corrected_score ?? null) ||
+    reason !== (existing?.correction_reason ?? '')
+  const canSave = correctedScore != null && (isDirty || !existing)
+
+  function chipCls(n: number, active: boolean) {
+    const variant = n >= 4 ? 'high' : n === 3 ? 'mid' : 'low'
+    if (!active) {
+      return 'bg-card text-muted border-border hover:border-border-strong hover:text-fg'
+    }
+    return variant === 'high'
+      ? 'bg-score-high/20 text-score-high border-score-high/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+      : variant === 'mid'
+        ? 'bg-score-mid/20 text-score-mid border-score-mid/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+        : 'bg-score-low/20 text-score-low border-score-low/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <div className={sectionLabel}>Corrected score</div>
+        <div className="flex flex-wrap gap-1.5">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              disabled={isPending}
+              onClick={() => setCorrectedScore(n)}
+              className={cn(
+                'size-9 inline-flex items-center justify-center rounded-md border text-[14px] font-mono font-semibold cursor-pointer transition-all tabular-nums disabled:opacity-40 disabled:cursor-default',
+                chipCls(n, correctedScore === n),
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className={sectionLabel}>Reason (optional)</div>
+        <textarea
+          className="w-full min-h-[80px] resize-y bg-bg border border-border rounded-md text-fg text-[13px] leading-[1.55] px-3 py-2 outline-none placeholder:text-faint hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 transition-[color,border-color,box-shadow]"
+          value={reason}
+          placeholder="What did the AI get wrong?"
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+
+      <div className="flex items-center gap-3 pt-1 border-t border-border/60 -mx-0 pt-3">
+        {existing && (
+          <div className="text-[11px] text-muted">
+            <span className="font-mono">{existing.original_score ?? '—'}</span>
+            <span className="text-faint mx-1">→</span>
+            <span className="font-mono text-fg">{existing.corrected_score}</span>
+            <span className="text-faint ml-2">
+              · {new Date(existing.corrected_at).toLocaleDateString()}
+            </span>
+          </div>
+        )}
+        <div className="flex gap-2 ml-auto">
+          {existing && (
+            <Button variant="ghost" size="sm" disabled={isPending} onClick={handleClear}>
+              Clear
+            </Button>
+          )}
+          <Button size="sm" disabled={!canSave || isPending} onClick={handleSave}>
+            {upsert.isPending ? 'Saving…' : existing ? 'Update' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Section({
   title,
   children,
@@ -226,6 +338,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
     queryFn: () => fetchJobDetail(dedupHash!),
     enabled: !!dedupHash,
   })
+  const { data: correction } = useEvalCorrection(dedupHash)
 
   if (!dedupHash) return null
 
@@ -262,6 +375,16 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               {data?.fit_score != null && (
                 <Badge variant={scoreVariant(data.fit_score)} className="text-[11px] px-2">
                   Score <span className="font-mono ml-0.5">{data.fit_score}</span>
+                </Badge>
+              )}
+              {correction && (
+                <Badge
+                  variant={scoreVariant(correction.corrected_score)}
+                  className="text-[11px] px-2 gap-1"
+                  title={`Original ${correction.original_score ?? '—'} → corrected ${correction.corrected_score}`}
+                >
+                  <span className="text-[10px] uppercase tracking-wider opacity-80">Corrected</span>
+                  <span className="font-mono">{correction.corrected_score}</span>
                 </Badge>
               )}
               {data?.confidence && (
@@ -335,13 +458,18 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                 <SkillsFitSection ai={data.ai_fit_detail} />
               </Section>
 
-              <Section title="Eval Correction" defaultOpen={false}>
-                <div className="text-[13px] text-muted py-2 italic flex items-center gap-2">
-                  Mark scoring errors and add corrections for gold dataset export.
-                  <Badge variant="outline" className="not-italic font-normal text-[10px]">
-                    coming soon
-                  </Badge>
-                </div>
+              <Section
+                title="Eval Correction"
+                defaultOpen={false}
+                badge={
+                  correction ? (
+                    <Badge variant={scoreVariant(correction.corrected_score)} className="font-mono">
+                      {correction.corrected_score}
+                    </Badge>
+                  ) : undefined
+                }
+              >
+                <EvalCorrectionSection dedupHash={data.dedup_hash} existing={correction} />
               </Section>
 
               <Section title="Application Tracking" defaultOpen={false}>
@@ -351,6 +479,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               <Section title="Dev Metadata" defaultOpen={false}>
                 <div className="flex flex-col gap-1.5">
                   {[
+                    ['Dedup hash', data.dedup_hash],
                     ['Model', data.model],
                     ['Provider', data.provider],
                     ['Profile version', data.profile_version],
@@ -362,7 +491,17 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                   ].map(([label, value]) => (
                     <div key={label} className="flex gap-3 text-[12px] py-1 border-b border-border/40 last:border-b-0">
                       <span className="w-[140px] shrink-0 text-muted">{label}</span>
-                      <span className="text-fg font-mono break-all">{value ?? <span className="text-faint">—</span>}</span>
+                      {value ? (
+                        <span
+                          className="text-fg font-mono break-all cursor-pointer hover:text-primary-hov transition-colors"
+                          title="Click to copy"
+                          onClick={() => navigator.clipboard?.writeText(String(value))}
+                        >
+                          {value}
+                        </span>
+                      ) : (
+                        <span className="text-faint font-mono">—</span>
+                      )}
                     </div>
                   ))}
                 </div>
