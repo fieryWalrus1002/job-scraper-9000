@@ -93,5 +93,8 @@ export async function deleteEvalCorrection(dedupHash: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/eval/corrections/${encodeURIComponent(dedupHash)}`, {
     method: 'DELETE',
   })
+  // Idempotent: 404 means it's already gone, which is the desired end state.
+  // The UI "Clear" flow can race with stale state or concurrent deletes.
+  if (res.status === 404) return
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
 }

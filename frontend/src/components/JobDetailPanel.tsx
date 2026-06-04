@@ -155,9 +155,13 @@ function EvalCorrectionSection({
     setReason('')
   }
 
+  // Trim the reason when comparing so whitespace-only edits don't enable Save
+  // (handleSave trims before sending; isDirty must match that normalization).
+  const trimmedReason = reason.trim()
+  const existingReason = (existing?.correction_reason ?? '').trim()
   const isDirty =
     correctedScore !== (existing?.corrected_score ?? null) ||
-    reason !== (existing?.correction_reason ?? '')
+    trimmedReason !== existingReason
   const canSave = correctedScore != null && (isDirty || !existing)
 
   function chipCls(n: number, active: boolean) {
@@ -495,7 +499,12 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                         <span
                           className="text-fg font-mono break-all cursor-pointer hover:text-primary-hov transition-colors"
                           title="Click to copy"
-                          onClick={() => navigator.clipboard?.writeText(String(value))}
+                          onClick={() => {
+                            // Swallow rejection — clipboard can fail in
+                            // insecure contexts or when permission is denied;
+                            // no unhandled-rejection noise in the console.
+                            void navigator.clipboard?.writeText(String(value)).catch(() => {})
+                          }}
                         >
                           {value}
                         </span>
