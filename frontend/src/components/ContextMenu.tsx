@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { cn } from '@/lib/utils'
 
 export interface ContextMenuItem {
   label: string
@@ -31,7 +32,6 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     }
   }, [onClose])
 
-  // Nudge menu back on-screen if it would overflow the viewport
   const style: React.CSSProperties = {
     position: 'fixed',
     top: Math.min(y, window.innerHeight - 200),
@@ -39,14 +39,26 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
   }
 
   return (
-    <div ref={ref} className="context-menu" style={style}>
+    <div
+      ref={ref}
+      className="z-[1000] bg-card border border-border rounded-lg shadow-[0_12px_32px_-4px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.04)] min-w-[160px] p-1 flex flex-col backdrop-blur-md"
+      style={style}
+    >
       {items.map((item) => (
         <button
           key={item.label}
-          className={`context-menu-item${item.active ? ' context-menu-item--active' : ''}`}
+          className={cn(
+            'block w-full text-left py-1.5 px-2.5 text-[13px] bg-transparent border-none rounded-md text-fg cursor-pointer hover:bg-hover transition-colors flex items-center justify-between gap-2',
+            item.active && 'text-primary-hov font-medium bg-primary/10',
+          )}
           onClick={() => { item.onClick(); onClose() }}
         >
-          {item.label}
+          <span>{item.label}</span>
+          {item.active && (
+            <svg width="12" height="12" viewBox="0 0 12 12" className="text-primary-hov shrink-0">
+              <path d="M2.5 6 L5 8.5 L9.5 3.5" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
         </button>
       ))}
     </div>

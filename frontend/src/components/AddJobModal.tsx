@@ -1,13 +1,29 @@
 import { useState } from 'react'
 import { useCreateManualJob } from '../hooks/useApplications'
-import { APPLICATION_STATUSES } from '../types'
+import { APPLICATION_STATUSES, STATUS_LABELS } from '../types'
 import type { ApplicationStatus } from '../types'
-import styles from './AddJobModal.module.css'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Props {
   onClose: () => void
   onSuccess: () => void
 }
+
+const labelCls = 'text-[10px] font-semibold text-muted uppercase tracking-[0.08em]'
+const textareaCls =
+  'w-full min-h-[110px] resize-y bg-bg-elevated border border-border rounded-md text-fg text-[13px] leading-[1.55] px-2.5 py-2 outline-none ' +
+  'placeholder:text-faint hover:border-border-strong ' +
+  'focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 ' +
+  'transition-[color,border-color,box-shadow]'
 
 export default function AddJobModal({ onClose, onSuccess }: Props) {
   const [title, setTitle] = useState('')
@@ -45,21 +61,23 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className={styles.addJobModal} onClick={(e) => e.stopPropagation()}>
-
-        <div className="add-job-modal-header">
-          <span className="add-job-modal-title">Add job manually</span>
-          <button type="button" className="btn btn--ghost btn--icon" onClick={onClose} aria-label="Close">✕</button>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[600px] p-0 gap-0">
+        <div className="px-6 pt-5 pb-4 border-b border-border">
+          <DialogTitle className="text-[15px] font-semibold tracking-tight text-fg">
+            Add job manually
+          </DialogTitle>
+          <p className="text-[12px] text-muted mt-1">
+            Track a job that wasn't found by the scraper.
+          </p>
         </div>
 
-        <form className={styles.body} onSubmit={handleSubmit}>
-
-          {/* Full Width Fields */}
-          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-            <label className="filter-label">Title *</label>
-            <input
-              className={styles.formInput}
+        <form className="grid grid-cols-2 gap-x-4 gap-y-3.5 px-6 py-5" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-1.5 col-span-2">
+            <label className={labelCls}>
+              Title <span className="text-score-low normal-case">*</span>
+            </label>
+            <Input
               required
               placeholder="e.g. Senior Software Engineer"
               value={title}
@@ -67,20 +85,27 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
             />
           </div>
 
-          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-            <label className="filter-label">Company</label>
-            <input
-              className={styles.formInput}
+          <div className="flex flex-col gap-1.5">
+            <label className={labelCls}>Company</label>
+            <Input
               placeholder="e.g. Acme Corp"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
             />
           </div>
 
-          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-            <label className="filter-label">Job URL</label>
-            <input
-              className={styles.formInput}
+          <div className="flex flex-col gap-1.5">
+            <label className={labelCls}>Location</label>
+            <Input
+              placeholder="e.g. Remote, Seattle WA"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 col-span-2">
+            <label className={labelCls}>Job URL</label>
+            <Input
               type="text"
               placeholder="https://…"
               value={url}
@@ -88,75 +113,89 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
             />
           </div>
 
-          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
-            <label className="filter-label">Job description</label>
+          <div className="flex flex-col gap-1.5 col-span-2">
+            <label className={labelCls}>Job description</label>
             <textarea
-              className={styles.formInput}
-              style={{ minHeight: '100px', resize: 'vertical' }} /* Allows clean vertical expanding */
+              className={textareaCls}
               placeholder="Copy-paste the job description here."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
-          {/* Half Width Fields (They don't get the fullWidth class modifier) */}
-          <div className={styles.formGroup}>
-            <label className="filter-label">Location</label>
-            <input
-              className={styles.formInput}
-              placeholder="e.g. Remote, Seattle WA"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label className="filter-label">Posted date</label>
-            <input
-              className={styles.formInput}
+          <div className="flex flex-col gap-1.5">
+            <label className={labelCls}>Posted date</label>
+            <Input
               type="date"
               value={postedAt}
               onChange={(e) => setPostedAt(e.target.value)}
             />
           </div>
 
-          <div className={styles.formGroup}>
-            <label className="filter-label">Your fit score * (1-5)</label>
-            <select
-              className={styles.formSelect}
-              value={fitScore}
-              onChange={(e) => setFitScore(e.target.value === '' ? '' : Number(e.target.value))}
+          <div className="flex flex-col gap-1.5">
+            <label className={labelCls}>
+              Your fit score <span className="text-score-low normal-case">*</span>
+            </label>
+            <Select
+              value={fitScore === '' ? undefined : String(fitScore)}
+              onValueChange={(v) => setFitScore(Number(v))}
             >
-              <option value="">— pick one —</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full h-8 text-[13px] bg-bg-elevated border-border hover:border-border-strong">
+                <SelectValue placeholder="— pick one —" />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    <span className="font-mono">{n}</span> <span className="text-muted">— {scoreHint(n)}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className={styles.formGroup}>
-            <label className="filter-label">Initial status</label>
-            <select
-              className={styles.formSelect}
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ApplicationStatus)}
-            >
-              {APPLICATION_STATUSES.map((s) => (
-                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-1.5 col-span-2">
+            <label className={labelCls}>Initial status</label>
+            <Select value={status} onValueChange={(v) => setStatus(v as ApplicationStatus)}>
+              <SelectTrigger className="w-full h-8 text-[13px] bg-bg-elevated border-border hover:border-border-strong">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {APPLICATION_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {apiError && <div className="text-error" style={{ fontSize: 13, gridColumn: '1 / -1' }}>{apiError}</div>}
+          {apiError && (
+            <div className="col-span-2 text-[12px] text-score-low bg-score-low/10 border border-score-low/20 rounded-md px-3 py-2">
+              {apiError}
+            </div>
+          )}
 
-          <div className={styles.modalActions}>
-            <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn" disabled={mutation.isPending}>
+          <div className="col-span-2 flex justify-end gap-3 pt-4 mt-2 border-t border-border -mx-6 px-6 pb-1">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? 'Adding…' : 'Add job'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
+}
+
+function scoreHint(n: number): string {
+  switch (n) {
+    case 5: return 'Perfect fit'
+    case 4: return 'Strong fit'
+    case 3: return 'Possible fit'
+    case 2: return 'Weak fit'
+    case 1: return 'Poor fit'
+    default: return ''
+  }
 }
