@@ -15,6 +15,7 @@ FROM python:3.13-slim-bookworm AS backend
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY src/ /app/src/
+COPY config/ /app/config/
 ENV PATH="/app/.venv/bin:$PATH"
 
 # TODO: Need to mount the proper data/ folder it will be reading and writing
