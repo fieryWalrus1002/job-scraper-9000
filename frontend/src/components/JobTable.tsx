@@ -19,6 +19,9 @@ import {
 } from '../lib/columns'
 import { useDeleteApplication, useMarkApplication } from '../hooks/useApplications'
 import ContextMenu from './ContextMenu'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 50
 
@@ -35,29 +38,48 @@ interface ContextState {
   job: JobSummary
 }
 
-// ── Cell renderers ──────────────────────────────────────────────────────────
+// ── Badge helpers ───────────────────────────────────────────────────────────
 
 function ScoreBadge({ score }: { score: number | null }) {
-  if (score === null) return <span className="badge badge--muted">—</span>
-  const cls = score >= 4 ? 'badge--high' : score === 3 ? 'badge--mid' : 'badge--low'
-  return <span className={`badge ${cls}`}>{score}</span>
+  if (score === null) {
+    return (
+      <span className="inline-flex items-center justify-center size-7 rounded-md text-[13px] font-mono text-faint border border-border/40">
+        —
+      </span>
+    )
+  }
+  const cls =
+    score >= 4 ? 'bg-score-high/15 text-score-high border-score-high/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' :
+    score === 3 ? 'bg-score-mid/15 text-score-mid border-score-mid/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' :
+    'bg-score-low/15 text-score-low border-score-low/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+  return (
+    <span className={cn(
+      'inline-flex items-center justify-center size-7 rounded-md text-[14px] font-mono font-semibold border tabular-nums',
+      cls,
+    )}>
+      {score}
+    </span>
+  )
 }
 
 function ClassificationBadge({ value }: { value: string | null }) {
-  if (!value) return <span className="badge badge--muted">—</span>
+  if (!value) return <span className="text-faint">—</span>
   const label = value.replace(/_/g, ' ')
-  const cls =
-    value === 'fully_remote'       ? 'badge--remote' :
-    value === 'location_restricted' ? 'badge--local'  :
-    value.startsWith('remote_with') ? 'badge--travel' :
-    'badge--muted'
-  return <span className={`badge ${cls}`}>{label}</span>
+  const variant =
+    value === 'fully_remote'        ? 'remote' :
+    value === 'location_restricted' ? 'local'  :
+    value.startsWith('remote_with') ? 'travel' :
+    'muted'
+  return <Badge variant={variant}>{label}</Badge>
 }
 
 function ConfidenceBadge({ value }: { value: string | null }) {
-  if (!value) return <span className="text-muted">—</span>
-  const cls = value === 'high' ? 'conf--high' : value === 'medium' ? 'conf--mid' : 'conf--low'
-  return <span className={`conf ${cls}`}>{value}</span>
+  if (!value) return <span className="text-faint">—</span>
+  const cls =
+    value === 'high'   ? 'text-score-high' :
+    value === 'medium' ? 'text-score-mid'  :
+    'text-score-low'
+  return <span className={cn('text-[11px] uppercase tracking-wider font-medium', cls)}>{value}</span>
 }
 
 function renderCell(key: string, job: JobSummary): ReactNode {
@@ -66,11 +88,11 @@ function renderCell(key: string, job: JobSummary): ReactNode {
       return <ScoreBadge score={job.fit_score} />
     case 'title':
       return (
-        <div className="title-cell">
-          <span className="title-text">{job.title ?? '—'}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">{job.title ?? '—'}</span>
           {job.source_url && (
             <a
-              className="title-ext-link"
+              className="shrink-0 text-[11px] text-muted no-underline opacity-60 leading-none hover:text-primary hover:opacity-100"
               href={job.source_url}
               target="_blank"
               rel="noopener noreferrer"
@@ -86,15 +108,26 @@ function renderCell(key: string, job: JobSummary): ReactNode {
     case 'confidence':
       return <ConfidenceBadge value={job.confidence} />
     case 'posted_at':
-      return <span className="text-muted">{job.posted_at ?? '—'}</span>
+      return <span className="text-muted font-mono text-[12px]">{job.posted_at ?? '—'}</span>
     case 'score_rationale':
-      return <span className="rationale-preview">{job.score_rationale ?? '—'}</span>
-    default:
-      return <span>{(job[key as keyof JobSummary] as string | null) ?? '—'}</span>
+      return (
+        <span className="overflow-hidden text-muted text-[12px] leading-[1.45]" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          {job.score_rationale ?? <span className="text-faint">—</span>}
+        </span>
+      )
+    default: {
+      const v = (job[key as keyof JobSummary] as string | null) ?? null
+      return v ? <span>{v}</span> : <span className="text-faint">—</span>
+    }
   }
 }
 
 // ── Quick-mark column ───────────────────────────────────────────────────────
+
+const qBtn =
+  'text-[11px] font-medium px-2 h-[22px] rounded-md border border-border bg-card text-muted cursor-pointer whitespace-nowrap ' +
+  'hover:border-border-strong hover:text-fg disabled:opacity-40 disabled:cursor-default transition-all'
+const qBtnActive = 'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
 
 function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
   const { mutate, isPending } = useMarkApplication()
@@ -104,11 +137,11 @@ function QuickMark({ dedupHash, current }: { dedupHash: string; current: string 
     { status: 'to_apply', label: 'To Apply' },
   ]
   return (
-    <div className="quick-mark" onClick={(e) => e.stopPropagation()}>
+    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
       {buttons.map(({ status, label }) => (
         <button
           key={status}
-          className={`quick-mark-btn${current === status ? ' quick-mark-btn--active' : ''}`}
+          className={cn(qBtn, current === status && qBtnActive)}
           disabled={isPending}
           onClick={() => mutate({ dedupHash, status })}
         >
@@ -168,20 +201,22 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
   const totalPages = table.getPageCount()
 
   if (items.length === 0) {
-    return <div className="empty-state">No jobs match the current filters.</div>
+    return (
+      <div className="py-20 text-center">
+        <div className="text-muted text-sm">No jobs match the current filters.</div>
+        <div className="text-faint text-xs mt-1">Adjust your filters in the sidebar to widen the search.</div>
+      </div>
+    )
   }
 
   return (
     <div className="table-outer">
       <div className="table-wrapper">
-        <table
-          className="job-table"
-          style={{ width: '100%' }}
-        >
+        <table className="job-table" style={{ width: '100%' }}>
           <thead>
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
-                <th className="col-rank">#</th>
+                <th className="w-11 max-w-11 text-right">#</th>
                 {hg.headers.map((header, i) => {
                   const prevHeader = i > 0 ? hg.headers[i - 1] : null
                   const isLast     = i === hg.headers.length - 1
@@ -195,7 +230,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                     <th
                       key={header.id}
                       style={{ position: 'relative', width: header.getSize() }}
-                      className="col-sortable"
+                      className="cursor-pointer select-none hover:text-fg"
                       draggable
                       onDragStart={(e) => {
                         if (isResizing.current) { e.preventDefault(); return }
@@ -217,7 +252,6 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                       }}
                       onClick={header.column.getToggleSortingHandler()}
                     >
-                      {/* Left-edge handle: resizes the PREVIOUS column — lives inside this th so it's always on top */}
                       {prevHeader?.column.getCanResize() && (
                         <div
                           className="col-resize-handle col-resize-handle--left"
@@ -227,8 +261,11 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                         />
                       )}
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getIsSorted() === 'desc' ? ' ↓' : header.column.getIsSorted() === 'asc' ? ' ↑' : <span className="sort-indicator"> ↕</span>}
-                      {/* Right-edge handle only on the last visible column (no next th to host a left-edge handle) */}
+                      {header.column.getIsSorted() === 'desc'
+                        ? ' ↓'
+                        : header.column.getIsSorted() === 'asc'
+                        ? ' ↑'
+                        : <span className="text-muted text-[10px]"> ↕</span>}
                       {isLast && header.column.getCanResize() && (
                         <div
                           className="col-resize-handle"
@@ -240,7 +277,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                     </th>
                   )
                 })}
-                <th className="col-track">Track</th>
+                <th className="w-[220px] min-w-[220px] max-w-[220px]">Track</th>
               </tr>
             ))}
           </thead>
@@ -252,17 +289,17 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
               return (
                 <tr
                   key={row.id}
-                  className={`job-row${appStatus ? ' job-row--tracked' : ''}`}
+                  className={cn('cursor-pointer transition-colors hover:bg-hover', appStatus && 'bg-primary-dim/15')}
                   onClick={() => onSelect(job.dedup_hash)}
                   onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, job }) }}
                 >
-                  <td className="col-rank text-muted">{rank}</td>
+                  <td className="w-11 max-w-11 text-right text-muted">{rank}</td>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} style={{ width: cell.column.getSize(), maxWidth: cell.column.getSize() }}>
                       {renderCell(cell.column.id, job)}
                     </td>
                   ))}
-                  <td className="col-track">
+                  <td className="w-[220px] min-w-[220px] max-w-[220px]">
                     <QuickMark dedupHash={job.dedup_hash} current={appStatus} />
                   </td>
                 </tr>
@@ -290,12 +327,16 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
       )}
 
       {totalPages > 1 && (
-        <div className="pagination">
-          <button className="btn" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}>«</button>
-          <button className="btn" onClick={() => table.previousPage()}  disabled={!table.getCanPreviousPage()}>‹</button>
-          <span className="pagination-info">{pageIndex + 1} / {totalPages}</span>
-          <button className="btn" onClick={() => table.nextPage()}      disabled={!table.getCanNextPage()}>›</button>
-          <button className="btn" onClick={() => table.setPageIndex(totalPages - 1)} disabled={!table.getCanNextPage()}>»</button>
+        <div className="flex items-center justify-center gap-1 p-3 border-t border-border shrink-0 bg-card/40">
+          <Button variant="secondary" size="icon-sm" onClick={() => table.setPageIndex(0)}         disabled={!table.getCanPreviousPage()}>«</Button>
+          <Button variant="secondary" size="icon-sm" onClick={() => table.previousPage()}           disabled={!table.getCanPreviousPage()}>‹</Button>
+          <span className="text-[12px] text-muted px-3 font-mono tabular-nums">
+            <span className="text-fg">{pageIndex + 1}</span>
+            <span className="text-faint mx-1">/</span>
+            {totalPages}
+          </span>
+          <Button variant="secondary" size="icon-sm" onClick={() => table.nextPage()}               disabled={!table.getCanNextPage()}>›</Button>
+          <Button variant="secondary" size="icon-sm" onClick={() => table.setPageIndex(totalPages - 1)} disabled={!table.getCanNextPage()}>»</Button>
         </div>
       )}
     </div>
