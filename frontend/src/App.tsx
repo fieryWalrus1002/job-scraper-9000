@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useJobs } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
+import { useAuth } from './hooks/useAuth'
 import { filtersFromParams, filtersToParams } from './lib/filters'
 import type { Filters } from './types'
 import FilterPane from './components/FilterPane'
@@ -15,6 +16,29 @@ import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
 
 export default function App() {
+  const { principal, isLoading: authLoading, isAuthenticated } = useAuth()
+
+  if (authLoading) {
+    return <div className="flex h-svh items-center justify-center text-muted text-sm">Loading…</div>
+  }
+
+  if (!isAuthenticated) {
+    if (!import.meta.env.DEV) {
+      window.location.href = '/.auth/login/aad?post_login_redirect_uri=/'
+    }
+    return (
+      <div data-testid="auth-redirect" className="flex h-svh items-center justify-center text-muted text-sm">
+        {import.meta.env.DEV
+          ? 'Not authenticated — set VITE_AUTH_BYPASS=1 in frontend/.env.local'
+          : 'Signing in…'}
+      </div>
+    )
+  }
+
+  return <AppShell email={principal!.userDetails} />
+}
+
+function AppShell({ email }: { email: string }) {
   const [urlParams, setUrlParams] = useSearchParams()
   const tab = urlParams.get('tab') ?? 'jobs'
   const filters = filtersFromParams(urlParams)
@@ -92,6 +116,13 @@ export default function App() {
           </button>
         </nav>
         <div className="flex-1" />
+        <a
+          href="/.auth/logout"
+          className="text-[12px] text-muted hover:text-fg transition-colors"
+          title="Sign out"
+        >
+          {email}
+        </a>
         <Button onClick={() => setAddJobOpen(true)}>
           <span className="text-[15px] leading-none mr-0.5">+</span>
           Add job

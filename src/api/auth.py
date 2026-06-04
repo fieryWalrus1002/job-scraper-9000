@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request
 
 log = logging.getLogger(__name__)
 
-BYPASS_VAR = "AUTH_BYPASS_DEV"
+BYPASS_VAR = "AUTH_BYPASS"
 _CONFIG_PATH = Path("config/auth.yml")
 
 _allowed_emails: frozenset[str] = frozenset()
@@ -48,7 +48,7 @@ def init(emails: list[str]) -> None:
 
 
 def current_principal(request: Request) -> Principal:
-    if os.environ.get(BYPASS_VAR):
+    if os.environ.get(BYPASS_VAR) == "1":
         return _DEV_PRINCIPAL
 
     header = request.headers.get("X-MS-CLIENT-PRINCIPAL")

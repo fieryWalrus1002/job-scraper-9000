@@ -84,6 +84,23 @@ async def test_health_public_in_bypass_mode(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Bypass disabled (AUTH_BYPASS=0 must not bypass)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_bypass_zero_string_enforces_auth(monkeypatch):
+    monkeypatch.setenv(auth.BYPASS_VAR, "0")
+    auth.init(["allowed@example.com"])
+    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
+    try:
+        status = await _get_jobs()
+    finally:
+        app.dependency_overrides.clear()
+    assert status == 401
+
+
+# ---------------------------------------------------------------------------
 # Enforced mode
 # ---------------------------------------------------------------------------
 
