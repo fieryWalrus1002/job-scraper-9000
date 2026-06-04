@@ -31,7 +31,8 @@ export interface paths {
         /** List Jobs */
         get: operations["list_jobs_api_jobs_get"];
         put?: never;
-        post?: never;
+        /** Create Manual Job */
+        post: operations["create_manual_job_api_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -89,6 +90,50 @@ export interface paths {
         head?: never;
         /** Update Application */
         patch: operations["update_application_api_applications__dedup_hash__patch"];
+        trace?: never;
+    };
+    "/api/eval/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Eval Corrections */
+        get: operations["list_eval_corrections_api_eval_corrections_get"];
+        put?: never;
+        /**
+         * Upsert Eval Correction
+         * @description Upsert a human correction to a job's skills_fit score.
+         *
+         *     The server snapshots the current AI score/model/profile_version from
+         *     raw.scored_job_postings so the correction stays meaningful even after a
+         *     later re-scoring run with different (model, profile_version). Last-write-
+         *     wins on dedup_hash.
+         */
+        post: operations["upsert_eval_correction_api_eval_corrections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eval/corrections/{dedup_hash}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Eval Correction */
+        get: operations["get_eval_correction_api_eval_corrections__dedup_hash__get"];
+        put?: never;
+        post?: never;
+        /** Delete Eval Correction */
+        delete: operations["delete_eval_correction_api_eval_corrections__dedup_hash__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -181,6 +226,35 @@ export interface components {
             applied_at?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** EvalCorrectionIn */
+        EvalCorrectionIn: {
+            /** Dedup Hash */
+            dedup_hash: string;
+            /** Corrected Score */
+            corrected_score: number;
+            /** Correction Reason */
+            correction_reason?: string | null;
+        };
+        /** EvalCorrectionOut */
+        EvalCorrectionOut: {
+            /** Dedup Hash */
+            dedup_hash: string;
+            /** Corrected Score */
+            corrected_score: number;
+            /** Correction Reason */
+            correction_reason: string | null;
+            /** Original Score */
+            original_score: number | null;
+            /** Original Model */
+            original_model: string;
+            /** Profile Version */
+            profile_version: string;
+            /**
+             * Corrected At
+             * Format: date-time
+             */
+            corrected_at: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -302,6 +376,29 @@ export interface components {
              */
             scored_at: string;
         };
+        /** ManualJobCreate */
+        ManualJobCreate: {
+            /** Title */
+            title: string;
+            /** Fit Score */
+            fit_score: number;
+            /** Company */
+            company?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Posted At */
+            posted_at?: string | null;
+            /**
+             * Status
+             * @default saved
+             * @enum {string}
+             */
+            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted";
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -371,6 +468,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_manual_job_api_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualJobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"];
                 };
             };
             /** @description Validation Error */
@@ -520,6 +650,131 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Application"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_eval_corrections_api_eval_corrections_get: {
+        parameters: {
+            query?: {
+                model?: string | null;
+                profile_version?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalCorrectionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_eval_correction_api_eval_corrections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvalCorrectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalCorrectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_eval_correction_api_eval_corrections__dedup_hash__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvalCorrectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_eval_correction_api_eval_corrections__dedup_hash__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

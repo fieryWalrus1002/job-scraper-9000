@@ -9,6 +9,8 @@ export type AiFitDetail = components['schemas']['AiFitDetail']
 export type Application = components['schemas']['Application']
 export type ApplicationCreate = components['schemas']['ApplicationCreate']
 export type ApplicationUpdate = components['schemas']['ApplicationUpdate']
+export type EvalCorrectionIn = components['schemas']['EvalCorrectionIn']
+export type EvalCorrectionOut = components['schemas']['EvalCorrectionOut']
 export interface ManualJobCreate {
   title: string
   fit_score: number
