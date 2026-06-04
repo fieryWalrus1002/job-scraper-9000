@@ -33,13 +33,15 @@ describe('App auth gate', () => {
     )
   })
 
-  it('redirects to login when unauthenticated', async () => {
+  it('shows dev message when unauthenticated (no redirect in dev)', async () => {
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue(null)
 
     renderApp()
 
     expect(await screen.findByTestId('auth-redirect')).toBeInTheDocument()
-    expect(window.location.href).toBe('/.auth/login/aad?post_login_redirect_uri=/')
+    expect(screen.getByTestId('auth-redirect').textContent).toMatch(/VITE_AUTH_BYPASS/)
+    // In dev mode the redirect must NOT fire — it causes a strobe loop in local dev
+    expect(window.location.href).toBe('')
   })
 
   it('renders app with logged-in email when authenticated', async () => {

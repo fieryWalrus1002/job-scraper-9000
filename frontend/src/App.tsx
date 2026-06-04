@@ -23,8 +23,16 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    window.location.href = '/.auth/login/aad?post_login_redirect_uri=/'
-    return <div data-testid="auth-redirect" className="flex h-svh items-center justify-center text-muted text-sm">Signing in…</div>
+    if (!import.meta.env.DEV) {
+      window.location.href = '/.auth/login/aad?post_login_redirect_uri=/'
+    }
+    return (
+      <div data-testid="auth-redirect" className="flex h-svh items-center justify-center text-muted text-sm">
+        {import.meta.env.DEV
+          ? 'Not authenticated — set VITE_AUTH_BYPASS=1 in frontend/.env.local'
+          : 'Signing in…'}
+      </div>
+    )
   }
 
   return <AppShell email={principal!.userDetails} />
