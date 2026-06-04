@@ -168,10 +168,16 @@ def export_corrections(
             cur.execute(
                 _SELECT_SQL, {"model": model, "profile_version": profile_version}
             )
-            with open(out_path, "w") as f:
+            # encoding="utf-8" + newline="\n" so the JSONL is deterministic
+            # across platforms (Windows would otherwise default to the locale
+            # encoding and translate "\n" → "\r\n").
+            with open(out_path, "w", encoding="utf-8", newline="\n") as f:
                 for row in cur:
                     record = build_gold_record(row)
-                    f.write(json.dumps(record, default=_json_default) + "\n")
+                    f.write(
+                        json.dumps(record, default=_json_default, ensure_ascii=False)
+                        + "\n"
+                    )
                     count += 1
     return count
 
