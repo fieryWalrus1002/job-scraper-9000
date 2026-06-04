@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class JobSummary(BaseModel):
@@ -140,3 +140,25 @@ class ApplicationUpdate(BaseModel):
     status: ApplicationStatus | None = None
     applied_at: date | None = None
     notes: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Eval corrections — dashboard-sourced gold set for skills_fit
+# ---------------------------------------------------------------------------
+
+
+class EvalCorrectionIn(BaseModel):
+    dedup_hash: str
+    corrected_score: int = Field(ge=1, le=5)
+    correction_reason: str | None = None
+
+
+class EvalCorrectionOut(BaseModel):
+    dedup_hash: str
+    corrected_score: int
+    correction_reason: str | None
+    # snapshot at correction time — what the AI thought when the human corrected
+    original_score: int | None
+    original_model: str
+    profile_version: str
+    corrected_at: datetime
