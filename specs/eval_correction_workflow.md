@@ -21,7 +21,9 @@ Both feed the same evaluator, same JSONL format.
 
 ```sql
 CREATE TABLE app.eval_corrections (
-  dedup_hash        TEXT PRIMARY KEY,
+  dedup_hash        TEXT PRIMARY KEY
+                        REFERENCES raw.scored_job_postings(dedup_hash)
+                        ON DELETE CASCADE,
   corrected_score   INT NOT NULL CHECK (corrected_score BETWEEN 1 AND 5),
   correction_reason TEXT,
   original_score    INT,

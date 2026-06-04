@@ -8,9 +8,10 @@ Adds app.eval_corrections — dashboard-sourced human corrections to skills_fit
 scores. Feeds the gold set for eval-harness comparison alongside the sampled
 proposal flow (scripts/propose_skills_fit_seed.py).
 
-One row per dedup_hash, last-write-wins. Snapshots (original_score, model,
-profile_version) at correction time so corrections stay interpretable when
-the underlying score is re-run with a different model or profile.
+One row per dedup_hash, last-write-wins. Snapshots (original_score,
+original_model, profile_version) at correction time so corrections stay
+interpretable when the underlying score is re-run with a different model
+or profile.
 """
 
 from typing import Sequence, Union
