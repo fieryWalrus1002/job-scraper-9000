@@ -1,0 +1,4 @@
+# Allowed identities. Email matched against userDetails from Entra ID (case-insensitive).
+# Copy to config/auth.yml and add your email address.
+allowed_emails:
+  - you@example.com
