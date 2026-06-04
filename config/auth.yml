@@ -1,3 +1,0 @@
-# Allowed identities. Email matched against userDetails from Entra ID (case-insensitive).
-allowed_emails:
-  - REDACTED_EMAIL
