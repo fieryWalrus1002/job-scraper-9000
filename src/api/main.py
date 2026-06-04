@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
@@ -13,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from . import auth as _auth
+from .auth import Principal, current_principal
 from .schemas import (
     Application,
     ApplicationCreate,
@@ -26,6 +29,8 @@ from .schemas import (
 )
 
 load_dotenv()
+
+log = logging.getLogger(__name__)
 
 _pool: AsyncConnectionPool | None = None
 
@@ -48,6 +53,14 @@ async def lifespan(app: FastAPI):
         open=False,
     )
     await _pool.open()
+
+    emails = _auth.load_auth_config()
+    _auth.init(emails)
+    if os.environ.get(_auth.BYPASS_VAR):
+        log.warning("auth: bypass (dev) — do not use in production")
+    else:
+        log.info("auth: enforced (allowlist=%d entries)", len(emails))
+
     yield
     await _pool.close()
 
@@ -77,6 +90,7 @@ async def get_pool() -> AsyncConnectionPool:
 
 
 Pool = Annotated[AsyncConnectionPool, Depends(get_pool)]
+Auth = Annotated[Principal, Depends(current_principal)]
 
 _LIST_COLS = """
     dedup_hash, source, source_url, title, company, location, posted_at,
@@ -105,6 +119,7 @@ def health_check():
 @router.get("/jobs", response_model=JobListResponse)
 async def list_jobs(
     pool: Pool,
+    principal: Auth,
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     remote_classification: Annotated[
@@ -192,7 +207,7 @@ async def list_jobs(
 
 
 @router.post("/jobs", response_model=Application, status_code=201)
-async def create_manual_job(body: ManualJobCreate, pool: Pool):
+async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
     key = "|".join(
         [
             (body.title or "").lower().strip(),
@@ -253,7 +268,7 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool):
 
 
 @router.get("/jobs/{dedup_hash}", response_model=JobDetail)
-async def get_job(dedup_hash: str, pool: Pool):
+async def get_job(dedup_hash: str, pool: Pool, principal: Auth):
     sql = f"""
         SELECT {_DETAIL_COLS}
         FROM raw.scored_job_postings
@@ -270,7 +285,7 @@ async def get_job(dedup_hash: str, pool: Pool):
 
 
 @router.get("/applications", response_model=list[Application])
-async def list_applications(pool: Pool):
+async def list_applications(pool: Pool, principal: Auth):
     sql = """
         SELECT
             a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
@@ -286,7 +301,7 @@ async def list_applications(pool: Pool):
 
 
 @router.post("/applications", response_model=Application, status_code=201)
-async def create_application(body: ApplicationCreate, pool: Pool):
+async def create_application(body: ApplicationCreate, pool: Pool, principal: Auth):
     sql = """
         INSERT INTO app.user_applications (dedup_hash, status, applied_at, notes)
         VALUES (%(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
@@ -304,7 +319,7 @@ async def create_application(body: ApplicationCreate, pool: Pool):
 
 
 @router.delete("/applications/{dedup_hash}", status_code=204, response_class=Response)
-async def delete_application(dedup_hash: str, pool: Pool):
+async def delete_application(dedup_hash: str, pool: Pool, principal: Auth):
     async with pool.connection() as conn:
         cur = await conn.execute(
             "DELETE FROM app.user_applications WHERE dedup_hash = %(dedup_hash)s",
@@ -316,7 +331,9 @@ async def delete_application(dedup_hash: str, pool: Pool):
 
 
 @router.patch("/applications/{dedup_hash}", response_model=Application)
-async def update_application(dedup_hash: str, body: ApplicationUpdate, pool: Pool):
+async def update_application(
+    dedup_hash: str, body: ApplicationUpdate, pool: Pool, principal: Auth
+):
     updates = body.model_dump(exclude_unset=True)
     if "status" in updates and updates["status"] is None:
         raise HTTPException(status_code=422, detail="status cannot be null")
@@ -350,7 +367,7 @@ _CORRECTION_COLS = """
 
 
 @router.post("/eval/corrections", response_model=EvalCorrectionOut, status_code=201)
-async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool):
+async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: Auth):
     """Upsert a human correction to a job's skills_fit score.
 
     The server snapshots the current AI score/model/profile_version from
@@ -403,7 +420,7 @@ async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool):
 
 
 @router.get("/eval/corrections/{dedup_hash}", response_model=EvalCorrectionOut)
-async def get_eval_correction(dedup_hash: str, pool: Pool):
+async def get_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
     async with pool.connection() as conn:
         cur = await conn.execute(
             f"""
@@ -422,7 +439,7 @@ async def get_eval_correction(dedup_hash: str, pool: Pool):
 @router.delete(
     "/eval/corrections/{dedup_hash}", status_code=204, response_class=Response
 )
-async def delete_eval_correction(dedup_hash: str, pool: Pool):
+async def delete_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
     async with pool.connection() as conn:
         cur = await conn.execute(
             "DELETE FROM app.eval_corrections WHERE dedup_hash = %(dedup_hash)s",
@@ -436,6 +453,7 @@ async def delete_eval_correction(dedup_hash: str, pool: Pool):
 @router.get("/eval/corrections", response_model=list[EvalCorrectionOut])
 async def list_eval_corrections(
     pool: Pool,
+    principal: Auth,
     model: Annotated[str | None, Query(max_length=200)] = None,
     profile_version: Annotated[str | None, Query(max_length=100)] = None,
 ):
