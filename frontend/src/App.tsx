@@ -50,41 +50,56 @@ export default function App() {
   const displayTotal = search ? filteredItems.length : data?.total
   const trackedCount = applications?.size ?? 0
 
-  const tabBtn = 'group relative px-3 py-1.5 border-none bg-transparent text-muted text-[13px] font-medium cursor-pointer rounded-md transition-all hover:text-fg'
+  const tabBtn =
+    'group relative inline-flex items-center gap-2 h-8 px-3 border-none bg-transparent text-muted text-[13px] font-medium cursor-pointer rounded-md transition-all hover:text-fg hover:bg-hover/50'
   const tabBtnActive = 'text-fg bg-card border border-border shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-  const tabCount = 'ml-1.5 text-[11px] font-mono text-faint group-hover:text-muted transition-colors'
-  const tabCountActive = 'text-primary-hov'
+  const tabCount =
+    'inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded text-[10.5px] font-mono tabular-nums font-medium ' +
+    'bg-bg-elevated/80 text-faint border border-border/60 ' +
+    'group-hover:text-muted group-hover:border-border transition-colors'
+  const tabCountActive = 'text-primary-hov bg-primary/15 border-primary/30'
 
   return (
     <div className="flex flex-col h-svh overflow-hidden">
-      <header className="flex items-center gap-5 px-5 h-[52px] border-b border-border shrink-0 bg-card/60 backdrop-blur-md">
-        <div className="flex items-center gap-2">
+      <header className="flex items-center gap-6 px-5 h-[52px] border-b border-border shrink-0 bg-card/60 backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
           <div className="size-6 rounded-md bg-gradient-to-br from-primary to-primary-dim flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_4px_rgba(99,102,241,0.4)]">
             <span className="text-[11px] font-bold text-white tracking-tight">JS</span>
           </div>
-          <span className="font-semibold text-[14px] text-fg whitespace-nowrap tracking-tight">Job Scraper <span className="text-muted font-normal">9000</span></span>
+          <span className="font-semibold text-[14px] text-fg whitespace-nowrap tracking-tight">
+            Job Scraper <span className="text-muted font-normal">9000</span>
+          </span>
         </div>
-        <nav className="flex gap-1 ml-2">
+        <nav className="flex items-center gap-1.5">
           <button className={cn(tabBtn, tab === 'jobs' && tabBtnActive)} onClick={() => setTab('jobs')}>
-            Jobs
-            {data && <span className={cn(tabCount, tab === 'jobs' && tabCountActive)}>{displayTotal?.toLocaleString()}</span>}
+            <span>Jobs</span>
+            {data && (
+              <span className={cn(tabCount, tab === 'jobs' && tabCountActive)}>
+                {displayTotal?.toLocaleString()}
+              </span>
+            )}
           </button>
           <button className={cn(tabBtn, tab === 'workflow' && tabBtnActive)} onClick={() => setTab('workflow')}>
-            Workflow
-            {trackedCount > 0 && <span className={cn(tabCount, tab === 'workflow' && tabCountActive)}>{trackedCount}</span>}
+            <span>Workflow</span>
+            {trackedCount > 0 && (
+              <span className={cn(tabCount, tab === 'workflow' && tabCountActive)}>
+                {trackedCount}
+              </span>
+            )}
           </button>
           <button className={cn(tabBtn, tab === 'summary' && tabBtnActive)} onClick={() => setTab('summary')}>
-            Summary
+            <span>Summary</span>
           </button>
         </nav>
         <div className="flex-1" />
-        <Button onClick={() => setAddJobOpen(true)} size="sm">
-          <span className="text-base leading-none">+</span> Add job
+        <Button onClick={() => setAddJobOpen(true)}>
+          <span className="text-[15px] leading-none mr-0.5">+</span>
+          Add job
         </Button>
       </header>
 
       <div className="flex-1 flex flex-row overflow-hidden">
-        <div className={cn('flex flex-row shrink-0 relative transition-[width] duration-200 ease', paneOpen ? 'w-[212px]' : 'w-5')}>
+        <div className={cn('flex flex-row shrink-0 relative transition-[width] duration-200 ease', paneOpen ? 'w-[224px]' : 'w-5')}>
           <FilterPane
             filters={filters}
             search={search}

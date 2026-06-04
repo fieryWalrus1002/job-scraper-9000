@@ -78,7 +78,7 @@ export default function WorkflowTab({ onSelectJob }: Props) {
   }
 
   return (
-    <div className="p-4">
+    <div className="flex flex-col h-full overflow-hidden">
       <FilterBar
         filter={filter}
         setFilter={setFilter}

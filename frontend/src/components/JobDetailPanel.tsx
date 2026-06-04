@@ -133,10 +133,10 @@ function Section({
   return (
     <div className="border-b border-border last:border-b-0">
       <button
-        className="flex items-center justify-between w-full px-6 py-3 bg-transparent border-none text-fg text-[13px] font-medium cursor-pointer text-left hover:bg-hover/60 transition-colors group"
+        className="flex items-center justify-between w-full px-7 py-3.5 bg-transparent border-none text-fg text-[13px] font-medium cursor-pointer text-left hover:bg-hover/60 transition-colors group"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-2.5">
           <svg
             width="10"
             height="10"
@@ -150,7 +150,7 @@ function Section({
         </span>
         {badge && <span>{badge}</span>}
       </button>
-      {open && <div className="px-6 pb-5 pt-1">{children}</div>}
+      {open && <div className="px-7 pb-6 pt-2">{children}</div>}
     </div>
   )
 }
@@ -184,7 +184,7 @@ function SkillsFitSection({ ai }: { ai: AiFitDetail | null }) {
       {ai.score_rationale && (
         <div className="flex flex-col gap-1.5">
           <div className={sectionLabel}>Rationale</div>
-          <div className="text-[13px] leading-[1.65] text-fg bg-bg-elevated border border-border rounded-md px-3.5 py-3 whitespace-pre-wrap">
+          <div className="text-[13px] leading-[1.65] text-fg bg-bg border border-border rounded-md px-4 py-3 whitespace-pre-wrap shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
             {ai.score_rationale}
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
         className="sm:max-w-[940px] w-full h-[88vh] p-0 gap-0 overflow-hidden"
       >
         {/* ── Header ───────────────────────────────── */}
-        <div className="flex items-start gap-4 px-6 pt-5 pb-4 border-b border-border shrink-0 bg-gradient-to-b from-card to-card/70">
+        <div className="flex items-start gap-4 px-7 pt-5 pb-4 border-b border-border shrink-0 bg-gradient-to-b from-card to-card/70">
           <div className="flex-1 min-w-0">
             <DialogTitle asChild>
               <h2 className="text-[18px] font-semibold text-fg m-0 mb-1.5 leading-[1.3] tracking-tight">
@@ -286,7 +286,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
               )}
             </div>
           </div>
-          <div className="flex gap-1.5 shrink-0">
+          <div className="flex gap-2 shrink-0">
             {data?.source_url && (
               <Button variant="secondary" size="sm" asChild>
                 <a href={data.source_url} target="_blank" rel="noopener noreferrer">
@@ -317,7 +317,7 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
           {data && (
             <>
               <Section title="Description">
-                <div className="font-sans text-[13px] leading-[1.7] text-fg whitespace-pre-wrap break-words m-0 max-h-[420px] overflow-y-auto bg-bg-elevated border border-border rounded-md p-3.5">
+                <div className="font-sans text-[13px] leading-[1.7] text-fg whitespace-pre-wrap break-words m-0 max-h-[420px] overflow-y-auto bg-bg border border-border rounded-md px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                   {data.description ?? <span className="text-faint">No description available.</span>}
                 </div>
               </Section>

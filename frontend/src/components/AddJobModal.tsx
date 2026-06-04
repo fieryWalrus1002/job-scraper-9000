@@ -175,11 +175,11 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
             </div>
           )}
 
-          <div className="col-span-2 flex justify-end gap-2 pt-2 mt-1 border-t border-border -mx-6 px-6 pb-1">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          <div className="col-span-2 flex justify-end gap-3 pt-4 mt-2 border-t border-border -mx-6 px-6 pb-1">
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? 'Adding…' : 'Add job'}
             </Button>
           </div>

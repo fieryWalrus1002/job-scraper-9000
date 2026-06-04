@@ -41,9 +41,25 @@ interface ContextState {
 // ── Badge helpers ───────────────────────────────────────────────────────────
 
 function ScoreBadge({ score }: { score: number | null }) {
-  if (score === null) return <span className="text-faint">—</span>
-  const variant = score >= 4 ? 'score_high' : score === 3 ? 'score_mid' : 'score_low'
-  return <Badge variant={variant} className="font-mono">{score}</Badge>
+  if (score === null) {
+    return (
+      <span className="inline-flex items-center justify-center size-7 rounded-md text-[13px] font-mono text-faint border border-border/40">
+        —
+      </span>
+    )
+  }
+  const cls =
+    score >= 4 ? 'bg-score-high/15 text-score-high border-score-high/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' :
+    score === 3 ? 'bg-score-mid/15 text-score-mid border-score-mid/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' :
+    'bg-score-low/15 text-score-low border-score-low/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+  return (
+    <span className={cn(
+      'inline-flex items-center justify-center size-7 rounded-md text-[14px] font-mono font-semibold border tabular-nums',
+      cls,
+    )}>
+      {score}
+    </span>
+  )
 }
 
 function ClassificationBadge({ value }: { value: string | null }) {

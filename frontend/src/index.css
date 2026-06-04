@@ -48,9 +48,8 @@
   --radius: 6px;
 }
 
-/* Global reset + base ───────────────────────────────── */
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Global base — Tailwind's preflight handles box-sizing/margin/padding reset.
+   Anything below is overrides / atmosphere, not resets. */
 
 :root {
   font-family: 'Geist', system-ui, sans-serif;
@@ -110,6 +109,56 @@ body {
 /* Selection */
 ::selection { background: rgba(99, 102, 241, 0.35); color: #fff; }
 
+/* ── Form control normalization ──────────────────── */
+
+/* Tell browsers to render native form controls in dark mode (calendar picker, spinners) */
+input, select, textarea, button { color-scheme: dark; font-family: inherit; }
+
+/* Date / time inputs — normalize the size & color of the browser-rendered value text */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"],
+input[type="week"] {
+  font-family: 'Geist', system-ui, sans-serif;
+  font-size: 13px;
+  color: #e6e8ee;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit {
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+}
+
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
+input[type="date"]::-webkit-datetime-edit-text { color: #5b6072; padding: 0 1px; }
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: #e6e8ee;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.45;
+  cursor: pointer;
+  filter: invert(0.7);
+  transition: opacity 0.15s;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 0.85; }
+
+/* Number inputs — strip default spinner */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
 /* ── Table layout ─────────────────────────────── */
 
 .table-outer { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -131,7 +180,7 @@ body {
   background: #14161f;
   backdrop-filter: blur(8px);
   border-bottom: 1px solid #262936;
-  padding: 10px 12px;
+  padding: 10px 14px;
   text-align: left;
   font-weight: 500;
   color: #8b91a3;
@@ -142,15 +191,21 @@ body {
   z-index: 10;
 }
 
+.job-table th:first-child { padding-left: 20px; }
+.job-table th:last-child  { padding-right: 20px; }
+
 .job-table th.col-sortable { cursor: pointer; user-select: none; }
 .job-table th.col-sortable:hover { color: #e6e8ee; }
 
 .job-table td {
-  padding: 10px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid rgba(38, 41, 54, 0.6);
   vertical-align: middle;
   overflow: hidden;
 }
+
+.job-table td:first-child { padding-left: 20px; }
+.job-table td:last-child  { padding-right: 20px; }
 
 .job-table tbody tr:last-child td { border-bottom: none; }
 

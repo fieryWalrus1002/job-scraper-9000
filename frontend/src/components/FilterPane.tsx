@@ -1,4 +1,13 @@
 import { useState } from 'react'
+import {
+  SearchIcon,
+  Building2Icon,
+  StarIcon,
+  GlobeIcon,
+  CalendarIcon,
+  DollarSignIcon,
+  Columns3Icon,
+} from 'lucide-react'
 import type { Filters } from '../types'
 import { EMPTY_FILTERS, REMOTE_OPTIONS, hasActiveFilters } from '../lib/filters'
 import { COLUMNS } from '../lib/columns'
@@ -26,11 +35,21 @@ const getRelativeDateString = (daysOffset: number) => {
   return `${year}-${month}-${day}`
 }
 
-const labelCls = 'text-[10px] font-semibold text-muted uppercase tracking-[0.08em]'
+const labelCls = 'text-[10.5px] font-semibold text-muted uppercase tracking-[0.08em] flex items-center gap-1.5'
+const iconCls = 'size-3 text-faint'
 const nativeSelect =
   'h-8 px-2 bg-bg-elevated border border-border rounded-md text-fg text-[13px] outline-none cursor-pointer ' +
   'hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 ' +
   'transition-[color,border-color,box-shadow]'
+
+function SectionLabel({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <span className={labelCls}>
+      <Icon className={iconCls} />
+      {children}
+    </span>
+  )
+}
 
 function Section({ children, className }: { children: React.ReactNode; className?: string }) {
   return <div className={cn('flex flex-col gap-1.5', className)}>{children}</div>
@@ -38,11 +57,13 @@ function Section({ children, className }: { children: React.ReactNode; className
 
 function Disclosure({
   label,
+  icon: Icon,
   open,
   onToggle,
   children,
 }: {
   label: string
+  icon: React.ComponentType<{ className?: string }>
   open: boolean
   onToggle: () => void
   children: React.ReactNode
@@ -52,16 +73,19 @@ function Disclosure({
       <button
         className={cn(
           labelCls,
-          'bg-transparent border-none cursor-pointer flex items-center justify-between gap-1 p-0 w-full text-left hover:text-fg transition-colors',
+          'bg-transparent border-none cursor-pointer justify-between p-0 w-full text-left hover:text-fg group transition-colors',
         )}
         onClick={onToggle}
       >
-        <span>{label}</span>
+        <span className="flex items-center gap-1.5">
+          <Icon className={cn(iconCls, 'group-hover:text-muted transition-colors')} />
+          {label}
+        </span>
         <svg
           width="10"
           height="10"
           viewBox="0 0 10 10"
-          className={cn('transition-transform duration-200', open && 'rotate-90')}
+          className={cn('transition-transform duration-200 text-faint group-hover:text-muted', open && 'rotate-90')}
           aria-hidden="true"
         >
           <path d="M3.5 2 L6.5 5 L3.5 8" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -105,12 +129,12 @@ export default function FilterPane({
   return (
     <aside
       className={cn(
-        'w-[212px] shrink-0 border-r border-border bg-card/40 backdrop-blur-sm px-3 py-3 flex flex-col gap-3 overflow-y-auto transition-[opacity,width] duration-150 ease',
+        'w-[224px] shrink-0 border-r border-border bg-card/40 backdrop-blur-sm px-4 py-4 flex flex-col gap-3.5 overflow-y-auto transition-[opacity,width] duration-150 ease',
         collapsed && 'overflow-hidden opacity-0 pointer-events-none w-0 p-0 border-none',
       )}
     >
       <Section>
-        <label className={labelCls}>Search</label>
+        <SectionLabel icon={SearchIcon}>Search</SectionLabel>
         <Input
           type="text"
           placeholder="title, company…"
@@ -120,7 +144,7 @@ export default function FilterPane({
       </Section>
 
       <Section>
-        <label className={labelCls}>Company</label>
+        <SectionLabel icon={Building2Icon}>Company</SectionLabel>
         <Input
           type="text"
           placeholder="e.g. SEL, Google…"
@@ -130,7 +154,7 @@ export default function FilterPane({
       </Section>
 
       <Section>
-        <label className={labelCls}>Score</label>
+        <SectionLabel icon={StarIcon}>Score</SectionLabel>
         <div className="flex items-center gap-1.5">
           <select
             className={cn(nativeSelect, 'flex-1')}
@@ -156,7 +180,7 @@ export default function FilterPane({
         </div>
       </Section>
 
-      <Disclosure label="Remote" open={remoteOpen} onToggle={() => setRemoteOpen((v) => !v)}>
+      <Disclosure label="Remote" icon={GlobeIcon} open={remoteOpen} onToggle={() => setRemoteOpen((v) => !v)}>
         {REMOTE_OPTIONS.filter((o) => o.value).map((o) => (
           <label
             key={o.value}
@@ -174,14 +198,14 @@ export default function FilterPane({
       </Disclosure>
 
       <Section>
-        <label className={labelCls}>Posted</label>
+        <SectionLabel icon={CalendarIcon}>Posted</SectionLabel>
         <Input
           type="date"
           value={filters.minPostedAt || defaultMinPostedAt}
           onChange={(e) => set('minPostedAt', e.target.value)}
         />
         <div className="flex items-center gap-2 mt-1">
-          <span className={cn(labelCls, 'shrink-0')}>to</span>
+          <span className="text-[10.5px] font-semibold text-faint uppercase tracking-[0.08em] shrink-0 w-7">to</span>
           <Input
             type="date"
             value={filters.maxPostedAt || defaultMaxPostedAt}
@@ -191,7 +215,9 @@ export default function FilterPane({
       </Section>
 
       <Section>
-        <label className={labelCls}>Min salary <span className="text-faint normal-case font-normal">($k/yr)</span></label>
+        <SectionLabel icon={DollarSignIcon}>
+          Min salary <span className="text-faint normal-case font-normal ml-0.5">($k/yr)</span>
+        </SectionLabel>
         <Input
           type="number"
           placeholder="e.g. 120"
@@ -201,9 +227,9 @@ export default function FilterPane({
         />
       </Section>
 
-      <div className="border-t border-border/60 -mx-3" />
+      <div className="border-t border-border/60 -mx-4" />
 
-      <Disclosure label="Columns" open={colsOpen} onToggle={() => setColsOpen((v) => !v)}>
+      <Disclosure label="Columns" icon={Columns3Icon} open={colsOpen} onToggle={() => setColsOpen((v) => !v)}>
         {COLUMNS.map((col) => (
           <label
             key={col.key}
@@ -220,7 +246,7 @@ export default function FilterPane({
         ))}
       </Disclosure>
 
-      <div className="flex flex-col gap-1.5 mt-auto pt-2 border-t border-border/60 -mx-3 px-3">
+      <div className="flex flex-col gap-1.5 mt-auto pt-2 border-t border-border/60 -mx-4 px-4">
         {total !== undefined && (
           <div className="text-[11px] text-muted flex items-baseline gap-1.5 mt-2">
             <span className="font-mono text-fg tabular-nums">{total.toLocaleString()}</span>
