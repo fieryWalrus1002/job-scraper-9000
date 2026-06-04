@@ -29,7 +29,13 @@ _DEV_PRINCIPAL = Principal(email="dev@localhost", roles=["dev-bypass"])
 
 
 def load_auth_config() -> list[str]:
+    if not _CONFIG_PATH.exists():
+        raise RuntimeError(f"Auth config not found: {_CONFIG_PATH}")
     data = yaml.safe_load(_CONFIG_PATH.read_text())
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"Auth config must be a YAML mapping, got: {type(data).__name__}"
+        )
     return [e.lower() for e in (data.get("allowed_emails") or [])]
 
 
@@ -47,8 +53,11 @@ def current_principal(request: Request) -> Principal:
         raise HTTPException(status_code=401, detail="Missing authentication")
 
     try:
-        claims = json.loads(base64.b64decode(header))
+        claims = json.loads(base64.b64decode(header, validate=True))
     except Exception:
+        raise HTTPException(status_code=401, detail="Malformed authentication header")
+
+    if not isinstance(claims, dict):
         raise HTTPException(status_code=401, detail="Malformed authentication header")
 
     email = (claims.get("userDetails") or "").lower()
