@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useJobs } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
@@ -18,14 +18,17 @@ import { cn } from './lib/utils'
 export default function App() {
   const { principal, isLoading: authLoading, isAuthenticated } = useAuth()
 
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated && !import.meta.env.DEV) {
+      window.location.href = '/.auth/login/aad?post_login_redirect_uri=/'
+    }
+  }, [authLoading, isAuthenticated])
+
   if (authLoading) {
     return <div className="flex h-svh items-center justify-center text-muted text-sm">Loading…</div>
   }
 
   if (!isAuthenticated) {
-    if (!import.meta.env.DEV) {
-      window.location.href = '/.auth/login/aad?post_login_redirect_uri=/'
-    }
     return (
       <div data-testid="auth-redirect" className="flex h-svh items-center justify-center text-muted text-sm">
         {import.meta.env.DEV
