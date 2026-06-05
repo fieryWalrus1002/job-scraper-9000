@@ -13,9 +13,6 @@ from typing import Annotated, Any, Literal, NoReturn, cast
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
 
-from alembic import command as alembic_command
-from alembic.config import Config as AlembicConfig
-
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import Response

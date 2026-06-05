@@ -128,6 +128,7 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
             continue
 
         result = _connect_and_ingest(records, args, database_url)
+        args.apply_schema = False  # only apply once per process run
         total += result["total"]
         inserted += result["inserted"]
         skipped += result["skipped"]

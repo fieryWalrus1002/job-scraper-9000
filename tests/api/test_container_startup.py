@@ -129,27 +129,22 @@ def test_container_exits_cleanly_without_database_url():
 
 
 @skip_if_no_docker
-def test_container_starts_with_unreachable_database():
-    """Container stays up when DATABASE_URL points at an unreachable host.
+def test_container_exits_with_unreachable_database():
+    """Container fails fast when DATABASE_URL points at an unreachable host.
 
-    psycopg_pool handles failed connections gracefully (retries in background),
-    so the lifespan completes and health returns 200. The pool exists but has
-    no live connections; DB-dependent routes will return 503 when they time out
-    waiting for a connection, but the container itself does not crash.
+    Alembic runs during lifespan startup and requires a live DB connection.
+    If the DB is unreachable, the migration fails and the container exits with
+    code 3 — ACA will restart it. The old psycopg_pool background-retry
+    behaviour no longer applies; fail-fast is intentional.
     """
     env = {
         "AUTH_BYPASS": "1",
         "DATABASE_URL": "postgresql://user:pass@192.0.2.1:5432/db",
     }
     with _Container(env=env, port=_HOST_PORT_BASE + 1) as c:
-        exit_code = c.wait_for_exit(timeout=8.0)
-        assert exit_code is None, (
-            f"Container exited with code {exit_code} on unreachable DB."
-        )
-        resp = _wait_for_health(c.base_url())
-        assert resp is not None, "Container started but /api/health never responded"
-        assert resp.status_code == 200, (
-            f"Expected 200 (pool initialised, DB reconnecting) but got {resp.status_code}"
+        exit_code = c.wait_for_exit(timeout=15.0)
+        assert exit_code == 3, (
+            f"Expected exit code 3 (startup failure) but got {exit_code!r}."
         )
 
 
