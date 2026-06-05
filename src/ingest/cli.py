@@ -47,7 +47,7 @@ def _cmd_ingest(args: argparse.Namespace) -> None:
     records = read_jsonl(input_path)
     if not records:
         log.warning("No records found in %s", input_path)
-        print("total=0 inserted=0 skipped=0 dry_run=false")
+        print(f"total=0 inserted=0 skipped=0 dry_run={str(args.dry_run).lower()}")
         return
 
     log.info("Loaded %d records from %s", len(records), input_path)

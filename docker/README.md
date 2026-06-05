@@ -59,7 +59,7 @@ I've already built an ingest.Dockerfile that sets up a container capable of runn
 
 ```bash
 # 1. Build the image locally
-docker build -f ingest.Dockerfile -t jobscraper-ingest:latest .
+docker build -f docker/ingest.Dockerfile -t jobscraper-ingest:latest .
 
 # 2. Run the container against your local network host, passing everything explicitly
 docker run --rm \
