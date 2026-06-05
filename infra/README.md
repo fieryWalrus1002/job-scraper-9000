@@ -70,7 +70,7 @@ Entra ID → App registrations → job-scraper-9000 → Authentication → Add a
 Set redirect URI to:
 `<YOUR-SWA-URL>/.auth/login/aad/callback`
 
-Next,you can visit it. At this time, it was a "please check back later" message, but thats because we haven't deployed the frontend yet. After we deploy the frontend, you should see the actual app.
+Next, you can visit it. At this time, it was a "please check back later" message, but that's because we haven't deployed the frontend yet. After we deploy the frontend, you should see the actual app.
 
 You can check the backend status with:
 
@@ -139,8 +139,8 @@ into the container app automatically. Pass `dbAdminPassword` at deploy time
 ```bash
 az deployment group create \
   --resource-group rg-jobscraper \
-  --template-file infra/main.bicep \
-  --parameters infra/main.bicepparam \
+  --template-file main.bicep \
+  --parameters main.bicepparam \
   --parameters clientSecret='<your-client-secret>' \
   --parameters dbAdminPassword='<your-db-password>'
 ```

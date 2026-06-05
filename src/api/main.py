@@ -53,7 +53,8 @@ async def lifespan(app: FastAPI):
         log.critical(_msg)
         sys.stderr.write(_msg)
         sys.stderr.flush()
-        await asyncio.sleep(5)  # give ACA log shipper time to forward before exit
+        delay = int(os.environ.get("LOG_FLUSH_DELAY", "5"))
+        await asyncio.sleep(delay)  # give ACA log shipper time to forward before exit
         sys.exit(3)
 
     _pool = AsyncConnectionPool(

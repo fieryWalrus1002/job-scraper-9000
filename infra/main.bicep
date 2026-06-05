@@ -15,10 +15,14 @@ param imageTag string = 'latest'
 param clientSecret string
 
 @secure()
-@description('Password for the Postgres admin login. Must not contain URL-reserved characters (@, :, /, ?, #) — it is interpolated directly into the DATABASE_URL connection string.')
+@description('Password for the Postgres admin login. Interpolated into DATABASE_URL — common reserved characters are percent-encoded automatically, but avoid single quotes.')
 param dbAdminPassword string
 
 param dbAdminLogin string = 'dbadmin'
+
+// Bicep has no uriEncode(); encode the characters that break a psycopg connection string.
+// % must go first to avoid double-encoding any already-present percent signs.
+var dbPasswordEncoded = replace(replace(replace(replace(dbAdminPassword, '%', '%25'), '@', '%40'), '#', '%23'), ':', '%3A')
 
 // ============================================================
 // Modules
@@ -60,7 +64,7 @@ module containerApp 'modules/containerApp.bicep' = {
     acrLoginServer: registry.outputs.loginServer
     acrPassword: registry.outputs.adminPassword
     imageTag: imageTag
-    databaseUrl: 'postgresql://${dbAdminLogin}:${dbAdminPassword}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
+    databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
   }
 }
 
