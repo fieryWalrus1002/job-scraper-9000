@@ -11,6 +11,7 @@ Run just the Docker tests:
 
 from __future__ import annotations
 
+import socket
 import subprocess
 import time
 import uuid
@@ -41,11 +42,18 @@ def _docker_available() -> bool:
         return False
 
 
+def _port_available(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) != 0
+
+
 @pytest.fixture(scope="session")
 def azurite_conn_str():
     """Start Azurite blob emulator in Docker; yield its connection string for the session."""
     if not _docker_available():
         pytest.skip("Docker not available")
+    if not _port_available(_HOST_BLOB_PORT):
+        pytest.skip(f"Port {_HOST_BLOB_PORT} is already in use")
 
     name = f"azurite-ingest-{uuid.uuid4().hex[:8]}"
     subprocess.run(
@@ -92,6 +100,7 @@ def azurite_conn_str():
 @pytest.fixture
 def clean_blob_storage(azurite_conn_str):
     """Create pending/processed/failed containers and empty them before each test."""
+    from azure.core.exceptions import ResourceExistsError
     from azure.storage.blob import BlobServiceClient
 
     svc = BlobServiceClient.from_connection_string(azurite_conn_str)
@@ -100,7 +109,7 @@ def clean_blob_storage(azurite_conn_str):
         c = svc.get_container_client(name)
         try:
             c.create_container()
-        except Exception:
+        except ResourceExistsError:
             pass
         for blob in c.list_blobs():
             c.delete_blob(blob.name)
