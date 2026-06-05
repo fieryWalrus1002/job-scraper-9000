@@ -51,7 +51,7 @@ As the frontend will be deployed to Azure Static Web Apps, it will not use the s
 
 ### 3. Blob Storage Ingest Pipeline
 
-Scored JSONL files are uploaded to an Azure Storage Account (`pending` container). An Azure Container Apps Job watches that container with a KEDA `azure-blob` trigger — when a blob arrives, the job spins up, ingests the data into PostgreSQL, and moves the blob to the `processed` container. The Bicep for the storage account and job lives in `infra/modules/storageAccount.bicep` and `infra/modules/ingestJob.bicep`.
+Scored JSONL files are uploaded to an Azure Storage Account (`pending` container). An Azure Container Apps Job watches that container with a KEDA `azure-blob` trigger — when a blob arrives, the job spins up, ingests the data into PostgreSQL, and moves the blob to the `processed` container on success. Unparseable blobs are dead-lettered to the `failed` container with a `reason` metadata tag so KEDA doesn't re-fire on the same poison blob indefinitely. The Bicep for the storage account and job lives in `infra/modules/storageAccount.bicep` and `infra/modules/ingestJob.bicep`.
 
 #### Build and push the ingest image
 
