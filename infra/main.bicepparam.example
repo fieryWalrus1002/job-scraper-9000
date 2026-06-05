@@ -26,3 +26,6 @@ param prefix = 'jobscraper'
 param tenantId = '<your-entra-tenant-id>'
 param clientId = '<your-entra-app-client-id>'
 param imageTag = 'placeholder'  // use 'placeholder' until real image is pushed to ACR
+param dbAdminLogin = 'dbadmin'
+// dbAdminPassword: pass at deploy time — never store here
+// --parameters dbAdminPassword='<your-db-password>'

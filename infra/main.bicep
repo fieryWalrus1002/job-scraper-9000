@@ -14,6 +14,11 @@ param imageTag string = 'latest'
 @secure()
 param clientSecret string
 
+@secure()
+param dbAdminPassword string
+
+param dbAdminLogin string = 'dbadmin'
+
 // ============================================================
 // Modules
 // ============================================================
@@ -34,6 +39,16 @@ module registry 'modules/registry.bicep' = {
   }
 }
 
+module database 'modules/database.bicep' = {
+  name: 'database'
+  params: {
+    location: location
+    prefix: prefix
+    adminLogin: dbAdminLogin
+    adminPassword: dbAdminPassword
+  }
+}
+
 module containerApp 'modules/containerApp.bicep' = {
   name: 'containerApp'
   params: {
@@ -44,6 +59,7 @@ module containerApp 'modules/containerApp.bicep' = {
     acrLoginServer: registry.outputs.loginServer
     acrPassword: registry.outputs.adminPassword
     imageTag: imageTag
+    databaseUrl: 'postgresql://${dbAdminLogin}:${dbAdminPassword}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
   }
 }
 

@@ -46,6 +46,19 @@ backend:
 migrate:
     uv run alembic upgrade head
 
+# Apply db/schema.sql to a target database. Pass DATABASE_URL explicitly for Azure:
+#   just db-init DATABASE_URL="postgresql://dbadmin:<pw>@<fqdn>:5432/jobscraper?sslmode=require"
+db-init DATABASE_URL='':
+    uv run python -c "
+import os, psycopg
+url = '{{DATABASE_URL}}' or os.environ['DATABASE_URL']
+sql = open('db/schema.sql').read()
+with psycopg.connect(url) as conn:
+    conn.autocommit = True
+    conn.execute(sql)
+print('schema applied')
+"
+
 db-up:
     docker compose up db -d
 

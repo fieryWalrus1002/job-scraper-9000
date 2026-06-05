@@ -131,6 +131,37 @@ az containerapp update \
 
 This will update the container app, which will trigger the SWA backend to update, which will trigger the frontend to update, and then you should be good to go!
 
+## Deploying with database
+
+The Bicep now provisions a PostgreSQL Flexible Server and wires `DATABASE_URL`
+into the container app automatically. Pass `dbAdminPassword` at deploy time
+(same pattern as `clientSecret`):
+
+```bash
+az deployment group create \
+  --resource-group rg-jobscraper \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam \
+  --parameters clientSecret='<your-client-secret>' \
+  --parameters dbAdminPassword='<your-db-password>'
+```
+
+After the deploy completes, run the schema migration once:
+
+```bash
+just db-init DATABASE_URL="postgresql://dbadmin:<pw>@<server-fqdn>:5432/jobscraper?sslmode=require"
+```
+
+The server FQDN is in the deployment outputs:
+
+```bash
+az deployment group show -g rg-jobscraper -n main --query properties.outputs
+```
+
+> **Note:** `DATABASE_URL` is stored as an ACA secret (`secretref:database-url`) so
+> the connection string is not exposed in plain-text env vars. Managed Identity
+> would be the next step up in security posture but requires more Entra ID setup.
+
 ## Injecting DATABASE_URL
 
 `DATABASE_URL` must be set as a secret-backed env var — not a plain env var — so the connection string isn't exposed in the ACA config.

@@ -10,6 +10,9 @@ param acrLoginServer string
 @secure()
 param acrPassword string
 
+@secure()
+param databaseUrl string
+
 // Set to 'placeholder' on first deploy before the real image exists in ACR.
 // After pushing the image, redeploy with the real tag.
 param imageTag string = 'placeholder'
@@ -54,6 +57,10 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'acr-password'
           value: acrPassword
         }
+        {
+          name: 'database-url'
+          value: databaseUrl
+        }
       ]
     }
     template: {
@@ -67,6 +74,10 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'AUTH_BYPASS'
               value: '0'
+            }
+            {
+              name: 'DATABASE_URL'
+              secretRef: 'database-url'
             }
           ]
           resources: {
