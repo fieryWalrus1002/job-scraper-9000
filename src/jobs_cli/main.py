@@ -6,6 +6,7 @@ from agents.remote_filter import cli as remote_filter_cli
 from agents.skills_fit import cli as skills_fit_cli
 from job_scraper import cli as job_scraper_cli
 from prefilter import cli as prefilter_cli
+from ingest import cli as ingest_cli
 
 
 def main() -> None:
@@ -20,6 +21,7 @@ def main() -> None:
     prefilter_cli.register(sub)
     remote_filter_cli.register(sub)
     skills_fit_cli.register(sub)
+    ingest_cli.register(sub)
 
     args = parser.parse_args()
     args.func(args)
