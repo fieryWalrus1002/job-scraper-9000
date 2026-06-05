@@ -129,3 +129,17 @@ ship-ingest:
     docker push "${ACR_LOGIN_SERVER}/jobscraper-ingest:latest"
 
     echo "====> Success! Image is live at ${ACR_LOGIN_SERVER}/jobscraper-ingest:latest"
+
+connect-az-db:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "===> pgcli connect to Azure PostgreSQL..."
+    pgcli -h "${AZURE_POSTGRES_SERVER}" -p 5432 -U "${AZURE_POSTGRES_USER}" -d "${AZURE_POSTGRES_DB}"
+
+
+watch-az-ingest:
+    watch -n 15 'az containerapp job execution list \
+        --name jobscraper-ingest-job \
+        --resource-group rg-jobscraper \
+        --query "[].{name:name,status:properties.status,start:properties.startTime}" \
+        -o table'
