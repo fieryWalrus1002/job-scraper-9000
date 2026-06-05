@@ -70,3 +70,14 @@ dev:
 build-images:
     docker build --target backend -t job-api -f docker/app.Dockerfile .
     docker build --target scraper -t job-scraper -f docker/app.Dockerfile .
+    docker build -t job-ingest -f docker/ingest.Dockerfile .
+
+# Upload scored JSONL to Azure Blob Storage pending container.
+# Requires AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY in .env (or az login).
+upload-blob DATE=DATE:
+    az storage blob upload \
+      --account-name "$AZURE_STORAGE_ACCOUNT" \
+      --container-name pending \
+      --name "{{DATE}}/skills_fit_scored.jsonl" \
+      --file "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
+      --overwrite

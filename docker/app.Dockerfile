@@ -16,6 +16,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY src/ /app/src/
 COPY config/ /app/config/
+COPY alembic.ini ./
+COPY migrations/ ./migrations/
 ENV PATH="/app/.venv/bin:$PATH"
 
 # TODO: Need to mount the proper data/ folder it will be reading and writing

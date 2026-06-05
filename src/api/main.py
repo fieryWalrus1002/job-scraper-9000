@@ -9,6 +9,9 @@ from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal, cast
 
+from alembic import command as alembic_command
+from alembic.config import Config as AlembicConfig
+
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from fastapi.responses import Response
@@ -56,6 +59,14 @@ async def lifespan(app: FastAPI):
         delay = int(os.environ.get("LOG_FLUSH_DELAY", "5"))
         await asyncio.sleep(delay)  # give ACA log shipper time to forward before exit
         sys.exit(3)
+
+    def _run_migrations() -> None:
+        cfg = AlembicConfig("alembic.ini")
+        alembic_command.upgrade(cfg, "head")
+
+    log.info("Running Alembic migrations…")
+    await asyncio.to_thread(_run_migrations)
+    log.info("Migrations complete.")
 
     _pool = AsyncConnectionPool(
         url,
