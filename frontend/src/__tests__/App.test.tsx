@@ -20,9 +20,9 @@ function renderApp() {
 
 describe('App auth gate', () => {
   beforeEach(() => {
-    // Mock window.location so assignments don't trigger JSDOM navigation errors
+    // Mock window.location so navigation calls don't trigger JSDOM errors
     delete (window as unknown as Record<string, unknown>).location
-    ;(window as unknown as Record<string, unknown>).location = { href: '' }
+    ;(window as unknown as Record<string, unknown>).location = { href: '', assign: vi.fn() }
 
     // Stub fetch for API calls made by other hooks inside App
     vi.stubGlobal(
