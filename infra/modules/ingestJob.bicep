@@ -26,7 +26,7 @@ resource ingestJob 'Microsoft.App/jobs@2024-03-01' = {
       replicaRetryLimit: 1
       eventTriggerConfig: {
         parallelism: 1
-        minimumExecutionCount: 0
+        replicaCompletionCount: 1
         scale: {
           minExecutions: 0
           maxExecutions: 1
@@ -69,7 +69,10 @@ resource ingestJob 'Microsoft.App/jobs@2024-03-01' = {
           image: imageTag == 'placeholder'
             ? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
             : '${acrLoginServer}/${prefix}-ingest:${imageTag}'
-          args: [
+          command: [
+            'python'
+            '-m'
+            'ingest.cli'
             '--schema-path'
             'db/schema.sql'
             '--apply-schema'

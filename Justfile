@@ -80,4 +80,51 @@ upload-blob DATE=DATE:
       --container-name pending \
       --name "{{DATE}}/skills_fit_scored.jsonl" \
       --file "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
+      --auth-mode login \
       --overwrite
+
+# Build and push the API container image to Azure Container Registry and trigger a new revision
+ship-api:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "====> Fetching container registry details from Azure..."
+    ACR_LOGIN_SERVER=$(az acr list -g rg-jobscraper --query "[0].loginServer" -o tsv)
+    ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+
+    echo "====> Authenticating with ACR: ${ACR_NAME}..."
+    az acr login --name "${ACR_NAME}"
+
+    echo "====> Building API image..."
+    docker build --target backend -f docker/app.Dockerfile -t "${ACR_LOGIN_SERVER}/jobscraper-api:latest" .
+
+    echo "====> Pushing image to Azure..."
+    docker push "${ACR_LOGIN_SERVER}/jobscraper-api:latest"
+
+    echo "====> Triggering new ACA revision..."
+    az containerapp update \
+      --name jobscraper-api \
+      --resource-group rg-jobscraper \
+      --image "${ACR_LOGIN_SERVER}/jobscraper-api:latest"
+
+    echo "====> Done! New revision is live."
+
+# Build and push the ingestion container image to Azure Container Registry
+ship-ingest:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "====> Fetching container registry details from Azure..."
+    ACR_LOGIN_SERVER=$(az acr list -g rg-jobscraper --query "[0].loginServer" -o tsv)
+    ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+
+    echo "====> Authenticating with ACR: ${ACR_NAME}..."
+    az acr login --name "${ACR_NAME}"
+
+    echo "====> Building ingest container image..."
+    docker build -f docker/ingest.Dockerfile -t "${ACR_LOGIN_SERVER}/jobscraper-ingest:latest" .
+
+    echo "====> Pushing image to Azure..."
+    docker push "${ACR_LOGIN_SERVER}/jobscraper-ingest:latest"
+
+    echo "====> Success! Image is live at ${ACR_LOGIN_SERVER}/jobscraper-ingest:latest"
