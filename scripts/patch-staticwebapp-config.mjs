@@ -1,8 +1,10 @@
 // Patches <YOUR-TENANT-ID> in dist/staticwebapp.config.json with AZURE_TENANT_ID.
 // Run automatically via the "postbuild" npm script after `npm run build`.
 //
-// - In CI: AZURE_TENANT_ID must be set or the build fails loudly.
-// - Locally: missing env var emits a warning and exits cleanly (placeholder stays).
+// If AZURE_TENANT_ID is unset (e.g. CI type-check builds, local dev without az login),
+// the placeholder is left as-is and the script exits cleanly. The deploy tooling
+// (just ship-frontend, or a future CD workflow) is responsible for ensuring the
+// variable is present before a real deployment.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -14,9 +16,6 @@ if (!fs.existsSync(configPath)) {
 }
 
 if (!tenantId) {
-  if (process.env.CI) {
-    throw new Error("AZURE_TENANT_ID is required when building in CI.");
-  }
   console.warn(
     "AZURE_TENANT_ID is not set. Leaving <YOUR-TENANT-ID> placeholder unchanged."
   );
