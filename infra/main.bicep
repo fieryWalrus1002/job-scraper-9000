@@ -15,6 +15,7 @@ param imageTag string = 'latest'
 param clientSecret string
 
 @secure()
+@description('Password for the Postgres admin login. Must not contain URL-reserved characters (@, :, /, ?, #) — it is interpolated directly into the DATABASE_URL connection string.')
 param dbAdminPassword string
 
 param dbAdminLogin string = 'dbadmin'

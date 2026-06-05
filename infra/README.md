@@ -37,19 +37,19 @@ This will then return the following output with the values you need to update in
 {
   "acrLoginServer": {
     "type": "String",
-    "value": "jobscraperyuohc35a34v2g.azurecr.io"
+    "value": "<YOUR-ACR-LOGIN-SERVER>"
   },
   "containerAppFqdn": {
     "type": "String",
-    "value": "jobscraper-api.happywave-b8ffb476.westus2.azurecontainerapps.io"
+    "value": "<YOUR-ACA-FQDN>"
   },
   "containerAppId": {
     "type": "String",
-    "value": "/subscriptions/1f487098-d357-4feb-86a2-2d50cf33ab58/resourceGroups/rg-jobscraper/providers/Microsoft.App/containerApps/jobscraper-api"
+    "value": "/subscriptions/<YOUR-SUBSCRIPTION-ID>/resourceGroups/rg-jobscraper/providers/Microsoft.App/containerApps/jobscraper-api"
   },
   "swaUrl": {
     "type": "String",
-    "value": "https://lemon-moss-05209ca1e.7.azurestaticapps.net"
+    "value": "<YOUR-SWA-URL>"
   }
 }
 ```
@@ -60,7 +60,7 @@ Like so:
 az staticwebapp backends link \
 --name jobscraper-swa \
 --resource-group rg-jobscraper \
---backend-resource-id /subscriptions/1f487098-d357-4feb-86a2-2d50cf33ab58/resourceGroups/rg-jobscraper/providers/Microsoft.App/containerApps/jobscraper-api \
+--backend-resource-id /subscriptions/<YOUR-SUBSCRIPTION-ID>/resourceGroups/rg-jobscraper/providers/Microsoft.App/containerApps/jobscraper-api \
 --backend-region westus2
 ```
 
@@ -68,7 +68,7 @@ And then you'll need to get into the EntraId portal to add the redirect URI. It 
 Entra ID → App registrations → job-scraper-9000 → Authentication → Add a platform → Web
 
 Set redirect URI to:
-https://lemon-moss-05209ca1e.7.azurestaticapps.net/.auth/login/aad/callback
+`<YOUR-SWA-URL>/.auth/login/aad/callback`
 
 Next,you can visit it. At this time, it was a "please check back later" message, but thats because we haven't deployed the frontend yet. After we deploy the frontend, you should see the actual app.
 
@@ -84,13 +84,13 @@ Now we're building the frontend, which will push the image to ACR, so we can red
 
 ```bash
 # Log in to ACR
-az acr login --name jobscraperyuohc35a34v2g
+az acr login --name <YOUR-ACR-NAME>
 
 # Build and push the backend image to ACR
-docker build -f docker/app.Dockerfile --target backend -t jobscraperyuohc35a34v2g.azurecr.io/jobscraper-api:latest .
+docker build -f docker/app.Dockerfile --target backend -t <YOUR-ACR-LOGIN-SERVER>/jobscraper-api:latest .
 
 # Push to ACR
-docker push jobscraperyuohc35a34v2g.azurecr.io/jobscraper-api:latest
+docker push <YOUR-ACR-LOGIN-SERVER>/jobscraper-api:latest
 ```
 
 ## Create the resources with the correct image tag
@@ -125,8 +125,7 @@ It should work fine. If you're dumb and forgot to add the email you're using in 
 az containerapp update \
 --name jobscraper-api \
 --resource-group rg-jobscraper \
---resource-group rg-jobscraper \
---image jobscraperyuohc35a34v2g.azurecr.io/jobscraper-api:latest
+--image <YOUR-ACR-LOGIN-SERVER>/jobscraper-api:latest
 ```
 
 This will update the container app, which will trigger the SWA backend to update, which will trigger the frontend to update, and then you should be good to go!
@@ -191,11 +190,11 @@ Register the Microsoft.App provider if you haven't already:
 az provider show -n Microsoft.App --query registrationState -o tsv
 ```
 
-It returned Registered for me. Next step, containerapp udpate:
+It returned Registered for me. Next step, containerapp update:
 
 ```bash
 az containerapp update \
 --name jobscraper-api \
 --resource-group rg-jobscraper \
---image jobscraperyuohc35a34v2g.azurecr.io/jobscraper-api:latest
+--image <YOUR-ACR-LOGIN-SERVER>/jobscraper-api:latest
 ```

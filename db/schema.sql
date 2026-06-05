@@ -93,28 +93,3 @@ CREATE INDEX IF NOT EXISTS idx_scored_jobs_salary_min
 COMMENT ON TABLE raw.scored_job_postings IS
     'Append-only landing table for ScoredJobPosting records from the skills-fit pipeline. '
     'Written by scripts/db_ingest.py; read-only for dbt (declared as a source in sources.yml).';
-
--- ---------------------------------------------------------------------------
--- App schema — user-facing state owned by the FastAPI layer.
--- ---------------------------------------------------------------------------
-
-CREATE SCHEMA IF NOT EXISTS app;
-
-CREATE TABLE IF NOT EXISTS app.user_applications (
-    dedup_hash   TEXT        PRIMARY KEY REFERENCES raw.scored_job_postings(dedup_hash),
-    status       TEXT        NOT NULL DEFAULT 'saved',
-    applied_at   DATE,
-    notes        TEXT,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS app.eval_corrections (
-    dedup_hash        TEXT        PRIMARY KEY,
-    corrected_score   SMALLINT    NOT NULL CHECK (corrected_score BETWEEN 1 AND 5),
-    correction_reason TEXT,
-    original_score    SMALLINT,
-    original_model    TEXT,
-    profile_version   TEXT,
-    corrected_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
