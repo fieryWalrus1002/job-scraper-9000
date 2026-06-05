@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
                 f"STARTUP: auth enforced (allowlist={len(emails)} entries)\n"
             )
             sys.stderr.flush()
-    except BaseException:
+    except Exception:
         _msg = (
             "\n" + "=" * 60 + "\n"
             "CRITICAL STARTUP FAILURE:\n" + traceback.format_exc() + "=" * 60 + "\n"
