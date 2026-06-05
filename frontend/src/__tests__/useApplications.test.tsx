@@ -36,6 +36,7 @@ const MOCK_APPLICATIONS: Application[] = [
 describe('useApplications', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('returns a Map keyed by dedup_hash on success', async () => {
