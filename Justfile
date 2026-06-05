@@ -1,6 +1,9 @@
 # Justfile
 # Call it like this: just pipeline DATE=2026-05-27
 
+# Automatically load a .env file from the repo root into all recipes
+set dotenv-load
+
 # Default to today's date using backticks, but customizable
 DATE := `date +%F`
 
@@ -16,8 +19,19 @@ filter-remote:
 filter-skills:
     uv run job-scraper-9000 skills-fit --run-date {{DATE}}
 
-ingest:
-    uv run scripts/db_ingest.py --run-date {{DATE}}
+ingest DATE=DATE:
+    uv run scripts/db_ingest.py \
+      --db-url "$DATABASE_URL" \
+      --input "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
+      --schema-path "db/schema.sql"
+
+# Ingest a fresh db with this one
+ingest-init DATE=DATE:
+    uv run scripts/db_ingest.py \
+      --db-url "$DATABASE_URL" \
+      --input "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
+      --schema-path "db/schema.sql" \
+      --apply-schema
 
 pipeline:
     just scrape

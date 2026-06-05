@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Ingest scored JSONL records into raw.scored_job_postings.
 
+All parameters must be explicitly passed via CLI arguments.
+
 Usage:
     uv run scripts/db_ingest.py --run-date 2026-06-01
     uv run scripts/db_ingest.py --input data/scored/2026-06-01/skills_fit_scored.jsonl
     uv run scripts/db_ingest.py --run-date 2026-06-01 --apply-schema  # first run
 
-Reads DATABASE_URL from the environment (set in .env):
-    DATABASE_URL=postgresql://jobscraper:jobscraper@localhost:5432/jobscraper
+# Reads DATABASE_URL from the environment (set in .env):
+#     DATABASE_URL=postgresql://jobscraper:jobscraper@localhost:5432/jobscraper
 
 Duplicate dedup_hash values are silently skipped (ON CONFLICT DO NOTHING).
 """
@@ -15,24 +17,23 @@ Duplicate dedup_hash values are silently skipped (ON CONFLICT DO NOTHING).
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import psycopg
-from dotenv import load_dotenv
 
-REPO_ROOT = Path(__file__).parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
-
-from agents.skills_fit.io import read_jsonl  # noqa: E402
-
-load_dotenv()
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_OUTPUT_PATTERN = "data/scored/{run_date}/skills_fit_scored.jsonl"
-_DDL_PATH = REPO_ROOT / "db" / "schema.sql"
+# DEFAULT_INPUT_PATTERN = os.environ.get(
+#     "INGEST_INPUT_PATTERN",
+#     "data/scored/{run_date}/skills_fit_scored.jsonl"
+# )
+# DEFAULT_SCHEMA_PATH = os.environ.get(
+#     "SCHEMA_SQL_PATH",
+#     "/app/db/schema.sql"
+# )
 
 _PROMOTED_METADATA_KEYS = frozenset(
     {"run_id", "scored_at", "model", "provider", "profile_version", "failure_reason"}
@@ -63,18 +64,23 @@ ON CONFLICT (dedup_hash) DO NOTHING
 """
 
 
-def resolve_input_path(*, run_date: str | None, input_path: str | None) -> Path:
-    if input_path:
-        return Path(input_path)
-    if run_date:
-        return Path(_DEFAULT_OUTPUT_PATTERN.format(run_date=run_date))
-    raise ValueError("--run-date or --input is required")
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+    return records
 
 
-def ensure_schema(conn: psycopg.Connection) -> None:
-    conn.execute(_DDL_PATH.read_text(encoding="utf-8"))
+def ensure_schema(conn: psycopg.Connection, schema_path: Path) -> None:
+    """Explicitly injected schema dependency."""
+    raw_sql = schema_path.read_text(encoding="utf-8")
+    with conn.cursor() as cur:
+        cur.execute(raw_sql)  # type: ignore[argument-type]
     conn.commit()
-    log.info("Schema applied from %s", _DDL_PATH)
+    log.info("Schema applied successfully from %s", schema_path)
 
 
 def _extract_row(record: dict) -> dict:
@@ -148,13 +154,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Ingest scored JSONL into raw.scored_job_postings"
     )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--run-date", metavar="YYYY-MM-DD")
-    group.add_argument("--input", metavar="PATH")
+
+    parser.add_argument(
+        "--db-url", required=True, help="PostgreSQL connection string (DATABASE_URL)"
+    )
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Absolute or relative path to the input JSONL file",
+    )
+    parser.add_argument(
+        "--schema-path", required=True, help="Path to the schema.sql DDL file"
+    )
+
+    # Optional flags
     parser.add_argument(
         "--apply-schema",
         action="store_true",
-        help="Run db/schema.sql first (idempotent; pass on first use or after schema changes)",
+        help="Run schema initialization first",
     )
     parser.add_argument(
         "--dry-run",
@@ -165,27 +182,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    # Keeps logs clean and scannable
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     args = parse_args(argv)
 
-    database_url = os.environ.get("DATABASE_URL")
-    if not database_url:
-        log.error("DATABASE_URL environment variable is not set")
-        return 1
+    input_path = Path(args.input)
+    schema_path = Path(args.schema_path)
+    database_url = args.db_url
 
-    try:
-        input_path = resolve_input_path(run_date=args.run_date, input_path=args.input)
-    except ValueError as exc:
-        log.error(str(exc))
-        return 1
-
+    # Fail fast on missing files
     if not input_path.exists():
         log.error("Input file not found: %s", input_path)
+        return 1
+
+    if args.apply_schema and not schema_path.exists():
+        log.error("Schema file not found: %s", schema_path)
         return 1
 
     records = read_jsonl(input_path)
     if not records:
         log.warning("No records found in %s", input_path)
+        # Explicit machine-readable result even for empty files
+        print("total=0 inserted=0 skipped=0 dry_run=False")
         return 0
 
     log.info("Loaded %d records from %s", len(records), input_path)
@@ -193,15 +211,18 @@ def main(argv: list[str] | None = None) -> int:
     try:
         with psycopg.connect(database_url) as conn:
             if args.apply_schema:
-                ensure_schema(conn)
+                ensure_schema(conn, schema_path)
             result = ingest(records, conn=conn, dry_run=args.dry_run)
     except psycopg.Error as exc:
         log.error("Database error: %s", exc)
         return 1
 
+    # Clean, flat key-value summary for easy log ingestion / parsing
     print(
-        f"total={result['total']} inserted={result['inserted']} "
-        f"skipped={result['skipped']} dry_run={result['dry_run']}"
+        f"total={result['total']} "
+        f"inserted={result['inserted']} "
+        f"skipped={result['skipped']} "
+        f"dry_run={str(result['dry_run']).lower()}"
     )
     return 0
 

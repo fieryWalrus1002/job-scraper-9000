@@ -48,3 +48,25 @@ We will need to provision the following Azure resources:
 The backend will be configured to scale down to zero when idle. The scraper will run nightly. Both of these will have the necessary environment variables and volume mounts configured to access shared data storage.
 
 As the frontend will be deployed to Azure Static Web Apps, it will not use the same Dockerfile we used for integration testing. Instead, it will be built and deployed directly from the React source code. The frontend will route API requests seamlessly using relative paths (/api/...).
+
+### 3. Addendum: Blob Storage Ingest Pipeline
+
+The next step in our Azure deployment is to set up the Blob Storage ingest pipeline. This involves creating a Blob Storage container where the local scraper can drop scored JSONL files, and an Azure Container Job that picks up these files and loads them into the PostgreSQL database.
+
+I've already built an ingest.Dockerfile that sets up a container capable of running the ingest script. The ingest job will be scheduled to run daily, and it will use the Azure Blob Storage SDK to download the latest scored JSONL file from the blob container before executing the database migration.
+
+#### Testing the Ingest Container Locally
+
+```bash
+# 1. Build the image locally
+docker build -f ingest.Dockerfile -t jobscraper-ingest:latest .
+
+# 2. Run the container against your local network host, passing everything explicitly
+docker run --rm \
+  --network="host" \
+  -v "$(pwd)/data:/app/data" \
+  jobscraper-ingest:latest \
+  --db-url "postgresql://jobscraper:jobscraper@127.0.0.1:5432/jobscraper" \
+  --input "/app/data/scored/2026-06-04/skills_fit_scored.jsonl" \
+  --schema-path "/app/db/schema.sql"
+```
