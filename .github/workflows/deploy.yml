@@ -29,17 +29,21 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Build and push API image, update ACA revision
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: |
           ACR_LOGIN_SERVER=$(az acr list -g rg-jobscraper --query "[0].loginServer" -o tsv)
           ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
           az acr login --name "$ACR_NAME"
           docker build --target backend -f docker/app.Dockerfile \
+            -t "${ACR_LOGIN_SERVER}/jobscraper-api:${IMAGE_TAG}" \
             -t "${ACR_LOGIN_SERVER}/jobscraper-api:latest" .
+          docker push "${ACR_LOGIN_SERVER}/jobscraper-api:${IMAGE_TAG}"
           docker push "${ACR_LOGIN_SERVER}/jobscraper-api:latest"
           az containerapp update \
             --name jobscraper-api \
             --resource-group rg-jobscraper \
-            --image "${ACR_LOGIN_SERVER}/jobscraper-api:latest"
+            --image "${ACR_LOGIN_SERVER}/jobscraper-api:${IMAGE_TAG}"
 
   deploy-ingest:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -54,12 +58,16 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Build and push ingest image
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: |
           ACR_LOGIN_SERVER=$(az acr list -g rg-jobscraper --query "[0].loginServer" -o tsv)
           ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
           az acr login --name "$ACR_NAME"
           docker build -f docker/ingest.Dockerfile \
+            -t "${ACR_LOGIN_SERVER}/jobscraper-ingest:${IMAGE_TAG}" \
             -t "${ACR_LOGIN_SERVER}/jobscraper-ingest:latest" .
+          docker push "${ACR_LOGIN_SERVER}/jobscraper-ingest:${IMAGE_TAG}"
           docker push "${ACR_LOGIN_SERVER}/jobscraper-ingest:latest"
 
   deploy-frontend:
