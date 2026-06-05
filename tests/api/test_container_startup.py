@@ -133,9 +133,8 @@ def test_container_exits_with_unreachable_database():
     """Container fails fast when DATABASE_URL points at an unreachable host.
 
     Alembic runs during lifespan startup and requires a live DB connection.
-    If the DB is unreachable, the migration fails and the container exits with
-    code 3 — ACA will restart it. The old psycopg_pool background-retry
-    behaviour no longer applies; fail-fast is intentional.
+    migrations/env.py sets connect_timeout=5 s so the container exits well
+    before the OS TCP retry timer (~63 s) would fire. ACA will then restart it.
     """
     env = {
         "AUTH_BYPASS": "1",

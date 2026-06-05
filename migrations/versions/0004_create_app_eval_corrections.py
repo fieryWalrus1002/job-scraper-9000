@@ -27,9 +27,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.execute("""
         CREATE TABLE IF NOT EXISTS app.eval_corrections (
-            dedup_hash         TEXT        PRIMARY KEY
-                                   REFERENCES raw.scored_job_postings(dedup_hash)
-                                   ON DELETE CASCADE,
+            dedup_hash         TEXT        PRIMARY KEY,
             corrected_score    INT         NOT NULL
                                    CHECK (corrected_score BETWEEN 1 AND 5),
             correction_reason  TEXT,

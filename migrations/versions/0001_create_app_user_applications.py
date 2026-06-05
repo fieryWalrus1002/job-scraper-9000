@@ -21,9 +21,7 @@ def upgrade() -> None:
     op.execute("CREATE SCHEMA IF NOT EXISTS app")
     op.execute("""
         CREATE TABLE IF NOT EXISTS app.user_applications (
-            dedup_hash   TEXT        PRIMARY KEY
-                             REFERENCES raw.scored_job_postings(dedup_hash)
-                             ON DELETE CASCADE,
+            dedup_hash   TEXT        PRIMARY KEY,
             status       TEXT        NOT NULL DEFAULT 'saved',
             applied_at   DATE,
             notes        TEXT,

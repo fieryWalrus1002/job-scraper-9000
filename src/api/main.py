@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
 
         _pool = AsyncConnectionPool(
             url,
-            kwargs={"row_factory": dict_row},
+            kwargs={"row_factory": dict_row, "connect_timeout": 5},
             min_size=2,
             max_size=10,
             open=False,
