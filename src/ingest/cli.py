@@ -13,8 +13,11 @@ Usage (standalone / container — must pass --db-url explicitly):
 Usage (blob mode — ACA Job entrypoint):
     python -m ingest.cli --schema-path db/schema.sql --apply-schema --blob-mode
     Requires AZURE_STORAGE_CONNECTION_STRING env var.
-    Processes all blobs in the "pending" container, moves each to "processed" on success.
-    Empty/unparseable blobs are also moved to "processed" to prevent KEDA re-triggering.
+    Processes all blobs in the "pending" container:
+      - on success → moved to "processed"
+      - empty blob → moved to "processed" (no-op success)
+      - unparseable JSONL → moved to "failed" with a reason metadata tag
+        (dead-letter, so KEDA doesn't re-trigger on the same poison blob)
     In --dry-run mode, blobs are never moved.
 
 Duplicate dedup_hash values are silently skipped (ON CONFLICT DO NOTHING).
@@ -48,10 +51,16 @@ def _connect_and_ingest(records, args, database_url: str) -> dict:
         sys.exit(1)
 
 
-def _move_blob(pending, processed, name: str, data: bytes) -> None:
-    processed.get_blob_client(name).upload_blob(data, overwrite=True)
+def _move_blob(
+    pending,
+    target,
+    name: str,
+    data: bytes,
+    metadata: dict[str, str] | None = None,
+) -> None:
+    target.get_blob_client(name).upload_blob(data, overwrite=True, metadata=metadata)
     pending.get_blob_client(name).delete_blob()
-    log.info("Moved %s → processed/%s", name, name)
+    log.info("Moved %s → %s/%s", name, target.container_name, name)
 
 
 def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
@@ -70,14 +79,15 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
     service = BlobServiceClient.from_connection_string(conn_str)
     pending = service.get_container_client("pending")
     processed = service.get_container_client("processed")
+    failed = service.get_container_client("failed")
 
     blobs = list(pending.list_blobs())
     if not blobs:
         log.info("No pending blobs to process")
-        print("total=0 inserted=0 skipped=0 blobs=0")
+        print("total=0 inserted=0 skipped=0 blobs=0 failed=0")
         return
 
-    total = inserted = skipped = 0
+    total = inserted = skipped = failed_count = 0
     for blob_props in blobs:
         name = blob_props.name
         log.info("Processing blob: %s", name)
@@ -88,13 +98,29 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
             tmp_path = Path(tmp.name)
 
         try:
-            records = read_jsonl(tmp_path)
+            try:
+                records = read_jsonl(tmp_path)
+            except (ValueError, UnicodeDecodeError) as exc:
+                log.exception("Blob %s is unparseable — moving to failed/", name)
+                failed_count += 1
+                if not args.dry_run:
+                    _move_blob(
+                        pending,
+                        failed,
+                        name,
+                        data,
+                        metadata={
+                            "reason": "unparseable_jsonl",
+                            "error": str(exc)[:200],
+                        },
+                    )
+                continue
         finally:
             tmp_path.unlink(missing_ok=True)
 
         if not records:
             log.warning(
-                "Blob %s had no records — moving to processed to prevent re-trigger",
+                "Blob %s had no records — moving to processed (no-op success)",
                 name,
             )
             if not args.dry_run:
@@ -102,6 +128,7 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
             continue
 
         result = _connect_and_ingest(records, args, database_url)
+        args.apply_schema = False  # only apply once per process run
         total += result["total"]
         inserted += result["inserted"]
         skipped += result["skipped"]
@@ -113,7 +140,8 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
 
     print(
         f"total={total} inserted={inserted} skipped={skipped} "
-        f"blobs={len(blobs)} dry_run={str(args.dry_run).lower()}"
+        f"blobs={len(blobs)} failed={failed_count} "
+        f"dry_run={str(args.dry_run).lower()}"
     )
 
 

@@ -5,7 +5,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from dotenv import load_dotenv
-from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy import create_engine, pool, text
 
 load_dotenv()
 
@@ -19,8 +19,9 @@ if not _raw_url:
     raise RuntimeError(
         "DATABASE_URL is not set — create a .env file or export it before running migrations"
     )
+# Pass the URL straight to create_engine instead of set_main_option, which would
+# run it through configparser's BasicInterpolation and choke on '%' in the password.
 _sa_url = _raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
-config.set_main_option("sqlalchemy.url", _sa_url)
 
 target_metadata = None
 
@@ -38,11 +39,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_engine(_sa_url, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         # app schema must exist before Alembic creates its version table there.
         connection.execute(text("CREATE SCHEMA IF NOT EXISTS app"))

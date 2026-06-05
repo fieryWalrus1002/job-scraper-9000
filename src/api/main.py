@@ -5,9 +5,10 @@ import hashlib
 import logging
 import os
 import sys
+import traceback
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime
-from typing import Annotated, Any, Literal, cast
+from typing import Annotated, Any, Literal, NoReturn, cast
 
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
@@ -40,6 +41,15 @@ log = logging.getLogger(__name__)
 _pool: AsyncConnectionPool | None = None
 
 
+async def _flush_and_exit(msg: str, code: int = 3) -> NoReturn:
+    """Write `msg` to stderr, sleep so the ACA log shipper can forward it, then exit `code`."""
+    sys.stderr.write(msg)
+    sys.stderr.flush()
+    delay = int(os.environ.get("LOG_FLUSH_DELAY", "5"))
+    await asyncio.sleep(delay)
+    sys.exit(code)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _pool
@@ -54,38 +64,51 @@ async def lifespan(app: FastAPI):
             + "\n"
         )
         log.critical(_msg)
-        sys.stderr.write(_msg)
-        sys.stderr.flush()
-        delay = int(os.environ.get("LOG_FLUSH_DELAY", "5"))
-        await asyncio.sleep(delay)  # give ACA log shipper time to forward before exit
-        sys.exit(3)
+        await _flush_and_exit(_msg)
 
     def _run_migrations() -> None:
         cfg = AlembicConfig("alembic.ini")
         alembic_command.upgrade(cfg, "head")
 
-    log.info("Running Alembic migrations…")
-    await asyncio.to_thread(_run_migrations)
-    log.info("Migrations complete.")
+    try:
+        sys.stderr.write("STARTUP: running Alembic migrations…\n")
+        sys.stderr.flush()
+        await asyncio.to_thread(_run_migrations)
+        sys.stderr.write("STARTUP: migrations complete\n")
+        sys.stderr.flush()
 
-    _pool = AsyncConnectionPool(
-        url,
-        kwargs={"row_factory": dict_row},
-        min_size=2,
-        max_size=10,
-        open=False,
-    )
-    await _pool.open()
+        _pool = AsyncConnectionPool(
+            url,
+            kwargs={"row_factory": dict_row},
+            min_size=2,
+            max_size=10,
+            open=False,
+        )
+        await _pool.open()
+        sys.stderr.write("STARTUP: db pool open\n")
+        sys.stderr.flush()
 
-    if os.environ.get(_auth.BYPASS_VAR) == "1":
-        log.warning("auth: bypass (dev) — do not use in production")
-    else:
-        emails = _auth.load_auth_config()
-        _auth.init(emails)
-        log.info("auth: enforced (allowlist=%d entries)", len(emails))
+        if os.environ.get(_auth.BYPASS_VAR) == "1":
+            sys.stderr.write("STARTUP: auth bypass (dev) — do not use in production\n")
+            sys.stderr.flush()
+        else:
+            emails = _auth.load_auth_config()
+            _auth.init(emails)
+            sys.stderr.write(
+                f"STARTUP: auth enforced (allowlist={len(emails)} entries)\n"
+            )
+            sys.stderr.flush()
+    except Exception:
+        _msg = (
+            "\n" + "=" * 60 + "\n"
+            "CRITICAL STARTUP FAILURE:\n" + traceback.format_exc() + "=" * 60 + "\n"
+        )
+        log.critical(_msg)
+        await _flush_and_exit(_msg)
 
     yield
-    await _pool.close()
+    if _pool is not None:
+        await _pool.close()
 
 
 app = FastAPI(lifespan=lifespan)

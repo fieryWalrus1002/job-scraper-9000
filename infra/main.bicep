@@ -68,19 +68,28 @@ module containerApp 'modules/containerApp.bicep' = {
   }
 }
 
+// Storage account name lives here (not in the module) so the resource ID can
+// be built with `resourceId(...)` for the `listKeys` call below — module
+// outputs aren't statically resolvable for listKeys arguments. `take` lowercases
+// and clamps to the Azure limit (3-24 chars, lowercase alphanumeric).
+var storageAccountName = take('${toLower(replace(prefix, '-', ''))}ingest', 24)
+
 module storage 'modules/storageAccount.bicep' = {
   name: 'storageAccount'
   params: {
     location: location
-    prefix: prefix
+    storageAccountName: storageAccountName
   }
 }
 
 // Derived inline so the account key never appears in deployment outputs.
-var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storage.outputs.storageAccountName};AccountKey=${listKeys(storage.outputs.storageAccountId, '2023-05-01').keys[0].value};EndpointSuffix=core.windows.net'
+var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${listKeys(resourceId('Microsoft.Storage/storageAccounts', storageAccountName), '2023-05-01').keys[0].value};EndpointSuffix=core.windows.net'
 
 module ingestJob 'modules/ingestJob.bicep' = {
   name: 'ingestJob'
+  // listKeys in storageConnectionString uses resourceId() (a string), not a
+  // module output, so the dependency on `storage` must be declared explicitly.
+  dependsOn: [storage]
   params: {
     location: location
     prefix: prefix
