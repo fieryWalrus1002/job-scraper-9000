@@ -1,8 +1,11 @@
 param location string
 param prefix string
 
+// Storage account names must be lowercase alphanumeric, 3-24 chars, globally unique.
+var storageAccountName = '${replace(prefix, '-', '')}ingest'
+
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: '${prefix}ingest'
+  name: storageAccountName
   location: location
   kind: 'StorageV2'
   sku: {
@@ -36,7 +39,5 @@ resource processedContainer 'Microsoft.Storage/storageAccounts/blobServices/cont
   }
 }
 
-var accountKey = storage.listKeys().keys[0].value
-
 output storageAccountName string = storage.name
-output connectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${accountKey};EndpointSuffix=core.windows.net'
+output storageAccountId string = storage.id

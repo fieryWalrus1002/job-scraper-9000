@@ -56,8 +56,8 @@ Scored JSONL files are uploaded to an Azure Storage Account (`pending` container
 #### Build and push the ingest image
 
 ```bash
-docker build -f docker/ingest.Dockerfile -t <YOUR-ACR-LOGIN-SERVER>/jobscraper-ingest:latest .
-docker push <YOUR-ACR-LOGIN-SERVER>/jobscraper-ingest:latest
+docker build -f docker/ingest.Dockerfile -t <YOUR-ACR-LOGIN-SERVER>/<YOUR-PREFIX>-ingest:latest .
+docker push <YOUR-ACR-LOGIN-SERVER>/<YOUR-PREFIX>-ingest:latest
 ```
 
 #### Upload a scored file (triggers the ingest job)

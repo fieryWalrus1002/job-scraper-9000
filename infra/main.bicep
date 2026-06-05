@@ -76,6 +76,9 @@ module storage 'modules/storageAccount.bicep' = {
   }
 }
 
+// Derived inline so the account key never appears in deployment outputs.
+var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storage.outputs.storageAccountName};AccountKey=${listKeys(storage.outputs.storageAccountId, '2023-05-01').keys[0].value};EndpointSuffix=core.windows.net'
+
 module ingestJob 'modules/ingestJob.bicep' = {
   name: 'ingestJob'
   params: {
@@ -85,7 +88,7 @@ module ingestJob 'modules/ingestJob.bicep' = {
     acrLoginServer: registry.outputs.loginServer
     acrPassword: registry.outputs.adminPassword
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
-    storageConnectionString: storage.outputs.connectionString
+    storageConnectionString: storageConnectionString
     imageTag: imageTag
   }
 }

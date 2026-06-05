@@ -14,6 +14,8 @@ Usage (blob mode — ACA Job entrypoint):
     python -m ingest.cli --schema-path db/schema.sql --apply-schema --blob-mode
     Requires AZURE_STORAGE_CONNECTION_STRING env var.
     Processes all blobs in the "pending" container, moves each to "processed" on success.
+    Empty/unparseable blobs are also moved to "processed" to prevent KEDA re-triggering.
+    In --dry-run mode, blobs are never moved.
 
 Duplicate dedup_hash values are silently skipped (ON CONFLICT DO NOTHING).
 """
@@ -44,6 +46,12 @@ def _connect_and_ingest(records, args, database_url: str) -> dict:
     except psycopg.Error as exc:
         log.error("Database error: %s", exc)
         sys.exit(1)
+
+
+def _move_blob(pending, processed, name: str, data: bytes) -> None:
+    processed.get_blob_client(name).upload_blob(data, overwrite=True)
+    pending.get_blob_client(name).delete_blob()
+    log.info("Moved %s → processed/%s", name, name)
 
 
 def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
@@ -85,7 +93,12 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
             tmp_path.unlink(missing_ok=True)
 
         if not records:
-            log.warning("Blob %s had no records — skipping", name)
+            log.warning(
+                "Blob %s had no records — moving to processed to prevent re-trigger",
+                name,
+            )
+            if not args.dry_run:
+                _move_blob(pending, processed, name, data)
             continue
 
         result = _connect_and_ingest(records, args, database_url)
@@ -93,11 +106,10 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
         inserted += result["inserted"]
         skipped += result["skipped"]
 
-        # Move to processed/
-        src_blob = pending.get_blob_client(name)
-        processed.get_blob_client(name).upload_blob(data, overwrite=True)
-        src_blob.delete_blob()
-        log.info("Moved %s → processed/%s", name, name)
+        if not args.dry_run:
+            _move_blob(pending, processed, name, data)
+        else:
+            log.info("Dry run — skipping blob move for %s", name)
 
     print(
         f"total={total} inserted={inserted} skipped={skipped} "
@@ -118,6 +130,10 @@ def _cmd_ingest(args: argparse.Namespace) -> None:
     if args.blob_mode:
         _ingest_from_blob(args, database_url)
         return
+
+    if not args.input:
+        log.error("--input is required when not using --blob-mode")
+        sys.exit(1)
 
     input_path = Path(args.input)
     if not input_path.exists():
