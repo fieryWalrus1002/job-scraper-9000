@@ -97,7 +97,7 @@ Azure Static Web Apps allows us to configure a `staticwebapp.config.json` file t
 
 Two-schema Postgres approach, chosen over Azure Blob Storage for the pipeline data:
 
-- **`raw` schema** — append-only landing zone for scored job postings. DDL owned by `scripts/db_ingest.py` (`db/schema.sql`). dbt treats these tables as read-only Sources. No Alembic migrations here — the ingest script applies DDL directly and rebuilds are safe.
+- **`raw` schema** — append-only landing zone for scored job postings. DDL owned by `src/ingest` (`db/schema.sql`). dbt treats these tables as read-only Sources. No Alembic migrations here — the ingest script applies DDL directly and rebuilds are safe.
 - **`app` schema** — user application state (tracked jobs, notes, status). Owned by Alembic + SQLModel. Safe, incremental migrations. Never touched during pipeline rebuilds.
 
 In Azure: the ACA Job writes to `raw` via the ingest script. The ACA App (FastAPI) reads `raw` and reads/writes `app`. Both point at the same Azure Database for PostgreSQL instance.

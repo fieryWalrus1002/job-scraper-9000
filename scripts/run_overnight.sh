@@ -39,7 +39,8 @@ uv run job-scraper-9000 run-config config/search.yml --save --run-date "$RUN_DAT
 uv run job-scraper-9000 prefilter --run-date "$RUN_DATE"
 uv run job-scraper-9000 remote-filter --run-date "$RUN_DATE"
 uv run job-scraper-9000 skills-fit --run-date "$RUN_DATE"
-
-uv run scripts/db_ingest.py --run-date "$RUN_DATE"
+uv run job-scraper-9000 ingest \
+  --input "data/scored/$RUN_DATE/skills_fit_scored.jsonl" \
+  --schema-path "db/schema.sql"
 
 echo "=== Pipeline finished successfully at $(date) ==="

@@ -20,15 +20,13 @@ filter-skills:
     uv run job-scraper-9000 skills-fit --run-date {{DATE}}
 
 ingest DATE=DATE:
-    uv run scripts/db_ingest.py \
-      --db-url "$DATABASE_URL" \
+    uv run job-scraper-9000 ingest \
       --input "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
       --schema-path "db/schema.sql"
 
 # Ingest a fresh db with this one
 ingest-init DATE=DATE:
-    uv run scripts/db_ingest.py \
-      --db-url "$DATABASE_URL" \
+    uv run job-scraper-9000 ingest \
       --input "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
       --schema-path "db/schema.sql" \
       --apply-schema
