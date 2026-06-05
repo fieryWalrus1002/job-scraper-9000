@@ -146,21 +146,12 @@ az deployment group create \
   --parameters dbAdminPassword='<your-db-password>'
 ```
 
-After the deploy completes, run the schema migration once:
-
-```bash
-just db-init DATABASE_URL="postgresql://dbadmin:<pw>@<server-fqdn>:5432/jobscraper?sslmode=require"
-```
-
-The server FQDN is in the deployment outputs:
-
-```bash
-az deployment group show -g rg-jobscraper -n main --query properties.outputs
-```
-
 > **Note:** `DATABASE_URL` is stored as an ACA secret (`secretref:database-url`) so
 > the connection string is not exposed in plain-text env vars. Managed Identity
 > would be the next step up in security posture but requires more Entra ID setup.
+
+Schema migration (`db/schema.sql`) is applied from inside Azure by the ingest job —
+the database is not exposed externally.
 
 ## Injecting DATABASE_URL
 
