@@ -73,7 +73,8 @@ build-images:
     docker build -t job-ingest -f docker/ingest.Dockerfile .
 
 # Upload scored JSONL to Azure Blob Storage pending container.
-# Requires AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY in .env (or az login).
+# Requires AZURE_STORAGE_ACCOUNT in .env and an active `az login` session
+# (uses --auth-mode login; no AZURE_STORAGE_KEY needed).
 upload-blob DATE=DATE:
     az storage blob upload \
       --account-name "$AZURE_STORAGE_ACCOUNT" \
