@@ -20,7 +20,7 @@ export default function App() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated && !import.meta.env.DEV) {
-      window.location.href = '/.auth/login/aad?post_login_redirect_uri=/'
+      window.location.assign('/.auth/login/aad?post_login_redirect_uri=/')
     }
   }, [authLoading, isAuthenticated])
 
