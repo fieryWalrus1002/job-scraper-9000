@@ -1,11 +1,9 @@
 param location string
-param prefix string
-
 // Storage account names must be lowercase alphanumeric, 3-24 chars, globally unique.
-// Lowercase the prefix and clamp the final name to 24 chars so an uppercase or
-// long prefix doesn't fail deployment with an invalid name.
-var rawName = '${toLower(replace(prefix, '-', ''))}ingest'
-var storageAccountName = length(rawName) > 24 ? substring(rawName, 0, 24) : rawName
+// Computed at main.bicep scope (not derived here) so the caller can build a
+// resourceId('Microsoft.Storage/storageAccounts', storageAccountName) that Bicep
+// can statically resolve for `listKeys`.
+param storageAccountName string
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
