@@ -1,0 +1,31 @@
+// Copy to main.bicepparam (gitignored) and fill in real values.
+// clientSecret is passed at deploy time — never store it here.
+//
+// Create resource group (first time only):
+//   az group create --name rg-jobscraper --location eastus
+//
+// Deploy:
+//   az deployment group create \
+//     --resource-group rg-jobscraper \
+//     --template-file main.bicep \
+//     --parameters main.bicepparam \
+//     --parameters clientSecret='<your-client-secret>'
+//
+// After deploy, link the SWA backend (manual step):
+//   az staticwebapp backends link \
+//     --name jobscraper-swa \
+//     --resource-group rg-jobscraper \
+//     --backend-resource-id <containerAppId from outputs> \
+//     --backend-region eastus
+//
+// Also update frontend/public/staticwebapp.config.json with your tenant ID
+// before deploying the frontend.
+using 'main.bicep'
+
+param prefix = 'jobscraper'
+param tenantId = '<your-entra-tenant-id>'
+param clientId = '<your-entra-app-client-id>'
+param imageTag = 'placeholder'  // use 'placeholder' until real image is pushed to ACR
+param dbAdminLogin = 'dbadmin'
+// dbAdminPassword: pass at deploy time — never store here
+// --parameters dbAdminPassword='<your-db-password>'
