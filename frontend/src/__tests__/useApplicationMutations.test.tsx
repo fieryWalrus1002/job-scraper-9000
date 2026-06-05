@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -17,6 +17,9 @@ function makeWrapper() {
   )
 }
 
+beforeEach(() => vi.restoreAllMocks())
+afterEach(() => vi.unstubAllGlobals())
+
 const MOCK_APPLICATION: Application = {
   dedup_hash: 'hash-a',
   status: 'saved',
@@ -29,8 +32,6 @@ const MOCK_APPLICATION: Application = {
 }
 
 describe('useMarkApplication', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
   it('posts to /api/applications and resolves on success', async () => {
     vi.stubGlobal(
       'fetch',
@@ -65,8 +66,6 @@ describe('useMarkApplication', () => {
 })
 
 describe('useUpdateApplication', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
   it('patches the application and resolves on success', async () => {
     const updated = { ...MOCK_APPLICATION, status: 'applied' as const, notes: 'Sent resume' }
     vi.stubGlobal(
@@ -85,8 +84,6 @@ describe('useUpdateApplication', () => {
 })
 
 describe('useDeleteApplication', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
   it('deletes the application and resolves on success', async () => {
     vi.stubGlobal(
       'fetch',
@@ -121,8 +118,6 @@ describe('useDeleteApplication', () => {
 })
 
 describe('useCreateManualJob', () => {
-  beforeEach(() => vi.restoreAllMocks())
-
   it('posts to /api/jobs and resolves on success', async () => {
     vi.stubGlobal(
       'fetch',

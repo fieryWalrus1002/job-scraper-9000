@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -56,9 +56,8 @@ const MOCK_RESPONSE: JobListResponse = {
 }
 
 describe('useJobs', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks()
-  })
+  beforeEach(() => vi.restoreAllMocks())
+  afterEach(() => vi.unstubAllGlobals())
 
   it('starts in loading state', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
