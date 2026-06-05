@@ -50,8 +50,9 @@ async def _get_jobs(headers: dict | None = None) -> int:
 
 
 @pytest.fixture(autouse=True)
-def reset_auth():
-    """Ensure each test starts with a clean auth state."""
+def reset_auth(monkeypatch):
+    """Ensure each test starts with clean auth state with bypass disabled."""
+    monkeypatch.delenv(auth.BYPASS_VAR, raising=False)
     auth.init([])
     yield
     auth.init([])
