@@ -38,8 +38,16 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+# Fail fast if the DB is unreachable rather than waiting for the OS TCP timeout (~63 s).
+_CONNECT_TIMEOUT_S = 5
+
+
 def run_migrations_online() -> None:
-    connectable = create_engine(_sa_url, poolclass=pool.NullPool)
+    connectable = create_engine(
+        _sa_url,
+        poolclass=pool.NullPool,
+        connect_args={"connect_timeout": _CONNECT_TIMEOUT_S},
+    )
     with connectable.connect() as connection:
         # app schema must exist before Alembic creates its version table there.
         connection.execute(text("CREATE SCHEMA IF NOT EXISTS app"))

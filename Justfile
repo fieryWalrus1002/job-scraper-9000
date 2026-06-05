@@ -110,6 +110,28 @@ ship-api:
 
     echo "====> Done! New revision is live."
 
+# Build the frontend and deploy to Azure Static Web Apps.
+# Requires an active `az login` session. Installs the SWA CLI on first run via npx.
+ship-frontend:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "====> Building frontend..."
+    cd frontend && npm ci && npm run build && cd ..
+
+    echo "====> Fetching SWA deployment token from Azure..."
+    SWA_TOKEN=$(az staticwebapp secrets list \
+        --name jobscraper-swa \
+        --resource-group rg-jobscraper \
+        --query "properties.apiKey" -o tsv)
+
+    echo "====> Deploying to Azure Static Web Apps..."
+    npx --yes @azure/static-web-apps-cli deploy ./frontend/dist \
+        --deployment-token "$SWA_TOKEN" \
+        --env production
+
+    echo "====> Done! Live at https://lemon-moss-05209ca1e.7.azurestaticapps.net"
+
 # Build and push the ingestion container image to Azure Container Registry
 ship-ingest:
     #!/usr/bin/env bash
