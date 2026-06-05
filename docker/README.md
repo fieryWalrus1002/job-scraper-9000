@@ -49,19 +49,33 @@ The backend will be configured to scale down to zero when idle. The scraper will
 
 As the frontend will be deployed to Azure Static Web Apps, it will not use the same Dockerfile we used for integration testing. Instead, it will be built and deployed directly from the React source code. The frontend will route API requests seamlessly using relative paths (/api/...).
 
-### 3. Addendum: Blob Storage Ingest Pipeline
+### 3. Blob Storage Ingest Pipeline
 
-The next step in our Azure deployment is to set up the Blob Storage ingest pipeline. This involves creating a Blob Storage container where the local scraper can drop scored JSONL files, and an Azure Container Job that picks up these files and loads them into the PostgreSQL database.
+Scored JSONL files are uploaded to an Azure Storage Account (`pending` container). An Azure Container Apps Job watches that container with a KEDA `azure-blob` trigger — when a blob arrives, the job spins up, ingests the data into PostgreSQL, and moves the blob to the `processed` container. The Bicep for the storage account and job lives in `infra/modules/storageAccount.bicep` and `infra/modules/ingestJob.bicep`.
 
-I've already built an ingest.Dockerfile that sets up a container capable of running the ingest script. The ingest job will be scheduled to run daily, and it will use the Azure Blob Storage SDK to download the latest scored JSONL file from the blob container before executing the database migration.
-
-#### Testing the Ingest Container Locally
+#### Build and push the ingest image
 
 ```bash
-# 1. Build the image locally
+docker build -f docker/ingest.Dockerfile -t <YOUR-ACR-LOGIN-SERVER>/jobscraper-ingest:latest .
+docker push <YOUR-ACR-LOGIN-SERVER>/jobscraper-ingest:latest
+```
+
+#### Upload a scored file (triggers the ingest job)
+
+```bash
+# From repo root — AZURE_STORAGE_ACCOUNT must be set in .env
+just upload-blob DATE=2026-06-04
+```
+
+The KEDA trigger polls every 60 s. Once the blob is detected, the ACA Job fires, ingests the data, and moves the blob to `processed/`.
+
+#### Testing the ingest container locally
+
+```bash
+# 1. Build
 docker build -f docker/ingest.Dockerfile -t jobscraper-ingest:latest .
 
-# 2. Run the container against your local network host, passing everything explicitly
+# 2. Run against local Postgres with a file mount
 docker run --rm \
   --network="host" \
   -v "$(pwd)/data:/app/data" \
@@ -69,4 +83,14 @@ docker run --rm \
   --db-url "postgresql://jobscraper:jobscraper@127.0.0.1:5432/jobscraper" \
   --input "/app/data/scored/2026-06-04/skills_fit_scored.jsonl" \
   --schema-path "/app/db/schema.sql"
+
+# 3. Test blob mode locally (needs a real storage account or Azurite)
+docker run --rm \
+  --network="host" \
+  -e DATABASE_URL="postgresql://jobscraper:jobscraper@127.0.0.1:5432/jobscraper" \
+  -e AZURE_STORAGE_CONNECTION_STRING="<connection-string>" \
+  jobscraper-ingest:latest \
+  --schema-path "db/schema.sql" \
+  --apply-schema \
+  --blob-mode
 ```

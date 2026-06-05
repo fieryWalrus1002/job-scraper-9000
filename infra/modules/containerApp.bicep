@@ -96,3 +96,4 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 
 output containerAppId string = api.id
 output containerAppFqdn string = api.properties.configuration.ingress.fqdn
+output acaEnvironmentId string = acaEnv.id

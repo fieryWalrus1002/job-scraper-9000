@@ -68,6 +68,28 @@ module containerApp 'modules/containerApp.bicep' = {
   }
 }
 
+module storage 'modules/storageAccount.bicep' = {
+  name: 'storageAccount'
+  params: {
+    location: location
+    prefix: prefix
+  }
+}
+
+module ingestJob 'modules/ingestJob.bicep' = {
+  name: 'ingestJob'
+  params: {
+    location: location
+    prefix: prefix
+    acaEnvironmentId: containerApp.outputs.acaEnvironmentId
+    acrLoginServer: registry.outputs.loginServer
+    acrPassword: registry.outputs.adminPassword
+    databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
+    storageConnectionString: storage.outputs.connectionString
+    imageTag: imageTag
+  }
+}
+
 module staticWebApp 'modules/staticWebApp.bicep' = {
   name: 'staticWebApp'
   params: {
@@ -87,3 +109,4 @@ output swaUrl string = 'https://${staticWebApp.outputs.swaHostname}'
 output acrLoginServer string = registry.outputs.loginServer
 output containerAppFqdn string = containerApp.outputs.containerAppFqdn
 output containerAppId string = containerApp.outputs.containerAppId
+output storageAccountName string = storage.outputs.storageAccountName
