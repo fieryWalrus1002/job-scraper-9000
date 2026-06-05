@@ -117,7 +117,9 @@ ship-frontend:
     set -euo pipefail
 
     echo "====> Building frontend..."
-    cd frontend && npm ci && npm run build && cd ..
+    npm --prefix frontend ci
+    AZURE_TENANT_ID=$(az account show --query tenantId -o tsv)
+    (cd frontend && AZURE_TENANT_ID="$AZURE_TENANT_ID" npm run build)
 
     echo "====> Fetching SWA deployment token from Azure..."
     SWA_TOKEN=$(az staticwebapp secrets list \
@@ -131,6 +133,7 @@ ship-frontend:
         --env production
 
     echo "====> Done! Live at https://lemon-moss-05209ca1e.7.azurestaticapps.net"
+
 
 # Build and push the ingestion container image to Azure Container Registry
 ship-ingest:
