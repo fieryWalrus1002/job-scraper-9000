@@ -131,6 +131,36 @@ az containerapp update \
 
 This will update the container app, which will trigger the SWA backend to update, which will trigger the frontend to update, and then you should be good to go!
 
+## Injecting DATABASE_URL
+
+`DATABASE_URL` must be set as a secret-backed env var — not a plain env var — so the connection string isn't exposed in the ACA config.
+
+```bash
+# Store the connection string as an ACA secret
+az containerapp secret set \
+  --name jobscraper-api \
+  --resource-group rg-jobscraper \
+  --secrets "database-url=<postgres-connection-string>"
+
+# Wire the secret to the DATABASE_URL env var
+az containerapp update \
+  --name jobscraper-api \
+  --resource-group rg-jobscraper \
+  --set-env-vars "DATABASE_URL=secretref:database-url"
+```
+
+The connection string format for psycopg is:
+`postgresql://user:password@host:5432/dbname?sslmode=require`
+
+To verify the secret is wired correctly (value will show as `secretref:database-url`, not the raw string):
+
+```bash
+az containerapp show \
+  --name jobscraper-api \
+  --resource-group rg-jobscraper \
+  --query "properties.template.containers[0].env"
+```
+
 ## Backend deployment
 
 Register the Microsoft.App provider if you haven't already:

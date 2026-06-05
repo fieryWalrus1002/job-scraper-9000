@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -41,14 +42,18 @@ async def lifespan(app: FastAPI):
     global _pool
     url = os.environ.get("DATABASE_URL")
     if not url:
-        sys.stderr.write("\n" + "=" * 60 + "\n")
-        sys.stderr.write("CRITICAL CONFIGURATION ERROR:\n")
-        sys.stderr.write("DATABASE_URL environment variable is missing or empty.\n")
-        sys.stderr.write(
+        _msg = (
+            "\n" + "=" * 60 + "\n"
+            "CRITICAL CONFIGURATION ERROR:\n"
+            "DATABASE_URL environment variable is missing or empty.\n"
             "The application cannot start without a database connection.\n"
+            + "=" * 60
+            + "\n"
         )
-        sys.stderr.write("=" * 60 + "\n\n")
+        log.critical(_msg)
+        sys.stderr.write(_msg)
         sys.stderr.flush()
+        await asyncio.sleep(5)  # give ACA log shipper time to forward before exit
         sys.exit(3)
 
     _pool = AsyncConnectionPool(

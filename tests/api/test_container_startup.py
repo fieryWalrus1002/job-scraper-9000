@@ -117,7 +117,7 @@ def test_container_exits_cleanly_without_database_url():
     """Container must exit with code 3 and write a clear CRITICAL message to
     stderr when DATABASE_URL is absent — not a raw traceback."""
     with _Container(env={"AUTH_BYPASS": "1"}, port=_HOST_PORT_BASE) as c:
-        exit_code = c.wait_for_exit(timeout=10.0)
+        exit_code = c.wait_for_exit(timeout=15.0)
         assert exit_code == 3, (
             f"Expected exit code 3 (missing DATABASE_URL) but got {exit_code!r}. "
             "Lifespan must call sys.exit(3) with a clear error message."
