@@ -15,7 +15,6 @@ FROM python:3.13-slim-bookworm AS backend
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY src/ /app/src/
-COPY config/ /app/config/
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 ENV PATH="/app/.venv/bin:$PATH"

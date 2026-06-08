@@ -155,6 +155,19 @@ ship-ingest:
 
     echo "====> Success! Image is live at ${ACR_LOGIN_SERVER}/jobscraper-ingest:latest"
 
+# Deploy or update Azure infrastructure via Bicep.
+# Secrets are passed at runtime from .env — never stored in main.bicepparam.
+# Requires: AZURE_POSTGRES_PASSWORD and AZURE_CLIENT_SECRET in .env, config/auth.yml present.
+deploy-infra:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export AUTH_CONFIG="$(cat config/auth.yml)"
+
+    az deployment group create \
+      --resource-group rg-jobscraper \
+      --template-file infra/main.bicep \
+      --parameters infra/main.bicepparam
+
 connect-az-db:
     #!/usr/bin/env bash
     set -euo pipefail

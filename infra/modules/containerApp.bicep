@@ -3,6 +3,9 @@ param prefix string
 param logAnalyticsCustomerId string
 
 @secure()
+param authConfig string
+
+@secure()
 param logAnalyticsSharedKey string
 
 param acrLoginServer string
@@ -61,6 +64,10 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'database-url'
           value: databaseUrl
         }
+        {
+          name: 'auth-config'
+          value: authConfig
+        }
       ]
     }
     template: {
@@ -84,6 +91,24 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
+          volumeMounts: [
+            {
+              volumeName: 'auth-config-vol'
+              mountPath: '/app/config'
+            }
+          ]
+        }
+      ]
+      volumes: [
+        {
+          name: 'auth-config-vol'
+          storageType: 'Secret'
+          secrets: [
+            {
+              secretRef: 'auth-config'
+              path: 'auth.yml'
+            }
+          ]
         }
       ]
       scale: {

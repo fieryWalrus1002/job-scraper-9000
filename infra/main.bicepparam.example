@@ -1,31 +1,29 @@
 // Copy to main.bicepparam (gitignored) and fill in real values.
-// clientSecret is passed at deploy time — never store it here.
 //
 // Create resource group (first time only):
-//   az group create --name rg-jobscraper --location eastus
+//   az group create --name rg-jobscraper --location westus2
 //
-// Deploy:
-//   az deployment group create \
-//     --resource-group rg-jobscraper \
-//     --template-file main.bicep \
-//     --parameters main.bicepparam \
-//     --parameters clientSecret='<your-client-secret>'
+// Deploy (just wraps this with AUTH_CONFIG exported from config/auth.yml):
+//   just deploy-infra
 //
-// After deploy, link the SWA backend (manual step):
+// After first deploy, link the SWA backend (manual step, or use Bicep issue #133):
 //   az staticwebapp backends link \
 //     --name jobscraper-swa \
 //     --resource-group rg-jobscraper \
 //     --backend-resource-id <containerAppId from outputs> \
-//     --backend-region eastus
-//
-// Also update frontend/public/staticwebapp.config.json with your tenant ID
-// before deploying the frontend.
+//     --backend-region westus2
 using 'main.bicep'
 
 param prefix = 'jobscraper'
 param tenantId = '<your-entra-tenant-id>'
 param clientId = '<your-entra-app-client-id>'
 param imageTag = 'placeholder'  // use 'placeholder' until real image is pushed to ACR
-param dbAdminLogin = 'dbadmin'
-// dbAdminPassword: pass at deploy time — never store here
-// --parameters dbAdminPassword='<your-db-password>'
+
+// Secrets are never stored here — read from environment at deploy time via readEnvironmentVariable().
+// Add these to your .env (loaded automatically by the Justfile):
+//   AZURE_CLIENT_SECRET=<your-entra-app-client-secret>
+//   AZURE_POSTGRES_PASSWORD=<your-db-admin-password>
+// Also ensure config/auth.yml exists locally (gitignored) — deploy-infra reads it into AUTH_CONFIG.
+param clientSecret = readEnvironmentVariable('AZURE_CLIENT_SECRET')
+param dbAdminPassword = readEnvironmentVariable('AZURE_POSTGRES_PASSWORD')
+param authConfig = readEnvironmentVariable('AUTH_CONFIG')
