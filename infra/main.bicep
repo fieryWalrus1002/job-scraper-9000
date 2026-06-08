@@ -20,6 +20,10 @@ param dbAdminPassword string
 
 param dbAdminLogin string = 'dbadmin'
 
+@secure()
+@description('Contents of config/auth.yml — the allowed_emails allowlist injected as a volume-mounted file.')
+param authConfig string
+
 // Bicep has no uriEncode(); encode the characters that break a psycopg connection string.
 // % must go first to avoid double-encoding any already-present percent signs.
 var dbPasswordEncoded = replace(replace(replace(replace(dbAdminPassword, '%', '%25'), '@', '%40'), '#', '%23'), ':', '%3A')
@@ -65,6 +69,7 @@ module containerApp 'modules/containerApp.bicep' = {
     acrPassword: registry.outputs.adminPassword
     imageTag: imageTag
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
+    authConfig: authConfig
   }
 }
 
