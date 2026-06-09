@@ -1,22 +1,36 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchJobDetail } from '../api'
-import type { AiFitDetail, Application, ApplicationStatus, EvalCorrectionOut } from '../types'
-import { APPLICATION_STATUSES, STATUS_LABELS } from '../types'
+import { fetchJobDetail } from '../../api'
+import type {
+  AiFitDetail,
+  Application,
+  ApplicationStatus,
+  EvalCorrectionOut,
+  JobDetail,
+} from '../../types'
+import { APPLICATION_STATUSES, STATUS_LABELS } from '../../types'
 import {
   useDeleteApplication,
   useMarkApplication,
   useUpdateApplication,
-} from '../hooks/useApplications'
+} from '../../hooks/useApplications'
 import {
   useDeleteEvalCorrection,
   useEvalCorrection,
   useSetEvalCorrection,
-} from '../hooks/useEvalCorrection'
+} from '../../hooks/useEvalCorrection'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
+import { QuickActions } from '@/components/ui/quick-actions'
 import { cn } from '@/lib/utils'
+
+const TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
+  { value: 'withdrawn', label: 'Pass', shortcut: 'P' },
+  { value: 'maybe', label: 'Maybe', shortcut: 'M' },
+  { value: 'to_apply', label: 'To Apply', shortcut: 'A' },
+]
 
 interface Props {
   dedupHash: string | null
@@ -319,6 +333,16 @@ function BulletList({
   )
 }
 
+function JobDetailVisitButton({ url }: { url: string | null | undefined }) {
+  return url ? (
+    <Button variant="secondary" size="sm" asChild>
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        View posting <span className="text-faint">↗</span>
+      </a>
+    </Button>
+  ) : null
+}
+
 function SkillsFitSection({ ai }: { ai: AiFitDetail | null }) {
   if (!ai) return <p className="text-faint text-[13px]">No skills fit data available.</p>
   return (
@@ -362,7 +386,175 @@ function SkillsFitSection({ ai }: { ai: AiFitDetail | null }) {
   )
 }
 
-export default function JobDetailPanel({ dedupHash, onClose, application }: Props) {
+function JobDetailCloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close job detail panel">
+      <X className="h-4 w-4 md:h-5 md:w-5" />
+    </Button>
+  )
+}
+
+interface JobDetailHeaderProps {
+  jobData: JobDetail | undefined
+  correction: EvalCorrectionOut | null | undefined
+  application: Application | undefined
+  onClose: () => void
+}
+
+function JobDetailHeader(props: JobDetailHeaderProps) {
+  const { jobData, correction, application, onClose } = props
+  const mark = useMarkApplication()
+  const update = useUpdateApplication()
+  const triagePending = mark.isPending || update.isPending
+  const currentStatus = application?.status ?? null
+
+  function setTriage(status: ApplicationStatus) {
+    if (!jobData) return
+    if (application) {
+      update.mutate({ dedupHash: jobData.dedup_hash, update: { status } })
+    } else {
+      mark.mutate({ dedupHash: jobData.dedup_hash, status })
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-start gap-4 px-7 pt-5 pb-4 border-b border-border shrink-0 bg-gradient-to-b from-card to-card/70">
+      <div className="flex-1 min-w-0">
+        <DialogTitle asChild>
+          <h2 className="text-[18px] font-semibold text-fg m-0 mb-1.5 leading-[1.3] tracking-tight">
+            {jobData?.title ?? '—'}
+          </h2>
+        </DialogTitle>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-fg mb-2.5">
+          <span className="font-medium">{jobData?.company ?? '—'}</span>
+          {jobData?.location && (
+            <>
+              <span className="text-faint">·</span>
+              <span className="text-muted">{jobData.location}</span>
+            </>
+          )}
+          {jobData?.posted_at && (
+            <>
+              <span className="text-faint">·</span>
+              <span className="text-muted font-mono text-[12px]">{jobData.posted_at}</span>
+            </>
+          )}
+        </div>
+
+        {/* Badges row, below title and metadata, above the fold */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {jobData?.fit_score != null && (
+            <Badge variant={scoreVariant(jobData.fit_score)} className="text-[11px] px-2">
+              Score <span className="font-mono ml-0.5">{jobData.fit_score}</span>
+            </Badge>
+          )}
+          {correction && (
+            <Badge
+              variant={scoreVariant(correction.corrected_score)}
+              className="text-[11px] px-2 gap-1"
+              title={`Original ${correction.original_score ?? '—'} → corrected ${correction.corrected_score}`}
+            >
+              <span className="text-[10px] uppercase tracking-wider opacity-80">Corrected</span>
+              <span className="font-mono">{correction.corrected_score}</span>
+            </Badge>
+          )}
+          {jobData?.confidence && (
+            <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
+              {jobData.confidence}
+            </Badge>
+          )}
+          {jobData?.remote_classification && (
+            <Badge variant={classificationVariant(jobData.remote_classification)}>
+              {jobData.remote_classification.replace(/_/g, ' ')}
+            </Badge>
+          )}
+          {(jobData?.salary_min_usd || jobData?.salary_max_usd) && (
+            <Badge variant="secondary" className="font-mono">
+              {jobData.salary_min_usd && jobData.salary_max_usd
+                ? `$${(jobData.salary_min_usd / 1000).toFixed(0)}–$${(jobData.salary_max_usd / 1000).toFixed(0)}K`
+                : jobData.salary_min_usd
+                  ? `$${(jobData.salary_min_usd / 1000).toFixed(0)}K+`
+                  : `≤ $${(jobData.salary_max_usd! / 1000).toFixed(0)}K`}
+              {jobData.salary_period ? ` / ${jobData.salary_period}` : ''}
+            </Badge>
+          )}
+
+          {/* Triage quick actions, full width below the header */}
+          {jobData && (
+            <div className="basis-full pt-3 mt-1 border-t border-border/50">
+              <QuickActions
+                aria-label="Triage status"
+                size="sm"
+                actions={TRIAGE_STATUSES.map((s) => ({
+                  id: s.value,
+                  label: s.label,
+                  shortcut: s.shortcut,
+                  active: currentStatus === s.value,
+                  disabled: triagePending,
+                  variant:
+                    s.value === 'withdrawn'
+                      ? 'danger'
+                      : s.value === 'to_apply'
+                        ? 'success'
+                        : 'warn',
+                  onSelect: () => setTriage(s.value),
+                }))}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Visit and close buttons, upper right*/}
+      <div className="flex gap-2 shrink-0">
+        <JobDetailVisitButton url={jobData?.source_url} />
+        <JobDetailCloseButton onClose={onClose} />
+      </div>
+    </div>
+  )
+}
+
+function DevMetadataSection({ jobData }: { jobData: JobDetail }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {[
+        ['Dedup hash', jobData.dedup_hash],
+        ['Model', jobData.model],
+        ['Provider', jobData.provider],
+        ['Profile version', jobData.profile_version],
+        ['Run ID', jobData.run_id],
+        ['Scored at', jobData.scored_at],
+        ['Ingested at', jobData.ingested_at],
+        ['Source', jobData.source],
+        ['Source job ID', jobData.source_job_id],
+      ].map(([label, value]) => (
+        <div
+          key={label}
+          className="flex gap-3 text-[12px] py-1 border-b border-border/40 last:border-b-0"
+        >
+          <span className="w-[140px] shrink-0 text-muted">{label}</span>
+          {value ? (
+            <span
+              className="text-fg font-mono break-all cursor-pointer hover:text-primary-hov transition-colors"
+              title="Click to copy"
+              onClick={() => {
+                // Swallow rejection — clipboard can fail in
+                // insecure contexts or when permission is denied;
+                // no unhandled-rejection noise in the console.
+                void navigator.clipboard?.writeText(String(value)).catch(() => {})
+              }}
+            >
+              {value}
+            </span>
+          ) : (
+            <span className="text-faint font-mono">—</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function JobDetailPanel({ dedupHash, onClose, application }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
     queryFn: () => fetchJobDetail(dedupHash!),
@@ -379,84 +571,12 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
         className="sm:max-w-[940px] w-full h-[88vh] p-0 gap-0 overflow-hidden"
       >
         {/* ── Header ───────────────────────────────── */}
-        <div className="flex items-start gap-4 px-7 pt-5 pb-4 border-b border-border shrink-0 bg-gradient-to-b from-card to-card/70">
-          <div className="flex-1 min-w-0">
-            <DialogTitle asChild>
-              <h2 className="text-[18px] font-semibold text-fg m-0 mb-1.5 leading-[1.3] tracking-tight">
-                {data?.title ?? '—'}
-              </h2>
-            </DialogTitle>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-fg mb-2.5">
-              <span className="font-medium">{data?.company ?? '—'}</span>
-              {data?.location && (
-                <>
-                  <span className="text-faint">·</span>
-                  <span className="text-muted">{data.location}</span>
-                </>
-              )}
-              {data?.posted_at && (
-                <>
-                  <span className="text-faint">·</span>
-                  <span className="text-muted font-mono text-[12px]">{data.posted_at}</span>
-                </>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {data?.fit_score != null && (
-                <Badge variant={scoreVariant(data.fit_score)} className="text-[11px] px-2">
-                  Score <span className="font-mono ml-0.5">{data.fit_score}</span>
-                </Badge>
-              )}
-              {correction && (
-                <Badge
-                  variant={scoreVariant(correction.corrected_score)}
-                  className="text-[11px] px-2 gap-1"
-                  title={`Original ${correction.original_score ?? '—'} → corrected ${correction.corrected_score}`}
-                >
-                  <span className="text-[10px] uppercase tracking-wider opacity-80">Corrected</span>
-                  <span className="font-mono">{correction.corrected_score}</span>
-                </Badge>
-              )}
-              {data?.confidence && (
-                <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
-                  {data.confidence}
-                </Badge>
-              )}
-              {data?.remote_classification && (
-                <Badge variant={classificationVariant(data.remote_classification)}>
-                  {data.remote_classification.replace(/_/g, ' ')}
-                </Badge>
-              )}
-              {(data?.salary_min_usd || data?.salary_max_usd) && (
-                <Badge variant="secondary" className="font-mono">
-                  {data.salary_min_usd && data.salary_max_usd
-                    ? `$${(data.salary_min_usd / 1000).toFixed(0)}–$${(data.salary_max_usd / 1000).toFixed(0)}K`
-                    : data.salary_min_usd
-                      ? `$${(data.salary_min_usd / 1000).toFixed(0)}K+`
-                      : `≤ $${(data.salary_max_usd! / 1000).toFixed(0)}K`}
-                  {data.salary_period ? ` / ${data.salary_period}` : ''}
-                </Badge>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            {data?.source_url && (
-              <Button variant="secondary" size="sm" asChild>
-                <a href={data.source_url} target="_blank" rel="noopener noreferrer">
-                  View posting <span className="text-faint">↗</span>
-                </a>
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onClose}
-              aria-label="Close job detail panel"
-            >
-              ✕
-            </Button>
-          </div>
-        </div>
+        <JobDetailHeader
+          jobData={data}
+          correction={correction}
+          application={application}
+          onClose={onClose}
+        />
 
         {/* ── Body ─────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
@@ -504,47 +624,12 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                 <EvalCorrectionSection dedupHash={data.dedup_hash} existing={correction} />
               </Section>
 
-              <Section title="Application Tracking" defaultOpen={false}>
-                <ApplicationTrackingSection dedupHash={data.dedup_hash} application={application} />
+              <Section title="Dev Metadata" defaultOpen={false}>
+                <DevMetadataSection jobData={data} />
               </Section>
 
-              <Section title="Dev Metadata" defaultOpen={false}>
-                <div className="flex flex-col gap-1.5">
-                  {[
-                    ['Dedup hash', data.dedup_hash],
-                    ['Model', data.model],
-                    ['Provider', data.provider],
-                    ['Profile version', data.profile_version],
-                    ['Run ID', data.run_id],
-                    ['Scored at', data.scored_at],
-                    ['Ingested at', data.ingested_at],
-                    ['Source', data.source],
-                    ['Source job ID', data.source_job_id],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="flex gap-3 text-[12px] py-1 border-b border-border/40 last:border-b-0"
-                    >
-                      <span className="w-[140px] shrink-0 text-muted">{label}</span>
-                      {value ? (
-                        <span
-                          className="text-fg font-mono break-all cursor-pointer hover:text-primary-hov transition-colors"
-                          title="Click to copy"
-                          onClick={() => {
-                            // Swallow rejection — clipboard can fail in
-                            // insecure contexts or when permission is denied;
-                            // no unhandled-rejection noise in the console.
-                            void navigator.clipboard?.writeText(String(value)).catch(() => {})
-                          }}
-                        >
-                          {value}
-                        </span>
-                      ) : (
-                        <span className="text-faint font-mono">—</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              <Section title="Application Tracking" defaultOpen={false}>
+                <ApplicationTrackingSection dedupHash={data.dedup_hash} application={application} />
               </Section>
             </>
           )}
