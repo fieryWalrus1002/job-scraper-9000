@@ -15,10 +15,9 @@ import AddJobModal from './components/AddJobModal'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
 
-// Stopgap: "Pass" in the JobDetailPanel triage saves as 'withdrawn', so we hide
-// those rows from the intake list. Replace with a dedicated 'passed' status once
-// the backend enum gains one.
-const DISMISSED_FROM_INTAKE: ApplicationStatus[] = ['withdrawn']
+// Statuses that hide a job from the intake list (Jobs / Summary tabs).
+// User can recover trashed jobs from the WorkflowTab "Trash" bucket.
+const TRASHED_FROM_INTAKE: ApplicationStatus[] = ['passed']
 
 export default function App() {
   const { principal, isLoading: authLoading, isAuthenticated } = useAuth()
@@ -77,7 +76,7 @@ function AppShell({ email }: { email: string }) {
   const allItems = data?.items ?? []
   const visibleItems = allItems.filter((j) => {
     const status = applications?.get(j.dedup_hash)?.status
-    return !status || !DISMISSED_FROM_INTAKE.includes(status)
+    return !status || !TRASHED_FROM_INTAKE.includes(status)
   })
   const filteredItems = search
     ? visibleItems.filter((j) => {
@@ -86,8 +85,8 @@ function AppShell({ email }: { email: string }) {
       })
     : visibleItems
 
-  const dismissedCount = allItems.length - visibleItems.length
-  const displayTotal = search || dismissedCount > 0 ? filteredItems.length : data?.total
+  const trashedCount = allItems.length - visibleItems.length
+  const displayTotal = search || trashedCount > 0 ? filteredItems.length : data?.total
   const trackedCount = applications?.size ?? 0
 
   const tabBtn =

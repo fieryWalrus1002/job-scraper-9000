@@ -24,7 +24,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 const MOCK_APPLICATION: Application = {
   dedup_hash: 'hash-a',
-  status: 'saved',
+  status: 'maybe',
   applied_at: null,
   notes: null,
   created_at: '2024-01-01T00:00:00Z',
@@ -43,7 +43,7 @@ describe('useMarkApplication', () => {
     const { result } = renderHook(() => useMarkApplication(), { wrapper: makeWrapper() })
 
     await act(async () => {
-      await result.current.mutateAsync({ dedupHash: 'hash-a', status: 'saved' })
+      await result.current.mutateAsync({ dedupHash: 'hash-a', status: 'maybe' })
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
@@ -60,7 +60,7 @@ describe('useMarkApplication', () => {
     const { result } = renderHook(() => useMarkApplication(), { wrapper: makeWrapper() })
 
     await act(async () => {
-      result.current.mutate({ dedupHash: 'hash-a', status: 'saved' })
+      result.current.mutate({ dedupHash: 'hash-a', status: 'maybe' })
     })
 
     await waitFor(() => expect(result.current.isError).toBe(true))
@@ -133,7 +133,7 @@ describe('useCreateManualJob', () => {
         title: 'Software Engineer',
         fit_score: 4,
         company: 'Acme',
-        status: 'saved',
+        status: 'maybe',
       })
     })
 
@@ -149,7 +149,7 @@ describe('useCreateManualJob', () => {
     const { result } = renderHook(() => useCreateManualJob(), { wrapper: makeWrapper() })
 
     await act(async () => {
-      result.current.mutate({ title: 'Duplicate Job', fit_score: 3, status: 'saved' })
+      result.current.mutate({ title: 'Duplicate Job', fit_score: 3, status: 'maybe' })
     })
 
     await waitFor(() => expect(result.current.isError).toBe(true))

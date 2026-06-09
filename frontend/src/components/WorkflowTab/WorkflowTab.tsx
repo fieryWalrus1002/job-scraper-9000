@@ -13,8 +13,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { FilterBar } from './FilterBar'
 
-const ARCHIVED_STATUSES: ApplicationStatus[] = ['rejected', 'withdrawn', 'hired', 'ghosted']
+const ARCHIVED_STATUSES: ApplicationStatus[] = [
+  'rejected',
+  'candidate_withdrew',
+  'hired',
+  'ghosted',
+]
 const IN_PROGRESS_STATUSES: ApplicationStatus[] = ['applied', 'screening', 'interview', 'offer']
+const TRASHED_STATUSES: ApplicationStatus[] = ['passed']
 
 type SortCol = 'status' | 'title' | 'score' | 'updated'
 type SortDir = 'asc' | 'desc'
@@ -51,6 +57,7 @@ export function WorkflowTab({ onSelectJob }: Props) {
 
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all')
   const [showArchived, setShowArchived] = useState(false)
+  const [showTrash, setShowTrash] = useState(false)
   const [showOnlyInProgress, setShowOnlyInProgress] = useState(false)
   const [sortCol, setSortCol] = useState<SortCol>('updated')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -65,14 +72,23 @@ export function WorkflowTab({ onSelectJob }: Props) {
   const inProgressCount = all.filter((a) =>
     IN_PROGRESS_STATUSES.includes(a.status as ApplicationStatus),
   ).length
+  const trashedCount = all.filter((a) =>
+    TRASHED_STATUSES.includes(a.status as ApplicationStatus),
+  ).length
 
   let bucketFiltered = all
   if (showArchived) {
     bucketFiltered = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
+  } else if (showTrash) {
+    bucketFiltered = all.filter((a) => TRASHED_STATUSES.includes(a.status as ApplicationStatus))
   } else if (showOnlyInProgress) {
     bucketFiltered = all.filter((a) => IN_PROGRESS_STATUSES.includes(a.status as ApplicationStatus))
   } else {
-    bucketFiltered = all.filter((a) => !ARCHIVED_STATUSES.includes(a.status as ApplicationStatus))
+    bucketFiltered = all.filter(
+      (a) =>
+        !ARCHIVED_STATUSES.includes(a.status as ApplicationStatus) &&
+        !TRASHED_STATUSES.includes(a.status as ApplicationStatus),
+    )
   }
 
   const counts = APPLICATION_STATUSES.reduce<Record<string, number>>((acc, s) => {
@@ -105,12 +121,15 @@ export function WorkflowTab({ onSelectJob }: Props) {
         setFilter={setFilter}
         showArchived={showArchived}
         setShowArchived={setShowArchived}
+        showTrash={showTrash}
+        setShowTrash={setShowTrash}
         showOnlyInProgress={showOnlyInProgress}
         setShowOnlyInProgress={setShowOnlyInProgress}
         counts={counts}
         allCount={all.length}
         archivedCount={archivedCount}
         inProgressCount={inProgressCount}
+        trashedCount={trashedCount}
       />
 
       {visible.length === 0 ? (
@@ -122,7 +141,7 @@ export function WorkflowTab({ onSelectJob }: Props) {
           </div>
           {filter === 'all' && (
             <div className="text-faint text-xs mt-1.5">
-              Use the <span className="text-muted">Save / Maybe / To Apply</span> buttons in the
+              Use the <span className="text-muted">Trash / Maybe / To Apply</span> buttons in the
               Jobs tab.
             </div>
           )}

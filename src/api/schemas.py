@@ -75,7 +75,6 @@ class JobListResponse(BaseModel):
 
 
 ApplicationStatus = Literal[
-    "saved",
     "maybe",
     "to_apply",
     "applied",
@@ -83,14 +82,14 @@ ApplicationStatus = Literal[
     "interview",
     "offer",
     "rejected",
-    "withdrawn",
+    "candidate_withdrew",
     "hired",
     "ghosted",
+    "passed",
 ]
 
 # Keep as a tuple for the SQL CHECK constraint in migrations.
 APPLICATION_STATUSES: tuple[str, ...] = (
-    "saved",
     "maybe",
     "to_apply",
     "applied",
@@ -98,9 +97,10 @@ APPLICATION_STATUSES: tuple[str, ...] = (
     "interview",
     "offer",
     "rejected",
-    "withdrawn",
+    "candidate_withdrew",
     "hired",
     "ghosted",
+    "passed",
 )
 
 
@@ -120,7 +120,7 @@ class Application(BaseModel):
 
 class ApplicationCreate(BaseModel):
     dedup_hash: str
-    status: ApplicationStatus = "saved"
+    status: ApplicationStatus = "maybe"
     applied_at: date | None = None
     notes: str | None = None
 
@@ -133,7 +133,7 @@ class ManualJobCreate(BaseModel):
     description: str | None = None
     location: str | None = None
     posted_at: date | None = None
-    status: ApplicationStatus = "saved"
+    status: ApplicationStatus = "maybe"
 
 
 class ApplicationUpdate(BaseModel):

@@ -179,7 +179,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted";
+            status: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
             /** Applied At */
             applied_at: string | null;
             /** Notes */
@@ -209,10 +209,10 @@ export interface components {
             dedup_hash: string;
             /**
              * Status
-             * @default saved
+             * @default maybe
              * @enum {string}
              */
-            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted";
+            status: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
             /** Applied At */
             applied_at?: string | null;
             /** Notes */
@@ -221,7 +221,7 @@ export interface components {
         /** ApplicationUpdate */
         ApplicationUpdate: {
             /** Status */
-            status?: ("saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted") | null;
+            status?: ("maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed") | null;
             /** Applied At */
             applied_at?: string | null;
             /** Notes */
@@ -394,10 +394,10 @@ export interface components {
             posted_at?: string | null;
             /**
              * Status
-             * @default saved
+             * @default maybe
              * @enum {string}
              */
-            status: "saved" | "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "hired" | "ghosted";
+            status: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
         };
         /** ValidationError */
         ValidationError: {

@@ -13,7 +13,7 @@ function wrapper({ children }: { children: ReactNode }) {
 const MOCK_APPLICATIONS: Application[] = [
   {
     dedup_hash: 'hash-a',
-    status: 'saved',
+    status: 'maybe',
     applied_at: null,
     notes: null,
     created_at: '2024-01-01T00:00:00Z',
