@@ -73,6 +73,7 @@ config/profile/CHANGELOG.md
 # Search configs have some PII
 config/search*.yml
 config/search.yml
+config/old_searches/*.yml
 !config/search*.yml.example
 
 # Auth config contains personal email address
