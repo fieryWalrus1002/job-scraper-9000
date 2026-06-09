@@ -5,7 +5,7 @@ import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
 import { filtersFromParams, filtersToParams } from './lib/filters'
-import type { Filters } from './types'
+import type { ApplicationStatus, Filters } from './types'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
 import { JobDetailPanel } from './components/JobDetailPanel'
@@ -14,6 +14,11 @@ import { WorkflowTab } from './components/WorkflowTab'
 import AddJobModal from './components/AddJobModal'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
+
+// Stopgap: "Pass" in the JobDetailPanel triage saves as 'withdrawn', so we hide
+// those rows from the intake list. Replace with a dedicated 'passed' status once
+// the backend enum gains one.
+const DISMISSED_FROM_INTAKE: ApplicationStatus[] = ['withdrawn']
 
 export default function App() {
   const { principal, isLoading: authLoading, isAuthenticated } = useAuth()
@@ -70,14 +75,19 @@ function AppShell({ email }: { email: string }) {
   }
 
   const allItems = data?.items ?? []
+  const visibleItems = allItems.filter((j) => {
+    const status = applications?.get(j.dedup_hash)?.status
+    return !status || !DISMISSED_FROM_INTAKE.includes(status)
+  })
   const filteredItems = search
-    ? allItems.filter((j) => {
+    ? visibleItems.filter((j) => {
         const hay = `${j.title ?? ''} ${j.company ?? ''} ${j.score_rationale ?? ''}`.toLowerCase()
         return hay.includes(search.toLowerCase())
       })
-    : allItems
+    : visibleItems
 
-  const displayTotal = search ? filteredItems.length : data?.total
+  const dismissedCount = allItems.length - visibleItems.length
+  const displayTotal = search || dismissedCount > 0 ? filteredItems.length : data?.total
   const trackedCount = applications?.size ?? 0
 
   const tabBtn =

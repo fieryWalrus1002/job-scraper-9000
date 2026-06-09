@@ -33,7 +33,7 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
   const [location, setLocation] = useState('')
   const [postedAt, setPostedAt] = useState('')
   const [fitScore, setFitScore] = useState<number | ''>('')
-  const [status, setStatus] = useState<ApplicationStatus>('saved')
+  const [status, setStatus] = useState<ApplicationStatus>('maybe')
   const [apiError, setApiError] = useState<string | null>(null)
 
   const mutation = useCreateManualJob()

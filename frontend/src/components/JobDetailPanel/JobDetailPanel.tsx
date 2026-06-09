@@ -86,7 +86,7 @@ function ApplicationTrackingSection({
     if (application) {
       update.mutate({ dedupHash, update: { notes } })
     } else if (notes.trim()) {
-      mark.mutate({ dedupHash, status: 'saved', notes })
+      mark.mutate({ dedupHash, status: 'maybe', notes })
     }
   }
 
