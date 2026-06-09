@@ -27,6 +27,11 @@ repos:
 
   - repo: local
     hooks:
+      - id: frontend-format-check
+        name: Frontend Prettier check
+        language: system
+        entry: frontend/node_modules/.bin/prettier --check --ignore-path frontend/.prettierignore
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|html)$
       - id: frontend-build
         name: Frontend TypeScript build
         language: system
