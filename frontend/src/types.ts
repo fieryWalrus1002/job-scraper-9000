@@ -24,8 +24,10 @@ export interface ManualJobCreate {
 
 // Derived from the generated schema — TS will error if this list diverges from the backend.
 export type ApplicationStatus = NonNullable<Application['status']>
+// Note: 'saved' is intentionally omitted from the user-facing list. The backend
+// enum still includes it for legacy DB rows; STATUS_LABELS retains a label so
+// those rows still display. Removal from the enum is a follow-up backend PR.
 export const APPLICATION_STATUSES = [
-  'saved',
   'maybe',
   'to_apply',
   'applied',

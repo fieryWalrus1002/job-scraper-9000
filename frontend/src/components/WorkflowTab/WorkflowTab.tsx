@@ -44,7 +44,7 @@ function sortApplications(rows: Application[], col: SortCol, dir: SortDir): Appl
   })
 }
 
-export default function WorkflowTab({ onSelectJob }: Props) {
+export function WorkflowTab({ onSelectJob }: Props) {
   const { data: applications, isLoading } = useApplications()
   const update = useUpdateApplication()
   const del = useDeleteApplication()
