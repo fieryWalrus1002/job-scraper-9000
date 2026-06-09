@@ -10,7 +10,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from api import auth
-from api.main import app, get_pool
+from api.dependencies import get_pool
+from api.main import app
 
 from .conftest import _FakePool, _make_cursor
 
