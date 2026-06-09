@@ -41,7 +41,10 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setApiError(null)
-    if (fitScore === '') { setApiError('Score is required.'); return }
+    if (fitScore === '') {
+      setApiError('Score is required.')
+      return
+    }
     try {
       await mutation.mutateAsync({
         title: title.trim(),
@@ -125,11 +128,7 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
 
           <div className="flex flex-col gap-1.5">
             <label className={labelCls}>Posted date</label>
-            <Input
-              type="date"
-              value={postedAt}
-              onChange={(e) => setPostedAt(e.target.value)}
-            />
+            <Input type="date" value={postedAt} onChange={(e) => setPostedAt(e.target.value)} />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -146,7 +145,8 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
               <SelectContent>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <SelectItem key={n} value={String(n)}>
-                    <span className="font-mono">{n}</span> <span className="text-muted">— {scoreHint(n)}</span>
+                    <span className="font-mono">{n}</span>{' '}
+                    <span className="text-muted">— {scoreHint(n)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -191,11 +191,17 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
 
 function scoreHint(n: number): string {
   switch (n) {
-    case 5: return 'Perfect fit'
-    case 4: return 'Strong fit'
-    case 3: return 'Possible fit'
-    case 2: return 'Weak fit'
-    case 1: return 'Poor fit'
-    default: return ''
+    case 5:
+      return 'Perfect fit'
+    case 4:
+      return 'Strong fit'
+    case 3:
+      return 'Possible fit'
+    case 2:
+      return 'Weak fit'
+    case 1:
+      return 'Poor fit'
+    default:
+      return ''
   }
 }

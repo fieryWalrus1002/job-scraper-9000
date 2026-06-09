@@ -30,7 +30,10 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div data-testid="auth-redirect" className="flex h-svh items-center justify-center text-muted text-sm">
+      <div
+        data-testid="auth-redirect"
+        className="flex h-svh items-center justify-center text-muted text-sm"
+      >
         {import.meta.env.DEV
           ? 'Not authenticated — set VITE_AUTH_BYPASS=1 in frontend/.env.local'
           : 'Signing in…'}
@@ -79,7 +82,8 @@ function AppShell({ email }: { email: string }) {
 
   const tabBtn =
     'group relative inline-flex items-center gap-2 h-8 px-3 border-none bg-transparent text-muted text-[13px] font-medium cursor-pointer rounded-md transition-all hover:text-fg hover:bg-hover/50'
-  const tabBtnActive = 'text-fg bg-card border border-border shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+  const tabBtnActive =
+    'text-fg bg-card border border-border shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
   const tabCount =
     'inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded text-[10.5px] font-mono tabular-nums font-medium ' +
     'bg-bg-elevated/80 text-faint border border-border/60 ' +
@@ -98,7 +102,10 @@ function AppShell({ email }: { email: string }) {
           </span>
         </div>
         <nav className="flex items-center gap-1.5">
-          <button className={cn(tabBtn, tab === 'jobs' && tabBtnActive)} onClick={() => setTab('jobs')}>
+          <button
+            className={cn(tabBtn, tab === 'jobs' && tabBtnActive)}
+            onClick={() => setTab('jobs')}
+          >
             <span>Jobs</span>
             {data && (
               <span className={cn(tabCount, tab === 'jobs' && tabCountActive)}>
@@ -106,7 +113,10 @@ function AppShell({ email }: { email: string }) {
               </span>
             )}
           </button>
-          <button className={cn(tabBtn, tab === 'workflow' && tabBtnActive)} onClick={() => setTab('workflow')}>
+          <button
+            className={cn(tabBtn, tab === 'workflow' && tabBtnActive)}
+            onClick={() => setTab('workflow')}
+          >
             <span>Workflow</span>
             {trackedCount > 0 && (
               <span className={cn(tabCount, tab === 'workflow' && tabCountActive)}>
@@ -114,7 +124,10 @@ function AppShell({ email }: { email: string }) {
               </span>
             )}
           </button>
-          <button className={cn(tabBtn, tab === 'summary' && tabBtnActive)} onClick={() => setTab('summary')}>
+          <button
+            className={cn(tabBtn, tab === 'summary' && tabBtnActive)}
+            onClick={() => setTab('summary')}
+          >
             <span>Summary</span>
           </button>
         </nav>
@@ -133,7 +146,12 @@ function AppShell({ email }: { email: string }) {
       </header>
 
       <div className="flex-1 flex flex-row overflow-hidden">
-        <div className={cn('flex flex-row shrink-0 relative transition-[width] duration-200 ease', paneOpen ? 'w-[224px]' : 'w-5')}>
+        <div
+          className={cn(
+            'flex flex-row shrink-0 relative transition-[width] duration-200 ease',
+            paneOpen ? 'w-[224px]' : 'w-5',
+          )}
+        >
           <FilterPane
             filters={filters}
             search={search}
@@ -174,9 +192,7 @@ function AppShell({ email }: { email: string }) {
             </>
           )}
 
-          {tab === 'workflow' && (
-            <WorkflowTab onSelectJob={setSelectedHash} />
-          )}
+          {tab === 'workflow' && <WorkflowTab onSelectJob={setSelectedHash} />}
 
           {tab === 'summary' && (
             <>
@@ -198,7 +214,10 @@ function AppShell({ email }: { email: string }) {
       {addJobOpen && (
         <AddJobModal
           onClose={() => setAddJobOpen(false)}
-          onSuccess={() => { setAddJobOpen(false); setTab('workflow') }}
+          onSuccess={() => {
+            setAddJobOpen(false)
+            setTab('workflow')
+          }}
         />
       )}
     </div>

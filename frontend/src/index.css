@@ -1,44 +1,44 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   /* ─── App palette ────────────────────────────────── */
-  --color-bg:           #0a0c12;
-  --color-bg-elevated:  #0f1119;
-  --color-card:         #14161f;
-  --color-hover:        #1c1f2b;
-  --color-border:       #262936;
-  --color-border-strong:#363a4e;
-  --color-fg:           #e6e8ee;
-  --color-muted:        #8b91a3;
-  --color-faint:        #5b6072;
-  --color-primary:      #6366f1;
-  --color-primary-hov:  #818cf8;
-  --color-primary-dim:  #3730a3;
+  --color-bg: #0a0c12;
+  --color-bg-elevated: #0f1119;
+  --color-card: #14161f;
+  --color-hover: #1c1f2b;
+  --color-border: #262936;
+  --color-border-strong: #363a4e;
+  --color-fg: #e6e8ee;
+  --color-muted: #8b91a3;
+  --color-faint: #5b6072;
+  --color-primary: #6366f1;
+  --color-primary-hov: #818cf8;
+  --color-primary-dim: #3730a3;
 
-  --color-score-high:   #22c55e;
-  --color-score-mid:    #f59e0b;
-  --color-score-low:    #ef4444;
-  --color-score-none:   #475569;
+  --color-score-high: #22c55e;
+  --color-score-mid: #f59e0b;
+  --color-score-low: #ef4444;
+  --color-score-none: #475569;
 
-  --color-remote:       #06b6d4;
-  --color-local:        #a78bfa;
-  --color-travel:       #f97316;
+  --color-remote: #06b6d4;
+  --color-local: #a78bfa;
+  --color-travel: #f97316;
 
   /* ─── shadcn semantic aliases ────────────────────── */
-  --color-background:           #0a0c12;
-  --color-foreground:           #e6e8ee;
-  --color-card-foreground:      #e6e8ee;
-  --color-popover:              #14161f;
-  --color-popover-foreground:   #e6e8ee;
-  --color-primary-foreground:   #ffffff;
-  --color-secondary:            #1c1f2b;
+  --color-background: #0a0c12;
+  --color-foreground: #e6e8ee;
+  --color-card-foreground: #e6e8ee;
+  --color-popover: #14161f;
+  --color-popover-foreground: #e6e8ee;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1c1f2b;
   --color-secondary-foreground: #e6e8ee;
-  --color-muted-foreground:     #8b91a3;
-  --color-accent:               #1c1f2b;
-  --color-accent-foreground:    #e6e8ee;
-  --color-destructive:          #ef4444;
-  --color-ring:                 #6366f1;
-  --color-input:                #262936;
+  --color-muted-foreground: #8b91a3;
+  --color-accent: #1c1f2b;
+  --color-accent-foreground: #e6e8ee;
+  --color-destructive: #ef4444;
+  --color-ring: #6366f1;
+  --color-input: #262936;
 
   /* ─── Typography ─────────────────────────────────── */
   --font-family-sans: 'Geist', system-ui, sans-serif;
@@ -64,7 +64,9 @@
 }
 
 /* Tabular numbers everywhere by default — scores, dates, counts */
-:root { font-variant-numeric: tabular-nums; }
+:root {
+  font-variant-numeric: tabular-nums;
+}
 
 /* Body atmosphere — subtle indigo bloom in top-right corner */
 body {
@@ -72,34 +74,45 @@ body {
   background:
     radial-gradient(
       ellipse 80% 50% at 100% 0%,
-      rgba(99, 102, 241, 0.10) 0%,
+      rgba(99, 102, 241, 0.1) 0%,
       rgba(99, 102, 241, 0.02) 40%,
       transparent 70%
     ),
-    radial-gradient(
-      ellipse 60% 40% at 0% 100%,
-      rgba(99, 102, 241, 0.05) 0%,
-      transparent 60%
-    ),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(99, 102, 241, 0.05) 0%, transparent 60%),
     #0a0c12;
   background-attachment: fixed;
 }
 
-#root { height: 100svh; display: flex; flex-direction: column; }
+#root {
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
 
 /* Custom scrollbar — subtle */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: #262936;
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #363a4e; background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-thumb:hover {
+  background: #363a4e;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
 
 /* Focus-visible default — never harsh */
-:focus { outline: none; }
+:focus {
+  outline: none;
+}
 :focus-visible {
   outline: 2px solid rgba(99, 102, 241, 0.6);
   outline-offset: 2px;
@@ -107,63 +120,90 @@ body {
 }
 
 /* Selection */
-::selection { background: rgba(99, 102, 241, 0.35); color: #fff; }
+::selection {
+  background: rgba(99, 102, 241, 0.35);
+  color: #fff;
+}
 
 /* ── Form control normalization ──────────────────── */
 
 /* Tell browsers to render native form controls in dark mode (calendar picker, spinners) */
-input, select, textarea, button { color-scheme: dark; font-family: inherit; }
+input,
+select,
+textarea,
+button {
+  color-scheme: dark;
+  font-family: inherit;
+}
 
 /* Date / time inputs — normalize the size & color of the browser-rendered value text */
-input[type="date"],
-input[type="datetime-local"],
-input[type="time"],
-input[type="month"],
-input[type="week"] {
+input[type='date'],
+input[type='datetime-local'],
+input[type='time'],
+input[type='month'],
+input[type='week'] {
   font-family: 'Geist', system-ui, sans-serif;
   font-size: 13px;
   color: #e6e8ee;
   font-variant-numeric: tabular-nums;
 }
 
-input[type="date"]::-webkit-datetime-edit,
-input[type="datetime-local"]::-webkit-datetime-edit {
+input[type='date']::-webkit-datetime-edit,
+input[type='datetime-local']::-webkit-datetime-edit {
   color: inherit;
   font-family: inherit;
   font-size: inherit;
   padding: 0;
 }
 
-input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+input[type='date']::-webkit-datetime-edit-fields-wrapper,
+input[type='datetime-local']::-webkit-datetime-edit-fields-wrapper {
   padding: 0;
 }
 
-input[type="date"]::-webkit-datetime-edit-text { color: #5b6072; padding: 0 1px; }
-input[type="date"]::-webkit-datetime-edit-month-field,
-input[type="date"]::-webkit-datetime-edit-day-field,
-input[type="date"]::-webkit-datetime-edit-year-field {
+input[type='date']::-webkit-datetime-edit-text {
+  color: #5b6072;
+  padding: 0 1px;
+}
+input[type='date']::-webkit-datetime-edit-month-field,
+input[type='date']::-webkit-datetime-edit-day-field,
+input[type='date']::-webkit-datetime-edit-year-field {
   color: #e6e8ee;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type='date']::-webkit-calendar-picker-indicator {
   opacity: 0.45;
   cursor: pointer;
   filter: invert(0.7);
   transition: opacity 0.15s;
 }
-input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 0.85; }
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+  opacity: 0.85;
+}
 
 /* Number inputs — strip default spinner */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-input[type="number"] { -moz-appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
 
 /* ── Table layout ─────────────────────────────── */
 
-.table-outer { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.table-outer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-.table-wrapper { flex: 1; overflow: auto; }
+.table-wrapper {
+  flex: 1;
+  overflow: auto;
+}
 
 /* ── TanStack job table ───────────────────────── */
 
@@ -191,11 +231,20 @@ input[type="number"] { -moz-appearance: textfield; }
   z-index: 10;
 }
 
-.job-table th:first-child { padding-left: 20px; }
-.job-table th:last-child  { padding-right: 20px; }
+.job-table th:first-child {
+  padding-left: 20px;
+}
+.job-table th:last-child {
+  padding-right: 20px;
+}
 
-.job-table th.col-sortable { cursor: pointer; user-select: none; }
-.job-table th.col-sortable:hover { color: #e6e8ee; }
+.job-table th.col-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.job-table th.col-sortable:hover {
+  color: #e6e8ee;
+}
 
 .job-table td {
   padding: 10px 14px;
@@ -204,10 +253,16 @@ input[type="number"] { -moz-appearance: textfield; }
   overflow: hidden;
 }
 
-.job-table td:first-child { padding-left: 20px; }
-.job-table td:last-child  { padding-right: 20px; }
+.job-table td:first-child {
+  padding-left: 20px;
+}
+.job-table td:last-child {
+  padding-right: 20px;
+}
 
-.job-table tbody tr:last-child td { border-bottom: none; }
+.job-table tbody tr:last-child td {
+  border-bottom: none;
+}
 
 /* ── Column resize handles ────────────────────── */
 
@@ -228,4 +283,7 @@ input[type="number"] { -moz-appearance: textfield; }
   width: 6px;
 }
 .col-resize-handle:hover,
-.col-resize-handle:active { background: #6366f1; opacity: 0.5; }
+.col-resize-handle:active {
+  background: #6366f1;
+  opacity: 0.5;
+}

@@ -49,14 +49,18 @@ function ScoreBadge({ score }: { score: number | null }) {
     )
   }
   const cls =
-    score >= 4 ? 'bg-score-high/15 text-score-high border-score-high/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' :
-    score === 3 ? 'bg-score-mid/15 text-score-mid border-score-mid/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' :
-    'bg-score-low/15 text-score-low border-score-low/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+    score >= 4
+      ? 'bg-score-high/15 text-score-high border-score-high/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+      : score === 3
+        ? 'bg-score-mid/15 text-score-mid border-score-mid/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+        : 'bg-score-low/15 text-score-low border-score-low/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
   return (
-    <span className={cn(
-      'inline-flex items-center justify-center size-7 rounded-md text-[14px] font-mono font-semibold border tabular-nums',
-      cls,
-    )}>
+    <span
+      className={cn(
+        'inline-flex items-center justify-center size-7 rounded-md text-[14px] font-mono font-semibold border tabular-nums',
+        cls,
+      )}
+    >
       {score}
     </span>
   )
@@ -66,20 +70,23 @@ function ClassificationBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-faint">—</span>
   const label = value.replace(/_/g, ' ')
   const variant =
-    value === 'fully_remote'        ? 'remote' :
-    value === 'location_restricted' ? 'local'  :
-    value.startsWith('remote_with') ? 'travel' :
-    'muted'
+    value === 'fully_remote'
+      ? 'remote'
+      : value === 'location_restricted'
+        ? 'local'
+        : value.startsWith('remote_with')
+          ? 'travel'
+          : 'muted'
   return <Badge variant={variant}>{label}</Badge>
 }
 
 function ConfidenceBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-faint">—</span>
   const cls =
-    value === 'high'   ? 'text-score-high' :
-    value === 'medium' ? 'text-score-mid'  :
-    'text-score-low'
-  return <span className={cn('text-[11px] uppercase tracking-wider font-medium', cls)}>{value}</span>
+    value === 'high' ? 'text-score-high' : value === 'medium' ? 'text-score-mid' : 'text-score-low'
+  return (
+    <span className={cn('text-[11px] uppercase tracking-wider font-medium', cls)}>{value}</span>
+  )
 }
 
 function renderCell(key: string, job: JobSummary): ReactNode {
@@ -89,7 +96,9 @@ function renderCell(key: string, job: JobSummary): ReactNode {
     case 'title':
       return (
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">{job.title ?? '—'}</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">
+            {job.title ?? '—'}
+          </span>
           {job.source_url && (
             <a
               className="shrink-0 text-[11px] text-muted no-underline opacity-60 leading-none hover:text-primary hover:opacity-100"
@@ -99,7 +108,9 @@ function renderCell(key: string, job: JobSummary): ReactNode {
               onClick={(e) => e.stopPropagation()}
               title="Open job posting"
               aria-label="Open job posting in a new tab"
-            >↗</a>
+            >
+              ↗
+            </a>
           )}
         </div>
       )
@@ -111,7 +122,10 @@ function renderCell(key: string, job: JobSummary): ReactNode {
       return <span className="text-muted font-mono text-[12px]">{job.posted_at ?? '—'}</span>
     case 'score_rationale':
       return (
-        <span className="overflow-hidden text-muted text-[12px] leading-[1.45]" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <span
+          className="overflow-hidden text-muted text-[12px] leading-[1.45]"
+          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+        >
           {job.score_rationale ?? <span className="text-faint">—</span>}
         </span>
       )
@@ -127,13 +141,14 @@ function renderCell(key: string, job: JobSummary): ReactNode {
 const qBtn =
   'text-[11px] font-medium px-2 h-[22px] rounded-md border border-border bg-card text-muted cursor-pointer whitespace-nowrap ' +
   'hover:border-border-strong hover:text-fg disabled:opacity-40 disabled:cursor-default transition-all'
-const qBtnActive = 'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+const qBtnActive =
+  'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
 
 function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
   const { mutate, isPending } = useMarkApplication()
   const buttons: { status: ApplicationStatus; label: string }[] = [
-    { status: 'saved',    label: 'Save'     },
-    { status: 'maybe',    label: 'Maybe'    },
+    { status: 'saved', label: 'Save' },
+    { status: 'maybe', label: 'Maybe' },
     { status: 'to_apply', label: 'To Apply' },
   ]
   return (
@@ -164,7 +179,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
   const { mutate: del } = useDeleteApplication()
 
   const columnVisibility = Object.fromEntries(
-    tableColumns.map((col) => [col.id!, visibleColumns.has(col.id!)])
+    tableColumns.map((col) => [col.id!, visibleColumns.has(col.id!)]),
   )
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -195,7 +210,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
     columnResizeMode: 'onChange',
   })
 
-  const dragCol    = useRef<string | null>(null)
+  const dragCol = useRef<string | null>(null)
   const isResizing = useRef(false)
   const { pageIndex } = table.getState().pagination
   const totalPages = table.getPageCount()
@@ -204,7 +219,9 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
     return (
       <div className="py-20 text-center">
         <div className="text-muted text-sm">No jobs match the current filters.</div>
-        <div className="text-faint text-xs mt-1">Adjust your filters in the sidebar to widen the search.</div>
+        <div className="text-faint text-xs mt-1">
+          Adjust your filters in the sidebar to widen the search.
+        </div>
       </div>
     )
   }
@@ -219,11 +236,14 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                 <th className="w-11 max-w-11 text-right">#</th>
                 {hg.headers.map((header, i) => {
                   const prevHeader = i > 0 ? hg.headers[i - 1] : null
-                  const isLast     = i === hg.headers.length - 1
+                  const isLast = i === hg.headers.length - 1
                   const startResize = (h: typeof header) => (e: React.MouseEvent) => {
                     isResizing.current = true
                     h.getResizeHandler()(e)
-                    const reset = () => { isResizing.current = false; window.removeEventListener('mouseup', reset) }
+                    const reset = () => {
+                      isResizing.current = false
+                      window.removeEventListener('mouseup', reset)
+                    }
                     window.addEventListener('mouseup', reset)
                   }
                   return (
@@ -233,17 +253,25 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                       className="cursor-pointer select-none hover:text-fg"
                       draggable
                       onDragStart={(e) => {
-                        if (isResizing.current) { e.preventDefault(); return }
+                        if (isResizing.current) {
+                          e.preventDefault()
+                          return
+                        }
                         dragCol.current = header.column.id
                       }}
-                      onDragEnd={() => { dragCol.current = null }}
+                      onDragEnd={() => {
+                        dragCol.current = null
+                      }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
                         if (!dragCol.current || dragCol.current === header.column.id) return
                         const order = table.getState().columnOrder
                         const from = order.indexOf(dragCol.current)
-                        const to   = order.indexOf(header.column.id)
-                        if (from === -1 || to === -1) { dragCol.current = null; return }
+                        const to = order.indexOf(header.column.id)
+                        if (from === -1 || to === -1) {
+                          dragCol.current = null
+                          return
+                        }
                         const next = [...order]
                         next.splice(from, 1)
                         next.splice(to, 0, dragCol.current)
@@ -256,16 +284,20 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
                         <div
                           className="col-resize-handle col-resize-handle--left"
                           onMouseDown={startResize(prevHeader)}
-                          onTouchStart={(e) => prevHeader.getResizeHandler()(e as unknown as React.MouseEvent)}
+                          onTouchStart={(e) =>
+                            prevHeader.getResizeHandler()(e as unknown as React.MouseEvent)
+                          }
                           onClick={(e) => e.stopPropagation()}
                         />
                       )}
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getIsSorted() === 'desc'
-                        ? ' ↓'
-                        : header.column.getIsSorted() === 'asc'
-                        ? ' ↑'
-                        : <span className="text-muted text-[10px]"> ↕</span>}
+                      {header.column.getIsSorted() === 'desc' ? (
+                        ' ↓'
+                      ) : header.column.getIsSorted() === 'asc' ? (
+                        ' ↑'
+                      ) : (
+                        <span className="text-muted text-[10px]"> ↕</span>
+                      )}
                       {isLast && header.column.getCanResize() && (
                         <div
                           className="col-resize-handle"
@@ -289,13 +321,22 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
               return (
                 <tr
                   key={row.id}
-                  className={cn('cursor-pointer transition-colors hover:bg-hover', appStatus && 'bg-primary-dim/15')}
+                  className={cn(
+                    'cursor-pointer transition-colors hover:bg-hover',
+                    appStatus && 'bg-primary-dim/15',
+                  )}
                   onClick={() => onSelect(job.dedup_hash)}
-                  onContextMenu={(e) => { e.preventDefault(); setCtx({ x: e.clientX, y: e.clientY, job }) }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setCtx({ x: e.clientX, y: e.clientY, job })
+                  }}
                 >
                   <td className="w-11 max-w-11 text-right text-muted">{rank}</td>
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} style={{ width: cell.column.getSize(), maxWidth: cell.column.getSize() }}>
+                    <td
+                      key={cell.id}
+                      style={{ width: cell.column.getSize(), maxWidth: cell.column.getSize() }}
+                    >
                       {renderCell(cell.column.id, job)}
                     </td>
                   ))}
@@ -315,12 +356,36 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
           y={ctx.y}
           onClose={() => setCtx(null)}
           items={[
-            { label: 'Save',             active: applications?.get(ctx.job.dedup_hash)?.status === 'saved',     onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'saved'     }) },
-            { label: 'Maybe',            active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe',    onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe'    }) },
-            { label: 'To Apply',         active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply', onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }) },
-            { label: 'Applied',          active: applications?.get(ctx.job.dedup_hash)?.status === 'applied',  onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied'  }) },
+            {
+              label: 'Save',
+              active: applications?.get(ctx.job.dedup_hash)?.status === 'saved',
+              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'saved' }),
+            },
+            {
+              label: 'Maybe',
+              active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe',
+              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe' }),
+            },
+            {
+              label: 'To Apply',
+              active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply',
+              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }),
+            },
+            {
+              label: 'Applied',
+              active: applications?.get(ctx.job.dedup_hash)?.status === 'applied',
+              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied' }),
+            },
             ...(applications?.has(ctx.job.dedup_hash)
-              ? [{ label: 'Remove tracking', active: false, onClick: () => { if (window.confirm('Remove tracking for this job?')) del(ctx.job.dedup_hash) } }]
+              ? [
+                  {
+                    label: 'Remove tracking',
+                    active: false,
+                    onClick: () => {
+                      if (window.confirm('Remove tracking for this job?')) del(ctx.job.dedup_hash)
+                    },
+                  },
+                ]
               : []),
           ]}
         />
@@ -328,15 +393,43 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-1 p-3 border-t border-border shrink-0 bg-card/40">
-          <Button variant="secondary" size="icon-sm" onClick={() => table.setPageIndex(0)}         disabled={!table.getCanPreviousPage()}>«</Button>
-          <Button variant="secondary" size="icon-sm" onClick={() => table.previousPage()}           disabled={!table.getCanPreviousPage()}>‹</Button>
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => table.setPageIndex(0)}
+            disabled={!table.getCanPreviousPage()}
+          >
+            «
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            ‹
+          </Button>
           <span className="text-[12px] text-muted px-3 font-mono tabular-nums">
             <span className="text-fg">{pageIndex + 1}</span>
             <span className="text-faint mx-1">/</span>
             {totalPages}
           </span>
-          <Button variant="secondary" size="icon-sm" onClick={() => table.nextPage()}               disabled={!table.getCanNextPage()}>›</Button>
-          <Button variant="secondary" size="icon-sm" onClick={() => table.setPageIndex(totalPages - 1)} disabled={!table.getCanNextPage()}>»</Button>
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            ›
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            onClick={() => table.setPageIndex(totalPages - 1)}
+            disabled={!table.getCanNextPage()}
+          >
+            »
+          </Button>
         </div>
       )}
     </div>

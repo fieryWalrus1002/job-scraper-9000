@@ -51,12 +51,22 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
             'block w-full text-left py-1.5 px-2.5 text-[13px] bg-transparent border-none rounded-md text-fg cursor-pointer hover:bg-hover transition-colors flex items-center justify-between gap-2',
             item.active && 'text-primary-hov font-medium bg-primary/10',
           )}
-          onClick={() => { item.onClick(); onClose() }}
+          onClick={() => {
+            item.onClick()
+            onClose()
+          }}
         >
           <span>{item.label}</span>
           {item.active && (
             <svg width="12" height="12" viewBox="0 0 12 12" className="text-primary-hov shrink-0">
-              <path d="M2.5 6 L5 8.5 L9.5 3.5" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M2.5 6 L5 8.5 L9.5 3.5"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           )}
         </button>

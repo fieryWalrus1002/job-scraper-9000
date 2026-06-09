@@ -27,9 +27,9 @@ describe('App auth gate', () => {
     // Stub fetch for API calls made by other hooks inside App
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 })),
     )
   })
 

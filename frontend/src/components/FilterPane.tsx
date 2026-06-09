@@ -35,14 +35,21 @@ const getRelativeDateString = (daysOffset: number) => {
   return `${year}-${month}-${day}`
 }
 
-const labelCls = 'text-[10.5px] font-semibold text-muted uppercase tracking-[0.08em] flex items-center gap-1.5'
+const labelCls =
+  'text-[10.5px] font-semibold text-muted uppercase tracking-[0.08em] flex items-center gap-1.5'
 const iconCls = 'size-3 text-faint'
 const nativeSelect =
   'h-8 px-2 bg-bg-elevated border border-border rounded-md text-fg text-[13px] outline-none cursor-pointer ' +
   'hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 ' +
   'transition-[color,border-color,box-shadow]'
 
-function SectionLabel({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+function SectionLabel({
+  icon: Icon,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  children: React.ReactNode
+}) {
   return (
     <span className={labelCls}>
       <Icon className={iconCls} />
@@ -85,10 +92,20 @@ function Disclosure({
           width="10"
           height="10"
           viewBox="0 0 10 10"
-          className={cn('transition-transform duration-200 text-faint group-hover:text-muted', open && 'rotate-90')}
+          className={cn(
+            'transition-transform duration-200 text-faint group-hover:text-muted',
+            open && 'rotate-90',
+          )}
           aria-hidden="true"
         >
-          <path d="M3.5 2 L6.5 5 L3.5 8" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M3.5 2 L6.5 5 L3.5 8"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
       {open && <div className="flex flex-col gap-0.5 pl-px">{children}</div>}
@@ -109,7 +126,13 @@ export default function FilterPane({
   const [colsOpen, setColsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(false)
 
-  type StringFilterKey = 'minScore' | 'maxScore' | 'minPostedAt' | 'maxPostedAt' | 'company' | 'minSalaryK'
+  type StringFilterKey =
+    | 'minScore'
+    | 'maxScore'
+    | 'minPostedAt'
+    | 'maxPostedAt'
+    | 'company'
+    | 'minSalaryK'
 
   function set(field: StringFilterKey, value: string) {
     onFiltersChange({ ...filters, [field]: value })
@@ -163,7 +186,9 @@ export default function FilterPane({
           >
             <option value="">min</option>
             {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
           <span className="text-faint text-xs">–</span>
@@ -174,13 +199,20 @@ export default function FilterPane({
           >
             <option value="">max</option>
             {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
         </div>
       </Section>
 
-      <Disclosure label="Remote" icon={GlobeIcon} open={remoteOpen} onToggle={() => setRemoteOpen((v) => !v)}>
+      <Disclosure
+        label="Remote"
+        icon={GlobeIcon}
+        open={remoteOpen}
+        onToggle={() => setRemoteOpen((v) => !v)}
+      >
         {REMOTE_OPTIONS.filter((o) => o.value).map((o) => (
           <label
             key={o.value}
@@ -205,7 +237,9 @@ export default function FilterPane({
           onChange={(e) => set('minPostedAt', e.target.value)}
         />
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[10.5px] font-semibold text-faint uppercase tracking-[0.08em] shrink-0 w-7">to</span>
+          <span className="text-[10.5px] font-semibold text-faint uppercase tracking-[0.08em] shrink-0 w-7">
+            to
+          </span>
           <Input
             type="date"
             value={filters.maxPostedAt || defaultMaxPostedAt}
@@ -229,7 +263,12 @@ export default function FilterPane({
 
       <div className="border-t border-border/60 -mx-4" />
 
-      <Disclosure label="Columns" icon={Columns3Icon} open={colsOpen} onToggle={() => setColsOpen((v) => !v)}>
+      <Disclosure
+        label="Columns"
+        icon={Columns3Icon}
+        open={colsOpen}
+        onToggle={() => setColsOpen((v) => !v)}
+      >
         {COLUMNS.map((col) => (
           <label
             key={col.key}
@@ -250,7 +289,9 @@ export default function FilterPane({
         {total !== undefined && (
           <div className="text-[11px] text-muted flex items-baseline gap-1.5 mt-2">
             <span className="font-mono text-fg tabular-nums">{total.toLocaleString()}</span>
-            <span>job{total !== 1 ? 's' : ''} {active ? 'matching' : 'total'}</span>
+            <span>
+              job{total !== 1 ? 's' : ''} {active ? 'matching' : 'total'}
+            </span>
           </div>
         )}
         {active && (
@@ -258,7 +299,10 @@ export default function FilterPane({
             variant="ghost"
             size="sm"
             className="w-full justify-start"
-            onClick={() => { onFiltersChange(EMPTY_FILTERS); onSearchChange('') }}
+            onClick={() => {
+              onFiltersChange(EMPTY_FILTERS)
+              onSearchChange('')
+            }}
           >
             Clear filters
           </Button>

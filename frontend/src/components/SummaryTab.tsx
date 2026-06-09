@@ -1,4 +1,3 @@
-
 import type { JobSummary } from '../types'
 
 interface Props {
@@ -16,7 +15,7 @@ const BAR_COLOR: Record<string, string> = {
   '3': 'bg-score-mid',
   '2': 'bg-score-low/80',
   '1': 'bg-score-low',
-  'none': 'bg-faint',
+  none: 'bg-faint',
 }
 
 function StatCard({
@@ -47,7 +46,9 @@ function StatCard({
       <div className="text-[28px] font-semibold text-fg leading-none font-mono tabular-nums tracking-tight">
         {value}
       </div>
-      <div className="mt-1.5 text-[11px] font-medium text-muted uppercase tracking-[0.08em]">{label}</div>
+      <div className="mt-1.5 text-[11px] font-medium text-muted uppercase tracking-[0.08em]">
+        {label}
+      </div>
     </div>
   )
 }
@@ -63,7 +64,7 @@ export default function SummaryTab({ items }: Props) {
   const fullyRemote = items.filter((j) => j.remote_classification === 'fully_remote').length
   const failures = items.filter((j) => j.failure_reason !== null).length
 
-  const scoreDist: Record<string, number> = { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0, 'none': 0 }
+  const scoreDist: Record<string, number> = { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0, none: 0 }
   for (const j of items) {
     const k = j.fit_score !== null ? String(j.fit_score) : 'none'
     scoreDist[k] = (scoreDist[k] ?? 0) + 1
@@ -95,7 +96,9 @@ export default function SummaryTab({ items }: Props) {
         <div className="bg-card border border-border rounded-lg px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted mb-4 font-semibold flex items-center gap-2">
             Score distribution
-            <span className="text-faint font-mono normal-case tracking-normal">· {total.toLocaleString()} jobs</span>
+            <span className="text-faint font-mono normal-case tracking-normal">
+              · {total.toLocaleString()} jobs
+            </span>
           </h3>
           <div className="flex flex-col gap-2.5">
             {(['5', '4', '3', '2', '1', 'none'] as const).map((k) => {
@@ -104,7 +107,9 @@ export default function SummaryTab({ items }: Props) {
               return (
                 <div key={k} className="flex items-center gap-3 group">
                   <div className="w-20 text-[12px] text-muted shrink-0 whitespace-nowrap">
-                    {k === 'none' ? 'No score' : (
+                    {k === 'none' ? (
+                      'No score'
+                    ) : (
                       <>
                         <span className="text-faint">Score</span>{' '}
                         <span className="font-mono text-fg">{k}</span>
@@ -134,17 +139,23 @@ export default function SummaryTab({ items }: Props) {
           <div className="flex flex-col gap-2.5">
             {sortedClassifications.map(([cls, count]) => {
               const color =
-                cls === 'fully_remote' ? 'bg-remote' :
-                cls === 'location_restricted' ? 'bg-local' :
-                cls.startsWith('remote_with') ? 'bg-travel' :
-                'bg-faint'
+                cls === 'fully_remote'
+                  ? 'bg-remote'
+                  : cls === 'location_restricted'
+                    ? 'bg-local'
+                    : cls.startsWith('remote_with')
+                      ? 'bg-travel'
+                      : 'bg-faint'
               return (
                 <div key={cls} className="flex items-center gap-3">
                   <div className="w-32 text-[12px] text-muted shrink-0 whitespace-nowrap overflow-hidden text-ellipsis">
                     {cls.replace(/_/g, ' ')}
                   </div>
                   <div className="flex-1 h-2.5 bg-bg-elevated rounded-full overflow-hidden border border-border/40">
-                    <div className={`h-full rounded-full min-w-[2px] transition-[width] duration-500 ease-out ${color}`} style={{ width: pct(count, total) }} />
+                    <div
+                      className={`h-full rounded-full min-w-[2px] transition-[width] duration-500 ease-out ${color}`}
+                      style={{ width: pct(count, total) }}
+                    />
                   </div>
                   <div className="text-[12px] whitespace-nowrap w-24 text-right font-mono tabular-nums">
                     <span className="text-fg">{count}</span>

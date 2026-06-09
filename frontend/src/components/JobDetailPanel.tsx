@@ -3,8 +3,16 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchJobDetail } from '../api'
 import type { AiFitDetail, Application, ApplicationStatus, EvalCorrectionOut } from '../types'
 import { APPLICATION_STATUSES, STATUS_LABELS } from '../types'
-import { useDeleteApplication, useMarkApplication, useUpdateApplication } from '../hooks/useApplications'
-import { useDeleteEvalCorrection, useEvalCorrection, useSetEvalCorrection } from '../hooks/useEvalCorrection'
+import {
+  useDeleteApplication,
+  useMarkApplication,
+  useUpdateApplication,
+} from '../hooks/useApplications'
+import {
+  useDeleteEvalCorrection,
+  useEvalCorrection,
+  useSetEvalCorrection,
+} from '../hooks/useEvalCorrection'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,7 +41,13 @@ function classificationVariant(value: string | null | undefined) {
 
 const sectionLabel = 'text-[10px] font-semibold text-muted uppercase tracking-[0.08em]'
 
-function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: string; application: Application | undefined }) {
+function ApplicationTrackingSection({
+  dedupHash,
+  application,
+}: {
+  dedupHash: string
+  application: Application | undefined
+}) {
   const mark = useMarkApplication()
   const update = useUpdateApplication()
   const del = useDeleteApplication()
@@ -78,7 +92,8 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
                   'text-xs px-2.5 h-7 rounded-md border border-border bg-card text-muted cursor-pointer transition-all',
                   'hover:border-border-strong hover:text-fg',
                   'disabled:opacity-40 disabled:cursor-default',
-                  active && 'bg-primary/15 border-primary/40 text-primary-hov font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
+                  active &&
+                    'bg-primary/15 border-primary/40 text-primary-hov font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
                 )}
               >
                 {STATUS_LABELS[s]}
@@ -109,7 +124,9 @@ function ApplicationTrackingSection({ dedupHash, application }: { dedupHash: str
             size="xs"
             className="ml-auto text-faint hover:text-score-low"
             disabled={isPending}
-            onClick={() => { if (window.confirm('Remove tracking for this job?')) del.mutate(dedupHash) }}
+            onClick={() => {
+              if (window.confirm('Remove tracking for this job?')) del.mutate(dedupHash)
+            }}
           >
             Remove tracking
           </Button>
@@ -160,8 +177,7 @@ function EvalCorrectionSection({
   const trimmedReason = reason.trim()
   const existingReason = (existing?.correction_reason ?? '').trim()
   const isDirty =
-    correctedScore !== (existing?.corrected_score ?? null) ||
-    trimmedReason !== existingReason
+    correctedScore !== (existing?.corrected_score ?? null) || trimmedReason !== existingReason
   const canSave = correctedScore != null && (isDirty || !existing)
 
   function chipCls(n: number, active: boolean) {
@@ -257,10 +273,20 @@ function Section({
             width="10"
             height="10"
             viewBox="0 0 10 10"
-            className={cn('text-faint transition-transform duration-200 group-hover:text-muted', open && 'rotate-90')}
+            className={cn(
+              'text-faint transition-transform duration-200 group-hover:text-muted',
+              open && 'rotate-90',
+            )}
             aria-hidden="true"
           >
-            <path d="M3.5 2 L6.5 5 L3.5 8" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M3.5 2 L6.5 5 L3.5 8"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           {title}
         </span>
@@ -280,14 +306,14 @@ function BulletList({
   markerClass?: string
   itemClass?: string
 }) {
-  const arr = Array.isArray(items)
-    ? items.filter((v): v is string => typeof v === 'string')
-    : []
+  const arr = Array.isArray(items) ? items.filter((v): v is string => typeof v === 'string') : []
   if (arr.length === 0) return <span className="text-faint text-[13px]">None</span>
   return (
     <ul className={cn('m-0 pl-4 flex flex-col gap-1.5', markerClass, itemClass)}>
       {arr.map((item, i) => (
-        <li key={`${i}-${item}`} className="text-[13px] leading-[1.6] text-fg marker:text-faint">{item}</li>
+        <li key={`${i}-${item}`} className="text-[13px] leading-[1.6] text-fg marker:text-faint">
+          {item}
+        </li>
       ))}
     </ul>
   )
@@ -406,8 +432,8 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                   {data.salary_min_usd && data.salary_max_usd
                     ? `$${(data.salary_min_usd / 1000).toFixed(0)}–$${(data.salary_max_usd / 1000).toFixed(0)}K`
                     : data.salary_min_usd
-                    ? `$${(data.salary_min_usd / 1000).toFixed(0)}K+`
-                    : `≤ $${(data.salary_max_usd! / 1000).toFixed(0)}K`}
+                      ? `$${(data.salary_min_usd / 1000).toFixed(0)}K+`
+                      : `≤ $${(data.salary_max_usd! / 1000).toFixed(0)}K`}
                   {data.salary_period ? ` / ${data.salary_period}` : ''}
                 </Badge>
               )}
@@ -445,7 +471,9 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
             <>
               <Section title="Description">
                 <div className="font-sans text-[13px] leading-[1.7] text-fg whitespace-pre-wrap break-words m-0 max-h-[420px] overflow-y-auto bg-bg border border-border rounded-md px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-                  {data.description ?? <span className="text-faint">No description available.</span>}
+                  {data.description ?? (
+                    <span className="text-faint">No description available.</span>
+                  )}
                 </div>
               </Section>
 
@@ -493,7 +521,10 @@ export default function JobDetailPanel({ dedupHash, onClose, application }: Prop
                     ['Source', data.source],
                     ['Source job ID', data.source_job_id],
                   ].map(([label, value]) => (
-                    <div key={label} className="flex gap-3 text-[12px] py-1 border-b border-border/40 last:border-b-0">
+                    <div
+                      key={label}
+                      className="flex gap-3 text-[12px] py-1 border-b border-border/40 last:border-b-0"
+                    >
                       <span className="w-[140px] shrink-0 text-muted">{label}</span>
                       {value ? (
                         <span

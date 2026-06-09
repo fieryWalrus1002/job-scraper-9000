@@ -42,9 +42,7 @@ describe('useApplications', () => {
   it('returns a Map keyed by dedup_hash on success', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(MOCK_APPLICATIONS), { status: 200 }),
-      ),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_APPLICATIONS), { status: 200 })),
     )
 
     const { result } = renderHook(() => useApplications(), { wrapper })
@@ -62,7 +60,12 @@ describe('useApplications', () => {
   it('enters error state on fetch failure', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response('Internal Server Error', { status: 500, statusText: 'Internal Server Error' })),
+      vi.fn().mockResolvedValue(
+        new Response('Internal Server Error', {
+          status: 500,
+          statusText: 'Internal Server Error',
+        }),
+      ),
     )
 
     const { result } = renderHook(() => useApplications(), { wrapper })

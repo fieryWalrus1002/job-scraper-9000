@@ -1,7 +1,15 @@
-
 import { useState } from 'react'
-import { useApplications, useDeleteApplication, useUpdateApplication } from '../../hooks/useApplications'
-import { APPLICATION_STATUSES, type Application, type ApplicationStatus, STATUS_LABELS } from '../../types'
+import {
+  useApplications,
+  useDeleteApplication,
+  useUpdateApplication,
+} from '../../hooks/useApplications'
+import {
+  APPLICATION_STATUSES,
+  type Application,
+  type ApplicationStatus,
+  STATUS_LABELS,
+} from '../../types'
 import { Badge } from '@/components/ui/badge'
 import { FilterBar } from './FilterBar'
 
@@ -19,10 +27,18 @@ function sortApplications(rows: Application[], col: SortCol, dir: SortDir): Appl
   return [...rows].sort((a, b) => {
     let cmp = 0
     switch (col) {
-      case 'status':  cmp = (a.status ?? '').localeCompare(b.status ?? ''); break
-      case 'title':   cmp = (a.title ?? '').localeCompare(b.title ?? ''); break
-      case 'score':   cmp = (a.fit_score ?? -1) - (b.fit_score ?? -1); break
-      case 'updated': cmp = (a.updated_at ?? '').localeCompare(b.updated_at ?? ''); break
+      case 'status':
+        cmp = (a.status ?? '').localeCompare(b.status ?? '')
+        break
+      case 'title':
+        cmp = (a.title ?? '').localeCompare(b.title ?? '')
+        break
+      case 'score':
+        cmp = (a.fit_score ?? -1) - (b.fit_score ?? -1)
+        break
+      case 'updated':
+        cmp = (a.updated_at ?? '').localeCompare(b.updated_at ?? '')
+        break
     }
     return dir === 'asc' ? cmp : -cmp
   })
@@ -43,8 +59,12 @@ export default function WorkflowTab({ onSelectJob }: Props) {
 
   const all = Array.from(applications?.values() ?? []) as Application[]
 
-  const archivedCount = all.filter((a) => ARCHIVED_STATUSES.includes(a.status as ApplicationStatus)).length
-  const inProgressCount = all.filter((a) => IN_PROGRESS_STATUSES.includes(a.status as ApplicationStatus)).length
+  const archivedCount = all.filter((a) =>
+    ARCHIVED_STATUSES.includes(a.status as ApplicationStatus),
+  ).length
+  const inProgressCount = all.filter((a) =>
+    IN_PROGRESS_STATUSES.includes(a.status as ApplicationStatus),
+  ).length
 
   let bucketFiltered = all
   if (showArchived) {
@@ -60,12 +80,13 @@ export default function WorkflowTab({ onSelectJob }: Props) {
     return acc
   }, {})
 
-  const filtered = filter === 'all' ? bucketFiltered : bucketFiltered.filter((a) => a.status === filter)
+  const filtered =
+    filter === 'all' ? bucketFiltered : bucketFiltered.filter((a) => a.status === filter)
   const visible = sortApplications(filtered, sortCol, sortDir)
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {
-      setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortCol(col)
       setSortDir(col === 'updated' ? 'desc' : 'asc')
@@ -101,7 +122,8 @@ export default function WorkflowTab({ onSelectJob }: Props) {
           </div>
           {filter === 'all' && (
             <div className="text-faint text-xs mt-1.5">
-              Use the <span className="text-muted">Save / Maybe / To Apply</span> buttons in the Jobs tab.
+              Use the <span className="text-muted">Save / Maybe / To Apply</span> buttons in the
+              Jobs tab.
             </div>
           )}
         </div>
@@ -148,17 +170,24 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         e.stopPropagation()
-                        update.mutate({ dedupHash: app.dedup_hash, update: { status: e.target.value as ApplicationStatus } })
+                        update.mutate({
+                          dedupHash: app.dedup_hash,
+                          update: { status: e.target.value as ApplicationStatus },
+                        })
                       }}
                     >
                       {APPLICATION_STATUSES.map((s) => (
-                        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                        <option key={s} value={s}>
+                          {STATUS_LABELS[s]}
+                        </option>
                       ))}
                     </select>
                   </td>
                   <td>
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0 text-fg">{app.title ?? '—'}</span>
+                      <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0 text-fg">
+                        {app.title ?? '—'}
+                      </span>
                       {app.source_url && (
                         <a
                           className="shrink-0 text-[11px] text-faint no-underline leading-none hover:text-primary-hov transition-colors"
@@ -167,7 +196,9 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           title="Open job posting"
-                        >↗</a>
+                        >
+                          ↗
+                        </a>
                       )}
                     </div>
                     <span className="text-muted text-[11px]">{app.company ?? '—'}</span>
@@ -175,7 +206,13 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                   <td>
                     {app.fit_score != null ? (
                       <Badge
-                        variant={app.fit_score >= 4 ? 'score_high' : app.fit_score === 3 ? 'score_mid' : 'score_low'}
+                        variant={
+                          app.fit_score >= 4
+                            ? 'score_high'
+                            : app.fit_score === 3
+                              ? 'score_mid'
+                              : 'score_low'
+                        }
                         className="font-mono"
                       >
                         {app.fit_score}
@@ -201,8 +238,13 @@ export default function WorkflowTab({ onSelectJob }: Props) {
                       title="Remove tracking"
                       aria-label="Remove tracking"
                       disabled={del.isPending}
-                      onClick={() => { if (window.confirm('Remove tracking for this job?')) del.mutate(app.dedup_hash) }}
-                    >×</button>
+                      onClick={() => {
+                        if (window.confirm('Remove tracking for this job?'))
+                          del.mutate(app.dedup_hash)
+                      }}
+                    >
+                      ×
+                    </button>
                   </td>
                 </tr>
               ))}

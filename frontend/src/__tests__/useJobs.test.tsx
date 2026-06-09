@@ -69,9 +69,7 @@ describe('useJobs', () => {
   it('returns job list on success', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(MOCK_RESPONSE), { status: 200 }),
-      ),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_RESPONSE), { status: 200 })),
     )
 
     const { result } = renderHook(() => useJobs(EMPTY_FILTERS), { wrapper })
@@ -83,9 +81,11 @@ describe('useJobs', () => {
   })
 
   it('includes active filters in the fetch URL', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ...MOCK_RESPONSE, total: 0, items: [] }), { status: 200 }),
-    )
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ...MOCK_RESPONSE, total: 0, items: [] }), { status: 200 }),
+      )
     vi.stubGlobal('fetch', fetchMock)
 
     const filters: Filters = { ...EMPTY_FILTERS, minScore: '3', company: 'Acme' }
@@ -101,7 +101,10 @@ describe('useJobs', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        new Response('Internal Server Error', { status: 500, statusText: 'Internal Server Error' }),
+        new Response('Internal Server Error', {
+          status: 500,
+          statusText: 'Internal Server Error',
+        }),
       ),
     )
 
