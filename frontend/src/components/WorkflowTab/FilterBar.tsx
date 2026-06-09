@@ -1,5 +1,4 @@
-
-import { APPLICATION_STATUSES, type ApplicationStatus, STATUS_LABELS} from '../../types'
+import { APPLICATION_STATUSES, type ApplicationStatus, STATUS_LABELS } from '../../types'
 import { cn } from '@/lib/utils'
 
 interface FilterBarProps {
@@ -18,7 +17,8 @@ interface FilterBarProps {
 const filterBtn =
   'group h-9 inline-flex items-center gap-2.5 px-4 bg-transparent border border-transparent rounded-md text-muted text-[12px] font-medium cursor-pointer whitespace-nowrap transition-all ' +
   'hover:bg-hover hover:text-fg disabled:opacity-30 disabled:cursor-default'
-const filterBtnActive = 'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+const filterBtnActive =
+  'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
 const countCls =
   'inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded text-[10.5px] font-mono tabular-nums font-medium ' +
   'bg-bg-elevated/80 text-faint border border-border/60 ' +
@@ -64,9 +64,7 @@ export function FilterBar({
         }}
       >
         In Progress
-        <span className={cn(countCls, showOnlyInProgress && countActive)}>
-          {inProgressCount}
-        </span>
+        <span className={cn(countCls, showOnlyInProgress && countActive)}>{inProgressCount}</span>
       </button>
 
       <span className="border-l border-border mx-1.5 h-5" />

@@ -11,7 +11,9 @@ import {
 import type { Application } from '../types'
 
 function makeWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   )
@@ -50,9 +52,9 @@ describe('useMarkApplication', () => {
   it('enters error state on fetch failure', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response('Bad Request', { status: 400, statusText: 'Bad Request' }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(new Response('Bad Request', { status: 400, statusText: 'Bad Request' })),
     )
 
     const { result } = renderHook(() => useMarkApplication(), { wrapper: makeWrapper() })
@@ -76,7 +78,10 @@ describe('useUpdateApplication', () => {
     const { result } = renderHook(() => useUpdateApplication(), { wrapper: makeWrapper() })
 
     await act(async () => {
-      await result.current.mutateAsync({ dedupHash: 'hash-a', update: { status: 'applied', notes: 'Sent resume' } })
+      await result.current.mutateAsync({
+        dedupHash: 'hash-a',
+        update: { status: 'applied', notes: 'Sent resume' },
+      })
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
@@ -85,10 +90,7 @@ describe('useUpdateApplication', () => {
 
 describe('useDeleteApplication', () => {
   it('deletes the application and resolves on success', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
 
     const { result } = renderHook(() => useDeleteApplication(), { wrapper: makeWrapper() })
 
@@ -102,9 +104,9 @@ describe('useDeleteApplication', () => {
   it('enters error state on fetch failure', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response('Not Found', { status: 404, statusText: 'Not Found' }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValue(new Response('Not Found', { status: 404, statusText: 'Not Found' })),
     )
 
     const { result } = renderHook(() => useDeleteApplication(), { wrapper: makeWrapper() })

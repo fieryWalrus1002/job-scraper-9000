@@ -24,7 +24,11 @@ describe('useAuth', () => {
   })
 
   it('returns principal and isAuthenticated=true when authenticated', async () => {
-    const principal = { userId: 'u1', userDetails: 'test@example.com', userRoles: ['authenticated'] }
+    const principal = {
+      userId: 'u1',
+      userDetails: 'test@example.com',
+      userRoles: ['authenticated'],
+    }
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue(principal)
 
     const { result } = renderHook(() => useAuth(), { wrapper })

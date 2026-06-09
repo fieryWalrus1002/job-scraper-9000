@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  EMPTY_FILTERS,
-  filtersFromParams,
-  filtersToParams,
-  hasActiveFilters,
-} from '../lib/filters'
+import { EMPTY_FILTERS, filtersFromParams, filtersToParams, hasActiveFilters } from '../lib/filters'
 import type { Filters } from '../types'
 
 describe('filtersFromParams', () => {
@@ -13,7 +8,9 @@ describe('filtersFromParams', () => {
   })
 
   it('maps scalar params to filter fields', () => {
-    const p = new URLSearchParams('minScore=3&maxScore=5&from=2024-01-01&to=2024-12-31&co=Acme&salMin=100')
+    const p = new URLSearchParams(
+      'minScore=3&maxScore=5&from=2024-01-01&to=2024-12-31&co=Acme&salMin=100',
+    )
     expect(filtersFromParams(p)).toEqual({
       minScore: '3',
       maxScore: '5',

@@ -25,9 +25,17 @@ export interface ManualJobCreate {
 // Derived from the generated schema — TS will error if this list diverges from the backend.
 export type ApplicationStatus = NonNullable<Application['status']>
 export const APPLICATION_STATUSES = [
-  'saved', 'maybe', 'to_apply', 'applied',
-  'screening', 'interview', 'offer',
-  'rejected', 'withdrawn', 'hired', 'ghosted',
+  'saved',
+  'maybe',
+  'to_apply',
+  'applied',
+  'screening',
+  'interview',
+  'offer',
+  'rejected',
+  'withdrawn',
+  'hired',
+  'ghosted',
 ] as const satisfies readonly ApplicationStatus[]
 
 // Used in tracking jobs, mostly in WorkflowTab, but also in AddJobModal for the status dropdown.

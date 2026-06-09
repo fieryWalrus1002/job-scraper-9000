@@ -9,14 +9,14 @@ export interface ColumnMeta {
 }
 
 export const COLUMNS: ColumnMeta[] = [
-  { key: 'fit_score',             label: 'Score',      defaultVisible: true,  defaultWidth: 100  },
-  { key: 'title',                 label: 'Title',      defaultVisible: true,  defaultWidth: 100 },
-  { key: 'company',               label: 'Company',    defaultVisible: true,  defaultWidth: 100 },
-  { key: 'location',              label: 'Location',   defaultVisible: true,  defaultWidth: 100 },
-  { key: 'remote_classification', label: 'Remote',     defaultVisible: false, defaultWidth: 100 },
-  { key: 'posted_at',             label: 'Posted',     defaultVisible: true,  defaultWidth: 100 },
-  { key: 'confidence',            label: 'Confidence', defaultVisible: false, defaultWidth: 100 },
-  { key: 'source',                label: 'Source',     defaultVisible: false, defaultWidth: 100 },
+  { key: 'fit_score', label: 'Score', defaultVisible: true, defaultWidth: 100 },
+  { key: 'title', label: 'Title', defaultVisible: true, defaultWidth: 100 },
+  { key: 'company', label: 'Company', defaultVisible: true, defaultWidth: 100 },
+  { key: 'location', label: 'Location', defaultVisible: true, defaultWidth: 100 },
+  { key: 'remote_classification', label: 'Remote', defaultVisible: false, defaultWidth: 100 },
+  { key: 'posted_at', label: 'Posted', defaultVisible: true, defaultWidth: 100 },
+  { key: 'confidence', label: 'Confidence', defaultVisible: false, defaultWidth: 100 },
+  { key: 'source', label: 'Source', defaultVisible: false, defaultWidth: 100 },
 ]
 
 const helper = createColumnHelper<JobSummary>()
@@ -29,14 +29,14 @@ export const tableColumns = COLUMNS.map((col) =>
     minSize: 50,
     enableSorting: true,
     enableResizing: true,
-  })
+  }),
 )
 
 // ── Persistence ────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'job9000-columns'
-const ORDER_KEY   = 'job9000-column-order'
-const SIZING_KEY  = 'job9000-column-sizing'
+const ORDER_KEY = 'job9000-column-order'
+const SIZING_KEY = 'job9000-column-sizing'
 
 const VALID_KEYS = new Set<string>(COLUMNS.map((c) => c.key as string))
 const DEFAULT_ORDER = COLUMNS.map((c) => c.key as string)
@@ -45,7 +45,9 @@ function tryParse<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key)
     if (raw) return JSON.parse(raw) as T
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return fallback
 }
 

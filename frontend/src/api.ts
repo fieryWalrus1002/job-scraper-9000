@@ -1,4 +1,14 @@
-import type { Application, ApplicationCreate, ApplicationUpdate, EvalCorrectionIn, EvalCorrectionOut, Filters, JobDetail, JobListResponse, ManualJobCreate } from './types'
+import type {
+  Application,
+  ApplicationCreate,
+  ApplicationUpdate,
+  EvalCorrectionIn,
+  EvalCorrectionOut,
+  Filters,
+  JobDetail,
+  JobListResponse,
+  ManualJobCreate,
+} from './types'
 
 // Empty in dev/prod (Vite proxy + Azure SWA both handle /api/* routing).
 // Set VITE_API_URL only if calling the backend directly without a proxy.
@@ -60,7 +70,10 @@ export async function createManualJob(body: ManualJobCreate): Promise<Applicatio
   return res.json() as Promise<Application>
 }
 
-export async function updateApplication(dedupHash: string, body: ApplicationUpdate): Promise<Application> {
+export async function updateApplication(
+  dedupHash: string,
+  body: ApplicationUpdate,
+): Promise<Application> {
   const res = await fetch(`${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
