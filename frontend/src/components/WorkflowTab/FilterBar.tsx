@@ -6,12 +6,15 @@ interface FilterBarProps {
   setFilter: (f: ApplicationStatus | 'all') => void
   showArchived: boolean
   setShowArchived: (v: boolean) => void
+  showTrash: boolean
+  setShowTrash: (v: boolean) => void
   showOnlyInProgress: boolean
   setShowOnlyInProgress: (v: boolean) => void
   counts: Record<string, number>
   allCount: number
   archivedCount: number
   inProgressCount: number
+  trashedCount: number
 }
 
 const filterBtn =
@@ -30,27 +33,32 @@ export function FilterBar({
   setFilter,
   showArchived,
   setShowArchived,
+  showTrash,
+  setShowTrash,
   showOnlyInProgress,
   setShowOnlyInProgress,
   counts,
   allCount,
   archivedCount,
   inProgressCount,
+  trashedCount,
 }: FilterBarProps) {
+  const isActiveView = !showOnlyInProgress && !showArchived && !showTrash
   return (
     <div className="flex items-center gap-2 px-6 py-3.5 border-b border-border shrink-0 bg-card/30">
       {/* 1. All Active View Button */}
       <button
-        className={cn(filterBtn, !showOnlyInProgress && !showArchived && filterBtnActive)}
+        className={cn(filterBtn, isActiveView && filterBtnActive)}
         onClick={() => {
           setShowOnlyInProgress(false)
           setShowArchived(false)
+          setShowTrash(false)
           setFilter('all')
         }}
       >
         Active
-        <span className={cn(countCls, !showOnlyInProgress && !showArchived && countActive)}>
-          {allCount - archivedCount}
+        <span className={cn(countCls, isActiveView && countActive)}>
+          {allCount - archivedCount - trashedCount}
         </span>
       </button>
 
@@ -60,6 +68,7 @@ export function FilterBar({
         onClick={() => {
           setShowOnlyInProgress(true)
           setShowArchived(false)
+          setShowTrash(false)
           setFilter('all')
         }}
       >
@@ -81,12 +90,26 @@ export function FilterBar({
         </button>
       ))}
 
-      {/* 4. Archived View Button (Floated Right) */}
+      {/* 4. Trash + Archive Views (Floated Right) */}
       <button
-        className={cn(filterBtn, 'ml-auto', showArchived ? filterBtnActive : 'opacity-70')}
+        className={cn(filterBtn, 'ml-auto', showTrash ? filterBtnActive : 'opacity-70')}
+        disabled={trashedCount === 0}
+        onClick={() => {
+          setShowTrash(true)
+          setShowArchived(false)
+          setShowOnlyInProgress(false)
+          setFilter('all')
+        }}
+      >
+        Trash
+        <span className={cn(countCls, showTrash && countActive)}>{trashedCount}</span>
+      </button>
+      <button
+        className={cn(filterBtn, showArchived ? filterBtnActive : 'opacity-70')}
         disabled={archivedCount === 0}
         onClick={() => {
           setShowArchived(true)
+          setShowTrash(false)
           setShowOnlyInProgress(false)
           setFilter('all')
         }}

@@ -24,9 +24,6 @@ export interface ManualJobCreate {
 
 // Derived from the generated schema — TS will error if this list diverges from the backend.
 export type ApplicationStatus = NonNullable<Application['status']>
-// Note: 'saved' is intentionally omitted from the user-facing list. The backend
-// enum still includes it for legacy DB rows; STATUS_LABELS retains a label so
-// those rows still display. Removal from the enum is a follow-up backend PR.
 export const APPLICATION_STATUSES = [
   'maybe',
   'to_apply',
@@ -35,14 +32,14 @@ export const APPLICATION_STATUSES = [
   'interview',
   'offer',
   'rejected',
-  'withdrawn',
+  'candidate_withdrew',
   'hired',
   'ghosted',
+  'passed',
 ] as const satisfies readonly ApplicationStatus[]
 
 // Used in tracking jobs, mostly in WorkflowTab, but also in AddJobModal for the status dropdown.
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
-  saved: 'Saved',
   maybe: 'Maybe',
   to_apply: 'To Apply',
   applied: 'Applied',
@@ -50,9 +47,10 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   interview: 'Interview',
   offer: 'Offer',
   rejected: 'Rejected',
-  withdrawn: 'Withdrawn',
+  candidate_withdrew: 'I Withdrew',
   hired: 'Hired!',
   ghosted: 'Ghosted',
+  passed: 'Trashed',
 }
 
 // Frontend-only — not part of the API schema.

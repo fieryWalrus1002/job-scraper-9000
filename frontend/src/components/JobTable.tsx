@@ -147,7 +147,7 @@ const qBtnActive =
 function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
   const { mutate, isPending } = useMarkApplication()
   const buttons: { status: ApplicationStatus; label: string }[] = [
-    { status: 'withdrawn', label: 'Pass' },
+    { status: 'passed', label: 'Trash' },
     { status: 'maybe', label: 'Maybe' },
     { status: 'to_apply', label: 'To Apply' },
   ]
@@ -357,9 +357,9 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
           onClose={() => setCtx(null)}
           items={[
             {
-              label: 'Pass',
-              active: applications?.get(ctx.job.dedup_hash)?.status === 'withdrawn',
-              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'withdrawn' }),
+              label: 'Trash',
+              active: applications?.get(ctx.job.dedup_hash)?.status === 'passed',
+              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'passed' }),
             },
             {
               label: 'Maybe',

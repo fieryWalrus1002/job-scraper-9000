@@ -27,7 +27,7 @@ import { QuickActions } from '@/components/ui/quick-actions'
 import { cn } from '@/lib/utils'
 
 const TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
-  { value: 'withdrawn', label: 'Pass', shortcut: 'P' },
+  { value: 'passed', label: 'Trash', shortcut: 'T' },
   { value: 'maybe', label: 'Maybe', shortcut: 'M' },
   { value: 'to_apply', label: 'To Apply', shortcut: 'A' },
 ]
@@ -491,11 +491,7 @@ function JobDetailHeader(props: JobDetailHeaderProps) {
                   active: currentStatus === s.value,
                   disabled: triagePending,
                   variant:
-                    s.value === 'withdrawn'
-                      ? 'danger'
-                      : s.value === 'to_apply'
-                        ? 'success'
-                        : 'warn',
+                    s.value === 'passed' ? 'danger' : s.value === 'to_apply' ? 'success' : 'warn',
                   onSelect: () => setTriage(s.value),
                 }))}
               />

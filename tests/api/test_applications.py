@@ -15,7 +15,7 @@ from tests.api.conftest import FAKE_JOB_ROW, _make_cursor
 
 FAKE_APP_ROW: dict[str, Any] = {
     "dedup_hash": FAKE_JOB_ROW["dedup_hash"],
-    "status": "saved",
+    "status": "maybe",
     "applied_at": None,
     "notes": None,
     "created_at": datetime(2026, 6, 1, 12, 0, 0),
@@ -49,7 +49,7 @@ async def test_list_applications_returns_rows(
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
-    assert data[0]["status"] == "saved"
+    assert data[0]["status"] == "maybe"
     assert data[0]["title"] == FAKE_JOB_ROW["title"]
 
 
@@ -62,10 +62,10 @@ async def test_create_application(client: AsyncClient, fake_conn: AsyncMock) -> 
     fake_conn.execute = AsyncMock(return_value=_make_cursor(FAKE_APP_ROW))
     resp = await client.post(
         "/api/applications",
-        json={"dedup_hash": FAKE_JOB_ROW["dedup_hash"], "status": "saved"},
+        json={"dedup_hash": FAKE_JOB_ROW["dedup_hash"], "status": "maybe"},
     )
     assert resp.status_code == 201
-    assert resp.json()["status"] == "saved"
+    assert resp.json()["status"] == "maybe"
 
 
 async def test_create_application_invalid_status(

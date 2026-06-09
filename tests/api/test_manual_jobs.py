@@ -15,7 +15,7 @@ from tests.api.conftest import _make_cursor
 
 FAKE_MANUAL_APP_ROW: dict[str, Any] = {
     "dedup_hash": "a" * 64,
-    "status": "saved",
+    "status": "maybe",
     "applied_at": None,
     "notes": None,
     "created_at": datetime(2026, 6, 3, 10, 0, 0),
@@ -33,7 +33,7 @@ _BODY = {
     "source_url": "https://example.com/jobs/staff",
     "location": "Remote",
     "posted_at": "2026-06-01",
-    "status": "saved",
+    "status": "maybe",
 }
 
 
@@ -58,7 +58,7 @@ async def test_create_manual_job_success(
     resp = await client.post("/api/jobs", json=_BODY)
     assert resp.status_code == 201
     data = resp.json()
-    assert data["status"] == "saved"
+    assert data["status"] == "maybe"
     assert data["title"] == "Staff Engineer"
     assert data["company"] == "Initech"
     assert fake_conn.execute.call_count == 2
