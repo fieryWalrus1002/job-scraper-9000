@@ -5,6 +5,11 @@ param prefix string
 // Used as the azureStaticWebApps auth provider clientId on the authConfig below.
 param swaHostname string
 
+// CAUTION: VNet injection is create-time-only. Changing this on a live
+// environment fails — the env must be deleted and recreated (runbook in
+// infra/README.md, #161).
+param infrastructureSubnetId string
+
 param logAnalyticsCustomerId string
 
 @secure()
@@ -35,6 +40,13 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
         customerId: logAnalyticsCustomerId
         sharedKey: logAnalyticsSharedKey
       }
+    }
+    vnetConfiguration: {
+      infrastructureSubnetId: infrastructureSubnetId
+      // internal: false keeps the public ingress endpoint — required by the
+      // SWA linked backend (#133); the trust boundary stays Easy Auth (#152),
+      // not network reachability. Only DB traffic moves onto the VNet (#161).
+      internal: false
     }
   }
 }

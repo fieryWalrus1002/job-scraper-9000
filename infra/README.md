@@ -39,33 +39,56 @@ on the registry; no registry password exists anywhere in ACA secrets.
   image-pull error. Re-running the deploy (or `az containerapp update`)
   fixes it.
 
-## Postgres firewall: scoped to ACA outbound IPs (#126)
+## Postgres networking: private endpoint hybrid (#161)
 
-`modules/dbFirewall.bicep` creates one allow rule per outbound IP of the
-Container Apps environment (`AllowAca-<ip>`), replacing the old
-`AllowAzureServices` 0.0.0.0 rule that admitted any Azure tenant. An optional
-`AllowHomeClient` rule for direct psql access comes from `HOME_CLIENT_IP` in
-`.env` (personal info — never committed).
+App traffic to Postgres rides a private endpoint inside a custom VNet; the
+server's public endpoint stays enabled but firewalled to a single
+`AllowHomeClient` rule fed by `HOME_CLIENT_IP` in `.env` (personal info —
+never committed). Flexible server supports both access modes at once.
 
-**Known failure mode**: Azure does not guarantee stable outbound IPs for
-Consumption environments. If they rotate, the API and ingest job fail loudly
-with Postgres connection errors until `just deploy-infra` is re-run — it
-re-reads the current IPs and adds new rules. Stale `AllowAca-*` rules (and
-any rule dropped from the template) are NOT deleted by incremental
-deployments; clean them up with:
+- `modules/vnet.bicep` — VNet with an `aca-infra` /23 (consumption-only ACA
+  minimum) and a `private-endpoints` /24.
+- `modules/dbPrivateEndpoint.bicep` — private endpoint + the
+  `privatelink.postgres.database.azure.com` zone, linked to the VNet.
+- DNS is split-horizon: the same `DATABASE_URL` FQDN resolves to the private
+  IP inside the VNet and the public IP from home, so `just connect-az-db`
+  is unchanged.
+
+### One-time cutover runbook (#161)
+
+VNet injection on an ACA environment is **create-time-only** — `what-if`
+shows it as an innocent property Create, but the deploy fails against the
+live environment. The API is down between steps 2 and 3.
+
+```bash
+# 1. Unlink the SWA backend (it points at the app being deleted)
+az staticwebapp backends unlink -n jobscraper-swa -g rg-jobscraper
+
+# 2. Delete the apps, then the environment (env can't be deleted while apps exist)
+az containerapp delete -n jobscraper-api -g rg-jobscraper --yes
+az containerapp job delete -n jobscraper-ingest-job -g rg-jobscraper --yes
+az containerapp env delete -n jobscraper-env -g rg-jobscraper --yes
+
+# 3. Recreate everything (env in VNet, apps, PE, DNS, SWA relink)
+just deploy-infra
+
+# 4. Verify: app responds via SWA, then confirm the DB connection is private
+az containerapp exec -n jobscraper-api -g rg-jobscraper --command sh
+#   inside: getent hosts <db-fqdn>   -> should print a 10.10.2.x address
+```
+
+The SWA hostname and Entra redirect URI are unaffected (the link is by
+resource ID, the auth boundary keys on the SWA hostname). The ACA FQDN
+changes; nothing references it statically.
+
+**Post-cutover firewall cleanup** — incremental deployments never delete
+rules dropped from the template. Remove everything except `AllowHomeClient`:
 
 ```bash
 az postgres flexible-server firewall-rule list -g rg-jobscraper --server-name <server> -o table
-az postgres flexible-server firewall-rule delete -g rg-jobscraper --server-name <server> --rule-name <name> --yes
+az postgres flexible-server firewall-rule delete -g rg-jobscraper --server-name <server> --rule-name AllowAzureServices --yes
+# ...and any ClientIPAddress_* / legacy home-IP rules
 ```
-
-**One-time cleanup after the first deploy of this model** — delete the
-out-of-band rules the template no longer owns: `AllowAzureServices`, plus any
-portal-created `ClientIPAddress_*` / legacy home-IP rules superseded by
-`AllowHomeClient`.
-
-Note: `what-if` cannot preview the firewall rules because the IP list is a
-runtime module output; they appear only at deploy time.
 
 ## Known issues
 

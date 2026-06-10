@@ -35,6 +35,17 @@ var dbPasswordEncoded = replace(replace(replace(replace(dbAdminPassword, '%', '%
 // Modules
 // ============================================================
 
+// Private networking (#161): the ACA environment is VNet-injected and DB
+// traffic rides a private endpoint; Postgres' public endpoint stays open for
+// the home IP only.
+module vnet 'modules/vnet.bicep' = {
+  name: 'vnet'
+  params: {
+    location: location
+    prefix: prefix
+  }
+}
+
 module logs 'modules/loganalytics.bicep' = {
   name: 'loganalytics'
   params: {
@@ -70,6 +81,18 @@ module database 'modules/database.bicep' = {
     prefix: prefix
     adminLogin: dbAdminLogin
     adminPassword: dbAdminPassword
+    homeClientIp: homeClientIp
+  }
+}
+
+module dbPrivateEndpoint 'modules/dbPrivateEndpoint.bicep' = {
+  name: 'dbPrivateEndpoint'
+  params: {
+    location: location
+    prefix: prefix
+    serverName: database.outputs.serverName
+    vnetId: vnet.outputs.vnetId
+    peSubnetId: vnet.outputs.peSubnetId
   }
 }
 
@@ -81,6 +104,7 @@ module backendApi 'modules/containerApp.bicep' = {
   params: {
     location: location
     prefix: prefix
+    infrastructureSubnetId: vnet.outputs.acaInfraSubnetId
     logAnalyticsCustomerId: logs.outputs.customerId
     logAnalyticsSharedKey: logs.outputs.sharedKey
     acrLoginServer: registry.outputs.loginServer
