@@ -27,3 +27,8 @@ param imageTag = 'placeholder'  // use 'placeholder' until real image is pushed 
 param clientSecret = readEnvironmentVariable('AZURE_CLIENT_SECRET')
 param dbAdminPassword = readEnvironmentVariable('AZURE_POSTGRES_PASSWORD')
 param authConfig = readEnvironmentVariable('AUTH_CONFIG')
+
+// Optional: your home/client IP, allowed through the Postgres firewall for
+// direct psql access (e.g. `just connect-az-db`). Lives in .env because it's
+// personal info in a public repo. Empty/unset skips the rule.
+param homeClientIp = readEnvironmentVariable('HOME_CLIENT_IP', '')

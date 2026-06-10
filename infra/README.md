@@ -21,6 +21,52 @@ az staticwebapp backends link \
 
 Also update `frontend/public/staticwebapp.config.json` with your tenant ID before deploying the frontend.
 
+## ACR auth: managed identity, no admin credentials (#126)
+
+The registry has `adminUserEnabled: false`. Image pulls use a shared
+user-assigned managed identity (`modules/identity.bicep`) granted `AcrPull`
+on the registry; no registry password exists anywhere in ACA secrets.
+
+- **CI and local pushes are unaffected**: `az acr login` exchanges an Entra
+  token, and both the CI service principal (Contributor on the resource
+  group) and your own account already have push/pull through RBAC.
+- **Deploying needs Owner-level rights**: the template creates a role
+  assignment, which requires `Microsoft.Authorization/roleAssignments/write`
+  (Owner or User Access Administrator) on the resource group. Run
+  `just deploy-infra` as yourself, not as the Contributor-only CI principal.
+- **First-deploy flake**: RBAC propagation can lag a few minutes, so the
+  first revision after switching to identity-based pulls may fail with an
+  image-pull error. Re-running the deploy (or `az containerapp update`)
+  fixes it.
+
+## Postgres firewall: scoped to ACA outbound IPs (#126)
+
+`modules/dbFirewall.bicep` creates one allow rule per outbound IP of the
+Container Apps environment (`AllowAca-<ip>`), replacing the old
+`AllowAzureServices` 0.0.0.0 rule that admitted any Azure tenant. An optional
+`AllowHomeClient` rule for direct psql access comes from `HOME_CLIENT_IP` in
+`.env` (personal info — never committed).
+
+**Known failure mode**: Azure does not guarantee stable outbound IPs for
+Consumption environments. If they rotate, the API and ingest job fail loudly
+with Postgres connection errors until `just deploy-infra` is re-run — it
+re-reads the current IPs and adds new rules. Stale `AllowAca-*` rules (and
+any rule dropped from the template) are NOT deleted by incremental
+deployments; clean them up with:
+
+```bash
+az postgres flexible-server firewall-rule list -g rg-jobscraper --server-name <server> -o table
+az postgres flexible-server firewall-rule delete -g rg-jobscraper --server-name <server> --rule-name <name> --yes
+```
+
+**One-time cleanup after the first deploy of this model** — delete the
+out-of-band rules the template no longer owns: `AllowAzureServices`, plus any
+portal-created `ClientIPAddress_*` / legacy home-IP rules superseded by
+`AllowHomeClient`.
+
+Note: `what-if` cannot preview the firewall rules because the IP list is a
+runtime module output; they appear only at deploy time.
+
 ## Known issues
 
 **First deploy fails on container app — image not found**

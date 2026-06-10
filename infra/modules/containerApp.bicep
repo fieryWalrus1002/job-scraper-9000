@@ -15,8 +15,8 @@ param logAnalyticsSharedKey string
 
 param acrLoginServer string
 
-@secure()
-param acrPassword string
+@description('Resource ID of the user-assigned identity that holds AcrPull on the registry.')
+param acrPullIdentityId string
 
 @secure()
 param databaseUrl string
@@ -42,6 +42,12 @@ resource acaEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
 resource api 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${prefix}-api'
   location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${acrPullIdentityId}': {}
+    }
+  }
   properties: {
     managedEnvironmentId: acaEnv.id
     configuration: {
@@ -65,15 +71,10 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acrLoginServer
-          username: replace(acrLoginServer, '.azurecr.io', '')
-          passwordSecretRef: 'acr-password'
+          identity: acrPullIdentityId
         }
       ]
       secrets: [
-        {
-          name: 'acr-password'
-          value: acrPassword
-        }
         {
           name: 'database-url'
           value: databaseUrl
@@ -163,3 +164,7 @@ resource apiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
 output containerAppId string = api.id
 output containerAppFqdn string = api.properties.configuration.ingress.fqdn
 output acaEnvironmentId string = acaEnv.id
+
+// Environment-level egress IPs (shared with the ingest job) — consumed by
+// dbFirewall.bicep to scope the Postgres firewall to this environment.
+output outboundIps array = api.properties.outboundIpAddresses

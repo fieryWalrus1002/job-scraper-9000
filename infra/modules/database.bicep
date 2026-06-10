@@ -34,17 +34,9 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   }
 }
 
-// startIpAddress == endIpAddress == '0.0.0.0' is Azure's convention for
-// "allow connections from any Azure service" (including ACA outbound IPs).
-resource firewallAzureServices 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2022-12-01' = {
-  parent: server
-  name: 'AllowAzureServices'
-  properties: {
-    startIpAddress: '0.0.0.0'
-    endIpAddress: '0.0.0.0'
-  }
-}
-
+// Firewall rules live in dbFirewall.bicep (#126), a standalone module scoped
+// to the ACA environment's outbound IPs — they need containerApp outputs, and
+// this module deploys before containerApp.
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2022-12-01' = {
   parent: server
   name: databaseName

@@ -3,8 +3,8 @@ param prefix string
 param acaEnvironmentId string
 param acrLoginServer string
 
-@secure()
-param acrPassword string
+@description('Resource ID of the user-assigned identity that holds AcrPull on the registry.')
+param acrPullIdentityId string
 
 @secure()
 param databaseUrl string
@@ -18,6 +18,12 @@ param imageTag string = 'placeholder'
 resource ingestJob 'Microsoft.App/jobs@2024-03-01' = {
   name: '${prefix}-ingest-job'
   location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${acrPullIdentityId}': {}
+    }
+  }
   properties: {
     environmentId: acaEnvironmentId
     configuration: {
@@ -52,13 +58,11 @@ resource ingestJob 'Microsoft.App/jobs@2024-03-01' = {
       secrets: [
         { name: 'database-url', value: databaseUrl }
         { name: 'storage-conn-str', value: storageConnectionString }
-        { name: 'acr-password', value: acrPassword }
       ]
       registries: [
         {
           server: acrLoginServer
-          username: replace(acrLoginServer, '.azurecr.io', '')
-          passwordSecretRef: 'acr-password'
+          identity: acrPullIdentityId
         }
       ]
     }
