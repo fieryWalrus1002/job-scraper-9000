@@ -73,8 +73,11 @@ module database 'modules/database.bicep' = {
   }
 }
 
-module containerApp 'modules/containerApp.bicep' = {
-  name: 'containerApp'
+// Role-named symbol, type-named file: the backend API is a container app.
+// NOTE: this module also creates the shared ACA *environment* that the
+// ingest job runs in (acaEnvironmentId output).
+module backendApi 'modules/containerApp.bicep' = {
+  name: 'backendApi'
   params: {
     location: location
     prefix: prefix
@@ -86,11 +89,11 @@ module containerApp 'modules/containerApp.bicep' = {
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
     authConfig: authConfig
     // The container app's authConfig (#152) trusts only requests proxied by
-    // this SWA, keyed on its default hostname. This makes containerApp depend
-    // on staticWebApp. NOTE for #133: adding a SWA->backend linkedBackend will
-    // make staticWebApp depend on containerApp, creating a cycle — break it by
+    // this SWA, keyed on its default hostname. This makes backendApi depend
+    // on frontendSwa. NOTE for #133: adding a SWA->backend linkedBackend will
+    // make frontendSwa depend on backendApi, creating a cycle — break it by
     // modelling linkedBackend as a separate resource that depends on both.
-    swaHostname: staticWebApp.outputs.swaHostname
+    swaHostname: frontendSwa.outputs.swaHostname
   }
 }
 
@@ -119,7 +122,7 @@ module ingestJob 'modules/ingestJob.bicep' = {
   params: {
     location: location
     prefix: prefix
-    acaEnvironmentId: containerApp.outputs.acaEnvironmentId
+    acaEnvironmentId: backendApi.outputs.acaEnvironmentId
     acrLoginServer: registry.outputs.loginServer
     acrPullIdentityId: identity.outputs.identityId
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
@@ -128,8 +131,8 @@ module ingestJob 'modules/ingestJob.bicep' = {
   }
 }
 
-module staticWebApp 'modules/staticWebApp.bicep' = {
-  name: 'staticWebApp'
+module frontendSwa 'modules/staticWebApp.bicep' = {
+  name: 'frontendSwa'
   params: {
     location: location
     prefix: prefix
@@ -139,30 +142,30 @@ module staticWebApp 'modules/staticWebApp.bicep' = {
   }
 }
 
-// SWA -> ACA backend link (#133). Standalone module depending on BOTH
-// staticWebApp and containerApp. It must not live inside either module:
-// containerApp already depends on staticWebApp (swaHostname, #152), so nesting
-// the link under staticWebApp would create a cycle. As a separate leaf the
-// graph stays acyclic.
 // Postgres firewall (#126). Standalone leaf module for the same reason as
 // linkedBackend: it needs the container app's outbound IPs, but database
-// deploys before containerApp. Replaces the old AllowAzureServices 0.0.0.0
+// deploys before backendApi. Replaces the old AllowAzureServices 0.0.0.0
 // rule (deleting that live rule is a one-time manual step — incremental
 // deployments don't remove resources dropped from the template).
 module dbFirewall 'modules/dbFirewall.bicep' = {
   name: 'dbFirewall'
   params: {
     serverName: database.outputs.serverName
-    acaOutboundIps: containerApp.outputs.outboundIps
+    acaOutboundIps: backendApi.outputs.outboundIps
     homeClientIp: homeClientIp
   }
 }
 
+// SWA -> ACA backend link (#133). Standalone module depending on BOTH
+// frontendSwa and backendApi. It must not live inside either module:
+// backendApi already depends on frontendSwa (swaHostname, #152), so nesting
+// the link under frontendSwa would create a cycle. As a separate leaf the
+// graph stays acyclic.
 module linkedBackend 'modules/linkedBackend.bicep' = {
   name: 'linkedBackend'
   params: {
     swaName: '${prefix}-swa'
-    backendResourceId: containerApp.outputs.containerAppId
+    backendResourceId: backendApi.outputs.containerAppId
     backendName: '${prefix}-api'
     region: location
   }
@@ -172,8 +175,8 @@ module linkedBackend 'modules/linkedBackend.bicep' = {
 // Outputs
 // ============================================================
 
-output swaUrl string = 'https://${staticWebApp.outputs.swaHostname}'
+output swaUrl string = 'https://${frontendSwa.outputs.swaHostname}'
 output acrLoginServer string = registry.outputs.loginServer
-output containerAppFqdn string = containerApp.outputs.containerAppFqdn
-output containerAppId string = containerApp.outputs.containerAppId
+output containerAppFqdn string = backendApi.outputs.containerAppFqdn
+output containerAppId string = backendApi.outputs.containerAppId
 output storageAccountName string = storage.outputs.storageAccountName
