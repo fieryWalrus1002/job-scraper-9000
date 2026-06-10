@@ -54,16 +54,17 @@ def _status_check(statuses: tuple[str, ...]) -> str:
 
 
 def upgrade() -> None:
-    # Backfill removed/renamed values BEFORE swapping the CHECK constraint,
-    # otherwise rows would violate the new constraint at install time.
+    # Drop the old constraint first so backfill values that are new to the
+    # enum (candidate_withdrew) don't violate it.  The whole upgrade runs in
+    # one transaction, so a failure rolls back cleanly.
+    op.execute(
+        "ALTER TABLE app.user_applications DROP CONSTRAINT IF EXISTS user_applications_status_check"
+    )
     op.execute(
         "UPDATE app.user_applications SET status = 'maybe' WHERE status = 'saved'"
     )
     op.execute(
         "UPDATE app.user_applications SET status = 'candidate_withdrew' WHERE status = 'withdrawn'"
-    )
-    op.execute(
-        "ALTER TABLE app.user_applications DROP CONSTRAINT IF EXISTS user_applications_status_check"
     )
     op.execute(f"""
         ALTER TABLE app.user_applications
