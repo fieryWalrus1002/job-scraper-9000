@@ -35,8 +35,8 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
 }
 
 // Firewall rules live in dbFirewall.bicep (#126), a standalone module scoped
-// to the ACA environment's outbound IPs — they need containerApp outputs, and
-// this module deploys before containerApp.
+// to the ACA environment's outbound IPs — they need backendApi outputs, and
+// this module deploys before backendApi.
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2022-12-01' = {
   parent: server
   name: databaseName

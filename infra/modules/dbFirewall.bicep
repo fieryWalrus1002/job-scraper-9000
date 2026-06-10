@@ -1,6 +1,6 @@
 // Postgres firewall rules (#126). Standalone module: the ACA allow rules need
 // the container app's outbound IPs, but database.bicep deploys before
-// containerApp (it feeds databaseUrl). Same acyclic-leaf pattern as
+// backendApi (it feeds databaseUrl). Same acyclic-leaf pattern as
 // linkedBackend — don't nest these rules inside database.bicep.
 param serverName string
 

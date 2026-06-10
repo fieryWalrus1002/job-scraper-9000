@@ -3,9 +3,9 @@
 // deploy.
 //
 // This lives in its own module, NOT inside staticWebApp.bicep, to avoid a
-// dependency cycle: containerApp already depends on staticWebApp (it consumes
-// swaHostname for the #152 authConfig). Putting the link inside staticWebApp
-// would make staticWebApp depend on containerApp's resource id -> cycle.
+// dependency cycle: backendApi already depends on frontendSwa (it consumes
+// swaHostname for the #152 authConfig). Putting the link inside frontendSwa
+// would make frontendSwa depend on backendApi's resource id -> cycle.
 // As a separate leaf that depends on both, the graph stays acyclic.
 
 param swaName string
