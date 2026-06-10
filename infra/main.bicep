@@ -161,6 +161,20 @@ module dbFirewall 'modules/dbFirewall.bicep' = {
 // backendApi already depends on frontendSwa (swaHostname, #152), so nesting
 // the link under frontendSwa would create a cycle. As a separate leaf the
 // graph stays acyclic.
+// Postgres firewall (#126). Standalone leaf module for the same reason as
+// linkedBackend: it needs the container app's outbound IPs, but database
+// deploys before containerApp. Replaces the old AllowAzureServices 0.0.0.0
+// rule (deleting that live rule is a one-time manual step — incremental
+// deployments don't remove resources dropped from the template).
+module dbFirewall 'modules/dbFirewall.bicep' = {
+  name: 'dbFirewall'
+  params: {
+    serverName: database.outputs.serverName
+    acaOutboundIps: containerApp.outputs.outboundIps
+    homeClientIp: homeClientIp
+  }
+}
+
 module linkedBackend 'modules/linkedBackend.bicep' = {
   name: 'linkedBackend'
   params: {
