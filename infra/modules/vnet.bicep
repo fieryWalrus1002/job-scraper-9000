@@ -13,12 +13,22 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-04-01' = {
     }
     subnets: [
       {
-        // Consumption-only ACA environments require a /23 or larger and no
-        // subnet delegation (workload-profiles envs would need /27 + a
-        // Microsoft.App/environments delegation instead).
+        // Consumption-only ACA environments require a /23 or larger. The
+        // Microsoft.App/environments delegation is mandatory — deploying
+        // without it fails with ManagedEnvironmentSubnetDelegationError
+        // (older docs said consumption-only needed no delegation; the
+        // platform now enforces it for all VNet-injected environments).
         name: 'aca-infra'
         properties: {
           addressPrefix: '10.10.0.0/23'
+          delegations: [
+            {
+              name: 'aca-delegation'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
         }
       }
       {
