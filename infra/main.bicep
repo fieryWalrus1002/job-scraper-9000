@@ -20,6 +20,9 @@ param dbAdminPassword string
 
 param dbAdminLogin string = 'dbadmin'
 
+@description('Optional home/client IP allowed through the Postgres firewall for direct psql access. Set HOME_CLIENT_IP in .env; empty skips the rule.')
+param homeClientIp string = ''
+
 @secure()
 @description('Contents of config/auth.yml — the allowed_emails allowlist injected as a volume-mounted file.')
 param authConfig string
@@ -40,11 +43,23 @@ module logs 'modules/loganalytics.bicep' = {
   }
 }
 
+// User-assigned identity for ACR pulls (#126) — shared by the container app
+// and the ingest job. registry.bicep grants it AcrPull; no admin credentials
+// are distributed anywhere.
+module identity 'modules/identity.bicep' = {
+  name: 'identity'
+  params: {
+    location: location
+    prefix: prefix
+  }
+}
+
 module registry 'modules/registry.bicep' = {
   name: 'registry'
   params: {
     location: location
     prefix: prefix
+    acrPullPrincipalId: identity.outputs.principalId
   }
 }
 
@@ -66,7 +81,7 @@ module containerApp 'modules/containerApp.bicep' = {
     logAnalyticsCustomerId: logs.outputs.customerId
     logAnalyticsSharedKey: logs.outputs.sharedKey
     acrLoginServer: registry.outputs.loginServer
-    acrPassword: registry.outputs.adminPassword
+    acrPullIdentityId: identity.outputs.identityId
     imageTag: imageTag
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
     authConfig: authConfig
@@ -106,7 +121,7 @@ module ingestJob 'modules/ingestJob.bicep' = {
     prefix: prefix
     acaEnvironmentId: containerApp.outputs.acaEnvironmentId
     acrLoginServer: registry.outputs.loginServer
-    acrPassword: registry.outputs.adminPassword
+    acrPullIdentityId: identity.outputs.identityId
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
     storageConnectionString: storageConnectionString
     imageTag: imageTag
@@ -129,6 +144,20 @@ module staticWebApp 'modules/staticWebApp.bicep' = {
 // containerApp already depends on staticWebApp (swaHostname, #152), so nesting
 // the link under staticWebApp would create a cycle. As a separate leaf the
 // graph stays acyclic.
+// Postgres firewall (#126). Standalone leaf module for the same reason as
+// linkedBackend: it needs the container app's outbound IPs, but database
+// deploys before containerApp. Replaces the old AllowAzureServices 0.0.0.0
+// rule (deleting that live rule is a one-time manual step — incremental
+// deployments don't remove resources dropped from the template).
+module dbFirewall 'modules/dbFirewall.bicep' = {
+  name: 'dbFirewall'
+  params: {
+    serverName: database.outputs.serverName
+    acaOutboundIps: containerApp.outputs.outboundIps
+    homeClientIp: homeClientIp
+  }
+}
+
 module linkedBackend 'modules/linkedBackend.bicep' = {
   name: 'linkedBackend'
   params: {

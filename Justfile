@@ -158,6 +158,8 @@ ship-ingest:
 # Deploy or update Azure infrastructure via Bicep.
 # Secrets are passed at runtime from .env — never stored in main.bicepparam.
 # Requires: AZURE_POSTGRES_PASSWORD and AZURE_CLIENT_SECRET in .env, config/auth.yml present.
+# Optional: HOME_CLIENT_IP in .env for the Postgres AllowHomeClient firewall rule.
+# Must run as an Owner-level identity: the template creates an AcrPull role assignment.
 deploy-infra:
     #!/usr/bin/env bash
     set -euo pipefail
