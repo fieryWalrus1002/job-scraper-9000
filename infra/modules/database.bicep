@@ -7,6 +7,9 @@ param adminPassword string
 param adminLogin string = 'dbadmin'
 param databaseName string = 'jobscraper'
 
+@description('Optional home/client IP for direct psql access via the public endpoint. Empty string skips the rule.')
+param homeClientIp string = ''
+
 // Unique server name scoped to this resource group
 var serverName = '${prefix}-db-${uniqueString(resourceGroup().id)}'
 
@@ -34,9 +37,18 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   }
 }
 
-// Firewall rules live in dbFirewall.bicep (#126), a standalone module scoped
-// to the ACA environment's outbound IPs — they need backendApi outputs, and
-// this module deploys before backendApi.
+// Public access stays enabled (the flexible-server default) but is firewalled
+// to this single rule: app traffic arrives via the private endpoint instead
+// (dbPrivateEndpoint.bicep, #161), so no Azure-side IPs need allowing.
+resource homeRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2022-12-01' = if (homeClientIp != '') {
+  parent: server
+  name: 'AllowHomeClient'
+  properties: {
+    startIpAddress: homeClientIp
+    endIpAddress: homeClientIp
+  }
+}
+
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2022-12-01' = {
   parent: server
   name: databaseName
