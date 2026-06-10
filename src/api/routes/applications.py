@@ -1,16 +1,12 @@
-"""Applications API routes
-- WIP, just scaffolding for now
-"""
-
 from fastapi import APIRouter, HTTPException, Response
 
-from api.schemas import Application, ApplicationCreate, ApplicationUpdate
+from ..schemas import Application, ApplicationCreate, ApplicationUpdate
 from ..dependencies import Pool, Auth
 
-router = APIRouter(tags=["Applications"])
+router = APIRouter(prefix="/applications", tags=["Applications"])
 
 
-@router.get("/applications", response_model=list[Application])
+@router.get("", response_model=list[Application])
 async def list_applications(pool: Pool, principal: Auth):
     sql = """
         SELECT
@@ -26,7 +22,7 @@ async def list_applications(pool: Pool, principal: Auth):
     return [Application.model_validate(r) for r in rows]
 
 
-@router.post("/applications", response_model=Application, status_code=201)
+@router.post("", response_model=Application, status_code=201)
 async def create_application(body: ApplicationCreate, pool: Pool, principal: Auth):
     sql = """
         INSERT INTO app.user_applications (dedup_hash, status, applied_at, notes)
@@ -44,7 +40,7 @@ async def create_application(body: ApplicationCreate, pool: Pool, principal: Aut
     return Application.model_validate(row)
 
 
-@router.delete("/applications/{dedup_hash}", status_code=204, response_class=Response)
+@router.delete("/{dedup_hash}", status_code=204, response_class=Response)
 async def delete_application(dedup_hash: str, pool: Pool, principal: Auth):
     async with pool.connection() as conn:
         cur = await conn.execute(
@@ -56,7 +52,7 @@ async def delete_application(dedup_hash: str, pool: Pool, principal: Auth):
     return Response(status_code=204)
 
 
-@router.patch("/applications/{dedup_hash}", response_model=Application)
+@router.patch("/{dedup_hash}", response_model=Application)
 async def update_application(
     dedup_hash: str, body: ApplicationUpdate, pool: Pool, principal: Auth
 ):
@@ -69,10 +65,16 @@ async def update_application(
     set_clause = ", ".join(f"{k} = %({k})s" for k in updates)
     updates["dedup_hash"] = dedup_hash
     sql = f"""
-        UPDATE app.user_applications
-        SET {set_clause}, updated_at = now()
-        WHERE dedup_hash = %(dedup_hash)s
-        RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+        WITH updated AS (
+            UPDATE app.user_applications
+            SET {set_clause}, updated_at = now()
+            WHERE dedup_hash = %(dedup_hash)s
+            RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+        )
+        SELECT u.dedup_hash, u.status, u.applied_at, u.notes, u.created_at, u.updated_at,
+               j.title, j.company, j.fit_score, j.source_url
+        FROM updated u
+        LEFT JOIN raw.scored_job_postings j USING (dedup_hash)
     """
     async with pool.connection() as conn:
         cur = await conn.execute(sql, updates)  # type: ignore[arg-type]

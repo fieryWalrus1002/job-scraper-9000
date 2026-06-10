@@ -156,8 +156,6 @@ async def test_job_detail_404_on_unknown_hash(client: AsyncClient, fake_conn) ->
 # ---------------------------------------------------------------------------
 # Unknown routes
 # ---------------------------------------------------------------------------
-
-
 async def test_old_unprefixed_health_returns_404(client: AsyncClient) -> None:
     resp = await client.get("/health")
     assert resp.status_code == 404

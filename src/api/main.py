@@ -41,7 +41,6 @@ async def _flush_and_exit(msg: str, code: int = 3) -> NoReturn:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _pool
     url = os.environ.get("DATABASE_URL")
     if not url:
         _msg = (
@@ -66,14 +65,16 @@ async def lifespan(app: FastAPI):
         sys.stderr.write("STARTUP: migrations complete\n")
         sys.stderr.flush()
 
-        _pool = AsyncConnectionPool(
+        pool = AsyncConnectionPool(
             url,
             kwargs={"row_factory": dict_row, "connect_timeout": 5},
             min_size=2,
             max_size=10,
             open=False,
         )
-        await _pool.open()
+        await pool.open()
+        app.state.pool = pool
+
         sys.stderr.write("STARTUP: db pool open\n")
         sys.stderr.flush()
 
@@ -96,8 +97,8 @@ async def lifespan(app: FastAPI):
         await _flush_and_exit(_msg)
 
     yield
-    if _pool is not None:
-        await _pool.close()
+    if getattr(app.state, "pool", None) is not None:
+        await app.state.pool.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -119,4 +120,4 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")
-app.include_router(eval_router, prefix="/api/eval")
+app.include_router(eval_router, prefix="/api")

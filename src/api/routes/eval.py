@@ -1,7 +1,3 @@
-"""Evaluation API routes
-- WIP, just scaffolding for now
-"""
-
 # app/routes/eval.py
 from typing import Annotated, Any, cast
 from fastapi import APIRouter, HTTPException, Query, Response
@@ -9,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from ..dependencies import Pool, Auth
 from ..schemas import EvalCorrectionIn, EvalCorrectionOut
 
-router = APIRouter(tags=["Eval Corrections"])
+router = APIRouter(prefix="/eval", tags=["Eval Corrections"])
 
 # ---------------------------------------------------------------------------
 # Eval corrections — dashboard-sourced gold set for skills_fit
@@ -21,7 +17,7 @@ _CORRECTION_COLS = """
 """
 
 
-@router.post("/eval/corrections", response_model=EvalCorrectionOut, status_code=201)
+@router.post("/corrections", response_model=EvalCorrectionOut, status_code=201)
 async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: Auth):
     """Upsert a human correction to a job's skills_fit score.
 
@@ -74,7 +70,7 @@ async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: 
     return EvalCorrectionOut.model_validate(row)
 
 
-@router.get("/eval/corrections/{dedup_hash}", response_model=EvalCorrectionOut)
+@router.get("/corrections/{dedup_hash}", response_model=EvalCorrectionOut)
 async def get_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
     async with pool.connection() as conn:
         cur = await conn.execute(
@@ -91,9 +87,7 @@ async def get_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
     return EvalCorrectionOut.model_validate(row)
 
 
-@router.delete(
-    "/eval/corrections/{dedup_hash}", status_code=204, response_class=Response
-)
+@router.delete("/corrections/{dedup_hash}", status_code=204, response_class=Response)
 async def delete_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
     async with pool.connection() as conn:
         cur = await conn.execute(
@@ -105,7 +99,7 @@ async def delete_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
     return Response(status_code=204)
 
 
-@router.get("/eval/corrections", response_model=list[EvalCorrectionOut])
+@router.get("/corrections", response_model=list[EvalCorrectionOut])
 async def list_eval_corrections(
     pool: Pool,
     principal: Auth,

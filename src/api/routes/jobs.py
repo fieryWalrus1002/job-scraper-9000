@@ -1,7 +1,3 @@
-"""JobsAPI routes
-- WIP, just scaffolding for now
-"""
-
 import hashlib
 from datetime import datetime, UTC, date
 from typing import Annotated, Literal, Any, cast
@@ -16,7 +12,7 @@ from ..schemas import (
     Application,
 )
 
-router = APIRouter(tags=["Jobs"])
+router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 _LIST_COLS = """
     dedup_hash, source, source_url, title, company, location, posted_at,
@@ -36,7 +32,7 @@ _DETAIL_COLS = """
 """
 
 
-@router.get("/jobs", response_model=JobListResponse)
+@router.get("", response_model=JobListResponse)
 async def list_jobs(
     pool: Pool,
     principal: Auth,
@@ -126,7 +122,7 @@ async def list_jobs(
     )
 
 
-@router.post("/jobs", response_model=Application, status_code=201)
+@router.post("", response_model=Application, status_code=201)
 async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
     key = "|".join(
         [
@@ -187,7 +183,7 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
     return Application.model_validate(app_row)
 
 
-@router.get("/jobs/{dedup_hash}", response_model=JobDetail)
+@router.get("/{dedup_hash}", response_model=JobDetail)
 async def get_job(dedup_hash: str, pool: Pool, principal: Auth):
     sql = f"""
         SELECT {_DETAIL_COLS}
