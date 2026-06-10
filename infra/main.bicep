@@ -124,6 +124,21 @@ module staticWebApp 'modules/staticWebApp.bicep' = {
   }
 }
 
+// SWA -> ACA backend link (#133). Standalone module depending on BOTH
+// staticWebApp and containerApp. It must not live inside either module:
+// containerApp already depends on staticWebApp (swaHostname, #152), so nesting
+// the link under staticWebApp would create a cycle. As a separate leaf the
+// graph stays acyclic.
+module linkedBackend 'modules/linkedBackend.bicep' = {
+  name: 'linkedBackend'
+  params: {
+    swaName: '${prefix}-swa'
+    backendResourceId: containerApp.outputs.containerAppId
+    backendName: '${prefix}-api'
+    region: location
+  }
+}
+
 // ============================================================
 // Outputs
 // ============================================================
