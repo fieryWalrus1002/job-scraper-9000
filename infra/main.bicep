@@ -70,6 +70,12 @@ module containerApp 'modules/containerApp.bicep' = {
     imageTag: imageTag
     databaseUrl: 'postgresql://${dbAdminLogin}:${dbPasswordEncoded}@${database.outputs.serverFqdn}:5432/${database.outputs.databaseName}?sslmode=require'
     authConfig: authConfig
+    // The container app's authConfig (#152) trusts only requests proxied by
+    // this SWA, keyed on its default hostname. This makes containerApp depend
+    // on staticWebApp. NOTE for #133: adding a SWA->backend linkedBackend will
+    // make staticWebApp depend on containerApp, creating a cycle — break it by
+    // modelling linkedBackend as a separate resource that depends on both.
+    swaHostname: staticWebApp.outputs.swaHostname
   }
 }
 

@@ -1,5 +1,10 @@
 param location string
 param prefix string
+
+// Default hostname of the linked Static Web App (e.g. lemon-moss-...azurestaticapps.net).
+// Used as the azureStaticWebApps auth provider clientId on the authConfig below.
+param swaHostname string
+
 param logAnalyticsCustomerId string
 
 @secure()
@@ -42,7 +47,16 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       ingress: {
         // external: true so SWA can reach it via linked-backend proxy.
-        // Auth is enforced at the FastAPI layer on every request regardless.
+        //
+        // SECURITY: external ingress is NOT made safe by FastAPI-layer auth.
+        // FastAPI trusts X-MS-CLIENT-PRINCIPAL, which any direct caller could
+        // forge. The real trust boundary is ACA built-in auth (Easy Auth) with
+        // the azureStaticWebApps identity provider — see the `apiAuth`
+        // authConfig resource below, which rejects any request not
+        // authenticated through the linked SWA *before* it reaches the
+        // container. Codified in #152 so a redeploy can't silently drop the
+        // boundary (it was previously applied out-of-band when the SWA backend
+        // was linked).
         external: true
         targetPort: 8000
         transport: 'http'
@@ -114,6 +128,33 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
       scale: {
         minReplicas: 0
         maxReplicas: 1
+      }
+    }
+  }
+}
+
+// The trust boundary for #152. ACA built-in auth (Easy Auth) rejects any
+// request that did not arrive authenticated through the linked SWA, before it
+// reaches the container — so the forgeable X-MS-CLIENT-PRINCIPAL header can
+// only be set by the SWA proxy, never by a direct caller of the external FQDN.
+resource apiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
+  parent: api
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      // Return401 (not RedirectToLoginPage): this is an API backend, not a
+      // browser surface. The interactive login flow lives in front, on the SWA.
+      unauthenticatedClientAction: 'Return401'
+    }
+    identityProviders: {
+      azureStaticWebApps: {
+        enabled: true
+        registration: {
+          clientId: swaHostname
+        }
       }
     }
   }
