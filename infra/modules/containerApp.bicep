@@ -176,7 +176,3 @@ resource apiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
 output containerAppId string = api.id
 output containerAppFqdn string = api.properties.configuration.ingress.fqdn
 output acaEnvironmentId string = acaEnv.id
-
-// Environment-level egress IPs (shared with the ingest job) — consumed by
-// dbFirewall.bicep to scope the Postgres firewall to this environment.
-output outboundIps array = api.properties.outboundIpAddresses
