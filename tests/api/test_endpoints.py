@@ -154,10 +154,29 @@ async def test_job_detail_404_on_unknown_hash(client: AsyncClient, fake_conn) ->
 
 
 # ---------------------------------------------------------------------------
-# Unknown routes
+# Route contract — all expected paths must be registered
 # ---------------------------------------------------------------------------
 
 
+async def test_route_contract(client: AsyncClient) -> None:
+    resp = await client.get("/openapi.json")
+    assert resp.status_code == 200
+    paths = set(resp.json()["paths"].keys())
+    expected = {
+        "/api/health",
+        "/api/jobs",
+        "/api/jobs/{dedup_hash}",
+        "/api/applications",
+        "/api/applications/{dedup_hash}",
+        "/api/eval/corrections",
+        "/api/eval/corrections/{dedup_hash}",
+    }
+    assert expected <= paths, f"Missing routes: {expected - paths}"
+
+
+# ---------------------------------------------------------------------------
+# Unknown routes — unprefixed paths must not resolve
+# ---------------------------------------------------------------------------
 async def test_old_unprefixed_health_returns_404(client: AsyncClient) -> None:
     resp = await client.get("/health")
     assert resp.status_code == 404
@@ -165,4 +184,14 @@ async def test_old_unprefixed_health_returns_404(client: AsyncClient) -> None:
 
 async def test_old_unprefixed_jobs_returns_404(client: AsyncClient) -> None:
     resp = await client.get("/jobs")
+    assert resp.status_code == 404
+
+
+async def test_old_unprefixed_applications_returns_404(client: AsyncClient) -> None:
+    resp = await client.get("/applications")
+    assert resp.status_code == 404
+
+
+async def test_old_unprefixed_eval_returns_404(client: AsyncClient) -> None:
+    resp = await client.get("/eval/corrections")
     assert resp.status_code == 404

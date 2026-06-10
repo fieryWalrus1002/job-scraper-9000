@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field
 
@@ -88,20 +88,7 @@ ApplicationStatus = Literal[
     "passed",
 ]
 
-# Keep as a tuple for the SQL CHECK constraint in migrations.
-APPLICATION_STATUSES: tuple[str, ...] = (
-    "maybe",
-    "to_apply",
-    "applied",
-    "screening",
-    "interview",
-    "offer",
-    "rejected",
-    "candidate_withdrew",
-    "hired",
-    "ghosted",
-    "passed",
-)
+APPLICATION_STATUSES: tuple[str, ...] = get_args(ApplicationStatus)
 
 
 class Application(BaseModel):
@@ -127,7 +114,7 @@ class ApplicationCreate(BaseModel):
 
 class ManualJobCreate(BaseModel):
     title: str
-    fit_score: int
+    fit_score: int = Field(ge=1, le=5)
     company: str | None = None
     source_url: str | None = None
     description: str | None = None
