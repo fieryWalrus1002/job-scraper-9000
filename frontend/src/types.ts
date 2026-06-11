@@ -15,6 +15,7 @@ export type SettingsResponse = components['schemas']['SettingsResponse']
 export type CandidateProfileInput = components['schemas']['CandidateProfileInput']
 export type SearchConfigInput = components['schemas']['SearchConfigInput']
 export type ProfileSaveResponse = components['schemas']['ProfileSaveResponse']
+export type SearchSaveResponse = components['schemas']['SearchSaveResponse']
 export interface ManualJobCreate {
   title: string
   fit_score: number
