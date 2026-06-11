@@ -75,6 +75,7 @@ config/search*.yml
 config/search.yml
 config/old_searches/*.yml
 !config/search*.yml.example
+config/job*.yml
 
 # Auth config contains personal email address
 config/auth.yml
