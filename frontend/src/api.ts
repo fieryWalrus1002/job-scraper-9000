@@ -10,6 +10,8 @@ import type {
   JobListResponse,
   ManualJobCreate,
   ProfileSaveResponse,
+  SearchConfigInput,
+  SearchSaveResponse,
   SettingsResponse,
 } from './types'
 
@@ -136,6 +138,20 @@ export async function saveProfile(body: CandidateProfileInput): Promise<ProfileS
   }
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<ProfileSaveResponse>
+}
+
+export async function saveSearch(body: SearchConfigInput): Promise<SearchSaveResponse> {
+  const res = await fetch(`${API_BASE}/api/settings/search`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 422) {
+    const data = (await res.json()) as { detail?: FastApiDetailItem[] }
+    throw new ApiValidationError(parseValidationErrors(data.detail ?? []))
+  }
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<SearchSaveResponse>
 }
 
 // ───── Eval corrections ─────
