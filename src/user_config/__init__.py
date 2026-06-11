@@ -17,13 +17,16 @@ from .transform import (
     dump_yaml,
     search_config_to_pipeline_yaml,
 )
+from .versioning import canonical_json, compute_profile_version
 
 __all__ = [
     "REMOTE_CLASSIFICATIONS",
     "CandidateProfileInput",
     "SearchConfigInput",
     "UserPolicies",
+    "canonical_json",
     "candidate_profile_to_pipeline_yaml",
+    "compute_profile_version",
     "derive_policies",
     "dump_yaml",
     "search_config_to_pipeline_yaml",
