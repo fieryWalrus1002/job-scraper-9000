@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from logging.config import fileConfig
 
@@ -12,6 +13,14 @@ load_dotenv()
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+log = logging.getLogger("alembic.env")
+
+# App-wide id for the migration advisory lock (arbitrary constant, "jobs" in
+# hex). Concurrent `alembic upgrade` runs — multiple ACA replicas migrating on
+# lifespan startup during a rolling deploy, or a CLI run alongside them —
+# serialize on this lock instead of racing through the version table (#153).
+_MIGRATION_LOCK_ID = 0x6A6F6273
 
 # Build the SQLAlchemy URL from DATABASE_URL, switching to the psycopg3 driver.
 _raw_url = os.environ.get("DATABASE_URL")
@@ -49,6 +58,18 @@ def run_migrations_online() -> None:
         connect_args={"connect_timeout": _CONNECT_TIMEOUT_S},
     )
     with connectable.connect() as connection:
+        # Session-level advisory lock: survives commits and is held until this
+        # connection closes at the end of the `with` block, so the schema
+        # bootstrap and every migration run under it.
+        locked = connection.execute(
+            text("SELECT pg_try_advisory_lock(:id)"), {"id": _MIGRATION_LOCK_ID}
+        ).scalar()
+        if not locked:
+            log.info("Migration advisory lock held by another process; waiting…")
+            connection.execute(
+                text("SELECT pg_advisory_lock(:id)"), {"id": _MIGRATION_LOCK_ID}
+            )
+            log.info("Migration advisory lock acquired; continuing")
         # app schema must exist before Alembic creates its version table there.
         connection.execute(text("CREATE SCHEMA IF NOT EXISTS app"))
         connection.commit()
