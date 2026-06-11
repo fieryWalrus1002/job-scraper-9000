@@ -1,0 +1,57 @@
+# A filled-in candidate_profile.yml.template — generic example content.
+profile_version: "2026-06-01_candidate_profile_v0.1" # ignored by the transform
+
+summary: |
+  Mechanical/materials engineer with five years across product development,
+  failure analysis, and manufacturing support. Strongest evidence includes
+  root-cause investigations on field returns, test fixture design, and FEA
+  validation reports that changed design decisions.
+
+level: |
+  Open to mid-level and senior individual-contributor roles. Not seeking
+  entry-level or director roles.
+
+education:
+  - "B.S. Mechanical Engineering — Example State University, 2019."
+
+core_skills:
+  - "Failure analysis and root-cause investigation"
+  - "Finite element analysis"
+  - "CAD modeling"
+  - "Test fixture design and validation testing"
+
+adjacent_skills:
+  - "Python for engineering analysis"
+  - "GD&T"
+
+growth_skills:
+  - "Design for additive manufacturing"
+
+preferred_domains:
+  - "Aerospace"
+  - "Medical devices"
+
+avoided_domains:
+  - "Pure sales roles"
+  - "High-travel field service"
+
+constraints:
+  hard:
+    - "Must be authorized to work in the US"
+    - "Must be remote or within commuting distance of Seattle, WA"
+  soft:
+    - "Prefer small-to-mid-size teams"
+
+evidence:
+  projects:
+    - name: "Valve housing field-failure investigation"
+      type: "work project"
+      summary: "Led root-cause analysis of cracking in a cast housing."
+      evidence_of:
+        - "Failure analysis"
+        - "Materials characterization"
+      outcome: "Material spec change adopted; field failures eliminated."
+
+scoring_notes: |
+  Strong matches should involve design, testing, or failure analysis.
+  Penalize roles that are mostly field service.

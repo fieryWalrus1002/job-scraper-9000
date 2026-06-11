@@ -1,0 +1,61 @@
+# Golden output: transform of fixtures/search_writer.yml.
+global:
+  default_max_results: 50
+  hours_old: 48
+  linkedin_time: day
+
+companies:
+  - national renewable energy laboratory
+  - the nature conservancy
+
+linkedin:
+  workplace: remote
+  job_type: fulltime
+  searches:
+    - keywords: Science Writer
+    - keywords: Technical Writer
+    - keywords: Content Strategist
+    - keywords: Copy Editor
+    - keywords: Grant Writer
+    - keywords: Policy Associate
+
+jobspy:
+  sites: linkedin,indeed
+  no_remote: false
+  searches:
+    - search_term: Science Writer
+      location: United States
+    - search_term: Technical Writer
+      location: United States
+    - search_term: Content Strategist
+      location: United States
+    - search_term: Copy Editor
+      location: United States
+    - search_term: Grant Writer
+      location: United States
+    - search_term: Policy Associate
+      location: United States
+    - search_term: Science Writer
+      location: Pullman, WA
+    - search_term: Technical Writer
+      location: Pullman, WA
+    - search_term: Content Strategist
+      location: Pullman, WA
+    - search_term: Copy Editor
+      location: Pullman, WA
+    - search_term: Grant Writer
+      location: Pullman, WA
+    - search_term: Policy Associate
+      location: Pullman, WA
+    - search_term: Science Writer
+      location: Seattle, WA
+    - search_term: Technical Writer
+      location: Seattle, WA
+    - search_term: Content Strategist
+      location: Seattle, WA
+    - search_term: Copy Editor
+      location: Seattle, WA
+    - search_term: Grant Writer
+      location: Seattle, WA
+    - search_term: Policy Associate
+      location: Seattle, WA
