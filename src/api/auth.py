@@ -158,6 +158,14 @@ def current_principal(request: Request) -> Principal:
     roles = [r for r in user_roles if isinstance(r, str)]
 
     if email not in _allowed_emails:
+        # Without this line, allowlist mismatches (e.g. a guest account whose
+        # userDetails arrives as the #EXT# UPN instead of their email) are
+        # undiagnosable from the logs.
+        log.warning(
+            "Allowlist rejection: userDetails=%r (provider=%r) is not allowlisted",
+            email,
+            claims.get("identityProvider"),
+        )
         raise HTTPException(status_code=403, detail="Access denied")
 
     _log_claim_keys_once(claims)

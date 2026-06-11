@@ -284,6 +284,24 @@ def test_external_id_never_falls_back_to_email():
     assert auth._extract_external_id(claims) is None
 
 
+def test_allowlist_rejection_logs_the_rejected_identity(caplog):
+    _allow("allowed@example.com")
+    header = _make_header("guest_gmail.com#EXT#@tenant", identityProvider="aad")
+    request = Request(
+        {"type": "http", "headers": [(b"x-ms-client-principal", header.encode())]}
+    )
+
+    with caplog.at_level("WARNING", logger="api.auth"):
+        with pytest.raises(Exception) as exc:
+            auth.current_principal(request)
+
+    assert getattr(exc.value, "status_code", None) == 403
+    assert any(
+        "guest_gmail.com#ext#@tenant" in r.message and "aad" in r.message
+        for r in caplog.records
+    )
+
+
 def test_principal_carries_external_id_and_provider():
     _allow("allowed@example.com")
     header = _make_header(
