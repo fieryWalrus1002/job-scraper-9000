@@ -29,6 +29,16 @@ from .users import sync_users
 
 load_dotenv()
 
+# Without this, the root logger sits at WARNING with no handler and every
+# log.info() in the API (JIT-link events, the one-time claim-keys line) is
+# silently dropped in production — only the raw sys.stderr writes survive.
+# basicConfig is a no-op if a handler is already configured (e.g. by tests).
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stderr,
+    format="%(levelname)s [%(name)s] %(message)s",
+)
+
 log = logging.getLogger(__name__)
 
 
