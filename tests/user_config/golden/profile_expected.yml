@@ -1,0 +1,44 @@
+# Golden output: transform of fixtures/profile_filled.yml with
+# profile_version "2026-06-11.abc123def456" injected.
+# Note: evidence and scoring_notes are deliberately absent — stored in the
+# DB payload but not yet part of the skills_fit scoring contract.
+profile_version: "2026-06-11.abc123def456"
+
+summary: |
+  Mechanical/materials engineer with five years across product development,
+  failure analysis, and manufacturing support. Strongest evidence includes
+  root-cause investigations on field returns, test fixture design, and FEA
+  validation reports that changed design decisions.
+
+level: |
+  Open to mid-level and senior individual-contributor roles. Not seeking
+  entry-level or director roles.
+
+education:
+  - "B.S. Mechanical Engineering — Example State University, 2019."
+
+core_skills:
+  - "Failure analysis and root-cause investigation"
+  - "Finite element analysis"
+  - "CAD modeling"
+  - "Test fixture design and validation testing"
+
+adjacent_skills:
+  - "Python for engineering analysis"
+  - "GD&T"
+
+growth_skills:
+  - "Design for additive manufacturing"
+
+preferred_domains:
+  - "Aerospace"
+  - "Medical devices"
+
+avoided_domains:
+  - "Pure sales roles"
+  - "High-travel field service"
+
+constraints:
+  - "HARD: Must be authorized to work in the US"
+  - "HARD: Must be remote or within commuting distance of Seattle, WA"
+  - "Soft preference: Prefer small-to-mid-size teams"

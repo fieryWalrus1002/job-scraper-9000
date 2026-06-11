@@ -1,0 +1,66 @@
+# Golden output: transform of fixtures/search_engineer.yml.
+# Reviewed by hand — if a transform change alters this, the change is the
+# thing under review, not the golden.
+global:
+  default_max_results: 50
+  hours_old: 48
+  linkedin_time: day
+
+companies:
+  - boeing
+  - blue origin
+  - stryker
+
+linkedin:
+  workplace: remote
+  job_type: fulltime
+  searches:
+    - keywords: Mechanical Engineer
+    - keywords: Materials Engineer
+    - keywords: Failure Analysis Engineer
+    - keywords: Product Development Engineer
+    - keywords: Test Engineer
+    - keywords: Manufacturing Engineer
+
+jobspy:
+  sites: linkedin,indeed
+  no_remote: false
+  searches:
+    # Remote / national
+    - search_term: Mechanical Engineer
+      location: United States
+    - search_term: Materials Engineer
+      location: United States
+    - search_term: Failure Analysis Engineer
+      location: United States
+    - search_term: Product Development Engineer
+      location: United States
+    - search_term: Test Engineer
+      location: United States
+    - search_term: Manufacturing Engineer
+      location: United States
+    # Local — home location first, then acceptable locations
+    - search_term: Mechanical Engineer
+      location: Pullman, WA
+    - search_term: Materials Engineer
+      location: Pullman, WA
+    - search_term: Failure Analysis Engineer
+      location: Pullman, WA
+    - search_term: Product Development Engineer
+      location: Pullman, WA
+    - search_term: Test Engineer
+      location: Pullman, WA
+    - search_term: Manufacturing Engineer
+      location: Pullman, WA
+    - search_term: Mechanical Engineer
+      location: Seattle, WA
+    - search_term: Materials Engineer
+      location: Seattle, WA
+    - search_term: Failure Analysis Engineer
+      location: Seattle, WA
+    - search_term: Product Development Engineer
+      location: Seattle, WA
+    - search_term: Test Engineer
+      location: Seattle, WA
+    - search_term: Manufacturing Engineer
+      location: Seattle, WA

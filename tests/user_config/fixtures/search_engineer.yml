@@ -1,0 +1,88 @@
+user:
+  display_name: "example engineer"
+  email: "example@example.com"
+  home_location:
+    city: "Pullman"
+    region: "WA"
+    country: "US"
+
+search_profile:
+  name: "materials engineering near Seattle"
+  status: active
+  goal_summary: "I need a job that pays the biscuits."
+  search_mode: balanced
+
+roles:
+  target_titles:
+    preferred:
+      - "Mechanical Engineer"
+      - "Materials Engineer"
+      - "Failure Analysis Engineer"
+      - "Product Development Engineer"
+    exploratory:
+      - "Test Engineer"
+      - "Manufacturing Engineer"
+  excluded_titles:
+    - "Sales Engineer"
+    - "Field Service Technician"
+
+work_constraints:
+  employment_types:
+    acceptable:
+      - fulltime
+  work_arrangements:
+    remote:
+      acceptable: true
+      preferred: true
+      required: false
+    hybrid:
+      acceptable: false
+    onsite:
+      acceptable: false
+
+locations:
+  acceptable:
+    - city: "Seattle"
+      region: "WA"
+      country: "US"
+  preferred: []
+  excluded: []
+  relocation:
+    willing: false
+
+organizations:
+  target_companies:
+    - "Boeing"
+    - "Blue Origin"
+    - "Stryker"
+  preferred_organization_types:
+    - "manufacturer"
+    - "national lab"
+    - "medical device company"
+
+industries_and_domains:
+  preferred:
+    - "aerospace"
+    - "medical devices"
+    - "advanced manufacturing"
+    - "energy storage"
+
+keywords:
+  required_any: []
+  required_all: []
+  preferred:
+    - "finite element analysis"
+    - "failure analysis"
+    - "product development"
+  excluded:
+    - "sales"
+    - "field service"
+
+scrape_preferences:
+  include_remote_national_searches: true
+  include_local_searches: true
+  include_company_board_searches: true
+  include_general_job_boards: true
+  max_results_per_task: 50
+  freshness_hours: 48
+  cadence: daily

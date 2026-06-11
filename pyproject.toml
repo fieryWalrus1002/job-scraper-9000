@@ -41,6 +41,7 @@ packages = [
     "src/api",
     "src/ci",
     "src/review_ui",
+    "src/user_config",
     "src/utils",
 ]
 
