@@ -99,7 +99,7 @@ class Application(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
-    # joined from raw.scored_job_postings
+    # joined from raw.job_postings + the user's own raw.job_scores row
     title: str | None = None
     company: str | None = None
     fit_score: int | None = None

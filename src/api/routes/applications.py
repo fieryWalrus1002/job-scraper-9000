@@ -1,33 +1,42 @@
 from fastapi import APIRouter, HTTPException, Response
 
 from ..schemas import Application, ApplicationCreate, ApplicationUpdate
-from ..dependencies import Pool, Auth
+from ..dependencies import Pool, CurrentUser
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
+# Joined display fields come from the shared posting plus this user's own
+# score row — never another user's.
+_JOINS = """
+    LEFT JOIN raw.job_postings p USING (dedup_hash)
+    LEFT JOIN raw.job_scores s
+        ON s.dedup_hash = a.dedup_hash AND s.user_id = a.user_id
+"""
+
 
 @router.get("", response_model=list[Application])
-async def list_applications(pool: Pool, principal: Auth):
-    sql = """
+async def list_applications(pool: Pool, user: CurrentUser):
+    sql = f"""
         SELECT
             a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
-            j.title, j.company, j.fit_score, j.source_url
+            p.title, p.company, s.fit_score, p.source_url
         FROM app.user_applications a
-        LEFT JOIN raw.scored_job_postings j USING (dedup_hash)
+        {_JOINS}
+        WHERE a.user_id = %(user_id)s
         ORDER BY a.updated_at DESC
     """
     async with pool.connection() as conn:
-        cur = await conn.execute(sql)
+        cur = await conn.execute(sql, {"user_id": user.id})  # type: ignore[arg-type]
         rows = await cur.fetchall()
     return [Application.model_validate(r) for r in rows]
 
 
 @router.post("", response_model=Application, status_code=201)
-async def create_application(body: ApplicationCreate, pool: Pool, principal: Auth):
+async def create_application(body: ApplicationCreate, pool: Pool, user: CurrentUser):
     sql = """
-        INSERT INTO app.user_applications (dedup_hash, status, applied_at, notes)
-        VALUES (%(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
-        ON CONFLICT (dedup_hash) DO UPDATE
+        INSERT INTO app.user_applications (user_id, dedup_hash, status, applied_at, notes)
+        VALUES (%(user_id)s, %(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
+        ON CONFLICT (user_id, dedup_hash) DO UPDATE
             SET status     = EXCLUDED.status,
                 applied_at = EXCLUDED.applied_at,
                 notes      = EXCLUDED.notes,
@@ -35,17 +44,18 @@ async def create_application(body: ApplicationCreate, pool: Pool, principal: Aut
         RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
     """
     async with pool.connection() as conn:
-        cur = await conn.execute(sql, body.model_dump())
+        cur = await conn.execute(sql, {**body.model_dump(), "user_id": user.id})
         row = await cur.fetchone()
     return Application.model_validate(row)
 
 
 @router.delete("/{dedup_hash}", status_code=204, response_class=Response)
-async def delete_application(dedup_hash: str, pool: Pool, principal: Auth):
+async def delete_application(dedup_hash: str, pool: Pool, user: CurrentUser):
     async with pool.connection() as conn:
         cur = await conn.execute(
-            "DELETE FROM app.user_applications WHERE dedup_hash = %(dedup_hash)s",
-            {"dedup_hash": dedup_hash},
+            "DELETE FROM app.user_applications "
+            "WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s",
+            {"user_id": user.id, "dedup_hash": dedup_hash},
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Application not found")
@@ -54,7 +64,7 @@ async def delete_application(dedup_hash: str, pool: Pool, principal: Auth):
 
 @router.patch("/{dedup_hash}", response_model=Application)
 async def update_application(
-    dedup_hash: str, body: ApplicationUpdate, pool: Pool, principal: Auth
+    dedup_hash: str, body: ApplicationUpdate, pool: Pool, user: CurrentUser
 ):
     updates = body.model_dump(exclude_unset=True)
     if "status" in updates and updates["status"] is None:
@@ -64,17 +74,18 @@ async def update_application(
 
     set_clause = ", ".join(f"{k} = %({k})s" for k in updates)
     updates["dedup_hash"] = dedup_hash
+    updates["user_id"] = user.id
     sql = f"""
         WITH updated AS (
             UPDATE app.user_applications
             SET {set_clause}, updated_at = now()
-            WHERE dedup_hash = %(dedup_hash)s
-            RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+            WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
+            RETURNING user_id, dedup_hash, status, applied_at, notes, created_at, updated_at
         )
-        SELECT u.dedup_hash, u.status, u.applied_at, u.notes, u.created_at, u.updated_at,
-               j.title, j.company, j.fit_score, j.source_url
-        FROM updated u
-        LEFT JOIN raw.scored_job_postings j USING (dedup_hash)
+        SELECT a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
+               p.title, p.company, s.fit_score, p.source_url
+        FROM updated a
+        {_JOINS}
     """
     async with pool.connection() as conn:
         cur = await conn.execute(sql, updates)  # type: ignore[arg-type]

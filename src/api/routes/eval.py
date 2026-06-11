@@ -2,13 +2,17 @@
 from typing import Annotated, Any, cast
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from ..dependencies import Pool, Auth
+from ..dependencies import Pool, CurrentUser
 from ..schemas import EvalCorrectionIn, EvalCorrectionOut
 
 router = APIRouter(prefix="/eval", tags=["Eval Corrections"])
 
 # ---------------------------------------------------------------------------
-# Eval corrections — dashboard-sourced gold set for skills_fit
+# Eval corrections — per-user gold set for skills_fit
+#
+# Scores are per-user, so corrections are too: a user correcting their own
+# score is gold data for *their* profile. Keyed (user_id, dedup_hash); all
+# routes operate on the current user's rows only.
 # ---------------------------------------------------------------------------
 
 _CORRECTION_COLS = """
@@ -18,22 +22,22 @@ _CORRECTION_COLS = """
 
 
 @router.post("/corrections", response_model=EvalCorrectionOut, status_code=201)
-async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: Auth):
-    """Upsert a human correction to a job's skills_fit score.
+async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, user: CurrentUser):
+    """Upsert the current user's correction to their skills_fit score.
 
-    The server snapshots the current AI score/model/profile_version from
-    raw.scored_job_postings so the correction stays meaningful even after a
-    later re-scoring run with different (model, profile_version). Last-write-
-    wins on dedup_hash.
+    The server snapshots the user's own score/model/profile_version from
+    raw.job_scores so the correction stays meaningful even after a later
+    re-scoring run with different (model, profile_version). Last-write-wins
+    per (user, job).
     """
     async with pool.connection() as conn:
         cur = await conn.execute(
             """
             SELECT fit_score, model, profile_version
-            FROM raw.scored_job_postings
-            WHERE dedup_hash = %(dedup_hash)s
+            FROM raw.job_scores
+            WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
             """,
-            {"dedup_hash": body.dedup_hash},
+            {"user_id": user.id, "dedup_hash": body.dedup_hash},
         )
         job_row = await cur.fetchone()
         if job_row is None:
@@ -43,12 +47,12 @@ async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: 
         cur = await conn.execute(
             f"""
             INSERT INTO app.eval_corrections
-                (dedup_hash, corrected_score, correction_reason,
+                (user_id, dedup_hash, corrected_score, correction_reason,
                  original_score, original_model, profile_version)
             VALUES
-                (%(dedup_hash)s, %(corrected_score)s, %(correction_reason)s,
+                (%(user_id)s, %(dedup_hash)s, %(corrected_score)s, %(correction_reason)s,
                  %(original_score)s, %(original_model)s, %(profile_version)s)
-            ON CONFLICT (dedup_hash) DO UPDATE
+            ON CONFLICT (user_id, dedup_hash) DO UPDATE
                 SET corrected_score   = EXCLUDED.corrected_score,
                     correction_reason = EXCLUDED.correction_reason,
                     original_score    = EXCLUDED.original_score,
@@ -58,6 +62,7 @@ async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: 
             RETURNING {_CORRECTION_COLS}
             """,
             {
+                "user_id": user.id,
                 "dedup_hash": body.dedup_hash,
                 "corrected_score": body.corrected_score,
                 "correction_reason": body.correction_reason,
@@ -71,15 +76,15 @@ async def upsert_eval_correction(body: EvalCorrectionIn, pool: Pool, principal: 
 
 
 @router.get("/corrections/{dedup_hash}", response_model=EvalCorrectionOut)
-async def get_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
+async def get_eval_correction(dedup_hash: str, pool: Pool, user: CurrentUser):
     async with pool.connection() as conn:
         cur = await conn.execute(
             f"""
             SELECT {_CORRECTION_COLS}
             FROM app.eval_corrections
-            WHERE dedup_hash = %(dedup_hash)s
+            WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
             """,
-            {"dedup_hash": dedup_hash},
+            {"user_id": user.id, "dedup_hash": dedup_hash},
         )
         row = await cur.fetchone()
     if row is None:
@@ -88,11 +93,12 @@ async def get_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
 
 
 @router.delete("/corrections/{dedup_hash}", status_code=204, response_class=Response)
-async def delete_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
+async def delete_eval_correction(dedup_hash: str, pool: Pool, user: CurrentUser):
     async with pool.connection() as conn:
         cur = await conn.execute(
-            "DELETE FROM app.eval_corrections WHERE dedup_hash = %(dedup_hash)s",
-            {"dedup_hash": dedup_hash},
+            "DELETE FROM app.eval_corrections "
+            "WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s",
+            {"user_id": user.id, "dedup_hash": dedup_hash},
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Correction not found")
@@ -102,19 +108,19 @@ async def delete_eval_correction(dedup_hash: str, pool: Pool, principal: Auth):
 @router.get("/corrections", response_model=list[EvalCorrectionOut])
 async def list_eval_corrections(
     pool: Pool,
-    principal: Auth,
+    user: CurrentUser,
     model: Annotated[str | None, Query(max_length=200)] = None,
     profile_version: Annotated[str | None, Query(max_length=100)] = None,
 ):
-    filters: list[str] = []
-    params: dict = {}
+    filters: list[str] = ["user_id = %(user_id)s"]
+    params: dict = {"user_id": user.id}
     if model is not None:
         filters.append("original_model = %(model)s")
         params["model"] = model
     if profile_version is not None:
         filters.append("profile_version = %(profile_version)s")
         params["profile_version"] = profile_version
-    where = ("WHERE " + " AND ".join(filters)) if filters else ""
+    where = "WHERE " + " AND ".join(filters)
     sql = f"""
         SELECT {_CORRECTION_COLS}
         FROM app.eval_corrections

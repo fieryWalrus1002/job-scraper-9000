@@ -108,7 +108,27 @@ async def test_principal_without_external_id_gets_403():
 
 
 @pytest.mark.asyncio
-async def test_dev_bypass_upserts_dev_admin():
+async def test_dev_bypass_acts_as_existing_admin():
+    """Bypass mode resolves to the bootstrap admin: local data is owned by
+    that row after the 0007 backfill, so a separate dev identity would see
+    an empty feed."""
+    conn = AsyncMock()
+    admin_row = {**FAKE_USER_ROW, "role": "admin"}
+    conn.execute = AsyncMock(return_value=_make_cursor(admin_row))
+
+    principal = _principal(
+        email="dev@localhost", external_id="dev-bypass", identity_provider="dev"
+    )
+    row = await get_or_provision_user(conn, principal)
+
+    assert row == admin_row
+    select_sql = conn.execute.await_args_list[0].args[0]
+    assert "role = 'admin'" in select_sql
+    assert conn.execute.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_dev_bypass_provisions_dev_admin_on_fresh_db():
     conn = AsyncMock()
     dev_row = {
         **FAKE_USER_ROW,
@@ -117,7 +137,7 @@ async def test_dev_bypass_upserts_dev_admin():
         "identity_provider": "dev",
         "role": "admin",
     }
-    conn.execute = AsyncMock(return_value=_make_cursor(dev_row))
+    conn.execute = AsyncMock(side_effect=[_make_cursor(None), _make_cursor(dev_row)])
 
     principal = _principal(
         email="dev@localhost", external_id="dev-bypass", identity_provider="dev"
@@ -125,7 +145,7 @@ async def test_dev_bypass_upserts_dev_admin():
     row = await get_or_provision_user(conn, principal)
 
     assert row["role"] == "admin"
-    insert_sql = conn.execute.await_args_list[0].args[0]
+    insert_sql = conn.execute.await_args_list[1].args[0]
     assert "ON CONFLICT (email)" in insert_sql
 
 
@@ -135,23 +155,18 @@ async def test_dev_bypass_upserts_dev_admin():
 
 
 @pytest.mark.asyncio
-async def test_me_returns_current_user(client, fake_conn):
-    dev_row = {
-        **FAKE_USER_ROW,
-        "email": "dev@localhost",
-        "external_id": "dev-bypass",
-        "identity_provider": "dev",
-        "role": "admin",
-    }
-    fake_conn.execute = AsyncMock(return_value=_make_cursor(dev_row))
+async def test_me_returns_current_user(client):
+    # The client fixture overrides current_user with conftest.TEST_USER, so
+    # this exercises the route wiring; provisioning is covered above.
+    from .conftest import TEST_USER
 
     resp = await client.get("/api/me")
 
     assert resp.status_code == 200
     body = resp.json()
     assert body == {
-        "id": str(_USER_ID),
-        "email": "dev@localhost",
-        "display_name": None,
-        "role": "admin",
+        "id": str(TEST_USER.id),
+        "email": TEST_USER.email,
+        "display_name": TEST_USER.display_name,
+        "role": TEST_USER.role,
     }

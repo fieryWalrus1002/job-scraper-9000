@@ -45,6 +45,22 @@ async def sync_users(conn, users: list[AuthUser]) -> None:
 async def get_or_provision_user(conn, principal: Principal) -> dict[str, Any]:
     """Resolve a Principal to its app.users row, JIT-linking on first login."""
     if principal.identity_provider == "dev":
+        # Bypass mode acts as the bootstrap admin: local data (job scores,
+        # applications) is owned by that row after the 0007 backfill, so a
+        # separate dev identity would see an empty feed. Fresh DBs with no
+        # admin yet get a dev@localhost admin instead.
+        cur = await conn.execute(
+            f"""
+            SELECT {_USER_COLS}
+            FROM app.users
+            WHERE role = 'admin'
+            ORDER BY created_at
+            LIMIT 1
+            """
+        )
+        row = await cur.fetchone()
+        if row is not None:
+            return cast(dict[str, Any], row)
         cur = await conn.execute(
             f"""
             INSERT INTO app.users

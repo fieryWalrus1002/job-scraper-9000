@@ -12,12 +12,25 @@ from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
+import uuid
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from api import auth
 from api.main import app
-from api.dependencies import get_pool
+from api.dependencies import current_user, get_pool
+from api.schemas import User
+
+# Stable fake identity for route tests: current_user is overridden in the
+# client fixture so route tests don't consume fake_conn.execute calls on
+# provisioning. Provisioning itself is tested directly in test_users.py.
+TEST_USER = User(
+    id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+    email="dev@localhost",
+    display_name="Dev Bypass",
+    role="admin",
+)
 
 # ---------------------------------------------------------------------------
 # Representative fake records
@@ -106,6 +119,7 @@ def fake_pool(fake_conn: AsyncMock) -> _FakePool:
 async def client(fake_pool: _FakePool, monkeypatch) -> AsyncClient:  # type: ignore[misc]
     monkeypatch.setenv(auth.BYPASS_VAR, "1")
     app.dependency_overrides[get_pool] = lambda: fake_pool
+    app.dependency_overrides[current_user] = lambda: TEST_USER
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:

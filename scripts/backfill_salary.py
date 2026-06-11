@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Backfill salary_min_usd / salary_max_usd / salary_period for existing rows.
 
-Runs the regex extractor against every row in raw.scored_job_postings
-that currently has a NULL salary_min_usd and a non-empty description.
+Runs the regex extractor against every row in raw.job_postings
+in raw.job_postings that currently has a NULL salary_min_usd and a non-empty description.
 
 Usage:
     uv run scripts/backfill_salary.py
@@ -28,14 +28,14 @@ log = logging.getLogger(__name__)
 
 _SELECT_SQL = """
     SELECT dedup_hash, description
-    FROM raw.scored_job_postings
+    FROM raw.job_postings
     WHERE salary_min_usd IS NULL
       AND description IS NOT NULL
       AND description <> ''
 """
 
 _UPDATE_SQL = """
-    UPDATE raw.scored_job_postings
+    UPDATE raw.job_postings
     SET salary_min_usd = %(salary_min_usd)s,
         salary_max_usd = %(salary_max_usd)s,
         salary_period  = %(salary_period)s

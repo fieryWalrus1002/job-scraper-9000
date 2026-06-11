@@ -269,3 +269,176 @@ def test_0006_downgrade_drops_users(fresh_pg):
             0
         ]
     assert exists is False
+
+
+# ---------------------------------------------------------------------------
+# 0007: split postings/scores, scope app tables per user
+# ---------------------------------------------------------------------------
+
+
+def _legacy_schema_sql() -> str:
+    """The pre-0007 raw.scored_job_postings DDL, inlined: db/schema.sql now
+    describes the split tables, but 0007 must be tested against the legacy
+    shape it migrates."""
+    return """
+    CREATE SCHEMA IF NOT EXISTS raw;
+    DO $$ BEGIN
+        CREATE TYPE raw.remote_classification AS ENUM (
+            'fully_remote', 'remote_with_quarterly_travel',
+            'remote_with_monthly_travel', 'remote_with_frequent_travel',
+            'hybrid', 'onsite_disguised', 'location_restricted', 'unclear');
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    DO $$ BEGIN
+        CREATE TYPE raw.fit_confidence AS ENUM ('low', 'medium', 'high');
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    CREATE TABLE raw.scored_job_postings (
+        dedup_hash TEXT PRIMARY KEY,
+        source TEXT, source_job_id TEXT, source_url TEXT,
+        title TEXT, company TEXT, location TEXT,
+        posted_at DATE, description TEXT, scraped_at TIMESTAMPTZ,
+        remote_classification raw.remote_classification,
+        fit_score SMALLINT CHECK (fit_score BETWEEN 1 AND 5),
+        confidence raw.fit_confidence,
+        score_rationale TEXT, ai_fit_detail JSONB,
+        pipeline_metadata JSONB NOT NULL DEFAULT '{}',
+        run_id TEXT NOT NULL, scored_at TIMESTAMPTZ NOT NULL,
+        model TEXT NOT NULL, provider TEXT NOT NULL,
+        profile_version TEXT NOT NULL, failure_reason TEXT,
+        metadata JSONB NOT NULL DEFAULT '{}',
+        ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        salary_min_usd INTEGER, salary_max_usd INTEGER, salary_period TEXT
+    );
+    """
+
+
+def _seed_legacy_data(conn_str: str) -> None:
+    with psycopg.connect(conn_str) as conn:
+        conn.execute(_legacy_schema_sql())
+        conn.execute("""
+            INSERT INTO raw.scored_job_postings
+                (dedup_hash, title, company, fit_score, run_id, scored_at,
+                 model, provider, profile_version)
+            VALUES
+                ('hash-1', 'Engineer A', 'Acme', 4, 'run-1', now(), 'm', 'p', 'v1'),
+                ('hash-2', 'Engineer B', 'Initech', 2, 'run-1', now(), 'm', 'p', 'v1')
+        """)
+        conn.execute(
+            "INSERT INTO app.user_applications (dedup_hash, status) "
+            "VALUES ('hash-1', 'applied')"
+        )
+        conn.execute("""
+            INSERT INTO app.eval_corrections
+                (dedup_hash, corrected_score, original_score, original_model,
+                 profile_version)
+            VALUES ('hash-2', 3, 2, 'm', 'v1')
+        """)
+
+
+@skip_if_no_docker
+def test_0007_splits_tables_and_backfills_to_admin(fresh_pg):
+    _run_alembic("0006", fresh_pg, extra_env=_BOOTSTRAP)
+    _seed_legacy_data(fresh_pg)
+
+    _run_alembic("0007", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        admin_id = conn.execute(
+            "SELECT id FROM app.users WHERE role = 'admin'"
+        ).fetchone()[0]
+
+        postings = conn.execute(
+            "SELECT dedup_hash, title FROM raw.job_postings ORDER BY dedup_hash"
+        ).fetchall()
+        assert postings == [("hash-1", "Engineer A"), ("hash-2", "Engineer B")]
+
+        scores = conn.execute(
+            "SELECT dedup_hash, user_id, fit_score FROM raw.job_scores "
+            "ORDER BY dedup_hash"
+        ).fetchall()
+        assert scores == [("hash-1", admin_id, 4), ("hash-2", admin_id, 2)]
+
+        legacy = conn.execute(
+            "SELECT to_regclass('raw.scored_job_postings')"
+        ).fetchone()[0]
+        assert legacy is None
+
+        app_row = conn.execute(
+            "SELECT user_id, status FROM app.user_applications"
+        ).fetchall()
+        assert app_row == [(admin_id, "applied")]
+
+        corr_row = conn.execute(
+            "SELECT user_id, corrected_score FROM app.eval_corrections"
+        ).fetchall()
+        assert corr_row == [(admin_id, 3)]
+
+
+@skip_if_no_docker
+def test_0007_composite_pk_allows_second_user_rows(fresh_pg):
+    _run_alembic("0006", fresh_pg, extra_env=_BOOTSTRAP)
+    _seed_legacy_data(fresh_pg)
+    _run_alembic("0007", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg, autocommit=True) as conn:
+        other_id = conn.execute(
+            "INSERT INTO app.users (email, role) "
+            "VALUES ('member@example.com', 'member') RETURNING id"
+        ).fetchone()[0]
+        # Same dedup_hash, different user — legal under the composite PK
+        conn.execute(
+            "INSERT INTO raw.job_scores "
+            "(user_id, dedup_hash, fit_score, run_id, scored_at, model, "
+            " provider, profile_version) "
+            "VALUES (%s, 'hash-1', 5, 'run-2', now(), 'm', 'p', 'v1')",
+            (other_id,),
+        )
+        conn.execute(
+            "INSERT INTO app.user_applications (user_id, dedup_hash, status) "
+            "VALUES (%s, 'hash-1', 'maybe')",
+            (other_id,),
+        )
+        # Duplicate (user, hash) still rejected
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(
+                "INSERT INTO app.user_applications (user_id, dedup_hash, status) "
+                "VALUES (%s, 'hash-1', 'applied')",
+                (other_id,),
+            )
+
+
+@skip_if_no_docker
+def test_0007_upgrade_on_fresh_db_without_legacy_table(fresh_pg):
+    """A fresh DB never had raw.scored_job_postings (it came from
+    db/schema.sql, not Alembic) — 0007 must bootstrap raw itself."""
+    _run_alembic("0007", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        for table in ("raw.job_postings", "raw.job_scores"):
+            exists = conn.execute(
+                f"SELECT to_regclass('{table}') IS NOT NULL"
+            ).fetchone()[0]
+            assert exists is True, f"{table} missing"
+
+
+@skip_if_no_docker
+def test_0007_downgrade_reconstructs_legacy_table(fresh_pg):
+    _run_alembic("0006", fresh_pg, extra_env=_BOOTSTRAP)
+    _seed_legacy_data(fresh_pg)
+    _run_alembic("0007", fresh_pg, extra_env=_BOOTSTRAP)
+
+    _run_alembic("0006", fresh_pg, command="downgrade", extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        rows = conn.execute(
+            "SELECT dedup_hash, fit_score FROM raw.scored_job_postings "
+            "ORDER BY dedup_hash"
+        ).fetchall()
+        assert rows == [("hash-1", 4), ("hash-2", 2)]
+        app_pk_cols = conn.execute("""
+            SELECT a.attname FROM pg_index i
+            JOIN pg_attribute a ON a.attrelid = i.indrelid
+                AND a.attnum = ANY(i.indkey)
+            WHERE i.indrelid = 'app.user_applications'::regclass
+              AND i.indisprimary
+        """).fetchall()
+        assert app_pk_cols == [("dedup_hash",)]
