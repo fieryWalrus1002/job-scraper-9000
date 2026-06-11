@@ -57,10 +57,15 @@ def _container_ip(name: str) -> str:
     return result.stdout.strip()
 
 
-def _run_alembic(revision: str, conn_str: str, command: str = "upgrade") -> None:
+def _run_alembic(
+    revision: str,
+    conn_str: str,
+    command: str = "upgrade",
+    extra_env: dict[str, str] | None = None,
+) -> None:
     result = subprocess.run(
         ["uv", "run", "alembic", command, revision],
-        env={**os.environ, "DATABASE_URL": conn_str},
+        env={**os.environ, "DATABASE_URL": conn_str, **(extra_env or {})},
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
@@ -201,3 +206,66 @@ def test_0005_downgrade_remaps_new_statuses(fresh_pg):
                 "INSERT INTO app.user_applications (dedup_hash, status) "
                 "VALUES ('hash-constraint-check', 'passed')"
             )
+
+
+# ---------------------------------------------------------------------------
+# 0006: create app.users + bootstrap admin seed
+# ---------------------------------------------------------------------------
+
+_BOOTSTRAP = {"BOOTSTRAP_ADMIN_EMAIL": "Bootstrap-Admin@Example.com"}
+
+
+@skip_if_no_docker
+def test_0006_creates_users_and_seeds_bootstrap_admin(fresh_pg):
+    """BOOTSTRAP_ADMIN_EMAIL takes precedence over any local auth.yml, so the
+    seed is deterministic across machines with and without that file."""
+    _run_alembic("0006", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        rows = conn.execute(
+            "SELECT email, role, external_id, identity_provider FROM app.users"
+        ).fetchall()
+
+    assert rows == [("bootstrap-admin@example.com", "admin", None, None)]
+
+
+@skip_if_no_docker
+def test_0006_users_constraints(fresh_pg):
+    _run_alembic("0006", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg, autocommit=True) as conn:
+        # duplicate email rejected
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(
+                "INSERT INTO app.users (email) VALUES ('bootstrap-admin@example.com')"
+            )
+        # invalid role rejected
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute(
+                "INSERT INTO app.users (email, role) VALUES ('x@example.com', 'root')"
+            )
+        # duplicate (identity_provider, external_id) rejected once linked
+        conn.execute(
+            "INSERT INTO app.users (email, identity_provider, external_id) "
+            "VALUES ('a@example.com', 'aad', 'oid-1')"
+        )
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(
+                "INSERT INTO app.users (email, identity_provider, external_id) "
+                "VALUES ('b@example.com', 'aad', 'oid-1')"
+            )
+        # multiple unlinked rows (NULL external_id) are fine
+        conn.execute("INSERT INTO app.users (email) VALUES ('c@example.com')")
+        conn.execute("INSERT INTO app.users (email) VALUES ('d@example.com')")
+
+
+@skip_if_no_docker
+def test_0006_downgrade_drops_users(fresh_pg):
+    _run_alembic("0006", fresh_pg, extra_env=_BOOTSTRAP)
+    _run_alembic("0005", fresh_pg, command="downgrade", extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        exists = conn.execute("SELECT to_regclass('app.users') IS NOT NULL").fetchone()[
+            0
+        ]
+    assert exists is False

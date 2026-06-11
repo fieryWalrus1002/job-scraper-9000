@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from starlette.requests import Request
 
 from api import auth
 from api.dependencies import get_pool
@@ -16,9 +17,13 @@ from api.main import app
 from .conftest import _FakePool, _make_cursor
 
 
-def _make_header(email: str, roles: list[str] | None = None) -> str:
-    claims = {"userDetails": email, "userRoles": roles or []}
+def _make_header(email: str, roles: list[str] | None = None, **extra) -> str:
+    claims = {"userDetails": email, "userRoles": roles or [], **extra}
     return base64.b64encode(json.dumps(claims).encode()).decode()
+
+
+def _allow(*emails: str) -> None:
+    auth.init([auth.AuthUser(email=e, role="member") for e in emails])
 
 
 def _pool_with_empty_jobs() -> _FakePool:
@@ -93,7 +98,7 @@ async def test_health_public_in_bypass_mode(monkeypatch):
 @pytest.mark.asyncio
 async def test_bypass_zero_string_enforces_auth(monkeypatch):
     monkeypatch.setenv(auth.BYPASS_VAR, "0")
-    auth.init(["allowed@example.com"])
+    _allow("allowed@example.com")
     app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
     try:
         status = await _get_jobs()
@@ -109,7 +114,7 @@ async def test_bypass_zero_string_enforces_auth(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_enforced_valid_allowlisted_email_returns_200():
-    auth.init(["allowed@example.com"])
+    _allow("allowed@example.com")
     app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
     try:
         status = await _get_jobs(
@@ -122,7 +127,7 @@ async def test_enforced_valid_allowlisted_email_returns_200():
 
 @pytest.mark.asyncio
 async def test_enforced_non_allowlisted_email_returns_403():
-    auth.init(["allowed@example.com"])
+    _allow("allowed@example.com")
     app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
     try:
         status = await _get_jobs(
@@ -135,7 +140,7 @@ async def test_enforced_non_allowlisted_email_returns_403():
 
 @pytest.mark.asyncio
 async def test_enforced_missing_header_returns_401():
-    auth.init(["allowed@example.com"])
+    _allow("allowed@example.com")
     app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
     try:
         status = await _get_jobs()
@@ -146,7 +151,7 @@ async def test_enforced_missing_header_returns_401():
 
 @pytest.mark.asyncio
 async def test_enforced_malformed_base64_returns_401():
-    auth.init(["allowed@example.com"])
+    _allow("allowed@example.com")
     app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
     try:
         status = await _get_jobs({"X-MS-CLIENT-PRINCIPAL": "not!!valid!!base64"})
@@ -157,7 +162,7 @@ async def test_enforced_malformed_base64_returns_401():
 
 @pytest.mark.asyncio
 async def test_email_matching_is_case_insensitive():
-    auth.init(["Allowed@Example.Com"])
+    _allow("Allowed@Example.Com")
     app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
     try:
         status = await _get_jobs(
@@ -175,7 +180,7 @@ async def test_email_matching_is_case_insensitive():
 
 @pytest.mark.asyncio
 async def test_health_public_no_header_enforced_mode():
-    auth.init(["allowed@example.com"])
+    _allow("allowed@example.com")
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
@@ -191,3 +196,108 @@ async def test_health_public_with_empty_allowlist():
     ) as ac:
         resp = await ac.get("/api/health")
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Config loading (users format)
+# ---------------------------------------------------------------------------
+
+
+def _write_config(tmp_path, monkeypatch, content: str) -> None:
+    cfg = tmp_path / "auth.yml"
+    cfg.write_text(content)
+    monkeypatch.setattr(auth, "_CONFIG_PATH", cfg)
+
+
+def test_load_auth_config_parses_users(tmp_path, monkeypatch):
+    _write_config(
+        tmp_path,
+        monkeypatch,
+        "users:\n"
+        "  - email: Owner@Example.com\n"
+        "    role: admin\n"
+        "  - email: friend@example.com\n",
+    )
+    users = auth.load_auth_config()
+    assert users == [
+        auth.AuthUser(email="owner@example.com", role="admin"),
+        auth.AuthUser(email="friend@example.com", role="member"),
+    ]
+
+
+def test_load_auth_config_rejects_legacy_format(tmp_path, monkeypatch):
+    _write_config(tmp_path, monkeypatch, "allowed_emails:\n  - a@example.com\n")
+    with pytest.raises(RuntimeError, match="legacy"):
+        auth.load_auth_config()
+
+
+def test_load_auth_config_rejects_bad_role(tmp_path, monkeypatch):
+    _write_config(
+        tmp_path, monkeypatch, "users:\n  - email: a@example.com\n    role: root\n"
+    )
+    with pytest.raises(RuntimeError, match="invalid role"):
+        auth.load_auth_config()
+
+
+def test_load_auth_config_rejects_duplicate_emails(tmp_path, monkeypatch):
+    _write_config(
+        tmp_path,
+        monkeypatch,
+        "users:\n  - email: a@example.com\n  - email: A@example.com\n",
+    )
+    with pytest.raises(RuntimeError, match="duplicate"):
+        auth.load_auth_config()
+
+
+def test_load_auth_config_rejects_empty_users(tmp_path, monkeypatch):
+    _write_config(tmp_path, monkeypatch, "users: []\n")
+    with pytest.raises(RuntimeError, match="non-empty"):
+        auth.load_auth_config()
+
+
+# ---------------------------------------------------------------------------
+# Stable external id extraction (Entra oid preferred, SWA userId fallback)
+# ---------------------------------------------------------------------------
+
+_OID_URI = "http://schemas.microsoft.com/identity/claims/objectidentifier"
+
+
+def test_external_id_prefers_entra_oid():
+    claims = {
+        "userId": "swa-hash",
+        "claims": [{"typ": _OID_URI, "val": "oid-123"}],
+    }
+    assert auth._extract_external_id(claims) == "oid-123"
+
+
+def test_external_id_accepts_short_oid_typ():
+    claims = {"userId": "swa-hash", "claims": [{"typ": "oid", "val": "oid-456"}]}
+    assert auth._extract_external_id(claims) == "oid-456"
+
+
+def test_external_id_falls_back_to_swa_user_id():
+    assert auth._extract_external_id({"userId": "swa-hash"}) == "swa-hash"
+
+
+def test_external_id_never_falls_back_to_email():
+    claims = {"userDetails": "user@example.com"}
+    assert auth._extract_external_id(claims) is None
+
+
+def test_principal_carries_external_id_and_provider():
+    _allow("allowed@example.com")
+    header = _make_header(
+        "allowed@example.com",
+        identityProvider="aad",
+        userId="swa-hash",
+        claims=[{"typ": _OID_URI, "val": "oid-789"}],
+    )
+    request = Request(
+        {"type": "http", "headers": [(b"x-ms-client-principal", header.encode())]}
+    )
+
+    principal = auth.current_principal(request)
+
+    assert principal.email == "allowed@example.com"
+    assert principal.external_id == "oid-789"
+    assert principal.identity_provider == "aad"

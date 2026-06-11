@@ -1,4 +1,10 @@
-# Allowed identities. Email matched against userDetails from Entra ID (case-insensitive).
-# Copy to config/auth.yml and add your email address.
-allowed_emails:
-  - you@example.com
+# Allowed identities. Email is matched against userDetails from Entra ID
+# (case-insensitive) and is the provisioning key for app.users; the stable
+# external id (Entra oid) is linked automatically on first login.
+# Copy to config/auth.yml and list your users. Exactly one admin is expected.
+# Roles: admin | member.
+users:
+  - email: you@example.com
+    role: admin
+  - email: friend@example.com
+    role: member
