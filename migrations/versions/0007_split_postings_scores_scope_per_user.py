@@ -192,7 +192,19 @@ def upgrade() -> None:
             {"admin_id": admin_id},
         )
     if legacy_exists:
+        # eval_corrections.dedup_hash has an FK to raw.scored_job_postings; drop
+        # it before dropping the table, then repoint it to raw.job_postings below.
+        op.execute(
+            "ALTER TABLE app.eval_corrections "
+            "DROP CONSTRAINT IF EXISTS eval_corrections_dedup_hash_fkey"
+        )
         op.execute("DROP TABLE raw.scored_job_postings")
+
+    op.execute(
+        "ALTER TABLE app.eval_corrections "
+        "ADD CONSTRAINT eval_corrections_dedup_hash_fkey "
+        "FOREIGN KEY (dedup_hash) REFERENCES raw.job_postings(dedup_hash) ON DELETE CASCADE"
+    )
 
     for table, idx_old, idx_new, idx_cols in (
         (
@@ -296,6 +308,12 @@ def downgrade() -> None:
             ON raw.scored_job_postings (salary_min_usd)
     """)
     op.execute("DROP TABLE raw.job_scores")
+    # eval_corrections.dedup_hash references raw.job_postings; drop it before
+    # dropping the table, then repoint it to raw.scored_job_postings below.
+    op.execute(
+        "ALTER TABLE app.eval_corrections "
+        "DROP CONSTRAINT IF EXISTS eval_corrections_dedup_hash_fkey"
+    )
     op.execute("DROP TABLE raw.job_postings")
 
     for table, idx_old, idx_new in (
@@ -336,3 +354,8 @@ def downgrade() -> None:
         CREATE INDEX idx_eval_corrections_model_profile
             ON app.eval_corrections (original_model, profile_version)
     """)
+    op.execute(
+        "ALTER TABLE app.eval_corrections "
+        "ADD CONSTRAINT eval_corrections_dedup_hash_fkey "
+        "FOREIGN KEY (dedup_hash) REFERENCES raw.scored_job_postings(dedup_hash) ON DELETE CASCADE"
+    )
