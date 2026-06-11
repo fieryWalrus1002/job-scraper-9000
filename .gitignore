@@ -85,3 +85,7 @@ frontend/openapi.json
 # Infra configs with PII (Azure Object IDs, etc.)
 infra/*.bicepparam
 infra/*.json
+
+# Materialized per-user configs (pull_user_configs.py) — contain personal
+# profile data; regenerated from the DB, never committed.
+runs/
