@@ -22,7 +22,9 @@ from .routes import (
     eval_router,
     health_router,
     jobs_router,
+    me_router,
 )
+from .users import sync_users
 
 
 load_dotenv()
@@ -82,10 +84,13 @@ async def lifespan(app: FastAPI):
             sys.stderr.write("STARTUP: auth bypass (dev) — do not use in production\n")
             sys.stderr.flush()
         else:
-            emails = _auth.load_auth_config()
-            _auth.init(emails)
+            auth_users = _auth.load_auth_config()
+            _auth.init(auth_users)
+            async with pool.connection() as conn:
+                await sync_users(conn, auth_users)
             sys.stderr.write(
-                f"STARTUP: auth enforced (allowlist={len(emails)} entries)\n"
+                f"STARTUP: auth enforced (allowlist={len(auth_users)} entries), "
+                "users synced\n"
             )
             sys.stderr.flush()
     except Exception:
@@ -121,3 +126,4 @@ app.include_router(health_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")
 app.include_router(eval_router, prefix="/api")
+app.include_router(me_router, prefix="/api")

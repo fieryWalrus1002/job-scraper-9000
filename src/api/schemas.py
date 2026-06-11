@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any, Literal, get_args
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -149,3 +150,15 @@ class EvalCorrectionOut(BaseModel):
     original_model: str
     profile_version: str
     corrected_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Users — multi-user phase (app.users)
+# ---------------------------------------------------------------------------
+
+
+class User(BaseModel):
+    id: UUID
+    email: str
+    display_name: str | None = None
+    role: Literal["admin", "member"]
