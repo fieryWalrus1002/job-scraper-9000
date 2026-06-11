@@ -104,12 +104,12 @@ export interface paths {
         put?: never;
         /**
          * Upsert Eval Correction
-         * @description Upsert a human correction to a job's skills_fit score.
+         * @description Upsert the current user's correction to their skills_fit score.
          *
-         *     The server snapshots the current AI score/model/profile_version from
-         *     raw.scored_job_postings so the correction stays meaningful even after a
-         *     later re-scoring run with different (model, profile_version). Last-write-
-         *     wins on dedup_hash.
+         *     The server snapshots the user's own score/model/profile_version from
+         *     raw.job_scores so the correction stays meaningful even after a later
+         *     re-scoring run with different (model, profile_version). Last-write-wins
+         *     per (user, job).
          */
         post: operations["upsert_eval_correction_api_eval_corrections_post"];
         delete?: never;
@@ -131,6 +131,77 @@ export interface paths {
         post?: never;
         /** Delete Eval Correction */
         delete: operations["delete_eval_correction_api_eval_corrections__dedup_hash__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Me
+         * @description The authenticated user's own record — drives role-aware frontend UI.
+         */
+        get: operations["get_me_api_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Profile */
+        put: operations["put_profile_api_settings_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Search */
+        put: operations["put_search_api_settings_search_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -227,6 +298,54 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /**
+         * CandidateProfileInput
+         * @description One user's filled-in candidate_profile.yml.template.
+         *
+         *     ``profile_version`` is accepted (the template carries the field, so
+         *     filled-in copies will have it) but ignored everywhere: the authoritative
+         *     version is the content hash computed on save (spec §2).
+         *
+         *     ``evidence`` and ``scoring_notes`` are stored but not yet emitted into
+         *     the pipeline profile — wiring them into the skills_fit prompt is a
+         *     scoring-contract change that needs its own eval pass.
+         */
+        CandidateProfileInput: {
+            /** Profile Version */
+            profile_version?: string | null;
+            /** Summary */
+            summary: string;
+            /** Level */
+            level: string;
+            /** Education */
+            education?: string[];
+            /** Core Skills */
+            core_skills: string[];
+            /** Adjacent Skills */
+            adjacent_skills?: string[];
+            /** Growth Skills */
+            growth_skills?: string[];
+            /** Preferred Domains */
+            preferred_domains?: string[];
+            /** Avoided Domains */
+            avoided_domains?: string[];
+            constraints?: components["schemas"]["Constraints"];
+            evidence?: components["schemas"]["Evidence"] | null;
+            /** Scoring Notes */
+            scoring_notes?: string | null;
+        };
+        /** Constraints */
+        Constraints: {
+            /** Hard */
+            hard?: string[];
+            /** Soft */
+            soft?: string[];
+        };
+        /** EmploymentTypes */
+        EmploymentTypes: {
+            /** Acceptable */
+            acceptable?: ("fulltime" | "parttime" | "contract")[];
+        };
         /** EvalCorrectionIn */
         EvalCorrectionIn: {
             /** Dedup Hash */
@@ -256,10 +375,70 @@ export interface components {
              */
             corrected_at: string;
         };
+        /** Evidence */
+        Evidence: {
+            /** Projects */
+            projects?: components["schemas"]["EvidenceProject"][];
+            /** Publications Or Writing Samples */
+            publications_or_writing_samples?: components["schemas"]["EvidenceWriting"][];
+            /** Engineering Artifacts */
+            engineering_artifacts?: components["schemas"]["EvidenceArtifact"][];
+        };
+        /** EvidenceArtifact */
+        EvidenceArtifact: {
+            /** Name */
+            name: string;
+            /** Evidence Of */
+            evidence_of?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** EvidenceProject */
+        EvidenceProject: {
+            /** Name */
+            name: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Evidence Of */
+            evidence_of?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** EvidenceWriting */
+        EvidenceWriting: {
+            /** Title */
+            title: string;
+            /** Evidence Of */
+            evidence_of?: string[];
+        } & {
+            [key: string]: unknown;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HomeLocation */
+        HomeLocation: {
+            /** City */
+            city: string;
+            /** Region */
+            region: string;
+            /**
+             * Country
+             * @default US
+             */
+            country: string;
+        };
+        /** IndustriesAndDomains */
+        IndustriesAndDomains: {
+            /** Preferred */
+            preferred?: string[];
+            /** Excluded */
+            excluded?: string[];
         };
         /** JobDetail */
         JobDetail: {
@@ -376,6 +555,39 @@ export interface components {
              */
             scored_at: string;
         };
+        /** Keywords */
+        Keywords: {
+            /** Required Any */
+            required_any?: string[];
+            /** Required All */
+            required_all?: string[];
+            /** Preferred */
+            preferred?: string[];
+            /** Excluded */
+            excluded?: string[];
+        };
+        /** Location */
+        Location: {
+            /** City */
+            city: string;
+            /** Region */
+            region: string;
+            /**
+             * Country
+             * @default US
+             */
+            country: string;
+        };
+        /** Locations */
+        Locations: {
+            /** Acceptable */
+            acceptable?: components["schemas"]["Location"][];
+            /** Preferred */
+            preferred?: components["schemas"]["Location"][];
+            /** Excluded */
+            excluded?: components["schemas"]["Location"][];
+            relocation?: components["schemas"]["Relocation"];
+        };
         /** ManualJobCreate */
         ManualJobCreate: {
             /** Title */
@@ -399,6 +611,184 @@ export interface components {
              */
             status: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
         };
+        /** Organizations */
+        Organizations: {
+            /** Target Companies */
+            target_companies?: string[];
+            /** Similar To */
+            similar_to?: string[];
+            /** Preferred Organization Types */
+            preferred_organization_types?: string[];
+        };
+        /** ProfileSaveResponse */
+        ProfileSaveResponse: {
+            /** Profile Version */
+            profile_version: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** Relocation */
+        Relocation: {
+            /**
+             * Willing
+             * @default false
+             */
+            willing: boolean;
+        };
+        /** Roles */
+        Roles: {
+            target_titles: components["schemas"]["TargetTitles"];
+            /** Excluded Titles */
+            excluded_titles?: string[];
+        };
+        /** ScrapePreferences */
+        ScrapePreferences: {
+            /**
+             * Include Remote National Searches
+             * @default true
+             */
+            include_remote_national_searches: boolean;
+            /**
+             * Include Local Searches
+             * @default true
+             */
+            include_local_searches: boolean;
+            /**
+             * Include Company Board Searches
+             * @default true
+             */
+            include_company_board_searches: boolean;
+            /**
+             * Include General Job Boards
+             * @default true
+             */
+            include_general_job_boards: boolean;
+            /**
+             * Max Results Per Task
+             * @default 50
+             */
+            max_results_per_task: number;
+            /**
+             * Freshness Hours
+             * @default 48
+             */
+            freshness_hours: number;
+            /**
+             * Cadence
+             * @default daily
+             * @enum {string}
+             */
+            cadence: "daily" | "weekly";
+        };
+        /**
+         * SearchConfigInput
+         * @description One user's filled-in job_search_template.yml.
+         */
+        SearchConfigInput: {
+            user: components["schemas"]["UserSection"];
+            search_profile: components["schemas"]["SearchProfileMeta"];
+            roles: components["schemas"]["Roles"];
+            work_constraints?: components["schemas"]["WorkConstraints"];
+            locations?: components["schemas"]["Locations"];
+            organizations?: components["schemas"]["Organizations"];
+            industries_and_domains?: components["schemas"]["IndustriesAndDomains"];
+            keywords?: components["schemas"]["Keywords"];
+            scrape_preferences?: components["schemas"]["ScrapePreferences"];
+        };
+        /** SearchProfileMeta */
+        SearchProfileMeta: {
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "paused";
+            /**
+             * Goal Summary
+             * @default
+             */
+            goal_summary: string;
+            /**
+             * Search Mode
+             * @default balanced
+             * @enum {string}
+             */
+            search_mode: "focused" | "balanced" | "broad";
+        };
+        /** SearchSaveResponse */
+        SearchSaveResponse: {
+            /** Policies */
+            policies: {
+                [key: string]: unknown;
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SettingsResponse
+         * @description Both payloads + versioning. Null payloads = not yet configured, which
+         *     the frontend renders as the onboarding state.
+         */
+        SettingsResponse: {
+            /** Profile */
+            profile?: {
+                [key: string]: unknown;
+            } | null;
+            /** Profile Version */
+            profile_version?: string | null;
+            /** Profile Updated At */
+            profile_updated_at?: string | null;
+            /** Search */
+            search?: {
+                [key: string]: unknown;
+            } | null;
+            /** Policies */
+            policies?: {
+                [key: string]: unknown;
+            } | null;
+            /** Search Updated At */
+            search_updated_at?: string | null;
+        };
+        /** TargetTitles */
+        TargetTitles: {
+            /** Preferred */
+            preferred: string[];
+            /** Exploratory */
+            exploratory?: string[];
+        };
+        /** User */
+        User: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name?: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "member";
+        };
+        /** UserSection */
+        UserSection: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            home_location?: components["schemas"]["HomeLocation"] | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -411,6 +801,35 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkArrangement */
+        WorkArrangement: {
+            /**
+             * Acceptable
+             * @default true
+             */
+            acceptable: boolean;
+            /**
+             * Preferred
+             * @default false
+             */
+            preferred: boolean;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
+        /** WorkArrangements */
+        WorkArrangements: {
+            remote?: components["schemas"]["WorkArrangement"];
+            hybrid?: components["schemas"]["WorkArrangement"];
+            onsite?: components["schemas"]["WorkArrangement"];
+        };
+        /** WorkConstraints */
+        WorkConstraints: {
+            employment_types?: components["schemas"]["EmploymentTypes"];
+            work_arrangements?: components["schemas"]["WorkArrangements"];
         };
     };
     responses: never;
@@ -775,6 +1194,112 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_me_api_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    get_settings_api_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+        };
+    };
+    put_profile_api_settings_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateProfileInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSaveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_search_api_settings_search_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchConfigInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSaveResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

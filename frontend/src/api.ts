@@ -2,17 +2,50 @@ import type {
   Application,
   ApplicationCreate,
   ApplicationUpdate,
+  CandidateProfileInput,
   EvalCorrectionIn,
   EvalCorrectionOut,
   Filters,
   JobDetail,
   JobListResponse,
   ManualJobCreate,
+  ProfileSaveResponse,
+  SettingsResponse,
 } from './types'
 
 // Empty in dev/prod (Vite proxy + Azure SWA both handle /api/* routing).
 // Set VITE_API_URL only if calling the backend directly without a proxy.
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+
+/** Field path (e.g. "summary", "constraints.hard") → first validation message. */
+export type FieldErrors = Record<string, string>
+
+/** Thrown on a 422 so forms can render messages next to the offending field. */
+export class ApiValidationError extends Error {
+  fields: FieldErrors
+  constructor(fields: FieldErrors) {
+    super('Validation failed')
+    this.name = 'ApiValidationError'
+    this.fields = fields
+  }
+}
+
+interface FastApiDetailItem {
+  loc: (string | number)[]
+  msg: string
+}
+
+// FastAPI 422 bodies are { detail: [{ loc: ["body", <field>...], msg }] }.
+// Drop the leading "body" and join the rest so nested fields get a stable key;
+// first message per field wins (one inline error is enough).
+function parseValidationErrors(detail: FastApiDetailItem[]): FieldErrors {
+  const fields: FieldErrors = {}
+  for (const item of detail) {
+    const path = item.loc.filter((p) => p !== 'body').join('.')
+    if (path && !(path in fields)) fields[path] = item.msg
+  }
+  return fields
+}
 
 export async function fetchJobs(filters: Filters): Promise<JobListResponse> {
   const params = new URLSearchParams()
@@ -81,6 +114,28 @@ export async function updateApplication(
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<Application>
+}
+
+// ───── Settings ─────
+
+export async function fetchSettings(): Promise<SettingsResponse> {
+  const res = await fetch(`${API_BASE}/api/settings`)
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<SettingsResponse>
+}
+
+export async function saveProfile(body: CandidateProfileInput): Promise<ProfileSaveResponse> {
+  const res = await fetch(`${API_BASE}/api/settings/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 422) {
+    const data = (await res.json()) as { detail?: FastApiDetailItem[] }
+    throw new ApiValidationError(parseValidationErrors(data.detail ?? []))
+  }
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<ProfileSaveResponse>
 }
 
 // ───── Eval corrections ─────
