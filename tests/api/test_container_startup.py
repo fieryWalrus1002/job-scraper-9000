@@ -147,47 +147,79 @@ def test_container_exits_with_unreachable_database():
         )
 
 
+def _start_postgres(pg_name: str) -> str:
+    """Start a throwaway Postgres container and return a DATABASE_URL for it."""
+    subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-d",
+            "--name",
+            pg_name,
+            "-e",
+            "POSTGRES_PASSWORD=test",
+            "-e",
+            "POSTGRES_USER=test",
+            "-e",
+            "POSTGRES_DB=test",
+            "postgres:16-alpine",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    # Give postgres a moment to accept connections
+    time.sleep(3)
+
+    pg_ip_result = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            "-f",
+            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+            pg_name,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    pg_ip = pg_ip_result.stdout.strip()
+    return f"postgresql://test:test@{pg_ip}:5432/test"
+
+
+@skip_if_no_docker
+def test_concurrent_replicas_migrate_without_racing():
+    """Two replicas starting against the same fresh Postgres must both come
+    healthy: migrations/env.py serializes `alembic upgrade` behind a Postgres
+    advisory lock (#153), so simultaneous lifespan migrations during a rolling
+    deploy queue up instead of racing through the version table."""
+    pg_name = f"test-pg-{uuid.uuid4().hex[:8]}"
+    try:
+        db_url = _start_postgres(pg_name)
+        env = {"AUTH_BYPASS": "1", "DATABASE_URL": db_url}
+        with (
+            _Container(env=env, port=_HOST_PORT_BASE + 3) as c1,
+            _Container(env=env, port=_HOST_PORT_BASE + 4) as c2,
+        ):
+            r1 = _wait_for_health(c1.base_url(), timeout=30.0)
+            r2 = _wait_for_health(c2.base_url(), timeout=30.0)
+            assert r1 is not None and r1.status_code == 200, (
+                f"Replica 1 unhealthy: {r1.status_code if r1 else 'no response'}"
+            )
+            assert r2 is not None and r2.status_code == 200, (
+                f"Replica 2 unhealthy: {r2.status_code if r2 else 'no response'}"
+            )
+            assert c1.poll() is None, "Replica 1 crashed after becoming healthy"
+            assert c2.poll() is None, "Replica 2 crashed after becoming healthy"
+    finally:
+        subprocess.run(["docker", "stop", pg_name], capture_output=True, timeout=15)
+
+
 @skip_if_no_docker
 def test_container_health_ok_with_postgres():
     """Container returns 200 on /api/health when a real Postgres is reachable."""
     pg_name = f"test-pg-{uuid.uuid4().hex[:8]}"
     try:
-        subprocess.run(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "-d",
-                "--name",
-                pg_name,
-                "-e",
-                "POSTGRES_PASSWORD=test",
-                "-e",
-                "POSTGRES_USER=test",
-                "-e",
-                "POSTGRES_DB=test",
-                "postgres:16-alpine",
-            ],
-            check=True,
-            capture_output=True,
-        )
-        # Give postgres a moment to accept connections
-        time.sleep(3)
-
-        pg_ip_result = subprocess.run(
-            [
-                "docker",
-                "inspect",
-                "-f",
-                "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
-                pg_name,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        pg_ip = pg_ip_result.stdout.strip()
-        db_url = f"postgresql://test:test@{pg_ip}:5432/test"
-
+        db_url = _start_postgres(pg_name)
         env = {"AUTH_BYPASS": "1", "DATABASE_URL": db_url}
         with _Container(env=env, port=_HOST_PORT_BASE + 2) as c:
             exit_code = c.wait_for_exit(timeout=8.0)
