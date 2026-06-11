@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 _USER_COLS = """
     id, external_id, identity_provider, email, display_name, role,
-    created_at, last_login_at
+    created_at, last_login_at, starter_seeded_at
 """
 
 
