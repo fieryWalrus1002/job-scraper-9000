@@ -11,6 +11,10 @@ export type ApplicationCreate = components['schemas']['ApplicationCreate']
 export type ApplicationUpdate = components['schemas']['ApplicationUpdate']
 export type EvalCorrectionIn = components['schemas']['EvalCorrectionIn']
 export type EvalCorrectionOut = components['schemas']['EvalCorrectionOut']
+export type SettingsResponse = components['schemas']['SettingsResponse']
+export type CandidateProfileInput = components['schemas']['CandidateProfileInput']
+export type SearchConfigInput = components['schemas']['SearchConfigInput']
+export type ProfileSaveResponse = components['schemas']['ProfileSaveResponse']
 export interface ManualJobCreate {
   title: string
   fit_score: number

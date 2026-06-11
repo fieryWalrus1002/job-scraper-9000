@@ -11,6 +11,7 @@ import JobTable from './components/JobTable'
 import { JobDetailPanel } from './components/JobDetailPanel'
 import SummaryTab from './components/SummaryTab'
 import { WorkflowTab } from './components/WorkflowTab'
+import SettingsPage from './components/SettingsPage'
 import AddJobModal from './components/AddJobModal'
 import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
@@ -139,6 +140,12 @@ function AppShell({ email }: { email: string }) {
           >
             <span>Summary</span>
           </button>
+          <button
+            className={cn(tabBtn, tab === 'settings' && tabBtnActive)}
+            onClick={() => setTab('settings')}
+          >
+            <span>Settings</span>
+          </button>
         </nav>
         <div className="flex-1" />
         <a
@@ -209,6 +216,8 @@ function AppShell({ email }: { email: string }) {
               {!isLoading && !isError && <SummaryTab items={filteredItems} />}
             </>
           )}
+
+          {tab === 'settings' && <SettingsPage />}
         </div>
       </div>
 
