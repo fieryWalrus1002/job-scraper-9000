@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export dashboard-sourced eval corrections to JSONL gold-set format.
 
-Reads from `app.eval_corrections` joined with `raw.scored_job_postings`,
+Reads from `app.eval_corrections` joined with `raw.job_postings` + `raw.job_scores`,
 filtered by `(original_model, profile_version)` so re-runs against a new
 (model, profile) start from a clean baseline.
 
@@ -62,18 +62,20 @@ _SELECT_SQL = """
         c.profile_version,
         c.corrected_at,
 
-        j.source, j.source_job_id, j.source_url,
-        j.title, j.company, j.location, j.posted_at, j.description,
-        j.scraped_at,
-        j.remote_classification::TEXT AS remote_classification,
-        j.salary_min_usd, j.salary_max_usd, j.salary_period,
+        p.source, p.source_job_id, p.source_url,
+        p.title, p.company, p.location, p.posted_at, p.description,
+        p.scraped_at,
+        p.remote_classification::TEXT AS remote_classification,
+        p.salary_min_usd, p.salary_max_usd, p.salary_period,
 
-        j.fit_score, j.confidence::TEXT AS confidence, j.score_rationale,
-        j.ai_fit_detail,
-        j.run_id, j.scored_at, j.model AS scored_model, j.provider,
-        j.profile_version AS scored_profile_version
+        s.fit_score, s.confidence::TEXT AS confidence, s.score_rationale,
+        s.ai_fit_detail,
+        s.run_id, s.scored_at, s.model AS scored_model, s.provider,
+        s.profile_version AS scored_profile_version
     FROM app.eval_corrections c
-    JOIN raw.scored_job_postings j USING (dedup_hash)
+    JOIN raw.job_postings p USING (dedup_hash)
+    JOIN raw.job_scores s
+        ON s.dedup_hash = c.dedup_hash AND s.user_id = c.user_id
     WHERE c.original_model = %(model)s
       AND c.profile_version = %(profile_version)s
     ORDER BY c.corrected_at DESC

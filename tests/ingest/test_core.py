@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
 
-from ingest.core import _extract_row
+import pytest
+
+from ingest.core import _extract_row, resolve_user_ids
 
 
 def _make_record(**overrides) -> dict:
@@ -121,3 +124,50 @@ def test_extract_row_pipeline_metadata_json() -> None:
     row = _extract_row(_make_record())
     pm = json.loads(row["pipeline_metadata"])
     assert pm["prefilter_result"] == "remote_filter_candidate"
+
+
+def test_extract_row_carries_user_email() -> None:
+    row = _extract_row(_make_record(user_email="friend@example.com"))
+    assert row["user_email"] == "friend@example.com"
+
+
+# ---------------------------------------------------------------------------
+# resolve_user_ids
+# ---------------------------------------------------------------------------
+
+
+def _conn_returning(email_id_pairs: list[tuple[str, str]]) -> MagicMock:
+    """Fake psycopg connection whose cursor returns the given (email, id) rows."""
+    cur = MagicMock()
+    cur.fetchall.return_value = email_id_pairs
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=cur)
+    cm.__exit__ = MagicMock(return_value=False)
+    conn = MagicMock()
+    conn.cursor.return_value = cm
+    return conn
+
+
+def test_resolve_user_ids_attaches_ids() -> None:
+    rows = [
+        {"dedup_hash": "h1", "user_email": "A@Example.com"},
+        {"dedup_hash": "h2", "user_email": None},
+    ]
+    conn = _conn_returning([("a@example.com", "id-a"), ("default@example.com", "id-d")])
+
+    resolve_user_ids(conn, rows, default_user_email="default@example.com")
+
+    assert rows[0]["user_id"] == "id-a"  # lowercased before lookup
+    assert rows[1]["user_id"] == "id-d"  # default filled the gap
+
+
+def test_resolve_user_ids_fails_without_email_or_default() -> None:
+    rows = [{"dedup_hash": "h1", "user_email": None}]
+    with pytest.raises(ValueError, match="no user_email"):
+        resolve_user_ids(_conn_returning([]), rows, default_user_email=None)
+
+
+def test_resolve_user_ids_fails_on_unknown_email() -> None:
+    rows = [{"dedup_hash": "h1", "user_email": "ghost@example.com"}]
+    with pytest.raises(ValueError, match="ghost@example.com"):
+        resolve_user_ids(_conn_returning([]), rows, default_user_email=None)

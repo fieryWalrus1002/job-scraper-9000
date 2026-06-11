@@ -28,6 +28,7 @@ def _ns(**kwargs) -> argparse.Namespace:
         apply_schema=False,
         dry_run=False,
         blob_mode=False,
+        user_email=None,
     )
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
@@ -107,8 +108,9 @@ def test_dry_run_nonempty_blob_not_moved(
         "ingest.cli._connect_and_ingest",
         lambda records, args, db_url: {
             "total": 1,
-            "inserted": 1,
-            "skipped": 0,
+            "postings_inserted": 1,
+            "scores_inserted": 1,
+            "scores_updated": 0,
             "dry_run": True,
         },
     )
@@ -122,3 +124,30 @@ def test_dry_run_nonempty_blob_not_moved(
 
     assert "real.jsonl" in [b.name for b in pending.list_blobs()]
     assert "real.jsonl" not in [b.name for b in processed.list_blobs()]
+
+
+@pytest.mark.docker
+def test_unresolvable_user_blob_dead_lettered(
+    clean_blob_storage, monkeypatch, azurite_conn_str
+):
+    """A blob whose records can't be resolved to an app.users row is moved to
+    failed/ with a reason tag — never ingested under a guessed owner."""
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", azurite_conn_str)
+
+    def _raise(records, args, db_url):
+        raise ValueError("Unknown user email(s) ['ghost@example.com']")
+
+    monkeypatch.setattr("ingest.cli._connect_and_ingest", _raise)
+    pending = clean_blob_storage["pending"]
+    failed = clean_blob_storage["failed"]
+
+    pending.get_blob_client("orphan.jsonl").upload_blob(
+        b'{"dedup_hash": "abc123", "user_email": "ghost@example.com"}\n',
+        overwrite=True,
+    )
+    _ingest_from_blob(_ns(blob_mode=True, dry_run=False), "postgresql://unused/db")
+
+    assert "orphan.jsonl" not in [b.name for b in pending.list_blobs()]
+    failed_blobs = list(failed.list_blobs(include=["metadata"]))
+    assert [b.name for b in failed_blobs] == ["orphan.jsonl"]
+    assert failed_blobs[0].metadata["reason"] == "unresolvable_user"

@@ -3,7 +3,7 @@ from datetime import datetime, UTC, date
 from typing import Annotated, Literal, Any, cast
 from fastapi import APIRouter, HTTPException, Query
 
-from ..dependencies import Pool, Auth
+from ..dependencies import Pool, CurrentUser
 from ..schemas import (
     JobListResponse,
     JobSummary,
@@ -14,28 +14,35 @@ from ..schemas import (
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
+# Feed queries join shared postings (p) to the current user's scores (s);
+# the join itself is the visibility rule — no score row, not your job.
 _LIST_COLS = """
-    dedup_hash, source, source_url, title, company, location, posted_at,
-    remote_classification::TEXT, salary_min_usd, salary_max_usd, salary_period,
-    fit_score, confidence::TEXT, score_rationale, failure_reason, scored_at
+    dedup_hash, p.source, p.source_url, p.title, p.company, p.location, p.posted_at,
+    p.remote_classification::TEXT, p.salary_min_usd, p.salary_max_usd, p.salary_period,
+    s.fit_score, s.confidence::TEXT, s.score_rationale, s.failure_reason, s.scored_at
 """
 
 _DETAIL_COLS = """
-    dedup_hash, source, source_job_id, source_url,
-    title, company, location, posted_at, description, scraped_at,
-    remote_classification::TEXT,
-    salary_min_usd, salary_max_usd, salary_period,
-    fit_score, confidence::TEXT, score_rationale,
-    ai_fit_detail, pipeline_metadata,
-    run_id, scored_at, model, provider, profile_version, failure_reason,
-    metadata, ingested_at
+    dedup_hash, p.source, p.source_job_id, p.source_url,
+    p.title, p.company, p.location, p.posted_at, p.description, p.scraped_at,
+    p.remote_classification::TEXT,
+    p.salary_min_usd, p.salary_max_usd, p.salary_period,
+    s.fit_score, s.confidence::TEXT, s.score_rationale,
+    s.ai_fit_detail, p.pipeline_metadata,
+    s.run_id, s.scored_at, s.model, s.provider, s.profile_version, s.failure_reason,
+    p.metadata, p.ingested_at
+"""
+
+_FROM = """
+    FROM raw.job_postings p
+    JOIN raw.job_scores s USING (dedup_hash)
 """
 
 
 @router.get("", response_model=JobListResponse)
 async def list_jobs(
     pool: Pool,
-    principal: Auth,
+    user: CurrentUser,
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     remote_classification: Annotated[
@@ -62,46 +69,46 @@ async def list_jobs(
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
-    filters: list[str] = []
-    params: dict = {}
+    filters: list[str] = ["s.user_id = %(user_id)s"]
+    params: dict = {"user_id": user.id}
 
     if min_score is not None:
-        filters.append("fit_score >= %(min_score)s")
+        filters.append("s.fit_score >= %(min_score)s")
         params["min_score"] = min_score
     if max_score is not None:
-        filters.append("fit_score <= %(max_score)s")
+        filters.append("s.fit_score <= %(max_score)s")
         params["max_score"] = max_score
     if remote_classification:
         filters.append(
-            "remote_classification = ANY(%(remote_classification)s::raw.remote_classification[])"
+            "p.remote_classification = ANY(%(remote_classification)s::raw.remote_classification[])"
         )
         params["remote_classification"] = list(remote_classification)
     if min_posted_at is not None:
-        filters.append("posted_at >= %(min_posted_at)s")
+        filters.append("p.posted_at >= %(min_posted_at)s")
         params["min_posted_at"] = min_posted_at
     if max_posted_at is not None:
-        filters.append("posted_at <= %(max_posted_at)s")
+        filters.append("p.posted_at <= %(max_posted_at)s")
         params["max_posted_at"] = max_posted_at
     if min_salary_usd is not None:
         filters.append(
-            "(salary_min_usd >= %(min_salary_usd)s OR salary_min_usd IS NULL)"
+            "(p.salary_min_usd >= %(min_salary_usd)s OR p.salary_min_usd IS NULL)"
         )
         params["min_salary_usd"] = min_salary_usd
     if search is not None:
-        filters.append("(title ILIKE %(search)s OR description ILIKE %(search)s)")
+        filters.append("(p.title ILIKE %(search)s OR p.description ILIKE %(search)s)")
         params["search"] = f"%{search}%"
     if company and company.strip():
-        filters.append("company ILIKE %(company)s")
+        filters.append("p.company ILIKE %(company)s")
         params["company"] = f"%{company.strip()}%"
 
-    where = ("WHERE " + " AND ".join(filters)) if filters else ""
+    where = "WHERE " + " AND ".join(filters)
 
-    count_sql = f"SELECT COUNT(*) AS n FROM raw.scored_job_postings {where}"
+    count_sql = f"SELECT COUNT(*) AS n {_FROM} {where}"
     list_sql = f"""
         SELECT {_LIST_COLS}
-        FROM raw.scored_job_postings
+        {_FROM}
         {where}
-        ORDER BY fit_score DESC NULLS LAST, scored_at DESC
+        ORDER BY s.fit_score DESC NULLS LAST, s.scored_at DESC
         LIMIT %(limit)s OFFSET %(offset)s
     """
     params["limit"] = limit
@@ -123,7 +130,7 @@ async def list_jobs(
 
 
 @router.post("", response_model=Application, status_code=201)
-async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
+async def create_manual_job(body: ManualJobCreate, pool: Pool, user: CurrentUser):
     key = "|".join(
         [
             (body.title or "").lower().strip(),
@@ -136,16 +143,16 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
     run_id = f"manual-{now.strftime('%Y-%m-%d-%H%M%S')}"
 
     async with pool.connection() as conn:
-        cur = await conn.execute(
+        # Posting storage is shared: if another user (or the pipeline) already
+        # has this posting, the insert no-ops and we just attach this user.
+        await conn.execute(
             """
-            INSERT INTO raw.scored_job_postings
-                (dedup_hash, title, company, source_url, description, location, posted_at,
-                 fit_score, run_id, scored_at, model, provider, profile_version)
+            INSERT INTO raw.job_postings
+                (dedup_hash, title, company, source_url, description, location,
+                 posted_at, created_by)
             VALUES
                 (%(dedup_hash)s, %(title)s, %(company)s, %(source_url)s,
-                %(description)s, %(location)s, %(posted_at)s,
-                 %(fit_score)s, %(run_id)s, %(scored_at)s,
-                 'user', 'user', 'user')
+                 %(description)s, %(location)s, %(posted_at)s, %(created_by)s)
             ON CONFLICT (dedup_hash) DO NOTHING
             """,
             {
@@ -156,6 +163,25 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
                 "description": body.description,
                 "location": body.location,
                 "posted_at": body.posted_at,
+                "created_by": user.id,
+            },
+        )
+
+        # The stub score row makes the posting visible in this user's feed;
+        # its conflict is what defines "duplicate" — per user, not global.
+        cur = await conn.execute(
+            """
+            INSERT INTO raw.job_scores
+                (user_id, dedup_hash, fit_score, run_id, scored_at,
+                 model, provider, profile_version)
+            VALUES
+                (%(user_id)s, %(dedup_hash)s, %(fit_score)s, %(run_id)s,
+                 %(scored_at)s, 'user', 'user', 'user')
+            ON CONFLICT (user_id, dedup_hash) DO NOTHING
+            """,
+            {
+                "user_id": user.id,
+                "dedup_hash": dedup_hash,
                 "fit_score": body.fit_score,
                 "run_id": run_id,
                 "scored_at": now,
@@ -166,13 +192,13 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
 
         cur = await conn.execute(
             """
-            INSERT INTO app.user_applications (dedup_hash, status)
-            VALUES (%(dedup_hash)s, %(status)s)
-            ON CONFLICT (dedup_hash) DO UPDATE
+            INSERT INTO app.user_applications (user_id, dedup_hash, status)
+            VALUES (%(user_id)s, %(dedup_hash)s, %(status)s)
+            ON CONFLICT (user_id, dedup_hash) DO UPDATE
                 SET status = EXCLUDED.status, updated_at = now()
             RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
             """,
-            {"dedup_hash": dedup_hash, "status": body.status},
+            {"user_id": user.id, "dedup_hash": dedup_hash, "status": body.status},
         )
         app_row = cast(dict[str, Any], await cur.fetchone())
 
@@ -184,14 +210,14 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, principal: Auth):
 
 
 @router.get("/{dedup_hash}", response_model=JobDetail)
-async def get_job(dedup_hash: str, pool: Pool, principal: Auth):
+async def get_job(dedup_hash: str, pool: Pool, user: CurrentUser):
     sql = f"""
         SELECT {_DETAIL_COLS}
-        FROM raw.scored_job_postings
-        WHERE dedup_hash = %(dedup_hash)s
+        {_FROM}
+        WHERE dedup_hash = %(dedup_hash)s AND s.user_id = %(user_id)s
     """
     async with pool.connection() as conn:
-        cur = await conn.execute(sql, {"dedup_hash": dedup_hash})  # type: ignore[arg-type]
+        cur = await conn.execute(sql, {"dedup_hash": dedup_hash, "user_id": user.id})  # type: ignore[arg-type]
         row = await cur.fetchone()
 
     if row is None:

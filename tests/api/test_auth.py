@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
@@ -26,13 +27,31 @@ def _allow(*emails: str) -> None:
     auth.init([auth.AuthUser(email=e, role="member") for e in emails])
 
 
-def _pool_with_empty_jobs() -> _FakePool:
-    """Fake pool that returns count=0, rows=[] for list_jobs."""
+def _pool_with_empty_jobs(provision_user: bool = False) -> _FakePool:
+    """Fake pool that returns count=0, rows=[] for list_jobs.
+
+    With provision_user=True, the first execute returns a user row — needed
+    by tests that reach the route handler, since CurrentUser resolves the
+    principal against app.users before the jobs queries run.
+    """
     conn = AsyncMock()
+    cursors = []
+    if provision_user:
+        cursors.append(
+            _make_cursor(
+                {
+                    "id": uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                    "email": "allowed@example.com",
+                    "display_name": None,
+                    "role": "member",
+                }
+            )
+        )
     count_cur = _make_cursor({"n": 0})
     list_cur = AsyncMock()
     list_cur.fetchall = AsyncMock(return_value=[])
-    conn.execute = AsyncMock(side_effect=[count_cur, list_cur])
+    cursors += [count_cur, list_cur]
+    conn.execute = AsyncMock(side_effect=cursors)
     return _FakePool(conn)
 
 
@@ -72,7 +91,9 @@ def reset_auth(monkeypatch):
 @pytest.mark.asyncio
 async def test_bypass_mode_passes_without_header(monkeypatch):
     monkeypatch.setenv(auth.BYPASS_VAR, "1")
-    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
+    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs(
+        provision_user=True
+    )
     try:
         status = await _get_jobs()
     finally:
@@ -115,10 +136,16 @@ async def test_bypass_zero_string_enforces_auth(monkeypatch):
 @pytest.mark.asyncio
 async def test_enforced_valid_allowlisted_email_returns_200():
     _allow("allowed@example.com")
-    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
+    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs(
+        provision_user=True
+    )
     try:
         status = await _get_jobs(
-            {"X-MS-CLIENT-PRINCIPAL": _make_header("allowed@example.com")}
+            {
+                "X-MS-CLIENT-PRINCIPAL": _make_header(
+                    "allowed@example.com", identityProvider="aad", userId="swa-1"
+                )
+            }
         )
     finally:
         app.dependency_overrides.clear()
@@ -163,10 +190,16 @@ async def test_enforced_malformed_base64_returns_401():
 @pytest.mark.asyncio
 async def test_email_matching_is_case_insensitive():
     _allow("Allowed@Example.Com")
-    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs()
+    app.dependency_overrides[get_pool] = lambda: _pool_with_empty_jobs(
+        provision_user=True
+    )
     try:
         status = await _get_jobs(
-            {"X-MS-CLIENT-PRINCIPAL": _make_header("allowed@example.com")}
+            {
+                "X-MS-CLIENT-PRINCIPAL": _make_header(
+                    "allowed@example.com", identityProvider="aad", userId="swa-1"
+                )
+            }
         )
     finally:
         app.dependency_overrides.clear()

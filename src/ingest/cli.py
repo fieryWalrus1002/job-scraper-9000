@@ -20,7 +20,7 @@ Usage (blob mode — ACA Job entrypoint):
         (dead-letter, so KEDA doesn't re-trigger on the same poison blob)
     In --dry-run mode, blobs are never moved.
 
-Duplicate dedup_hash values are silently skipped (ON CONFLICT DO NOTHING).
+Posting duplicates are skipped (first scrape wins); score re-runs are last-write-wins per (user, job). Every record must resolve to an app.users row via its user_email field or --user-email.
 """
 
 import argparse
@@ -45,7 +45,12 @@ def _connect_and_ingest(records, args, database_url: str) -> dict:
         with psycopg.connect(database_url) as conn:
             if args.apply_schema:
                 ensure_schema(conn, schema_path)
-            return ingest(records, conn=conn, dry_run=args.dry_run)
+            return ingest(
+                records,
+                conn=conn,
+                dry_run=args.dry_run,
+                default_user_email=args.user_email,
+            )
     except psycopg.Error as exc:
         log.error("Database error: %s", exc)
         sys.exit(1)
@@ -84,10 +89,13 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
     blobs = list(pending.list_blobs())
     if not blobs:
         log.info("No pending blobs to process")
-        print("total=0 inserted=0 skipped=0 blobs=0 failed=0")
+        print(
+            "total=0 postings_inserted=0 scores_inserted=0 scores_updated=0 "
+            "blobs=0 failed=0"
+        )
         return
 
-    total = inserted = skipped = failed_count = 0
+    total = postings_inserted = scores_inserted = scores_updated = failed_count = 0
     for blob_props in blobs:
         name = blob_props.name
         log.info("Processing blob: %s", name)
@@ -127,11 +135,27 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
                 _move_blob(pending, processed, name, data)
             continue
 
-        result = _connect_and_ingest(records, args, database_url)
+        try:
+            result = _connect_and_ingest(records, args, database_url)
+        except ValueError as exc:
+            # Unresolvable user identity: dead-letter the blob rather than
+            # guessing an owner — scores in the wrong feed are unrecoverable.
+            log.exception("Blob %s has unresolvable user(s) — moving to failed/", name)
+            failed_count += 1
+            if not args.dry_run:
+                _move_blob(
+                    pending,
+                    failed,
+                    name,
+                    data,
+                    metadata={"reason": "unresolvable_user", "error": str(exc)[:200]},
+                )
+            continue
         args.apply_schema = False  # only apply once per process run
         total += result["total"]
-        inserted += result["inserted"]
-        skipped += result["skipped"]
+        postings_inserted += result["postings_inserted"]
+        scores_inserted += result["scores_inserted"]
+        scores_updated += result["scores_updated"]
 
         if not args.dry_run:
             _move_blob(pending, processed, name, data)
@@ -139,7 +163,8 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
             log.info("Dry run — skipping blob move for %s", name)
 
     print(
-        f"total={total} inserted={inserted} skipped={skipped} "
+        f"total={total} postings_inserted={postings_inserted} "
+        f"scores_inserted={scores_inserted} scores_updated={scores_updated} "
         f"blobs={len(blobs)} failed={failed_count} "
         f"dry_run={str(args.dry_run).lower()}"
     )
@@ -171,16 +196,24 @@ def _cmd_ingest(args: argparse.Namespace) -> None:
     records = read_jsonl(input_path)
     if not records:
         log.warning("No records found in %s", input_path)
-        print(f"total=0 inserted=0 skipped=0 dry_run={str(args.dry_run).lower()}")
+        print(
+            "total=0 postings_inserted=0 scores_inserted=0 scores_updated=0 "
+            f"dry_run={str(args.dry_run).lower()}"
+        )
         return
 
     log.info("Loaded %d records from %s", len(records), input_path)
-    result = _connect_and_ingest(records, args, database_url)
+    try:
+        result = _connect_and_ingest(records, args, database_url)
+    except ValueError as exc:
+        log.error("%s", exc)
+        sys.exit(1)
 
     print(
         f"total={result['total']} "
-        f"inserted={result['inserted']} "
-        f"skipped={result['skipped']} "
+        f"postings_inserted={result['postings_inserted']} "
+        f"scores_inserted={result['scores_inserted']} "
+        f"scores_updated={result['scores_updated']} "
         f"dry_run={str(result['dry_run']).lower()}"
     )
 
@@ -188,7 +221,7 @@ def _cmd_ingest(args: argparse.Namespace) -> None:
 def _add_ingest(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "ingest",
-        help="Ingest scored JSONL records into raw.scored_job_postings",
+        help="Ingest scored JSONL into raw.job_postings + raw.job_scores",
     )
     p.add_argument(
         "--db-url",
@@ -206,6 +239,15 @@ def _add_ingest(sub: argparse._SubParsersAction) -> None:
     )
     p.add_argument(
         "--dry-run", action="store_true", help="Parse records but do not write to DB"
+    )
+    p.add_argument(
+        "--user-email",
+        default=None,
+        help=(
+            "Default target user for records without an embedded user_email "
+            "field. Every record must resolve to an app.users row or the "
+            "batch fails."
+        ),
     )
     p.add_argument(
         "--blob-mode",
@@ -226,13 +268,14 @@ def main(argv: list[str] | None = None) -> int:
     """Standalone entrypoint for container use — flat parser, no subcommand."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(
-        description="Ingest scored JSONL into raw.scored_job_postings"
+        description="Ingest scored JSONL into raw.job_postings + raw.job_scores"
     )
     parser.add_argument("--db-url", default=None)
     parser.add_argument("--input", default=None)
     parser.add_argument("--schema-path", required=True)
     parser.add_argument("--apply-schema", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--user-email", default=None)
     parser.add_argument(
         "--blob-mode",
         action="store_true",

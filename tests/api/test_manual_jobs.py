@@ -37,12 +37,16 @@ _BODY = {
 }
 
 
-def _two_cursors(app_row: dict[str, Any]) -> tuple[AsyncMock, AsyncMock]:
-    """Return (job_insert_cursor, app_insert_cursor) pair."""
-    job_cur = _make_cursor()
-    job_cur.rowcount = 1
+def _three_cursors(
+    app_row: dict[str, Any],
+) -> tuple[AsyncMock, AsyncMock, AsyncMock]:
+    """Return (posting_insert, score_insert, app_insert) cursors."""
+    posting_cur = _make_cursor()
+    posting_cur.rowcount = 1
+    score_cur = _make_cursor()
+    score_cur.rowcount = 1
     app_cur = _make_cursor(app_row)
-    return job_cur, app_cur
+    return posting_cur, score_cur, app_cur
 
 
 # ---------------------------------------------------------------------------
@@ -53,26 +57,43 @@ def _two_cursors(app_row: dict[str, Any]) -> tuple[AsyncMock, AsyncMock]:
 async def test_create_manual_job_success(
     client: AsyncClient, fake_conn: AsyncMock
 ) -> None:
-    job_cur, app_cur = _two_cursors(FAKE_MANUAL_APP_ROW)
-    fake_conn.execute = AsyncMock(side_effect=[job_cur, app_cur])
+    fake_conn.execute = AsyncMock(side_effect=_three_cursors(FAKE_MANUAL_APP_ROW))
     resp = await client.post("/api/jobs", json=_BODY)
     assert resp.status_code == 201
     data = resp.json()
     assert data["status"] == "maybe"
     assert data["title"] == "Staff Engineer"
     assert data["company"] == "Initech"
+    assert fake_conn.execute.call_count == 3
+
+
+async def test_create_manual_job_duplicate_for_this_user(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """409 only when *this user's* score row already exists."""
+    posting_cur = _make_cursor()
+    posting_cur.rowcount = 0  # posting already exists — not a conflict by itself
+    score_cur = _make_cursor()
+    score_cur.rowcount = 0  # user already has this job
+    fake_conn.execute = AsyncMock(side_effect=[posting_cur, score_cur])
+    resp = await client.post("/api/jobs", json=_BODY)
+    assert resp.status_code == 409
     assert fake_conn.execute.call_count == 2
 
 
-async def test_create_manual_job_duplicate(
+async def test_create_manual_job_existing_posting_other_user(
     client: AsyncClient, fake_conn: AsyncMock
 ) -> None:
-    job_cur = _make_cursor()
-    job_cur.rowcount = 0  # ON CONFLICT DO NOTHING — row already exists
-    fake_conn.execute = AsyncMock(return_value=job_cur)
+    """A posting another user already has still succeeds for this user."""
+    posting_cur = _make_cursor()
+    posting_cur.rowcount = 0  # shared posting already present
+    score_cur = _make_cursor()
+    score_cur.rowcount = 1  # but this user's score row is new
+    app_cur = _make_cursor(FAKE_MANUAL_APP_ROW)
+    fake_conn.execute = AsyncMock(side_effect=[posting_cur, score_cur, app_cur])
     resp = await client.post("/api/jobs", json=_BODY)
-    assert resp.status_code == 409
-    assert fake_conn.execute.call_count == 1
+    assert resp.status_code == 201
+    assert fake_conn.execute.call_count == 3
 
 
 async def test_create_manual_job_missing_title(
@@ -93,20 +114,18 @@ async def test_create_manual_job_with_applied_status(
     client: AsyncClient, fake_conn: AsyncMock
 ) -> None:
     row = {**FAKE_MANUAL_APP_ROW, "status": "applied"}
-    job_cur, app_cur = _two_cursors(row)
-    fake_conn.execute = AsyncMock(side_effect=[job_cur, app_cur])
+    fake_conn.execute = AsyncMock(side_effect=_three_cursors(row))
     resp = await client.post("/api/jobs", json={**_BODY, "status": "applied"})
     assert resp.status_code == 201
     assert resp.json()["status"] == "applied"
-    assert fake_conn.execute.call_count == 2
+    assert fake_conn.execute.call_count == 3
 
 
 async def test_create_manual_job_fit_score_stored(
     client: AsyncClient, fake_conn: AsyncMock
 ) -> None:
     row = {**FAKE_MANUAL_APP_ROW, "fit_score": 5}
-    job_cur, app_cur = _two_cursors(row)
-    fake_conn.execute = AsyncMock(side_effect=[job_cur, app_cur])
+    fake_conn.execute = AsyncMock(side_effect=_three_cursors(row))
     resp = await client.post("/api/jobs", json={**_BODY, "fit_score": 5})
     assert resp.status_code == 201
     assert resp.json()["fit_score"] == 5
