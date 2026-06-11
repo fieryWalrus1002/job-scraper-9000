@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import uuid
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -44,6 +45,9 @@ def _pool_with_empty_jobs(provision_user: bool = False) -> _FakePool:
                     "email": "allowed@example.com",
                     "display_name": None,
                     "role": "member",
+                    # Already provisioned and seeded → ensure_starter_set
+                    # short-circuits without extra queries.
+                    "starter_seeded_at": datetime(2026, 6, 11, 12, 0, 0),
                 }
             )
         )
