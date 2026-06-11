@@ -23,6 +23,7 @@ from .routes import (
     health_router,
     jobs_router,
     me_router,
+    settings_router,
 )
 from .users import sync_users
 
@@ -137,3 +138,4 @@ app.include_router(jobs_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")
 app.include_router(eval_router, prefix="/api")
 app.include_router(me_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
