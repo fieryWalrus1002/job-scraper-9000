@@ -174,8 +174,7 @@ connect-az-db:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "===> pgcli connect to Azure PostgreSQL..."
-    pgcli -h "${AZURE_POSTGRES_SERVER}" -p 5432 -U "${AZURE_POSTGRES_USER}" -d "${AZURE_POSTGRES_DB}"
-
+    PGPASSWORD=${AZURE_POSTGRES_PASSWORD} pgcli -h "${AZURE_POSTGRES_SERVER}" -p 5432 -U "${AZURE_POSTGRES_USER}" -d "${AZURE_POSTGRES_DB}"
 
 watch-az-ingest:
     watch -n 15 'az containerapp job execution list \
