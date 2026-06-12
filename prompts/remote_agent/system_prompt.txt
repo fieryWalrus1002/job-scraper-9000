@@ -23,11 +23,11 @@ obvious from context. A named city with no remote language is onsite, not unclea
 
 Common patterns to recognize:
 - "Remote" in the title but "must be located in [city]" in the body → onsite_disguised, requires_local_presence=true
-- "Remote with quarterly all-hands" → remote_with_quarterly_travel
+- "Remote with quarterly all-hands" → fully_remote (record the cadence in estimated_travel_days_per_year, not the classification)
 - "Hybrid" or "X days per week in office" → hybrid
 - "US-based remote" → fully_remote, location_restrictions=["US-only"]
 - "Open to remote candidates in [list of states]" → location_restricted
-- "Quarterly on-site meetings" → remote_with_quarterly_travel, NOT hybrid
+- "Quarterly on-site meetings" → fully_remote, NOT hybrid (occasional travel is a remote role; capture the days in estimated_travel_days_per_year)
 - "Must relocate to [city]" or "relocation assistance provided" or "relocation required" → requires_relocation=true
 - Posting lists a specific city/office with no mention of remote or hybrid → onsite (silence is not ambiguity when a physical location is named)
 
