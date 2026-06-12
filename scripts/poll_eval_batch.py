@@ -26,6 +26,8 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parents[1]))
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
+from utils import batch_api
+from utils.batch_api import TERMINAL_STATUSES
 from utils.run_logger import JsonlRunLogger
 from agent_eval.metrics import compute_metrics
 from agent_eval.provenance import build_run_record, hash_file, hash_string
@@ -39,7 +41,6 @@ log = logging.getLogger(__name__)
 
 SIDECAR_GLOB = "data/eval/eval_batch_*.json"
 RUNS_FILE = "data/eval/runs.jsonl"
-TERMINAL_STATUSES = {"completed", "failed", "expired", "cancelled"}
 INCOMPLETE_STATUSES = {
     "validating",
     "in_progress",
@@ -102,12 +103,13 @@ def ensure_results_file(
         return Path(existing)
 
     output_file_id = getattr(batch, "output_file_id", None)
-    if not output_file_id:
-        raise RuntimeError("Batch completed but output_file_id is missing")
+    content = batch_api.download_results(client, batch)
 
     run_id = sidecar["run_id"]
     output_file = Path("data/eval/batch") / f"eval_results_{run_id}.jsonl"
-    _download_file(client, output_file_id, output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(content, encoding="utf-8")
+    log.info("Downloaded %s → %s", output_file_id, output_file)
 
     sidecar["output_file_id"] = output_file_id
     sidecar["output_file"] = str(output_file)

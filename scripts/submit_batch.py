@@ -18,12 +18,15 @@ import argparse
 import logging
 import os
 import sys
-import time
 from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
+
+from utils import batch_api
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -31,8 +34,6 @@ log = logging.getLogger(__name__)
 
 DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"
 POLL_INTERVAL = 60  # seconds
-
-TERMINAL_STATUSES = {"completed", "failed", "expired", "cancelled"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,58 +63,23 @@ def parse_args() -> argparse.Namespace:
 
 
 def upload_batch(client: OpenAI, batch_path: Path, batch_id_path: Path) -> str:
-    log.info("Uploading %s ...", batch_path)
-    with open(batch_path, "rb") as f:
-        file_obj = client.files.create(file=f, purpose="batch")
-    log.info("File uploaded: %s", file_obj.id)
-
-    batch = client.batches.create(
-        input_file_id=file_obj.id,
-        endpoint="/v1/chat/completions",
-        completion_window="24h",
-    )
-    log.info("Batch created: %s  status=%s", batch.id, batch.status)
-
-    batch_id_path.write_text(batch.id)
+    batch_id, _ = batch_api.upload_and_create_batch(client, batch_path)
+    batch_id_path.write_text(batch_id)
     log.info("Batch ID saved to %s", batch_id_path)
-
-    return batch.id
-
-
-def poll_until_done(client: OpenAI, batch_id: str, poll_interval: int):
-    log.info("Polling batch %s every %ds ...", batch_id, poll_interval)
-    while True:
-        batch = client.batches.retrieve(batch_id)
-        counts = batch.request_counts
-        log.info(
-            "status=%-12s  completed=%d/%d  failed=%d",
-            batch.status,
-            counts.completed,
-            counts.total,
-            counts.failed,
-        )
-
-        if batch.status in TERMINAL_STATUSES:
-            return batch
-
-        time.sleep(poll_interval)
+    return batch_id
 
 
 def download_results(client: OpenAI, batch, results_path: Path) -> None:
-    if batch.status != "completed":
-        log.error("Batch ended with status=%s — no results to download", batch.status)
+    try:
+        content = batch_api.download_results(client, batch)
+    except RuntimeError as exc:
+        log.error("%s — no results to download", exc)
         if batch.error_file_id:
             errors = client.files.content(batch.error_file_id).text
             log.error("Errors:\n%s", errors[:2000])
         sys.exit(1)
 
-    if not batch.output_file_id:
-        log.error("Batch completed but output_file_id is missing")
-        sys.exit(1)
-
     log.info("Downloading results (file_id=%s) ...", batch.output_file_id)
-    content = client.files.content(batch.output_file_id).text
-
     results_path.write_text(content)
     log.info("Results written to %s", results_path)
 
@@ -164,7 +130,7 @@ def main() -> None:
         )
         return
 
-    batch = poll_until_done(client, batch_id, args.poll_interval)
+    batch = batch_api.poll_until_done(client, batch_id, args.poll_interval)
     download_results(client, batch, results_path)
 
     print(
