@@ -1,10 +1,10 @@
 """``job-scraper-9000 overnight`` — Phase 13 orchestrator (spec §8).
 
-Slices 4–5 wire plan + scrape + consolidation + classification. Slices 6–7
-extend :func:`run_overnight` with skills_fit, ingest, and the end-of-run
-summary. The ``--scrape-only`` flag in the CLI stops after the scrape phase;
-the default invocation runs through classification, then fails loudly on the
-unimplemented tail.
+Slices 4–6 wire plan + scrape + consolidation + classification + the
+per-user skills_fit/ingest tail. Slice 7 layers per-user failure isolation
+and a polished end-of-run summary on top. The ``--scrape-only`` flag in the
+CLI stops after the scrape phase; the default invocation runs the full
+pipeline through ingest.
 """
 
 from __future__ import annotations
@@ -26,6 +26,13 @@ from pipeline.consolidation import (
     default_classify_fn,
 )
 from pipeline.planner import plan_run
+from pipeline.scoring import (
+    IngestFn,
+    ScoreFn,
+    default_ingest_fn,
+    default_score_fn,
+    score_and_ingest_run,
+)
 from pipeline.worker import ScrapeFn, default_scrape_fn, run_worker
 
 log = logging.getLogger(__name__)
@@ -41,15 +48,17 @@ def run_overnight(
     database_url: str | None = None,
     scrape_fn: ScrapeFn = default_scrape_fn,
     classify_fn: ClassifyFn = default_classify_fn,
+    score_fn: ScoreFn = default_score_fn,
+    ingest_fn: IngestFn = default_ingest_fn,
 ) -> dict[str, Any]:
-    """Plan + scrape + consolidate + classify. Returns a summary the CLI prints.
+    """Plan + scrape + consolidate + classify + score + ingest.
 
-    ``scrape_only=True`` stops after the scrape phase. The default invocation
-    runs through classification and then raises — skills_fit/ingest are
-    slice 6, the end-of-run summary slice 7.
+    Returns a summary the CLI prints. ``scrape_only=True`` stops after the
+    scrape phase. The default invocation runs the full pipeline through
+    per-user ingest; the end-of-run summary polish is slice 7.
 
-    ``scrape_fn`` / ``classify_fn`` are injectable for tests; production
-    callers take the defaults.
+    ``scrape_fn`` / ``classify_fn`` / ``score_fn`` / ``ingest_fn`` are
+    injectable for tests; production callers take the defaults.
     """
     url = database_url or os.environ.get("DATABASE_URL")
     if not url:
@@ -72,22 +81,34 @@ def run_overnight(
     if summary["consolidation"]["postings_consolidated"] == 0:
         # Legitimate for a quiet night (or all scrapes failing — the scrape
         # counters in the summary distinguish the two). run_remote_filter
-        # treats an empty input as an error, so don't hand it one.
-        log.warning("No postings consolidated — skipping classification phase")
+        # treats an empty input as an error, so don't hand it one; nothing
+        # to score or ingest either.
+        log.warning(
+            "No postings consolidated — skipping classification + scoring phases"
+        )
         summary["classification"] = None
-    else:
-        summary["classification"] = classify_consolidated(
-            runs_dir=runs_dir, run_id=run_id, classify_fn=classify_fn
+        summary["scoring"] = None
+        return summary
+
+    summary["classification"] = classify_consolidated(
+        runs_dir=runs_dir, run_id=run_id, classify_fn=classify_fn
+    )
+
+    # skills_fit + ingest fan back out per user. A fresh connection: the
+    # classification phase ran entirely on disk, and ingest wants its own
+    # transactions per user batch.
+    with psycopg.connect(url, autocommit=True) as conn:
+        summary["scoring"] = score_and_ingest_run(
+            conn,
+            run_id=run_id,
+            run_date=run_date,
+            runs_dir=runs_dir,
+            score_fn=score_fn,
+            ingest_fn=ingest_fn,
         )
 
-    log.info("Phases through classification complete: %s", summary)
-    # Slice 6 (skills_fit + ingest) and slice 7 (end-of-run summary) land
-    # here. Failing loudly until then keeps the default invocation honest.
-    raise NotImplementedError(
-        "Slice 5 ships through classification; skills_fit + ingest land in "
-        "slice 6, the end-of-run summary in slice 7. Pass --scrape-only for "
-        "the scrape-phase-only run."
-    )
+    log.info("Pipeline complete through ingest: %s", summary)
+    return summary
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,10 @@
-"""Integration tests for ``src/pipeline/consolidation.py`` + the overnight
-wiring through classification.
+"""Integration tests for ``src/pipeline/consolidation.py`` + the full overnight
+wiring (plan → scrape → consolidate → classify → score → ingest).
 
-A fake ``classify_fn`` is injected so no test touches an LLM, mirroring how
-the worker tests inject ``scrape_fn``. Consolidation still talks to a real
-Postgres so the upsert and the succeeded-rows query exercise their actual SQL.
+Fake ``classify_fn`` / ``score_fn`` / ``ingest_fn`` are injected so no test
+touches an LLM, mirroring how the worker tests inject ``scrape_fn``.
+Consolidation still talks to a real Postgres so the upsert and the
+succeeded-rows query exercise their actual SQL.
 """
 
 from __future__ import annotations
@@ -64,7 +65,11 @@ def _consolidated_rows(conn: psycopg.Connection, run_id: str) -> dict[str, list[
     return {h: users for h, users in rows}
 
 
-def _fake_classify_factory(calls: list[dict]):
+def _fake_classify_factory(calls: list[dict], *, classification: str = "fully_remote"):
+    """Records its call and writes every input posting to ``pass_path`` tagged
+    with ``_remote_analysis.remote_classification`` — the shape the scoring
+    phase reads back."""
+
     def _fn(*, input_path: Path, pass_path: Path, trash_path: Path, parent_run_id: str):
         calls.append(
             {
@@ -74,8 +79,56 @@ def _fake_classify_factory(calls: list[dict]):
                 "parent_run_id": parent_run_id,
             }
         )
-        n = len(input_path.read_text().splitlines())
+        lines = [ln for ln in input_path.read_text().splitlines() if ln.strip()]
+        with pass_path.open("w", encoding="utf-8") as f:
+            for ln in lines:
+                rec = json.loads(ln)
+                rec["_remote_analysis"] = {"remote_classification": classification}
+                f.write(json.dumps(rec) + "\n")
+        n = len(lines)
         return {"pass": n, "trash": 0, "skipped": 0, "total": n}
+
+    return _fn
+
+
+def _fake_score_factory(calls: list[dict]):
+    """Echoes the per-user input to the scored output and records the call."""
+
+    def _fn(
+        *,
+        input_path: Path,
+        output_path: Path,
+        profile_file: Path,
+        run_date,
+        parent_run_id,
+    ):
+        lines = [ln for ln in input_path.read_text().splitlines() if ln.strip()]
+        output_path.write_text("".join(ln + "\n" for ln in lines))
+        calls.append(
+            {
+                "input_path": input_path,
+                "output_path": output_path,
+                "profile_file": profile_file,
+                "run_date": run_date,
+                "parent_run_id": parent_run_id,
+                "n": len(lines),
+            }
+        )
+        return {"scored": len(lines)}
+
+    return _fn
+
+
+def _fake_ingest_factory(calls: list[dict]):
+    def _fn(*, scored_path: Path, user_email: str, conn):
+        n = len([ln for ln in scored_path.read_text().splitlines() if ln.strip()])
+        calls.append({"scored_path": scored_path, "user_email": user_email})
+        return {
+            "total": n,
+            "postings_inserted": n,
+            "scores_inserted": n,
+            "scores_updated": 0,
+        }
 
     return _fn
 
@@ -301,15 +354,15 @@ def test_classify_consolidated_invokes_classify_fn_with_run_paths(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# run_overnight wiring — plan → scrape → consolidate → classify
+# run_overnight wiring — plan → scrape → consolidate → classify → score → ingest
 # ---------------------------------------------------------------------------
 
 
 @skip_if_no_docker
-def test_run_overnight_runs_through_classification_then_raises(migrated_pg, tmp_path):
-    """End-to-end with fakes at both injection points. The slice-6 guard
-    still fires after classification — that's asserted, not worked around —
-    but every phase before it must have completed."""
+def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
+    """End-to-end with fakes at every injection point. Every phase from plan
+    through per-user ingest must complete, and the per-user score/ingest tail
+    must see the right profile and owning email."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         seed_user(conn, "e2e@example.com")
 
@@ -319,16 +372,19 @@ def test_run_overnight_runs_through_classification_then_raises(migrated_pg, tmp_
         "company": "Acme",
         "description": "d",
     }
-    calls: list[dict] = []
+    classify_calls: list[dict] = []
+    score_calls: list[dict] = []
+    ingest_calls: list[dict] = []
 
-    with pytest.raises(NotImplementedError, match="slice 6"):
-        run_overnight(
-            run_date="2026-06-12",
-            runs_dir=tmp_path,
-            database_url=migrated_pg,
-            scrape_fn=lambda source, payload: [posting],
-            classify_fn=_fake_classify_factory(calls),
-        )
+    summary = run_overnight(
+        run_date="2026-06-12",
+        runs_dir=tmp_path,
+        database_url=migrated_pg,
+        scrape_fn=lambda source, payload: [posting],
+        classify_fn=_fake_classify_factory(classify_calls),
+        score_fn=_fake_score_factory(score_calls),
+        ingest_fn=_fake_ingest_factory(ingest_calls),
+    )
 
     with psycopg.connect(migrated_pg) as conn:
         rows = _consolidated_rows(conn, "overnight-2026-06-12")
@@ -336,27 +392,44 @@ def test_run_overnight_runs_through_classification_then_raises(migrated_pg, tmp_
 
     # Classification ran once over the union file (same posting scraped for
     # every source collapses to one line).
-    assert len(calls) == 1
-    union = calls[0]["input_path"].read_text().splitlines()
-    assert len(union) == 1
-    assert calls[0]["parent_run_id"] == "overnight-2026-06-12"
+    assert len(classify_calls) == 1
+    assert len(classify_calls[0]["input_path"].read_text().splitlines()) == 1
+    assert classify_calls[0]["parent_run_id"] == "overnight-2026-06-12"
+
+    # Scoring fanned back out to the one user, against their materialized
+    # profile, tagged with the run's date.
+    assert summary["scoring"]["users_scored"] == 1
+    assert summary["scoring"]["postings_scored"] == 1
+    assert len(score_calls) == 1
+    assert score_calls[0]["run_date"] == "2026-06-12"
+    assert score_calls[0]["profile_file"] == (
+        tmp_path / "e2e_example_com" / "overnight-2026-06-12" / "candidate_profile.yml"
+    )
+    assert score_calls[0]["parent_run_id"] == "overnight-2026-06-12"
+
+    # Ingest routed that user's scored file under their email.
+    assert len(ingest_calls) == 1
+    assert ingest_calls[0]["user_email"] == "e2e@example.com"
 
 
 @skip_if_no_docker
-def test_run_overnight_skips_classification_when_nothing_consolidated(
-    migrated_pg, tmp_path
-):
+def test_run_overnight_skips_tail_when_nothing_consolidated(migrated_pg, tmp_path):
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         seed_user(conn, "quiet@example.com")
 
-    calls: list[dict] = []
-    with pytest.raises(NotImplementedError):
-        run_overnight(
-            run_date="2026-06-12",
-            runs_dir=tmp_path,
-            database_url=migrated_pg,
-            scrape_fn=lambda source, payload: [],
-            classify_fn=_fake_classify_factory(calls),
-        )
+    classify_calls: list[dict] = []
+    score_calls: list[dict] = []
 
-    assert calls == []  # empty union never reaches the classifier
+    summary = run_overnight(
+        run_date="2026-06-12",
+        runs_dir=tmp_path,
+        database_url=migrated_pg,
+        scrape_fn=lambda source, payload: [],
+        classify_fn=_fake_classify_factory(classify_calls),
+        score_fn=_fake_score_factory(score_calls),
+    )
+
+    assert classify_calls == []  # empty union never reaches the classifier
+    assert score_calls == []  # nor the scorer
+    assert summary["classification"] is None
+    assert summary["scoring"] is None
