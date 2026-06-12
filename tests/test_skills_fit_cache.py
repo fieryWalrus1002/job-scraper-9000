@@ -15,7 +15,7 @@ def make_analysis(score: int = 4) -> SkillsFitAnalysis:
     )
 
 
-def test_analysis_cache_round_trip_and_profile_hash_invalidation(tmp_path):
+def test_analysis_cache_round_trip_and_profile_version_invalidation(tmp_path):
     cache_path = tmp_path / "skills_fit_cache.jsonl"
     cache = AnalysisCache(cache_path)
     analysis = make_analysis(5)
@@ -25,7 +25,7 @@ def test_analysis_cache_round_trip_and_profile_hash_invalidation(tmp_path):
         prompt_hash="prompt-1",
         provider="openai",
         model="gpt-4o-mini",
-        profile_hash="profile-1",
+        profile_version="2026-06-12.deadbeefcafe",
         analysis=analysis,
     )
 
@@ -34,14 +34,14 @@ def test_analysis_cache_round_trip_and_profile_hash_invalidation(tmp_path):
         prompt_hash="prompt-1",
         provider="openai",
         model="gpt-4o-mini",
-        profile_hash="profile-1",
+        profile_version="2026-06-12.deadbeefcafe",
     )
     miss = cache.get(
         dedup_hash="hash-a",
         prompt_hash="prompt-1",
         provider="openai",
         model="gpt-4o-mini",
-        profile_hash="profile-2",
+        profile_version="2026-06-13.0000000000ff",
     )
 
     assert hit is not None
@@ -55,7 +55,7 @@ def test_analysis_cache_skips_malformed_lines(tmp_path, caplog):
         "not json\n"
         + json.dumps(
             {
-                "key": "hash-a|prompt-1|openai|gpt-4o-mini|profile-1",
+                "key": "hash-a|prompt-1|openai|gpt-4o-mini|2026-06-12.deadbeefcafe",
                 "analysis": make_analysis().model_dump(),
             }
         )
@@ -69,7 +69,7 @@ def test_analysis_cache_skips_malformed_lines(tmp_path, caplog):
         prompt_hash="prompt-1",
         provider="openai",
         model="gpt-4o-mini",
-        profile_hash="profile-1",
+        profile_version="2026-06-12.deadbeefcafe",
     )
 
     assert "Skipping malformed cache line" in caplog.text

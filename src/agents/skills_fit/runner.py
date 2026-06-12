@@ -368,7 +368,7 @@ def run_skills_fit(
                         prompt_hash=prompt_hash,
                         provider=provider_name,
                         model=model_name,
-                        profile_hash=profile_hash,
+                        profile_version=profile_version,
                     )
                     if analysis is not None:
                         cache_hits += 1
@@ -391,7 +391,7 @@ def run_skills_fit(
                                 prompt_hash=prompt_hash,
                                 provider=provider_name,
                                 model=model_name,
-                                profile_hash=profile_hash,
+                                profile_version=profile_version,
                                 analysis=analysis,
                             )
                     if analysis is None:
