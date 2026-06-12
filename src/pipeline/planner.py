@@ -126,11 +126,15 @@ def plan_run(
     for row in rows:
         email = row["email"]
         if row["profile_payload"] is None or row["search_payload"] is None:
-            log.warning(
-                "%s — has only %s configured; skipping",
-                email,
-                "profile" if row["profile_payload"] is not None else "search",
-            )
+            missing = [
+                name
+                for name, payload in (
+                    ("profile", row["profile_payload"]),
+                    ("search config", row["search_payload"]),
+                )
+                if payload is None
+            ]
+            log.warning("%s — missing %s; skipping", email, " and ".join(missing))
             summary["users_skipped"] += 1
             summary["skipped_emails"].append(email)
             continue

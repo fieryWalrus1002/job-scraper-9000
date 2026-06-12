@@ -57,6 +57,7 @@ ai_response.txt
 # local stuff I don't want to commit
 notes/
 logs/
+handoffs/
 
 # Configs with PII
 

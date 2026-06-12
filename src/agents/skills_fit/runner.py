@@ -166,6 +166,7 @@ def run_skills_fit(
     local_input: str | Path | None = None,
     output: str | Path | None = None,
     config_path: str | Path = DEFAULT_CONFIG_PATH,
+    profile_file: str | Path | None = None,
     provider: str | None = None,
     model: str | None = None,
     temperature: float | None = None,
@@ -234,7 +235,9 @@ def run_skills_fit(
         config_hash = hash_file(config_file)
 
         profile_file = Path(
-            config.get("profile_file", "config/profile/candidate_profile.yml")
+            profile_file
+            if profile_file is not None
+            else config.get("profile_file", "config/profile/candidate_profile.yml")
         )
         if not profile_file.exists():
             raise FileNotFoundError(f"Profile file not found: {profile_file}")
