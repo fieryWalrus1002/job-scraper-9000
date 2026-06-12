@@ -10,6 +10,8 @@ Five operations on the queue:
   ``posting_count``.
 - :func:`mark_failed` — terminal: stamp ``finished_at`` + ``error`` (full
   traceback). Per-user failure isolation (§7) leans on this.
+- :func:`requeue_running` — interruption cleanup: move this run's in-flight
+  rows back to ``pending`` so a manual rerun can resume.
 - :func:`pending_count` — read-only diagnostic for the orchestrator
   end-of-phase summary.
 
@@ -102,7 +104,8 @@ def mark_succeeded(conn: Connection, *, job_id: UUID | str, posting_count: int) 
         UPDATE pipe.scrape_jobs
         SET status = 'succeeded',
             finished_at = now(),
-            posting_count = %s
+            posting_count = %s,
+            error = NULL
         WHERE id = %s
         """,
         (posting_count, str(job_id)),
@@ -123,6 +126,31 @@ def mark_failed(conn: Connection, *, job_id: UUID | str, error: str) -> None:
         """,
         (error, str(job_id)),
     )
+
+
+def requeue_running(conn: Connection, *, run_id: str, error: str) -> int:
+    """Move this run's ``running`` rows back to ``pending`` after interruption.
+
+    Operator aborts during local debugging should not leave permanent source
+    blockers behind, and they should be retryable with the same ``run_id``.
+    ``attempts`` is intentionally preserved: the row was claimed and tried,
+    even though it did not reach a terminal state.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE pipe.scrape_jobs
+            SET status = 'pending',
+                started_at = NULL,
+                finished_at = NULL,
+                posting_count = NULL,
+                error = %s
+            WHERE run_id = %s
+              AND status = 'running'
+            """,
+            (error, run_id),
+        )
+        return cur.rowcount
 
 
 def pending_count(conn: Connection, *, run_id: str) -> int:

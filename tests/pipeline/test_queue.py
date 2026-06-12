@@ -17,6 +17,7 @@ from pipeline.queue import (
     mark_failed,
     mark_succeeded,
     pending_count,
+    requeue_running,
 )
 
 from .conftest import skip_if_no_docker
@@ -228,6 +229,47 @@ def test_mark_failed_captures_error_text(migrated_pg):
         assert status == "failed"
         assert err is not None and "ValueError: boom" in err
         assert finished is not None
+
+
+@skip_if_no_docker
+def test_requeue_running_resets_in_flight_rows_for_retry(migrated_pg):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        uid = _new_user(conn, "requeue@example.com")
+        enqueue(conn, run_id="r", user_id=uid, source="linkedin", query_payload={})
+        enqueue(conn, run_id="r", user_id=uid, source="jobspy", query_payload={})
+        claimed = claim_next(conn)
+        assert claimed is not None
+
+        requeued = requeue_running(
+            conn,
+            run_id="r",
+            error="Run overnight-r interrupted by operator: SIGINT; job requeued",
+        )
+
+        assert requeued == 1
+        row = conn.execute(
+            "SELECT status, attempts, error, started_at, finished_at, posting_count "
+            "FROM pipe.scrape_jobs WHERE id = %s",
+            (claimed["id"],),
+        ).fetchone()
+        assert row is not None
+        status, attempts, err, started, finished, posting_count = row
+        assert status == "pending"
+        assert attempts == 1
+        assert err is not None and "SIGINT" in err
+        assert started is None
+        assert finished is None
+        assert posting_count is None
+        assert pending_count(conn, run_id="r") == 2
+
+        retried = claim_next(conn)
+        assert retried is not None and retried["id"] == claimed["id"]
+        mark_succeeded(conn, job_id=retried["id"], posting_count=7)
+        succeeded = conn.execute(
+            "SELECT status, error, posting_count FROM pipe.scrape_jobs WHERE id = %s",
+            (claimed["id"],),
+        ).fetchone()
+        assert succeeded == ("succeeded", None, 7)
 
 
 @skip_if_no_docker
