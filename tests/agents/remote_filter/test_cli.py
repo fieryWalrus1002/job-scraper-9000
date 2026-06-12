@@ -700,3 +700,40 @@ def test_remote_filter_cmd_explicit_paths_override_run_date():
         user_timezone=None,
         cache_path=DEFAULT_CACHE_PATH,
     )
+
+
+def test_remote_filter_cmd_batch_flag_routes_to_batch_runner():
+    from agents.remote_filter.cache import DEFAULT_CACHE_PATH
+    from agents.remote_filter.cli import _cmd_remote_filter
+
+    args = _cli_fake_args(
+        input="raw.jsonl",
+        pass_output="pass.jsonl",
+        trash_output="trash.jsonl",
+        config="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        run_date=None,
+        cache_path=None,
+        no_cache=False,
+        batch=True,
+        poll_interval=30,
+    )
+
+    with (
+        patch("agents.remote_filter.batch.run_remote_filter_batch") as mock_batch,
+        patch("agents.remote_filter.runner.run_remote_filter") as mock_serial,
+    ):
+        _cmd_remote_filter(args)
+
+    mock_serial.assert_not_called()
+    mock_batch.assert_called_once_with(
+        input_path="raw.jsonl",
+        pass_path="pass.jsonl",
+        trash_path="trash.jsonl",
+        config_path="remote.yml",
+        user_location="USA",
+        user_timezone=None,
+        cache_path=DEFAULT_CACHE_PATH,
+        poll_interval=30,
+    )

@@ -86,6 +86,16 @@ Within-batch duplicates (by `dedup_hash`, falling back to `source_job_id`) are c
 
 Across-batch analyses are cached at `data/cache/remote_filter_analyses.jsonl`, keyed by `(dedup_hash, prompt_hash, provider, model, context_fp)` — where `dedup_hash` falls back to `source_job_id` when absent, and `context_fp` is a fingerprint of the search-context fields the prompt actually reads (`keywords`, `workplace`, `job_type`, `user_timezone`). Any of: a prompt edit, a model or provider swap, or a change to a context field that affects the prompt → key changes → cache misses and recomputes. No manual invalidation needed. Pass `--no-cache` to bypass, or `--cache-path` to point elsewhere. The run summary logs `cache N/M hits (X%)`.
 
+### Batch mode (`--batch`)
+
+For large runs, `--batch` submits every cache-miss job to the [OpenAI Batch API](https://platform.openai.com/docs/guides/batch) as a single job — roughly half the per-token cost, at the price of latency (the run blocks polling until the batch completes):
+
+```bash
+uv run job-scraper-9000 remote-filter --run-date 2026-05-16 --batch
+```
+
+It is a single blocking command: submit → poll → write the same pass/trash outputs as the serial path. Cache hits never enter the batch (so a re-run is cheap), and outputs/telemetry are identical apart from the 50%-discounted cost estimate. `--poll-interval SECONDS` (default 60) controls the status-poll cadence. The Batch API is OpenAI-only — `--batch` with a non-OpenAI provider fails fast with a clear error; drop the flag to run the serial path against ollama.
+
 Each enriched output record contains all original job fields plus:
 
 ```json
