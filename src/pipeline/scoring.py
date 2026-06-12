@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 from pathlib import Path
 from typing import Any, Callable
 
@@ -174,9 +175,15 @@ def score_and_ingest_run(
     """Per-user skills_fit + ingest over the classified union.
 
     Returns a summary: ``{"users_scored": N, "users_skipped_no_postings": M,
-    "postings_scored": K, "scores_inserted": …, "scores_updated": …,
-    "postings_unclassified": …, "per_user": [...]}``. The CLI prints it; the
-    end-of-run summary (slice 7) builds on it.
+    "users_failed": F, "postings_scored": K, "scores_inserted": …,
+    "scores_updated": …, "postings_unclassified": …, "per_user": [...]}``.
+    The end-of-run summary (:mod:`pipeline.summary`) builds on it.
+
+    Per-user failure isolation (spec §7): a user whose skills_fit or ingest
+    step raises is logged with its full traceback, recorded ``failed`` in the
+    summary, and skipped — the loop carries on for everyone else. ``ingest``
+    runs each user inside its own DB transaction, so a mid-batch raise leaves
+    no partial scores for that user.
     """
     classified = _load_classified(runs_dir, run_id)
 
@@ -187,6 +194,7 @@ def score_and_ingest_run(
     summary: dict[str, Any] = {
         "users_scored": 0,
         "users_skipped_no_postings": 0,
+        "users_failed": 0,
         "postings_scored": 0,
         "scores_inserted": 0,
         "scores_updated": 0,
@@ -196,90 +204,104 @@ def score_and_ingest_run(
 
     for row in user_rows:
         email = row["email"]
-        acceptable = set(
-            UserPolicies.model_validate(
-                row["policies"] or {}
-            ).remote.acceptable_classifications
-        )
+        try:
+            acceptable = set(
+                UserPolicies.model_validate(
+                    row["policies"] or {}
+                ).remote.acceptable_classifications
+            )
 
-        survivors: list[dict[str, Any]] = []
-        unclassified = 0
-        for dedup_hash in row["dedup_hashes"]:
-            rec = classified.get(dedup_hash)
-            if rec is None:
-                unclassified += 1
+            survivors: list[dict[str, Any]] = []
+            unclassified = 0
+            for dedup_hash in row["dedup_hashes"]:
+                rec = classified.get(dedup_hash)
+                if rec is None:
+                    unclassified += 1
+                    continue
+                if _classification_of(rec) in acceptable:
+                    survivors.append(rec)
+            summary["postings_unclassified"] += unclassified
+
+            if not survivors:
+                log.info(
+                    "%s — no postings survived remote policy "
+                    "(%d requested, %d unclassified); skipping skills_fit",
+                    email,
+                    len(row["dedup_hashes"]),
+                    unclassified,
+                )
+                summary["users_skipped_no_postings"] += 1
+                summary["per_user"].append(
+                    {"email": email, "postings_scored": 0, "skipped": True}
+                )
                 continue
-            if _classification_of(rec) in acceptable:
-                survivors.append(rec)
-        summary["postings_unclassified"] += unclassified
 
-        if not survivors:
-            log.info(
-                "%s — no postings survived remote policy "
-                "(%d requested, %d unclassified); skipping skills_fit",
-                email,
-                len(row["dedup_hashes"]),
-                unclassified,
+            out_dir = skills_fit_dir(runs_dir, email, run_id)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            input_path = out_dir / INPUT_NAME
+            with input_path.open("w", encoding="utf-8") as f:
+                for rec in survivors:
+                    f.write(json.dumps(rec) + "\n")
+            scored_path = out_dir / SCORED_NAME
+
+            profile_file = runs_dir / _slug(email) / run_id / "candidate_profile.yml"
+            if not profile_file.exists():
+                raise FileNotFoundError(
+                    f"Materialized profile for {email} (run_id={run_id}) is missing: "
+                    f"{profile_file} — the planner should have written it"
+                )
+
+            score_fn(
+                input_path=input_path,
+                output_path=scored_path,
+                profile_file=profile_file,
+                run_date=run_date,
+                parent_run_id=run_id,
             )
-            summary["users_skipped_no_postings"] += 1
+            ingest_summary = ingest_fn(
+                scored_path=scored_path, user_email=email, conn=conn
+            )
+
+            scores_inserted = ingest_summary.get("scores_inserted", 0)
+            scores_updated = ingest_summary.get("scores_updated", 0)
+            summary["users_scored"] += 1
+            summary["postings_scored"] += len(survivors)
+            summary["scores_inserted"] += scores_inserted
+            summary["scores_updated"] += scores_updated
             summary["per_user"].append(
-                {"email": email, "postings_scored": 0, "skipped": True}
+                {
+                    "email": email,
+                    "postings_scored": len(survivors),
+                    "scores_inserted": scores_inserted,
+                    "scores_updated": scores_updated,
+                    "skipped": False,
+                }
             )
-            continue
-
-        out_dir = skills_fit_dir(runs_dir, email, run_id)
-        out_dir.mkdir(parents=True, exist_ok=True)
-        input_path = out_dir / INPUT_NAME
-        with input_path.open("w", encoding="utf-8") as f:
-            for rec in survivors:
-                f.write(json.dumps(rec) + "\n")
-        scored_path = out_dir / SCORED_NAME
-
-        profile_file = runs_dir / _slug(email) / run_id / "candidate_profile.yml"
-        if not profile_file.exists():
-            raise FileNotFoundError(
-                f"Materialized profile for {email} (run_id={run_id}) is missing: "
-                f"{profile_file} — the planner should have written it"
+            log.info(
+                "%s — scored %d posting(s) → %d new, %d re-scored",
+                email,
+                len(survivors),
+                scores_inserted,
+                scores_updated,
             )
-
-        score_fn(
-            input_path=input_path,
-            output_path=scored_path,
-            profile_file=profile_file,
-            run_date=run_date,
-            parent_run_id=run_id,
-        )
-        ingest_summary = ingest_fn(scored_path=scored_path, user_email=email, conn=conn)
-
-        scores_inserted = ingest_summary.get("scores_inserted", 0)
-        scores_updated = ingest_summary.get("scores_updated", 0)
-        summary["users_scored"] += 1
-        summary["postings_scored"] += len(survivors)
-        summary["scores_inserted"] += scores_inserted
-        summary["scores_updated"] += scores_updated
-        summary["per_user"].append(
-            {
-                "email": email,
-                "postings_scored": len(survivors),
-                "scores_inserted": scores_inserted,
-                "scores_updated": scores_updated,
-                "skipped": False,
-            }
-        )
-        log.info(
-            "%s — scored %d posting(s) → %d new, %d re-scored",
-            email,
-            len(survivors),
-            scores_inserted,
-            scores_updated,
-        )
+        except Exception:
+            # Per-user isolation (spec §7): one user's failure must not sink
+            # everyone else's scores. Full traceback to the log now; the
+            # end-of-run summary surfaces the one-liner for the morning admin.
+            tb = traceback.format_exc()
+            log.error("%s — skills_fit/ingest failed; isolating:\n%s", email, tb)
+            summary["users_failed"] += 1
+            summary["per_user"].append(
+                {"email": email, "postings_scored": 0, "failed": True, "error": tb}
+            )
 
     log.info(
-        "skills_fit + ingest phase done for run_id=%s: %d user(s) scored, "
-        "%d skipped (no postings), %d posting(s) scored",
+        "skills_fit + ingest phase done for run_id=%s: %d scored, %d skipped "
+        "(no postings), %d failed, %d posting(s) scored",
         run_id,
         summary["users_scored"],
         summary["users_skipped_no_postings"],
+        summary["users_failed"],
         summary["postings_scored"],
     )
     return summary

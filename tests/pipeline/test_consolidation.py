@@ -411,6 +411,41 @@ def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
     assert len(ingest_calls) == 1
     assert ingest_calls[0]["user_email"] == "e2e@example.com"
 
+    # End-of-run summary is attached and reflects the one successful user.
+    rs = summary["run_summary"]
+    assert rs["all_failed"] is False
+    assert rs["users_ok"] == 1
+    assert "e2e@example.com — OK" in rs["text"]
+
+
+@skip_if_no_docker
+def test_run_overnight_all_scrapes_failed_is_all_failed(migrated_pg, tmp_path):
+    """Every user's scrape raising → nothing consolidated, and the run
+    summary's verdict is all-failed (the CLI exits non-zero on it)."""
+
+    def _boom(source, payload):
+        raise RuntimeError("scraper exploded")
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        seed_user(conn, "doomed@example.com")
+
+    summary = run_overnight(
+        run_date="2026-06-12",
+        runs_dir=tmp_path,
+        database_url=migrated_pg,
+        scrape_fn=_boom,
+        classify_fn=_fake_classify_factory([]),
+        score_fn=_fake_score_factory([]),
+    )
+
+    # Nothing consolidated (the failed scrape produced no JSONL), so the tail
+    # is skipped — but the run summary still renders the per-user verdict.
+    assert summary["scoring"] is None
+    rs = summary["run_summary"]
+    assert rs["all_failed"] is True
+    assert "doomed@example.com — FAILED" in rs["text"]
+    assert "scraper exploded" in rs["text"]
+
 
 @skip_if_no_docker
 def test_run_overnight_skips_tail_when_nothing_consolidated(migrated_pg, tmp_path):
