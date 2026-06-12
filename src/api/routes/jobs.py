@@ -45,13 +45,17 @@ async def list_jobs(
     user: CurrentUser,
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
+    # Superset filter: the remote_with_*_travel values are legacy as of
+    # remote_filter SCHEMA_VERSION 3.0.0 (no longer produced), kept here so
+    # callers can still filter historical rows that carry them. See
+    # specs/remote_filter_simplification.md §5.
     remote_classification: Annotated[
         list[
             Literal[
                 "fully_remote",
-                "remote_with_quarterly_travel",
-                "remote_with_monthly_travel",
-                "remote_with_frequent_travel",
+                "remote_with_quarterly_travel",  # legacy (pre-3.0)
+                "remote_with_monthly_travel",  # legacy
+                "remote_with_frequent_travel",  # legacy
                 "hybrid",
                 "onsite_disguised",
                 "location_restricted",

@@ -181,12 +181,11 @@ def derive_policies(search: SearchConfigInput) -> UserPolicies:
     classes: set[str] = set()
     wa = search.work_constraints.work_arrangements
     if wa.remote.acceptable:
-        classes |= {
-            "fully_remote",
-            "remote_with_quarterly_travel",
-            "remote_with_monthly_travel",
-            "remote_with_frequent_travel",
-        }
+        # Post-3.0 the agent folds travel into numeric estimated_travel_days,
+        # so a remote-with-travel role is classified fully_remote. The legacy
+        # remote_with_*_travel buckets are no longer produced and so are not
+        # added to new acceptable-sets (specs/remote_filter_simplification.md).
+        classes.add("fully_remote")
     if wa.hybrid.acceptable:
         classes.add("hybrid")
     if wa.onsite.acceptable:

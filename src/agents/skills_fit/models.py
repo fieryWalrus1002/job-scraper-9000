@@ -15,11 +15,16 @@ SCHEMA_VERSION = "1.0.0"
 FitScore = Literal[1, 2, 3, 4, 5]
 Confidence = Literal["low", "medium", "high"]
 InputSource = Literal["remote_filter_pass", "local_candidate"]
+# Echoes the stored remote_filter classification onto ScoredJobPosting for
+# display. Kept a SUPERSET: the remote_with_*_travel values are legacy as of
+# remote_filter SCHEMA_VERSION 3.0.0 (no longer produced) but historical job
+# rows still carry them and must validate here. See
+# specs/remote_filter_simplification.md §5.
 RemoteClassification = Literal[
     "fully_remote",
-    "remote_with_quarterly_travel",
-    "remote_with_monthly_travel",
-    "remote_with_frequent_travel",
+    "remote_with_quarterly_travel",  # legacy (pre-3.0)
+    "remote_with_monthly_travel",  # legacy
+    "remote_with_frequent_travel",  # legacy
     "hybrid",
     "onsite_disguised",
     "location_restricted",
