@@ -6,6 +6,7 @@ the push/pull admin scripts, and (Phase 13) the queue builder.
 """
 
 from .models import (
+    LEGACY_REMOTE_CLASSIFICATIONS,
     REMOTE_CLASSIFICATIONS,
     CandidateProfileInput,
     SearchConfigInput,
@@ -20,6 +21,7 @@ from .transform import (
 from .versioning import canonical_json, compute_profile_version
 
 __all__ = [
+    "LEGACY_REMOTE_CLASSIFICATIONS",
     "REMOTE_CLASSIFICATIONS",
     "CandidateProfileInput",
     "SearchConfigInput",
