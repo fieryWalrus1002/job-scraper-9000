@@ -442,3 +442,73 @@ def test_0007_downgrade_reconstructs_legacy_table(fresh_pg):
               AND i.indisprimary
         """).fetchall()
         assert app_pk_cols == [("dedup_hash",)]
+
+
+# ---------------------------------------------------------------------------
+# 0010: pipe schema + scrape_jobs / consolidated_postings (Phase 13 §5)
+# ---------------------------------------------------------------------------
+
+
+def _make_user(conn_str: str, email: str) -> str:
+    """Insert a user row; return the generated UUID as text (so the test can
+    cast back to UUID when it needs to)."""
+    with psycopg.connect(conn_str) as conn:
+        row = conn.execute(
+            "INSERT INTO app.users (email) VALUES (%s) RETURNING id::text",
+            (email,),
+        ).fetchone()
+    assert row is not None
+    return row[0]
+
+
+@skip_if_no_docker
+def test_0010_creates_pipe_schema_and_tables(fresh_pg):
+    _run_alembic("0010", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        for table in ("pipe.scrape_jobs", "pipe.consolidated_postings"):
+            row = conn.execute(f"SELECT to_regclass('{table}') IS NOT NULL").fetchone()
+            assert row is not None and row[0] is True, f"{table} missing"
+
+
+@skip_if_no_docker
+def test_0010_scrape_jobs_constraints(fresh_pg):
+    _run_alembic("0010", fresh_pg, extra_env=_BOOTSTRAP)
+    uid = _make_user(fresh_pg, "constraints@example.com")
+
+    with psycopg.connect(fresh_pg, autocommit=True) as conn:
+        conn.execute(
+            "INSERT INTO pipe.scrape_jobs (run_id, user_id, source, query_payload) "
+            "VALUES ('r1', %s::uuid, 'linkedin', '{}'::jsonb)",
+            (uid,),
+        )
+        # UNIQUE (run_id, user_id, source) makes re-enqueue idempotent
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(
+                "INSERT INTO pipe.scrape_jobs (run_id, user_id, source, query_payload) "
+                "VALUES ('r1', %s::uuid, 'linkedin', '{}'::jsonb)",
+                (uid,),
+            )
+        # status CHECK rejects unknown values
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute(
+                "INSERT INTO pipe.scrape_jobs "
+                "(run_id, user_id, source, query_payload, status) "
+                "VALUES ('r2', %s::uuid, 'linkedin', '{}'::jsonb, 'queued')",
+                (uid,),
+            )
+
+
+@skip_if_no_docker
+def test_0010_downgrade_drops_pipe(fresh_pg):
+    _run_alembic("0010", fresh_pg, extra_env=_BOOTSTRAP)
+    _run_alembic("0009", fresh_pg, command="downgrade", extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        for table in ("pipe.scrape_jobs", "pipe.consolidated_postings"):
+            row = conn.execute(f"SELECT to_regclass('{table}') IS NOT NULL").fetchone()
+            assert row is not None and row[0] is False, f"{table} still present"
+        schema = conn.execute(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'pipe'"
+        ).fetchone()
+        assert schema is None
