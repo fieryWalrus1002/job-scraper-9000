@@ -30,6 +30,8 @@ def test_skills_fit_defaults():
     assert args.run_date is None
     assert args.config == "config/agent/skills_fit.yml"
     assert args.limit is None
+    assert args.batch is False
+    assert args.poll_interval == 60
 
 
 def test_skills_fit_custom_args():
@@ -40,10 +42,15 @@ def test_skills_fit_custom_args():
         "skills_fit.yml",
         "--limit",
         "5",
+        "--batch",
+        "--poll-interval",
+        "2",
     )
     assert args.run_date == "2026-05-23"
     assert args.config == "skills_fit.yml"
     assert args.limit == 5
+    assert args.batch is True
+    assert args.poll_interval == 2
 
 
 def test_skills_fit_cmd_calls_runner():
@@ -53,6 +60,7 @@ def test_skills_fit_cmd_calls_runner():
         run_date="2026-05-23",
         config="skills_fit.yml",
         limit=5,
+        batch=False,
     )
 
     with patch("agents.skills_fit.runner.run_skills_fit") as mock_run:
@@ -65,10 +73,34 @@ def test_skills_fit_cmd_calls_runner():
     )
 
 
+def test_skills_fit_cmd_calls_batch_runner():
+    from agents.skills_fit.cli import _cmd_skills_fit
+
+    args = _fake_args(
+        run_date="2026-05-23",
+        config="skills_fit.yml",
+        limit=5,
+        batch=True,
+        poll_interval=2,
+    )
+
+    with patch("agents.skills_fit.batch.run_skills_fit_batch") as mock_run:
+        _cmd_skills_fit(args)
+
+    mock_run.assert_called_once_with(
+        run_date="2026-05-23",
+        config_path="skills_fit.yml",
+        limit=5,
+        poll_interval=2,
+    )
+
+
 def test_skills_fit_cmd_returns_shell_friendly_exit_codes():
     from agents.skills_fit.cli import _cmd_skills_fit
 
-    args = _fake_args(run_date="2026-05-23", config="skills_fit.yml", limit=None)
+    args = _fake_args(
+        run_date="2026-05-23", config="skills_fit.yml", limit=None, batch=False
+    )
 
     with patch(
         "agents.skills_fit.runner.run_skills_fit",
