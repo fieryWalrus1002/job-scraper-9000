@@ -53,8 +53,12 @@ packages = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Docker-backed integration tests (live Postgres, Azurite, the API container)
+# are excluded by default for a fast local loop. Run them explicitly with
+# `uv run pytest -m docker`; CI does this in a dedicated step.
+addopts = "-m 'not docker'"
 markers = [
-    "docker: tests that require a running Docker daemon and a pre-built image",
+    "docker: tests that require a running Docker daemon (live Postgres/Azurite or a pre-built image)",
 ]
 
 [tool.pyright]

@@ -28,6 +28,12 @@ jobs:
 
       - run: uv run pytest
 
+      # Docker-backed integration tests (live Postgres, Azurite) are excluded
+      # from the default run; run them explicitly here. The GitHub runner has a
+      # Docker daemon available. The API container_startup tests still skip
+      # unless the image is built, as before.
+      - run: uv run pytest -m docker
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
