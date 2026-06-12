@@ -33,6 +33,7 @@ from pipeline.scoring import (
     default_score_fn,
     score_and_ingest_run,
 )
+from pipeline.summary import build_overnight_summary
 from pipeline.worker import ScrapeFn, default_scrape_fn, run_worker
 
 log = logging.getLogger(__name__)
@@ -55,7 +56,9 @@ def run_overnight(
 
     Returns a summary the CLI prints. ``scrape_only=True`` stops after the
     scrape phase. The default invocation runs the full pipeline through
-    per-user ingest; the end-of-run summary polish is slice 7.
+    per-user ingest. Every return path attaches ``summary["run_summary"]`` —
+    the per-user, stderr-ready end-of-run rollup with the all-failed verdict
+    (spec §7).
 
     ``scrape_fn`` / ``classify_fn`` / ``score_fn`` / ``ingest_fn`` are
     injectable for tests; production callers take the defaults.
@@ -72,15 +75,18 @@ def run_overnight(
         summary["scrape"] = run_worker(conn, runs_dir=runs_dir, scrape_fn=scrape_fn)
 
         if scrape_only:
-            return summary
+            summary["consolidation"] = None
+            summary["classification"] = None
+            summary["scoring"] = None
+            return _finalize(url, summary)
 
         summary["consolidation"] = consolidate_run(
             conn, run_id=run_id, runs_dir=runs_dir
         )
 
     if summary["consolidation"]["postings_consolidated"] == 0:
-        # Legitimate for a quiet night (or all scrapes failing — the scrape
-        # counters in the summary distinguish the two). run_remote_filter
+        # Legitimate for a quiet night (or all scrapes failing — the run
+        # summary's per-user verdict distinguishes the two). run_remote_filter
         # treats an empty input as an error, so don't hand it one; nothing
         # to score or ingest either.
         log.warning(
@@ -88,7 +94,7 @@ def run_overnight(
         )
         summary["classification"] = None
         summary["scoring"] = None
-        return summary
+        return _finalize(url, summary)
 
     summary["classification"] = classify_consolidated(
         runs_dir=runs_dir, run_id=run_id, classify_fn=classify_fn
@@ -107,7 +113,20 @@ def run_overnight(
             ingest_fn=ingest_fn,
         )
 
-    log.info("Pipeline complete through ingest: %s", summary)
+    return _finalize(url, summary)
+
+
+def _finalize(url: str, summary: dict[str, Any]) -> dict[str, Any]:
+    """Attach the end-of-run summary and log completion. Every return path
+    of :func:`run_overnight` funnels through here so the run_summary (and its
+    exit verdict) is always present."""
+    summary["run_summary"] = build_overnight_summary(
+        url,
+        run_id=summary["run_id"],
+        scrape=summary["scrape"],
+        scoring=summary.get("scoring"),
+    )
+    log.info("Pipeline complete: %s", summary["run_summary"]["text"])
     return summary
 
 
@@ -122,12 +141,14 @@ def _cmd_overnight(args: argparse.Namespace) -> None:
         runs_dir=Path(args.runs_dir),
         scrape_only=args.scrape_only,
     )
-    log.info("Overnight summary: %s", summary)
-    # Non-zero exit iff every (user, source) row failed — keeps the at-job
-    # exit code honest. Spec §7 talks about partial-success → 0; we apply that
-    # here at the scrape phase too.
-    scrape = summary["scrape"]
-    if scrape["succeeded"] == 0 and scrape["failed"] > 0:
+    run_summary = summary["run_summary"]
+    # The morning admin reads this block; keep it on stderr, separate from the
+    # structured logging stream.
+    print(run_summary["text"], file=sys.stderr)
+    # Exit non-zero iff *every* user failed (spec §7). Any partial success
+    # exits zero — the admin reads the summary and re-runs the idempotent
+    # queue for the failed rows.
+    if run_summary["all_failed"]:
         sys.exit(2)
 
 

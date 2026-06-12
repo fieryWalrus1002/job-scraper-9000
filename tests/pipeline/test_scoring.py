@@ -294,23 +294,45 @@ def test_counts_postings_with_no_classification(migrated_pg, tmp_path):
 
 
 @skip_if_no_docker
-def test_raises_when_materialized_profile_missing(migrated_pg, tmp_path):
-    """A user with survivors but no materialized profile is a broken planner
-    contract — fail loud."""
+def test_isolates_a_failing_user_and_finishes_the_rest(migrated_pg, tmp_path):
+    """Spec §7: one user's skills_fit/ingest exception is isolated — logged,
+    recorded ``failed`` in the summary — and the run finishes for everyone
+    else. Here the failure surfaces as a missing materialized profile (a
+    broken planner contract), but any raise inside the per-user step is
+    treated the same way."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        u1 = seed_user(conn, "noprofile@example.com")
-        _seed_consolidated(conn, dedup_hash="h1", requested_by=[u1])
+        u_bad = seed_user(conn, "noprofile@example.com")
+        u_ok = seed_user(conn, "fine@example.com")
+        _seed_consolidated(conn, dedup_hash="h-bad", requested_by=[u_bad])
+        _seed_consolidated(conn, dedup_hash="h-ok", requested_by=[u_ok])
 
-    _write_classified(tmp_path, passed=[_classified("h1", "fully_remote")])
-    # deliberately do NOT materialize the profile
+    _materialize_profile(tmp_path, "fine@example.com")
+    # deliberately do NOT materialize noprofile@example.com's profile
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-bad", "fully_remote"),
+            _classified("h-ok", "fully_remote"),
+        ],
+    )
 
+    score_calls: list[dict] = []
+    ingest_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        with pytest.raises(FileNotFoundError, match="profile"):
-            score_and_ingest_run(
-                conn,
-                run_id=RUN_ID,
-                run_date=RUN_DATE,
-                runs_dir=tmp_path,
-                score_fn=_score_factory([]),
-                ingest_fn=_ingest_factory([]),
-            )
+        summary = score_and_ingest_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(score_calls),
+            ingest_fn=_ingest_factory(ingest_calls),
+        )
+
+    assert summary["users_scored"] == 1
+    assert summary["users_failed"] == 1
+    # The good user still got scored and ingested.
+    assert [c["user_email"] for c in ingest_calls] == ["fine@example.com"]
+    failed = [u for u in summary["per_user"] if u.get("failed")]
+    assert len(failed) == 1
+    assert failed[0]["email"] == "noprofile@example.com"
+    assert "profile" in failed[0]["error"]
