@@ -520,17 +520,33 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging()
     args = parse_args(argv)
     try:
-        run_skills_fit(
-            run_date=args.run_date,
-            remote_input=args.remote_input,
-            local_input=args.local_input,
-            output=args.output,
-            config_path=args.config,
-            provider=args.provider,
-            model=args.model,
-            temperature=args.temperature,
-            limit=args.limit,
-        )
+        if getattr(args, "batch", False):
+            from agents.skills_fit.batch import run_skills_fit_batch
+
+            run_skills_fit_batch(
+                run_date=args.run_date,
+                remote_input=args.remote_input,
+                local_input=args.local_input,
+                output=args.output,
+                config_path=args.config,
+                provider=args.provider,
+                model=args.model,
+                temperature=args.temperature,
+                limit=args.limit,
+                poll_interval=getattr(args, "poll_interval", 60),
+            )
+        else:
+            run_skills_fit(
+                run_date=args.run_date,
+                remote_input=args.remote_input,
+                local_input=args.local_input,
+                output=args.output,
+                config_path=args.config,
+                provider=args.provider,
+                model=args.model,
+                temperature=args.temperature,
+                limit=args.limit,
+            )
     except (FileNotFoundError, ValueError) as exc:
         log.error(str(exc))
         return 1

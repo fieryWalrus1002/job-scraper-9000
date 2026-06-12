@@ -22,14 +22,24 @@ class ResolvedPaths:
 
 
 def _cmd_skills_fit(args) -> None:
-    from agents.skills_fit.runner import run_skills_fit
-
     try:
-        run_skills_fit(
-            run_date=args.run_date,
-            config_path=args.config,
-            limit=args.limit,
-        )
+        if getattr(args, "batch", False):
+            from agents.skills_fit.batch import run_skills_fit_batch
+
+            run_skills_fit_batch(
+                run_date=args.run_date,
+                config_path=args.config,
+                limit=args.limit,
+                poll_interval=getattr(args, "poll_interval", 60),
+            )
+        else:
+            from agents.skills_fit.runner import run_skills_fit
+
+            run_skills_fit(
+                run_date=args.run_date,
+                config_path=args.config,
+                limit=args.limit,
+            )
     except (FileNotFoundError, ValueError) as exc:
         log.error(str(exc))
         sys.exit(1)
@@ -60,6 +70,20 @@ def _add_skills_fit(sub: argparse._SubParsersAction) -> None:
         type=_parse_positive_int,
         help="Limit deduped records for testing",
     )
+    p.add_argument(
+        "--batch",
+        action="store_true",
+        help="Submit all cache-miss jobs via the OpenAI Batch API (one blocking "
+        "submit+poll), then write the same scored output. OpenAI provider only.",
+    )
+    p.add_argument(
+        "--poll-interval",
+        default=60,
+        dest="poll_interval",
+        type=int,
+        metavar="SECONDS",
+        help="Seconds between batch status polls when --batch is set (default: 60)",
+    )
     p.set_defaults(func=_cmd_skills_fit)
 
 
@@ -86,6 +110,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--temperature", type=float, help="Override llm.temperature in-memory"
     )
     parser.add_argument("--limit", type=int, help="Limit deduped records for testing")
+    parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Submit cache misses via the OpenAI Batch API. OpenAI provider only.",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        default=60,
+        type=int,
+        metavar="SECONDS",
+        help="Seconds between batch status polls when --batch is set (default: 60)",
+    )
     args = parser.parse_args(argv)
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be >= 1")
