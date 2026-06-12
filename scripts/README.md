@@ -18,6 +18,26 @@ ______________________________________________________________________
 
 ## Scripts
 
+### `push_user_config.py` / `pull_user_configs.py`
+
+Admin CLI for the per-user configs that live in Postgres (Phase 12, [specs/configs_in_db_design.md](../specs/configs_in_db_design.md)). Both connect to the DB directly via `DATABASE_URL`; no API involvement.
+
+`push_user_config.py` validates a filled-in profile/search template against the shared Pydantic models (`src/user_config/`) and upserts it for a user, printing the computed `profile_version`. Use it to onboard a user before they've touched the in-app Settings form. The user must already exist in `app.users`.
+
+```bash
+uv run scripts/push_user_config.py --user-email a@b.com \
+    --profile config/profile/alice.yml --search config/search/alice.yml
+```
+
+`pull_user_configs.py` materializes the DB back to the YAML the pipeline consumes — `runs/<email-slug>/{search.yml,candidate_profile.yml,policies.yml}` — so an overnight run can pick it up.
+
+```bash
+uv run scripts/pull_user_configs.py --all          # every configured user
+uv run scripts/pull_user_configs.py --user-email a@b.com
+```
+
+______________________________________________________________________
+
 ### `prepare_batch.py`
 
 Reads raw jobs and produces an [OpenAI Batch API](https://platform.openai.com/docs/guides/batch) request file.
