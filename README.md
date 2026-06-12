@@ -133,13 +133,27 @@ uv run scripts/view_top_x_jobs.py --run-date 2026-05-26 --start 0 --limit 20
 
 Should it have been `--start 0 --end 20`? Yes, probably. Or done it as a slice `--range 0:20`. But here we are.
 
-**Schedule a run overnight:**
+**Run the multi-user overnight pipeline:**
+
+```bash
+just run-overnight
+```
+
+This delegates to the Phase 13 orchestrator:
+
+```bash
+uv run job-scraper-9000 overnight --run-date "$(date +%F)"
+```
+
+The `just run-overnight` recipe builds `DATABASE_URL` from the same `AZURE_POSTGRES_*` variables used by the Azure DB recipes, then invokes the CLI. The `overnight` command writes human-readable logs to stderr and, by default, `logs/overnight_<run-date>_<HHMMSS>.log` so each invocation gets its own log. Use `--log-file <path>` to choose a different file or `--no-log-file` for terminal-only debugging. If interrupted with Ctrl-C, SIGTERM, or Ctrl-Z, running scrape jobs are requeued to `pending` so rerunning the same date can resume.
+
+**Schedule a run overnight with `at`:**
 
 ```bash
 at 12:30 AM -f scripts/run_overnight.sh
 ```
 
-This will schedule the `scripts/run_overnight.sh` script to execute at 12:30 AM. The script should contain the necessary commands to run the full pipeline.
+The script is now only a compatibility wrapper around `just run-overnight`, so existing `at` jobs keep working with the same database-url construction as manual runs. Logs still come from the CLI's default `logs/overnight_<run-date>_<HHMMSS>.log` behavior.
 
 **Run the gold-expansion HITL loop (after reviewing markdown files):**
 

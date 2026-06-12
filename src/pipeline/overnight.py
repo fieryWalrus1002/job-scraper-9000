@@ -12,9 +12,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import psycopg
 
@@ -26,6 +28,7 @@ from pipeline.consolidation import (
     default_classify_fn,
 )
 from pipeline.planner import plan_run
+from pipeline.queue import pending_count, requeue_running
 from pipeline.scoring import (
     IngestFn,
     ScoreFn,
@@ -39,6 +42,8 @@ from pipeline.worker import ScrapeFn, default_scrape_fn, run_worker
 log = logging.getLogger(__name__)
 
 DEFAULT_RUNS_DIR = Path("runs")
+DEFAULT_LOGS_DIR = Path("logs")
+_LOG_FILE_HANDLE: TextIO | None = None
 
 
 def run_overnight(
@@ -135,12 +140,132 @@ def _finalize(url: str, summary: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _cmd_overnight(args: argparse.Namespace) -> None:
-    summary = run_overnight(
-        run_date=args.run_date,
-        runs_dir=Path(args.runs_dir),
-        scrape_only=args.scrape_only,
+class _OperatorInterrupt(KeyboardInterrupt):
+    def __init__(self, signame: str, exit_code: int) -> None:
+        super().__init__(f"Interrupted by operator ({signame})")
+        self.signame = signame
+        self.exit_code = exit_code
+
+
+class _Tee:
+    """Mirror writes to multiple text streams.
+
+    The overnight CLI runs unattended under ``at`` today and likely under a
+    cloud scheduler later. Tying the log file to stdout/stderr captures normal
+    logging, explicit prints, and uncaught tracebacks without depending on a
+    shell wrapper for redirection.
+    """
+
+    def __init__(self, *streams: TextIO) -> None:
+        self._streams = streams
+
+    @property
+    def encoding(self) -> str | None:
+        return self._streams[0].encoding
+
+    def isatty(self) -> bool:
+        return self._streams[0].isatty()
+
+    def write(self, data: str) -> int:
+        for stream in self._streams:
+            stream.write(data)
+            stream.flush()
+        return len(data)
+
+    def flush(self) -> None:
+        for stream in self._streams:
+            stream.flush()
+
+
+def _default_log_file(run_date: str) -> Path:
+    started_at = datetime.now().strftime("%H%M%S")
+    return DEFAULT_LOGS_DIR / f"overnight_{run_date}_{started_at}.log"
+
+
+def _configure_overnight_logging(*, run_date: str, log_file: Path | None) -> None:
+    global _LOG_FILE_HANDLE
+
+    if log_file is not None:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        _LOG_FILE_HANDLE = log_file.open("a", encoding="utf-8", buffering=1)
+        sys.stdout = _Tee(sys.stdout, _LOG_FILE_HANDLE)  # type: ignore[assignment]
+        sys.stderr = _Tee(sys.stderr, _LOG_FILE_HANDLE)  # type: ignore[assignment]
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        stream=sys.stderr,
+        force=True,
     )
+    logging.captureWarnings(True)
+
+    log.info("=== Overnight pipeline started for run_date=%s ===", run_date)
+    if log_file is not None:
+        log.info("Writing overnight log to %s", log_file)
+
+
+def _install_interrupt_handlers() -> None:
+    def _handler(signum: int, _frame: object) -> None:
+        signame = signal.Signals(signum).name
+        # Preserve conventional shell exit codes: 128 + signal number.
+        raise _OperatorInterrupt(signame, 128 + signum)
+
+    for name in ("SIGINT", "SIGTERM", "SIGTSTP"):
+        signum = getattr(signal, name, None)
+        if signum is not None:
+            signal.signal(signum, _handler)
+
+
+def _requeue_interrupted_run(*, run_id: str, reason: str) -> None:
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        log.error("DATABASE_URL not set; cannot requeue interrupted jobs")
+        return
+
+    error = f"Run {run_id} interrupted by operator: {reason}; job requeued"
+    try:
+        with psycopg.connect(url, autocommit=True) as conn:
+            requeued = requeue_running(conn, run_id=run_id, error=error)
+            pending = pending_count(conn, run_id=run_id)
+    except Exception:
+        log.exception("Failed to requeue interrupted jobs for run_id=%s", run_id)
+        return
+
+    log.warning(
+        "Run %s interrupted by operator; requeued %d running job(s); "
+        "%d pending job(s) remain retryable",
+        run_id,
+        requeued,
+        pending,
+    )
+
+
+def _cmd_overnight(args: argparse.Namespace) -> None:
+    log_file = None
+    if not args.no_log_file:
+        log_file = Path(args.log_file or _default_log_file(args.run_date))
+    _configure_overnight_logging(run_date=args.run_date, log_file=log_file)
+    _install_interrupt_handlers()
+
+    run_id = f"overnight-{args.run_date}"
+    try:
+        summary = run_overnight(
+            run_date=args.run_date,
+            runs_dir=Path(args.runs_dir),
+            scrape_only=args.scrape_only,
+        )
+    except _OperatorInterrupt as exc:
+        log.warning("Overnight pipeline interrupted by operator (%s)", exc.signame)
+        _requeue_interrupted_run(run_id=run_id, reason=exc.signame)
+        sys.exit(exc.exit_code)
+    except KeyboardInterrupt:
+        log.warning("Overnight pipeline interrupted by operator (KeyboardInterrupt)")
+        _requeue_interrupted_run(run_id=run_id, reason="KeyboardInterrupt")
+        sys.exit(130)
+    except BaseException:
+        log.exception("Overnight pipeline failed before completion")
+        raise
+
     run_summary = summary["run_summary"]
     # The morning admin reads this block; keep it on stderr, separate from the
     # structured logging stream.
@@ -149,7 +274,12 @@ def _cmd_overnight(args: argparse.Namespace) -> None:
     # exits zero — the admin reads the summary and re-runs the idempotent
     # queue for the failed rows.
     if run_summary["all_failed"]:
+        log.error("Overnight pipeline finished with all users failed")
         sys.exit(2)
+    if run_summary["users_failed"]:
+        log.warning("Overnight pipeline finished with per-user failures")
+    else:
+        log.info("Overnight pipeline finished successfully")
 
 
 def _add_overnight(sub: argparse._SubParsersAction) -> None:
@@ -174,6 +304,16 @@ def _add_overnight(sub: argparse._SubParsersAction) -> None:
         "--scrape-only",
         action="store_true",
         help="Stop after plan + scrape (skip consolidation + classification)",
+    )
+    log_group = p.add_mutually_exclusive_group()
+    log_group.add_argument(
+        "--log-file",
+        help="Path for the overnight log (default: logs/overnight_<run-date>_<HHMMSS>.log)",
+    )
+    log_group.add_argument(
+        "--no-log-file",
+        action="store_true",
+        help="Do not write a local log file; log to stderr only",
     )
     p.set_defaults(func=_cmd_overnight)
 

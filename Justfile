@@ -38,6 +38,12 @@ pipeline:
     just filter-skills
     just ingest
 
+run-overnight:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
+        uv run job-scraper-9000 overnight --run-date "$(date +%F)"
+
 sync-types:
     uv run scripts/export_openapi.py --out frontend/openapi.json
     cd frontend && npx --no-install openapi-typescript openapi.json -o src/schema.gen.ts
