@@ -30,16 +30,34 @@ def _cmd_remote_filter(args) -> None:
     cache_path = None if args.no_cache else (args.cache_path or DEFAULT_CACHE_PATH)
 
     try:
-        run_remote_filter(
-            input_path=input_path,
-            pass_path=pass_path,
-            trash_path=trash_path,
-            config_path=args.config,
-            user_location=args.user_location,
-            user_timezone=args.user_timezone,
-            cache_path=cache_path,
-        )
+        if getattr(args, "batch", False):
+            from agents.remote_filter.batch import run_remote_filter_batch
+
+            run_remote_filter_batch(
+                input_path=input_path,
+                pass_path=pass_path,
+                trash_path=trash_path,
+                config_path=args.config,
+                user_location=args.user_location,
+                user_timezone=args.user_timezone,
+                cache_path=cache_path,
+                poll_interval=getattr(args, "poll_interval", 60),
+            )
+        else:
+            run_remote_filter(
+                input_path=input_path,
+                pass_path=pass_path,
+                trash_path=trash_path,
+                config_path=args.config,
+                user_location=args.user_location,
+                user_timezone=args.user_timezone,
+                cache_path=cache_path,
+            )
     except FileNotFoundError as exc:
+        log.error(str(exc))
+        sys.exit(1)
+    except ValueError as exc:
+        # e.g. --batch with a non-openai provider
         log.error(str(exc))
         sys.exit(1)
 
@@ -98,6 +116,20 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         dest="no_cache",
         help="Disable the across-batch cache; always call the LLM",
+    )
+    p.add_argument(
+        "--batch",
+        action="store_true",
+        help="Submit all cache-miss jobs via the OpenAI Batch API (one blocking "
+        "submit+poll), then write the same pass/trash outputs. OpenAI provider only.",
+    )
+    p.add_argument(
+        "--poll-interval",
+        default=60,
+        dest="poll_interval",
+        type=int,
+        metavar="SECONDS",
+        help="Seconds between batch status polls when --batch is set (default: 60)",
     )
     p.set_defaults(func=_cmd_remote_filter)
 
