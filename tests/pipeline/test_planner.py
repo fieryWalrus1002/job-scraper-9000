@@ -12,71 +12,13 @@ import yaml
 
 import psycopg
 import pytest
-from psycopg.types.json import Json
 
 from pipeline.planner import plan_run
 
+from .conftest import seed_user as _seed_user
 from .conftest import skip_if_no_docker
 
 pytestmark = pytest.mark.docker
-
-
-# ---------------------------------------------------------------------------
-# Seed payloads — minimal-but-valid SearchConfigInput / CandidateProfileInput.
-# ---------------------------------------------------------------------------
-
-
-def _valid_search_payload() -> dict:
-    return {
-        "user": {
-            "display_name": "Test User",
-            "email": "test@example.com",
-            "home_location": {"city": "Seattle", "region": "WA", "country": "US"},
-        },
-        "search_profile": {"name": "ML Engineer search"},
-        "roles": {"target_titles": {"preferred": ["ML Engineer", "ML Ops"]}},
-        "organizations": {"target_companies": ["acme", "initech"]},
-    }
-
-
-def _valid_profile_payload() -> dict:
-    return {
-        "summary": "Experienced ML engineer with infra background. " * 2,
-        "level": "Senior individual contributor",
-        "core_skills": ["Python", "PyTorch"],
-    }
-
-
-def _seed_user(
-    conn: psycopg.Connection,
-    email: str,
-    *,
-    with_profile: bool = True,
-    with_search: bool = True,
-) -> str:
-    uid_row = conn.execute(
-        "INSERT INTO app.users (email) VALUES (%s) RETURNING id::text", (email,)
-    ).fetchone()
-    assert uid_row is not None
-    uid = uid_row[0]
-
-    if with_search:
-        conn.execute(
-            """
-            INSERT INTO app.user_search_configs (user_id, payload, policies)
-            VALUES (%s::uuid, %s, %s)
-            """,
-            (uid, Json(_valid_search_payload()), Json({})),
-        )
-    if with_profile:
-        conn.execute(
-            """
-            INSERT INTO app.candidate_profiles (user_id, payload, profile_version)
-            VALUES (%s::uuid, %s, %s)
-            """,
-            (uid, Json(_valid_profile_payload()), "2026-06-12.testhashabcd"),
-        )
-    return uid
 
 
 # ---------------------------------------------------------------------------
