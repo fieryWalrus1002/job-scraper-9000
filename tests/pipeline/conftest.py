@@ -44,9 +44,21 @@ def _container_ip(name: str) -> str:
     return result.stdout.strip()
 
 
-@pytest.fixture
-def migrated_pg():
-    """Spin up Postgres, run all migrations to head, yield the conn string."""
+_TEMPLATE_DB = "appdb_template"
+
+
+def _conn_str(host: str, dbname: str) -> str:
+    return f"postgresql://test:test@{host}:5432/{dbname}"
+
+
+@pytest.fixture(scope="session")
+def _pg_template():
+    """Start one Postgres container per session and migrate a template DB once.
+
+    Per-test databases are cloned from this template via ``CREATE DATABASE ...
+    TEMPLATE`` (see ``migrated_pg``), which is far cheaper than re-running the
+    whole Alembic chain for every test. Yields ``(host_ip, template_db)``.
+    """
     if not _docker_available():
         pytest.skip("Docker not available")
 
@@ -70,37 +82,66 @@ def migrated_pg():
         capture_output=True,
     )
 
-    conn_str = f"postgresql://test:test@{_container_ip(name)}:5432/test"
+    try:
+        host = _container_ip(name)
+        # 'postgres' is the maintenance DB used to issue CREATE/DROP DATABASE.
+        admin_str = _conn_str(host, "postgres")
 
-    deadline = time.monotonic() + 20.0
-    while time.monotonic() < deadline:
-        try:
-            with psycopg.connect(conn_str, connect_timeout=2):
-                break
-        except Exception:
-            time.sleep(0.5)
-    else:
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True)
-        pytest.fail("Postgres container did not become ready within 20s")
+        deadline = time.monotonic() + 20.0
+        while time.monotonic() < deadline:
+            try:
+                with psycopg.connect(admin_str, connect_timeout=2):
+                    break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            pytest.fail("Postgres container did not become ready within 20s")
 
-    result = subprocess.run(
-        ["uv", "run", "alembic", "upgrade", "head"],
-        env={
-            **os.environ,
-            "DATABASE_URL": conn_str,
-            "BOOTSTRAP_ADMIN_EMAIL": "admin@example.com",
-        },
-        capture_output=True,
-        text=True,
-        cwd=str(_REPO_ROOT),
-    )
-    assert result.returncode == 0, (
-        f"alembic upgrade failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-    )
+        with psycopg.connect(admin_str, autocommit=True) as conn:
+            conn.execute(f'CREATE DATABASE "{_TEMPLATE_DB}"')
 
-    yield conn_str
+        result = subprocess.run(
+            ["uv", "run", "alembic", "upgrade", "head"],
+            env={
+                **os.environ,
+                "DATABASE_URL": _conn_str(host, _TEMPLATE_DB),
+                "BOOTSTRAP_ADMIN_EMAIL": "admin@example.com",
+            },
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
+        )
+        assert result.returncode == 0, (
+            f"alembic upgrade failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+        )
 
-    subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=15)
+        yield host, _TEMPLATE_DB
+    finally:
+        subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=15)
+
+
+@pytest.fixture
+def migrated_pg(_pg_template):
+    """A pristine migrated Postgres per test, cloned from the session template.
+
+    Yields a connection string to a freshly created copy of the migrated
+    template DB; the copy is dropped on teardown. State is identical to a
+    full migrate-from-scratch (bootstrap admin included) at a fraction of the
+    cost.
+    """
+    host, template = _pg_template
+    admin_str = _conn_str(host, "postgres")
+    dbname = f"test_{uuid.uuid4().hex[:12]}"
+
+    with psycopg.connect(admin_str, autocommit=True) as conn:
+        conn.execute(f'CREATE DATABASE "{dbname}" TEMPLATE "{template}"')
+
+    try:
+        yield _conn_str(host, dbname)
+    finally:
+        with psycopg.connect(admin_str, autocommit=True) as conn:
+            # Force-drop in case the test left connections open (Postgres 13+).
+            conn.execute(f'DROP DATABASE IF EXISTS "{dbname}" WITH (FORCE)')
 
 
 skip_if_no_docker = pytest.mark.skipif(
