@@ -33,12 +33,13 @@ policy_thresholds:
   disallowed_classifications:
     - "onsite_disguised"
     - "hybrid"
-    - "onsite"
+    # location_restricted is handled by the geographic/timezone checks below.
 
   travel:
+    # Sole travel gate as of SCHEMA_VERSION 3.0.0 — the old per-category
+    # remote_with_*_travel buckets were dropped; travel is judged on the
+    # numeric estimate the model emits.
     max_estimated_days_per_year: 15
-    prohibited_categories:
-      - "remote_with_frequent_travel"
 
   relocation:
     allow_required_relocation: false
@@ -113,7 +114,7 @@ Each enriched output record contains all original job fields plus:
   "_filter_result": "pass",
   "_filter_reason": "passed",
   "_filter_metadata": {
-    "schema_version": "2.0.0",
+    "schema_version": "3.0.0",
     "prompt_hash": "...",
     "commit": "..."
   }
@@ -124,18 +125,15 @@ ______________________________________________________________________
 
 ## Classification schema
 
-| Classification                 | Meaning                                                          |
-| ------------------------------ | ---------------------------------------------------------------- |
-| `fully_remote`                 | No physical presence ever expected                               |
-| `remote_with_quarterly_travel` | Remote with travel roughly quarterly or less                     |
-| `remote_with_monthly_travel`   | Remote with travel roughly monthly                               |
-| `remote_with_frequent_travel`  | Remote with frequent/material travel, e.g. >12 days/year or 25%+ |
-| `hybrid`                       | Regular in-office days expected                                  |
-| `onsite_disguised`             | Listed as remote but requires local/commuting presence           |
-| `location_restricted`          | Genuinely remote but restricted to specific geographies          |
-| `unclear`                      | Description and context do not provide enough signal             |
+| Classification        | Meaning                                                 |
+| --------------------- | ------------------------------------------------------- |
+| `fully_remote`        | No physical presence ever expected                      |
+| `hybrid`              | Regular in-office days expected                         |
+| `onsite_disguised`    | Listed as remote but requires local/commuting presence  |
+| `location_restricted` | Genuinely remote but restricted to specific geographies |
+| `unclear`             | Description and context do not provide enough signal    |
 
-Legacy labels may appear in old reviewed data, but the active model schema is the list above.
+As of `SCHEMA_VERSION` 3.0.0 the classification captures **remote-ness only**. Travel frequency is no longer a bucket — it lives entirely in the numeric `estimated_travel_days_per_year`, which policy code thresholds (see Filter logic). The retired `remote_with_*_travel` labels still appear in old reviewed data and historical rows (`models.LEGACY_CLASSIFICATIONS`), but the active model never emits them. See [`specs/remote_filter_simplification.md`](../../../specs/remote_filter_simplification.md).
 
 ______________________________________________________________________
 
@@ -146,7 +144,6 @@ A posting is trashed if any configured policy rule rejects it:
 - `requires_relocation` is true and relocation is not allowed
 - `requires_local_presence` is true and local presence is not allowed
 - classification is listed under `policy_thresholds.disallowed_classifications`
-- classification is listed under `policy_thresholds.travel.prohibited_categories`
 - estimated travel days exceed `policy_thresholds.travel.max_estimated_days_per_year`
 - location restrictions conflict with `USER_LOCATION`
 - hard timezone requirements match rejected timezone keywords
