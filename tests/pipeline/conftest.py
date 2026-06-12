@@ -108,6 +108,15 @@ skip_if_no_docker = pytest.mark.skipif(
 )
 
 
+def pytest_collection_modifyitems(items):
+    """Auto-tag every test that needs a live Postgres (``migrated_pg``) with the
+    ``docker`` marker, so the default ``-m "not docker"`` run skips them for a
+    fast local loop. CI runs the docker-marked suite in a separate step."""
+    for item in items:
+        if "migrated_pg" in getattr(item, "fixturenames", ()):
+            item.add_marker("docker")
+
+
 # ---------------------------------------------------------------------------
 # Seed helpers — minimal-but-valid SearchConfigInput / CandidateProfileInput.
 # ---------------------------------------------------------------------------
