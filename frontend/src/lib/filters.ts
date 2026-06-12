@@ -46,11 +46,16 @@ export function hasActiveFilters(filters: Filters): boolean {
   )
 }
 
+// Remote-classification filter options offered in the UI. The legacy
+// remote_with_*_travel buckets are intentionally omitted as of remote_filter
+// SCHEMA_VERSION 3.0.0 — the pipeline no longer produces them (travel is now
+// numeric). Historical rows that still carry those values continue to render:
+// ClassificationBadge / classificationVariant handle any `remote_with_*` string
+// generically (the 'travel' badge variant). The API filter still accepts the
+// values, so historical rows remain filterable by URL param if needed.
+// See specs/remote_filter_simplification.md §5.
 export const REMOTE_OPTIONS: { value: string; label: string }[] = [
   { value: 'fully_remote', label: 'Fully remote' },
-  { value: 'remote_with_quarterly_travel', label: 'Remote + quarterly travel' },
-  { value: 'remote_with_monthly_travel', label: 'Remote + monthly travel' },
-  { value: 'remote_with_frequent_travel', label: 'Remote + frequent travel' },
   { value: 'hybrid', label: 'Hybrid' },
   { value: 'location_restricted', label: 'Location restricted' },
   { value: 'onsite_disguised', label: 'Onsite (disguised)' },
