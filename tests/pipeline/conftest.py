@@ -1,5 +1,5 @@
 """Shared fixtures for ``tests/pipeline/`` — a fresh, migrated Postgres
-per test."""
+per test, plus user-seeding helpers."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from psycopg.types.json import Json
 
 _PG_IMAGE = "postgres:16-alpine"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -105,3 +106,61 @@ def migrated_pg():
 skip_if_no_docker = pytest.mark.skipif(
     not _docker_available(), reason="Docker not available"
 )
+
+
+# ---------------------------------------------------------------------------
+# Seed helpers — minimal-but-valid SearchConfigInput / CandidateProfileInput.
+# ---------------------------------------------------------------------------
+
+
+def valid_search_payload() -> dict:
+    return {
+        "user": {
+            "display_name": "Test User",
+            "email": "test@example.com",
+            "home_location": {"city": "Seattle", "region": "WA", "country": "US"},
+        },
+        "search_profile": {"name": "ML Engineer search"},
+        "roles": {"target_titles": {"preferred": ["ML Engineer", "ML Ops"]}},
+        "organizations": {"target_companies": ["acme", "initech"]},
+    }
+
+
+def valid_profile_payload() -> dict:
+    return {
+        "summary": "Experienced ML engineer with infra background. " * 2,
+        "level": "Senior individual contributor",
+        "core_skills": ["Python", "PyTorch"],
+    }
+
+
+def seed_user(
+    conn: psycopg.Connection,
+    email: str,
+    *,
+    with_profile: bool = True,
+    with_search: bool = True,
+) -> str:
+    uid_row = conn.execute(
+        "INSERT INTO app.users (email) VALUES (%s) RETURNING id::text", (email,)
+    ).fetchone()
+    assert uid_row is not None
+    uid = uid_row[0]
+
+    if with_search:
+        conn.execute(
+            """
+            INSERT INTO app.user_search_configs (user_id, payload, policies)
+            VALUES (%s::uuid, %s, %s)
+            """,
+            (uid, Json(valid_search_payload()), Json({})),
+        )
+    if with_profile:
+        conn.execute(
+            """
+            INSERT INTO app.candidate_profiles (user_id, payload, profile_version)
+            VALUES (%s::uuid, %s, %s)
+            """,
+            (uid, Json(valid_profile_payload()), "2026-06-12.testhashabcd"),
+        )
+    return uid
