@@ -19,13 +19,13 @@ from pydantic import BaseModel, Field
 #   - Refactoring how the Literal or constants are expressed in code
 #   - Changes to LEGACY_CLASSIFICATIONS (UI-only, never produced by the LLM)
 #   - Prompt edits (prompt identity is tracked separately via prompt_hash)
-SCHEMA_VERSION = "2.0.0"
+SCHEMA_VERSION = "3.0.0"
 
+# Remote-ness axis only. Travel frequency is no longer a classification bucket;
+# it survives entirely as the numeric estimated_travel_days_per_year, which
+# policy code thresholds. See specs/remote_filter_simplification.md.
 RemoteClassification = Literal[
     "fully_remote",
-    "remote_with_quarterly_travel",
-    "remote_with_monthly_travel",
-    "remote_with_frequent_travel",
     "hybrid",
     "onsite_disguised",
     "location_restricted",
@@ -34,7 +34,12 @@ RemoteClassification = Literal[
 
 REMOTE_CLASSIFICATIONS: list[str] = list(get_args(RemoteClassification))
 
+# Values the LLM no longer produces but that still appear in historical eval
+# records and DB rows; kept so those parse and render.
 LEGACY_CLASSIFICATIONS: list[str] = [
+    "remote_with_quarterly_travel",  # pre-3.0: travel collapsed into numeric days
+    "remote_with_monthly_travel",  # pre-3.0
+    "remote_with_frequent_travel",  # pre-3.0
     "remote_with_occasional_travel",  # pre-2.0 teacher runs
     "onsite",  # pre-2.0 teacher runs
 ]

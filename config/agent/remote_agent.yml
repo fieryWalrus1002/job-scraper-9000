@@ -28,14 +28,14 @@ policy_thresholds:
   disallowed_classifications:
     - "onsite_disguised"
     - "hybrid"
-    - "onsite"
     # location_restricted is intentionally excluded — geographic and timezone
     # checks below handle it with actual user location/timezone matching.
 
   travel:
+    # Sole travel gate as of SCHEMA_VERSION 3.0.0. The old per-category buckets
+    # (remote_with_*_travel) were dropped; travel is judged on the numeric
+    # estimate the model emits.
     max_estimated_days_per_year: 15
-    prohibited_categories:
-      - "remote_with_frequent_travel"
 
   relocation:
     allow_required_relocation: false

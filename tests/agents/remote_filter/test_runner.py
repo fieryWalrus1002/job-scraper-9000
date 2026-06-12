@@ -42,8 +42,6 @@ policy_thresholds:
     - onsite_disguised
   travel:
     max_estimated_days_per_year: 15
-    prohibited_categories:
-      - remote_with_frequent_travel
   relocation:
     allow_required_relocation: false
     allow_local_presence_required: false

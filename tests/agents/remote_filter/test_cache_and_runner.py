@@ -39,8 +39,6 @@ policy_thresholds:
     - hybrid
   travel:
     max_estimated_days_per_year: 15
-    prohibited_categories:
-      - remote_with_frequent_travel
   relocation:
     allow_required_relocation: false
     allow_local_presence_required: false
@@ -412,7 +410,6 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
                 "  disallowed_classifications: []\n"
                 "  travel:\n"
                 "    max_estimated_days_per_year: 15\n"
-                "    prohibited_categories: []\n"
                 "  relocation:\n"
                 "    allow_required_relocation: false\n"
                 "    allow_local_presence_required: false\n"

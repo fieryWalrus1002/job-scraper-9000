@@ -189,9 +189,9 @@ def passes_remote_filter(
     if analysis.remote_classification in policy["disallowed_classifications"]:
         return False, f"classification:{analysis.remote_classification}"
 
-    if analysis.remote_classification in policy["travel"]["prohibited_categories"]:
-        return False, "travel_too_frequent"
-
+    # Travel is gated solely on the numeric estimate now; the old per-category
+    # buckets were dropped in SCHEMA_VERSION 3.0.0. "Frequent travel" postings
+    # still fail here because frequent travel implies days > the threshold.
     if (
         analysis.estimated_travel_days_per_year is not None
         and analysis.estimated_travel_days_per_year

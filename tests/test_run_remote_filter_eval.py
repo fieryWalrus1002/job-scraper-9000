@@ -21,10 +21,6 @@ def _config() -> dict:
                 "location_restricted",
             ],
             "travel": {
-                "prohibited_categories": [
-                    "remote_with_frequent_travel",
-                    "remote_with_monthly_travel",
-                ],
                 "max_estimated_days_per_year": 15,
             },
             "relocation": {

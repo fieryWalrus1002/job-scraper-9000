@@ -33,7 +33,6 @@ def _make_analysis(**overrides) -> RemoteAnalysis:
 
 def _make_config(
     disallowed_classifications=None,
-    prohibited_travel_categories=None,
     max_days=15,
     allow_relocation=False,
     allow_local_presence=False,
@@ -45,11 +44,6 @@ def _make_config(
             "disallowed_classifications": disallowed_classifications
             or ["hybrid", "onsite_disguised"],
             "travel": {
-                "prohibited_categories": prohibited_travel_categories
-                or [
-                    "remote_with_frequent_travel",
-                    "remote_with_monthly_travel",
-                ],
                 "max_estimated_days_per_year": max_days,
             },
             "relocation": {
@@ -118,35 +112,38 @@ def test_requires_local_presence_fails():
     assert reason == "requires_local_presence"
 
 
-def test_frequent_travel_always_fails():
+# Travel is gated solely on the numeric estimate as of SCHEMA_VERSION 3.0.0.
+# A frequent-travel posting is now a fully_remote role with a high day count,
+# trashed by the day threshold rather than a classification bucket.
+def test_frequent_travel_fails_via_day_threshold():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="remote_with_frequent_travel"),
+        _make_analysis(
+            remote_classification="fully_remote",
+            estimated_travel_days_per_year=40,
+        ),
         _make_config(),
     )
     assert not ok
-    assert reason == "travel_too_frequent"
+    assert "travel_days_exceeded" in reason
 
 
-def test_monthly_travel_fails_when_prohibited():
-    ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="remote_with_monthly_travel"),
-        _make_config(),
-    )
-    assert not ok
-    assert reason == "travel_too_frequent"
-
-
-def test_monthly_travel_passes_when_allowed():
+def test_monthly_travel_passes_under_threshold():
     ok, _ = passes_remote_filter(
-        _make_analysis(remote_classification="remote_with_monthly_travel"),
-        _make_config(prohibited_travel_categories=["remote_with_frequent_travel"]),
+        _make_analysis(
+            remote_classification="fully_remote",
+            estimated_travel_days_per_year=12,
+        ),
+        _make_config(),
     )
     assert ok
 
 
 def test_quarterly_travel_passes():
     ok, _ = passes_remote_filter(
-        _make_analysis(remote_classification="remote_with_quarterly_travel"),
+        _make_analysis(
+            remote_classification="fully_remote",
+            estimated_travel_days_per_year=4,
+        ),
         _make_config(),
     )
     assert ok
