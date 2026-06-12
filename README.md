@@ -63,7 +63,9 @@ uv sync
 cp .env.example .env   # fill in your secrets
 ```
 
-`.env` holds secrets and per-machine values (API keys, your home location). See [`.env.example`](.env.example) for the canonical list with inline comments. Non-secret runtime config (LLM provider/model/URL, policy thresholds, search targets) lives in YAML under `config/`, not `.env`.
+`.env` holds secrets and per-machine values (API keys, your home location). See [`.env.example`](.env.example) for the canonical list with inline comments. Non-secret **operator** config (LLM provider/model/URL, policy thresholds, prompts) lives in YAML under `config/`, not `.env`.
+
+**Per-user search targeting and candidate profiles live in Postgres** (Phase 12), not in committed YAML. Users edit their own through the in-app Settings page; the admin can seed them from filled-in templates with `scripts/push_user_config.py`. The pipeline itself never reads the DB — `scripts/pull_user_configs.py` materializes each user's config to `runs/<user>/{search.yml,candidate_profile.yml}`, the same YAML shapes the scraper and skills-fit agent already consume. See [specs/configs_in_db_design.md](specs/configs_in_db_design.md).
 
 ______________________________________________________________________
 
@@ -203,6 +205,7 @@ ______________________________________________________________________
 | Scraper CLI — all commands, flags, YAML config                             | [src/agents/README.md](src/agents/README.md)                                     |
 | Remote filter agent — config, commands, classification schema              | [src/agents/remote_filter/README.md](src/agents/remote_filter/README.md)         |
 | Skills fit agent — ordinal scoring, profile contract, teacher-first HITL   | [src/agents/skills_fit/README.md](src/agents/skills_fit/README.md)               |
+| User configs in DB — per-user profile/search, settings form, push/pull     | [specs/configs_in_db_design.md](specs/configs_in_db_design.md)                   |
 | Skills fit plan — schema, calibration, sequencing (Phase R / G / B)        | [specs/skills_fit_agent_plan.md](specs/skills_fit_agent_plan.md)                 |
 | Teacher-student distillation design                                        | [specs/teacher-student.md](specs/teacher-student.md)                             |
 | Batch pipeline scripts — prepare, merge, sample                            | [scripts/README.md](scripts/README.md)                                           |
@@ -224,7 +227,7 @@ ______________________________________________________________________
 
 ```Plaintext
 job-scraper-9000/
-├── config/           # Search configs, agent policy, candidate profile
+├── config/           # Operator config: scraper/agent policy, provider/model (per-user profile + search live in the DB)
 ├── data/             # Local pipeline file-based medallion workspace
 ├── docker/           # Multi-target application Dockerfiles (backend, scraper, frontend)
 ├── frontend/         # Standalone Vite + React client application (TS + shadcn/ui)
@@ -237,6 +240,7 @@ job-scraper-9000/
     ├── prefilter/    # Deterministic static routing layer (no LLM overhead)
     ├── agents/       # Multi-agent intelligence layers (remote_filter, skills_fit)
     ├── agent_eval/   # Automated grading, metric aggregations, run logging
+    ├── user_config/  # Per-user config models + human→pipeline transform (Phase 12)
     └── review_ui/    # Streamlit HITL gold-standard evaluation app
 ```
 
