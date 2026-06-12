@@ -7,6 +7,7 @@ from agents.skills_fit import cli as skills_fit_cli
 from job_scraper import cli as job_scraper_cli
 from prefilter import cli as prefilter_cli
 from ingest import cli as ingest_cli
+from pipeline import overnight as overnight_cli
 
 
 def main() -> None:
@@ -22,6 +23,7 @@ def main() -> None:
     remote_filter_cli.register(sub)
     skills_fit_cli.register(sub)
     ingest_cli.register(sub)
+    overnight_cli.register(sub)
 
     args = parser.parse_args()
     args.func(args)
