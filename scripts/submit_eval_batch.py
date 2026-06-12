@@ -31,6 +31,8 @@ from agent_eval.provenance import generate_run_id, hash_file, hash_string
 from agents.remote_filter.models import RemoteAnalysis, SCHEMA_VERSION
 from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH, _build_user_message
 from scripts.run_remote_filter_eval import CONFIG_PATH, GOLD_FILE, load_gold
+from utils import batch_api
+from utils.batch_api import BATCH_ENDPOINT, COMPLETION_WINDOW
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -38,8 +40,6 @@ log = logging.getLogger(__name__)
 
 DEFAULT_BATCH_DIR = "data/eval/batch"
 DEFAULT_SIDECAR_DIR = "data/eval"
-BATCH_ENDPOINT = "/v1/chat/completions"
-COMPLETION_WINDOW = "24h"
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,21 +171,6 @@ def write_requests(
     log.info("Wrote %d batch requests → %s", len(records), request_file)
 
 
-def submit_batch(client: OpenAI, request_file: Path) -> tuple[str, str]:
-    log.info("Uploading %s", request_file)
-    with request_file.open("rb") as f:
-        file_obj = client.files.create(file=f, purpose="batch")
-    log.info("Uploaded request file: %s", file_obj.id)
-
-    batch = client.batches.create(
-        input_file_id=file_obj.id,
-        endpoint=BATCH_ENDPOINT,
-        completion_window=COMPLETION_WINDOW,
-    )
-    log.info("Created batch: %s status=%s", batch.id, batch.status)
-    return batch.id, file_obj.id
-
-
 def _display_path(path: Path) -> str:
     try:
         return str(path.relative_to(Path.cwd()))
@@ -254,7 +239,7 @@ def main() -> None:
     write_requests(records, config, request_file)
 
     client = OpenAI(api_key=api_key)
-    batch_id, input_file_id = submit_batch(client, request_file)
+    batch_id, input_file_id = batch_api.upload_and_create_batch(client, request_file)
 
     sidecar = build_sidecar(
         batch_id=batch_id,
