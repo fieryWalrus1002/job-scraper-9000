@@ -18,6 +18,13 @@ COPY src/ /app/src/
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 ENV PATH="/app/.venv/bin:$PATH"
+# The image installs deps with --no-install-project, so first-party packages
+# aren't pip-installed — they run straight off /app/src and must be importable
+# as top-level modules (the same layout as local `uv sync` and the tests:
+# `from api...`, `from user_config import ...`). Without this, any absolute
+# cross-package import (e.g. the settings router importing user_config) raises
+# ModuleNotFoundError at startup and the app crash-loops.
+ENV PYTHONPATH="/app/src"
 
 # TODO: Need to mount the proper data/ folder it will be reading and writing
 
