@@ -31,6 +31,15 @@ ingest-init DATE=DATE:
       --schema-path "db/schema.sql" \
       --apply-schema
 
+# Ingest a completed overnight run's per-user scored files into the LOCAL DB
+# (dev only). Walks data/pipeline_runs/<RUN_ID>/<slug>/skills_fit/scored.jsonl
+# and feeds each through the ingest CLI; records self-route by their stamped
+# user_email. Uses DATABASE_URL from .env (point it at your local DB) — the
+# cloud path is blob → ACA Job (`just upload-blob`), not this.
+#   just ingest-run RUN_ID=2026-06-12T1635-overnight
+ingest-run RUN_ID:
+    uv run scripts/ingest_run.py --run-id {{RUN_ID}}
+
 pipeline:
     just scrape
     just prefilter
