@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ingest.core import _extract_row, resolve_user_ids
+from ingest.core import _extract_row, _strip_nul, resolve_user_ids
 
 
 def _make_record(**overrides) -> dict:
@@ -129,6 +129,45 @@ def test_extract_row_pipeline_metadata_json() -> None:
 def test_extract_row_carries_user_email() -> None:
     row = _extract_row(_make_record(user_email="friend@example.com"))
     assert row["user_email"] == "friend@example.com"
+
+
+# ---------------------------------------------------------------------------
+# _strip_nul
+# ---------------------------------------------------------------------------
+
+
+def test_strip_nul_removes_from_text_field() -> None:
+    record = _make_record(description="Build\x00 great things.")
+    row = _extract_row(record)
+    assert "\x00" not in row["description"]
+    assert row["description"] == "Build great things."
+
+
+def test_strip_nul_removes_from_nested_jsonb_field() -> None:
+    # Mirrors the real failure: NUL buried in ai_fit.top_matches lands in the
+    # ai_fit_detail jsonb column as a U+0000 escape that Postgres rejects.
+    record = _make_record()
+    record["ai_fit"]["top_matches"] = ["Docker, CI/CD, and \x00*nix"]
+    row = _extract_row(record)
+    assert "\\u0000" not in row["ai_fit_detail"]
+    detail = json.loads(row["ai_fit_detail"])
+    assert detail["top_matches"] == ["Docker, CI/CD, and *nix"]
+
+
+def test_strip_nul_warns_with_count(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    record = {"dedup_hash": "h1", "title": "a\x00b\x00c"}
+    with caplog.at_level(logging.WARNING):
+        _strip_nul(record)
+    assert "Stripped 2 NUL byte(s)" in caplog.text
+    assert "h1" in caplog.text
+
+
+def test_strip_nul_noop_when_clean() -> None:
+    record = _make_record()
+    cleaned = _strip_nul(record)
+    assert cleaned == record
 
 
 # ---------------------------------------------------------------------------

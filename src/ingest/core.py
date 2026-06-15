@@ -79,7 +79,40 @@ def ensure_schema(conn: psycopg.Connection, schema_path: Path) -> None:
     log.info("Schema applied successfully from %s", schema_path)
 
 
+def _strip_nul(record: dict) -> dict:
+    """Recursively drop NUL bytes (U+0000) from every string in the record.
+
+    Postgres cannot store U+0000 in ``text`` or ``jsonb`` columns, so a single
+    stray NUL — scraped descriptions and LLM output occasionally carry one —
+    otherwise fails the whole ingest batch with UntranslatableCharacter. We
+    scrub rather than crash, but count and WARN so it is never silent.
+    """
+    nul_count = 0
+
+    def scrub(value: Any) -> Any:
+        nonlocal nul_count
+        if isinstance(value, str):
+            nul_count += value.count("\x00")
+            return value.replace("\x00", "")
+        if isinstance(value, dict):
+            return {k: scrub(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [scrub(v) for v in value]
+        return value
+
+    cleaned = scrub(record)
+    if nul_count:
+        log.warning(
+            "Stripped %d NUL byte(s) from record dedup_hash=%s before ingest "
+            "(Postgres cannot store U+0000)",
+            nul_count,
+            cleaned.get("dedup_hash"),
+        )
+    return cleaned
+
+
 def _extract_row(record: dict) -> dict:
+    record = _strip_nul(record)
     ai_fit = record.get("ai_fit") or {}
     metadata = record.get("metadata") or {}
 
