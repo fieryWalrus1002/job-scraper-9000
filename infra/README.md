@@ -235,16 +235,18 @@ Flow:
    `data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl` per user. Each
    record is stamped with its owning `user_email`.
 
-1. **Upload** — `just upload-blob RUN_ID=<run_id>` walks the run and uploads
-   one blob per user to the `pending` container as
-   `pending/<run_id>/<slug>__scored.jsonl`. Auth is AAD (`az --auth-mode login`);
-   the operator's identity needs the **Storage Blob Data Contributor** role on
-   the storage account (no account key on the laptop).
+1. **Upload** — `just upload-blob <run_id>` walks the run and uploads one blob
+   per user to the `pending` container as `pending/<run_id>__<slug>__scored.jsonl`.
+   The name is **flat (no `/`) at the container root** — the KEDA azure-blob
+   scaler counts root-level blobs only (default `blobDelimiter` is `/`), so a
+   nested key sits in a virtual folder the scaler never counts and the trigger
+   never fires. Auth is AAD (`az --auth-mode login`); the operator's identity
+   needs the **Storage Blob Data Contributor** role (no account key on the laptop).
 
 1. **Ingest** — the `<prefix>-ingest-job` ACA Job (`modules/ingestJob.bicep`)
    has a KEDA `azure-blob` trigger on `pending` (`blobCountPerJob=1`,
-   `parallelism=1`), so **one blob per user fans out one Job execution per
-   user**. It runs `python -m ingest.cli --blob-mode` and, per blob:
+   `parallelism=1`). It runs `python -m ingest.cli --blob-mode`, which lists
+   `pending` recursively and drains every blob in one execution; per blob:
 
    - success → moves the blob to the `processed` container;
    - empty blob → `processed` (no-op success);
@@ -262,29 +264,33 @@ Watch executions:
 just watch-az-ingest    # az containerapp job execution list, refreshed
 ```
 
-### End-to-end dry-run validation (non-prod)
+### End-to-end validation
 
-Validate the whole chain against a **non-prod** DB + storage account before
-trusting a real overnight run — point `DATABASE_URL` / storage at a throwaway
-target, never prod:
+No throwaway infra needed: ingest is **idempotent** — postings dedup (first
+wins) and scores upsert last-write-wins per `(user, dedup_hash)` — so running
+the chain into your real DB is just the normal write path, not a destructive
+test. (A separate non-prod DB on a single-user project isn't worth the cost.)
+Validate against your actual DB; use a local DB only if you want isolation and
+are willing to seed matching `app.users` rows.
 
 ```bash
-# 1. Produce a small run locally (or reuse an existing data/pipeline_runs/<run_id>).
+# 1. Produce a run (or reuse an existing data/pipeline_runs/<run_id>).
 just run-overnight                      # note the run_id from the summary
 
-# 2. Dry-run the local ingest first — parses + resolves every user, writes nothing.
+# 2. (Optional) parse-check the files first — writes nothing. Note this only
+#    validates JSONL parsing; user resolution happens at real ingest time.
 uv run scripts/ingest_run.py --run-id <run_id> --dry-run
 
-# 3. Upload to the NON-PROD storage account's `pending` container.
-AZURE_STORAGE_ACCOUNT=<nonprod-account> just upload-blob RUN_ID=<run_id>
+# 3. Upload — one flat blob per user to `pending`.
+AZURE_STORAGE_ACCOUNT=<account> just upload-blob <run_id>
 
-# 4. Watch the ACA Job fan out one execution per blob; confirm blobs land in
-#    `processed` (success) and none in `failed`.
+# 4. Watch the ACA Job (KEDA fires within pollingInterval ~60s); confirm the
+#    blobs land in `processed` and nothing in `failed`.
 just watch-az-ingest
 
-# 5. Confirm scores in the non-prod DB, routed to the right users.
-#    psql/pgcli: SELECT u.email, count(*) FROM raw.job_scores s
-#                JOIN app.users u ON u.id = s.user_id GROUP BY u.email;
+# 5. Confirm scores landed, routed to the right users (just connect-az-db):
+#    SELECT u.email, count(*) FROM raw.job_scores s
+#    JOIN app.users u ON u.id = s.user_id GROUP BY u.email;
 ```
 
 A blob in `failed/` carries a `reason` tag (`unparseable_jsonl` /

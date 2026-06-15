@@ -2,8 +2,9 @@
 15 slice 3).
 
 The ``az`` upload is injected (``upload_fn``) so no test touches Azure; the
-work under test is the per-user walk, the ``pending/<run_id>/<slug>__scored.jsonl``
-blob naming (D4), and the loud failure on an empty run.
+work under test is the per-user walk, the flat
+``pending/<run_id>__<slug>__scored.jsonl`` blob naming (root-level so the KEDA
+scaler counts it), and the loud failure on an empty run.
 """
 
 from __future__ import annotations
@@ -63,8 +64,8 @@ def test_uploads_one_blob_per_user(tmp_path):
     )
 
     assert names == [
-        f"{RUN_ID}/alice_example_com__scored.jsonl",
-        f"{RUN_ID}/bob_example_com__scored.jsonl",
+        f"{RUN_ID}__alice_example_com__scored.jsonl",
+        f"{RUN_ID}__bob_example_com__scored.jsonl",
     ]
     # Each upload targets the pending container on the given account, from the
     # user's own scored file.
