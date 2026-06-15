@@ -19,9 +19,15 @@ import psycopg
 import pytest
 from psycopg.types.json import Json
 
+from ingest.core import ingest, read_jsonl
 from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
 from pipeline.planner import _slug
-from pipeline.scoring import SCORED_NAME, score_run, skills_fit_dir
+from pipeline.scoring import (
+    SCORED_NAME,
+    iter_run_user_outputs,
+    score_run,
+    skills_fit_dir,
+)
 
 from .conftest import seed_user, skip_if_no_docker
 
@@ -322,3 +328,153 @@ def test_isolates_a_failing_user_and_finishes_the_rest(migrated_pg, tmp_path):
     assert len(failed) == 1
     assert failed[0]["email"] == "noprofile@example.com"
     assert "profile" in failed[0]["error"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 15 G2 — user_email stamping + iter_run_user_outputs walk
+# ---------------------------------------------------------------------------
+
+
+def _scored_records(runs_dir: Path, email: str) -> list[dict]:
+    path = skills_fit_dir(runs_dir, email, RUN_ID) / SCORED_NAME
+    return [json.loads(ln) for ln in path.read_text().splitlines() if ln.strip()]
+
+
+@skip_if_no_docker
+def test_stamps_user_email_into_scored_records(migrated_pg, tmp_path):
+    """Every scored record carries its owning user_email so the file
+    self-routes on ingest (Phase 15 G2) — even though the consolidated
+    postings the scorer saw were profile-free."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-shared", requested_by=[u1, u2])
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-shared", "fully_remote"),
+            _classified("h-alice", "fully_remote"),
+        ],
+    )
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory([]),
+        )
+
+    alice = _scored_records(tmp_path, "alice@example.com")
+    bob = _scored_records(tmp_path, "bob@example.com")
+    assert {r["user_email"] for r in alice} == {"alice@example.com"}
+    assert {r["user_email"] for r in bob} == {"bob@example.com"}
+
+
+@skip_if_no_docker
+def test_iter_run_user_outputs_walks_a_run(migrated_pg, tmp_path):
+    """The shared walk yields one (user_email, slug, scored_path) per user
+    with scored output, reads user_email back from the stamped file, and
+    skips the shared _consolidated stage dir."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-shared", requested_by=[u1, u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(tmp_path, passed=[_classified("h-shared", "fully_remote")])
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory([]),
+        )
+
+    outputs = list(iter_run_user_outputs(tmp_path, RUN_ID))
+    assert [o.user_email for o in outputs] == ["alice@example.com", "bob@example.com"]
+    assert [o.slug for o in outputs] == [
+        _slug("alice@example.com"),
+        _slug("bob@example.com"),
+    ]
+    for o in outputs:
+        assert (
+            o.scored_path
+            == skills_fit_dir(tmp_path, o.user_email, RUN_ID) / SCORED_NAME
+        )
+        assert o.scored_path.exists()
+
+
+@skip_if_no_docker
+def test_scored_records_round_trip_through_ingest(migrated_pg, tmp_path):
+    """End-to-end of the self-routing contract: a stamped scored file ingests
+    with no default user — each record routes to its own user purely on its
+    embedded user_email (Phase 15 G2)."""
+
+    def _scored_output_fn(
+        *, input_path, output_path, profile_file, run_date, parent_run_id
+    ):
+        # Emit ingest-shaped records: the runner stamps metadata.scored_at,
+        # which raw.job_scores requires NOT NULL.
+        with output_path.open("w") as f:
+            for ln in input_path.read_text().splitlines():
+                if not ln.strip():
+                    continue
+                rec = json.loads(ln)
+                rec["metadata"] = {"scored_at": "2026-06-12T00:00:00+00:00"}
+                f.write(json.dumps(rec) + "\n")
+        return {"scored": 0}
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-shared", requested_by=[u1, u2])
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-shared", "fully_remote"),
+            _classified("h-alice", "fully_remote"),
+        ],
+    )
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_scored_output_fn,
+        )
+
+    # Ingest each user's file with NO default_user_email — routing must come
+    # entirely from the stamped records.
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        for out in iter_run_user_outputs(tmp_path, RUN_ID):
+            ingest(read_jsonl(out.scored_path), conn=conn, default_user_email=None)
+
+        rows = conn.execute(
+            """
+            SELECT u.email, s.dedup_hash
+            FROM raw.job_scores s
+            JOIN app.users u ON u.id = s.user_id
+            ORDER BY u.email, s.dedup_hash
+            """
+        ).fetchall()
+
+    assert set(rows) == {
+        ("alice@example.com", "h-alice"),
+        ("alice@example.com", "h-shared"),
+        ("bob@example.com", "h-shared"),
+    }
