@@ -1,0 +1,64 @@
+name: AI Code Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# A PR's `synchronize` event fires on every push; cancel an in-flight review
+# when a newer push arrives so we don't pay for (or comment from) stale runs.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      # Only first-party pieces touch the secrets: actions/checkout (for the
+      # review script), the runner's preinstalled `gh` CLI, and our own
+      # .github/scripts/ai_review.py. No third-party Action runs with the
+      # OpenAI key or the write-capable GitHub token.
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Review PR diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
+          # Verify this model id is valid/available on the account — a wrong id
+          # makes the OpenAI call (and this step) fail loudly.
+          OPENAI_MODEL: gpt-5.4 #gpt-5.4-mini
+          PR: ${{ github.event.pull_request.number }}
+          REVIEW_PROMPT: >-
+            You are a senior engineer reviewing a pull request for a Python
+            data-pipeline repo (scrapes job postings, then LLM agents filter
+            and rank them). Focus on, in priority order:
+            (1) Correctness bugs and logic errors.
+            (2) Security issues — committed secrets or credentials, unsafe
+            subprocess/SQL/deserialization, secrets logged or sent to third
+            parties. Note that .env holds secrets and must never be committed.
+            (3) Silent failures. This codebase's rule is fail fast and log
+            loudly: flag swallowed exceptions, bare excepts, empty results
+            returned in place of an error, or error paths with no log/stack
+            trace.
+            (4) Clear design and reuse — duplicated logic, dead code, leaky
+            abstractions.
+            Skip pure formatting, import order, and lint nits: ruff and pyright
+            already gate those in pre-commit. Be concise, cite specific lines,
+            and prefer a few high-confidence findings over an exhaustive list.
+            If the diff looks clean, say so rather than inventing problems.
+        # Default shell is `bash -eo pipefail`, so a non-zero exit anywhere in
+        # the pipe fails the step (and skips the comment) rather than posting
+        # an empty review. The `-s` guard skips commenting when there's nothing
+        # to say (empty diff → the script writes no stdout).
+        run: |
+          gh pr diff "$PR" | python3 .github/scripts/ai_review.py > review.md
+          if [ -s review.md ]; then
+            gh pr comment "$PR" --body-file review.md
+          else
+            echo "No review output — skipping comment."
+          fi
