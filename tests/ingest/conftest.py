@@ -54,14 +54,28 @@ def _port_available(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 
+# Timeouts so a wedged Docker daemon/socket fails loudly instead of hanging
+# test setup forever (matches _docker_available's timeout=5).
+_INSPECT_TIMEOUT_S = 10
+_PULL_TIMEOUT_S = 120
+
+
 def _image_present(image: str) -> bool:
     """True if ``image`` is already cached locally (no registry contact)."""
-    return (
-        subprocess.run(
-            ["docker", "image", "inspect", image], capture_output=True
-        ).returncode
-        == 0
-    )
+    try:
+        return (
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                capture_output=True,
+                timeout=_INSPECT_TIMEOUT_S,
+            ).returncode
+            == 0
+        )
+    except subprocess.TimeoutExpired:
+        # Daemon wedged — treat as "not cached" so we fall through to the pull,
+        # which has its own timeout + retry and will fail loudly if Docker is
+        # genuinely stuck.
+        return False
 
 
 def _ensure_image(image: str, *, attempts: int = 3, base_delay: float = 2.0) -> None:
@@ -76,16 +90,27 @@ def _ensure_image(image: str, *, attempts: int = 3, base_delay: float = 2.0) -> 
     """
     if _image_present(image):
         return
-    last: subprocess.CompletedProcess[str] | None = None
+    last_err = "(no output)"
     for attempt in range(1, attempts + 1):
-        last = subprocess.run(["docker", "pull", image], capture_output=True, text=True)
-        if last.returncode == 0:
-            return
+        try:
+            result = subprocess.run(
+                ["docker", "pull", image],
+                capture_output=True,
+                text=True,
+                timeout=_PULL_TIMEOUT_S,
+            )
+            if result.returncode == 0:
+                return
+            last_err = (
+                f"exit {result.returncode}\n"
+                f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+        except subprocess.TimeoutExpired:
+            last_err = f"timed out after {_PULL_TIMEOUT_S}s"
         if attempt < attempts:
             time.sleep(base_delay * 2 ** (attempt - 1))
     raise RuntimeError(
-        f"docker pull {image!r} failed after {attempts} attempts; last stderr:\n"
-        f"{last.stderr if last else '(no output)'}"
+        f"docker pull {image!r} failed after {attempts} attempts; last error:\n{last_err}"
     )
 
 
