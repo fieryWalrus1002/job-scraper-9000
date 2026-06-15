@@ -1,23 +1,8 @@
 # Justfile
-# Call it like this: just pipeline DATE=2026-05-27
+# Main flow: just run-overnight  →  just upload-blob RUN_ID=…  (or just ingest-run RUN_ID=… for local)
 
 # Automatically load a .env file from the repo root into all recipes
 set dotenv-load
-
-# Default to today's date using backticks, but customizable
-DATE := `date +%F`
-
-scrape:
-    uv run job-scraper-9000 run-config config/search.yml --save --run-date {{DATE}}
-
-prefilter:
-    uv run job-scraper-9000 prefilter --run-date {{DATE}}
-
-filter-remote:
-    uv run job-scraper-9000 remote-filter --run-date {{DATE}}
-
-filter-skills:
-    uv run job-scraper-9000 skills-fit --run-date {{DATE}}
 
 # Ingest a completed overnight run's per-user scored files into the LOCAL DB
 # (dev only). Walks data/pipeline_runs/<RUN_ID>/<slug>/skills_fit/scored.jsonl
