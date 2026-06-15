@@ -61,7 +61,12 @@ _PULL_TIMEOUT_S = 120
 
 
 def _image_present(image: str) -> bool:
-    """True if ``image`` is already cached locally (no registry contact)."""
+    """True if ``image`` is already cached locally (no registry contact).
+
+    A timeout on this fast local op means the Docker daemon is wedged — raise
+    immediately with the real cause rather than misclassify it as a cache miss
+    and grind through ~3×120s of pull retries with a misleading error.
+    """
     try:
         return (
             subprocess.run(
@@ -71,11 +76,11 @@ def _image_present(image: str) -> bool:
             ).returncode
             == 0
         )
-    except subprocess.TimeoutExpired:
-        # Daemon wedged — treat as "not cached" so we fall through to the pull,
-        # which has its own timeout + retry and will fail loudly if Docker is
-        # genuinely stuck.
-        return False
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"`docker image inspect {image}` timed out after {_INSPECT_TIMEOUT_S}s "
+            "— the Docker daemon appears wedged."
+        ) from exc
 
 
 def _ensure_image(image: str, *, attempts: int = 3, base_delay: float = 2.0) -> None:
