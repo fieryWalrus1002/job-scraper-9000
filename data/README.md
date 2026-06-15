@@ -4,19 +4,21 @@ This repo treats `data/` as the local pipeline workspace. Most JSONL contents ar
 
 ## Summary by folder
 
-| Folder              | Writers / processes                                                                              | Default outputs                                                                                                                                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data/raw/`         | `job-scraper <scraper> --save`; `job-scraper run-config --save`                                  | Flat: `data/raw/YYYY-MM-DD_HH-MM_<source>_<keywords>.jsonl`; with `run-config --run-date`: `data/raw/YYYY-MM-DD/*.jsonl`                                                                                  |
-| `data/prefiltered/` | `job-scraper prefilter` via `src/prefilter/router.py`                                            | `data/prefiltered/remote_filter_input.jsonl` or `data/prefiltered/<date>/remote_filter_input.jsonl`; overwritten                                                                                          |
-| `data/local/`       | `job-scraper prefilter` via `src/prefilter/router.py`                                            | `data/local/local_jobs.jsonl` or `data/local/<date>/local_jobs.jsonl`; overwritten                                                                                                                        |
-| `data/trash/`       | `job-scraper prefilter`; `job-scraper remote-filter`                                             | `prefilter_trash.jsonl` and `remote_filter_trash.jsonl`; overwritten                                                                                                                                      |
-| `data/filtered/`    | `job-scraper remote-filter` via `src/agents/remote_filter/runner.py`                             | `data/filtered/remote_filter_pass.jsonl` or `data/filtered/<date>/remote_filter_pass.jsonl`; overwritten                                                                                                  |
-| `data/cache/`       | Remote filter analysis cache via `src/agents/remote_filter/cache.py`                             | `data/cache/remote_filter_analyses.jsonl`; append-only unless `--no-cache` is used                                                                                                                        |
-| `data/batch/`       | `scripts/prepare_batch.py`; `scripts/submit_batch.py`                                            | `gpt_teacher_batch.jsonl`, `gpt_teacher_jobs.jsonl`, `last_batch_id.txt`, `gpt_teacher_results.jsonl` under `data/batch/<date>/`                                                                          |
-| `data/staging/`     | `scripts/merge_batch_results.py`; skills-fit seed/review scripts; `scripts/sample_for_review.py` | `to_review.jsonl` append; `skills_fit_seed_template.jsonl` overwrite; `skills_fit_seed_proposed.jsonl` append; `skills_fit_review/*.md` write; `review_batch.jsonl` overwrite                             |
-| `data/eval/`        | Streamlit review UI; eval runners; eval batch scripts; skills-fit gold parsers/scorer            | `ground_truth.jsonl` append; `skills_fit_ground_truth.jsonl` append; `runs.jsonl` append; `mismatches_<run_id>.jsonl` overwrite; `eval_batch_<run_id>.json`; `batch/eval_requests/results/errors_*.jsonl` |
-| `data/archive/`     | No implemented repo writer found                                                                 | Current contents appear manually archived, likely from `data/staging/skills_fit_review/`                                                                                                                  |
-| `data/runs/`        | `RunTracker` (`src/utils/run_tracker.py`) — wrapping every pipeline component run                | `data/runs/runs.jsonl`; append-only                                                                                                                                                                       |
+| Folder                | Writers / processes                                                                              | Default outputs                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/raw/`           | `job-scraper <scraper> --save`; `job-scraper run-config --save`                                  | Flat: `data/raw/YYYY-MM-DD_HH-MM_<source>_<keywords>.jsonl`; with `run-config --run-date`: `data/raw/YYYY-MM-DD/*.jsonl`                                                                                  |
+| `data/prefiltered/`   | `job-scraper prefilter` via `src/prefilter/router.py`                                            | `data/prefiltered/remote_filter_input.jsonl` or `data/prefiltered/<date>/remote_filter_input.jsonl`; overwritten                                                                                          |
+| `data/local/`         | `job-scraper prefilter` via `src/prefilter/router.py`                                            | `data/local/local_jobs.jsonl` or `data/local/<date>/local_jobs.jsonl`; overwritten                                                                                                                        |
+| `data/trash/`         | `job-scraper prefilter`; `job-scraper remote-filter`                                             | `prefilter_trash.jsonl` and `remote_filter_trash.jsonl`; overwritten                                                                                                                                      |
+| `data/filtered/`      | `job-scraper remote-filter` via `src/agents/remote_filter/runner.py`                             | `data/filtered/remote_filter_pass.jsonl` or `data/filtered/<date>/remote_filter_pass.jsonl`; overwritten                                                                                                  |
+| `data/cache/`         | Remote filter analysis cache via `src/agents/remote_filter/cache.py`                             | `data/cache/remote_filter_analyses.jsonl`; append-only unless `--no-cache` is used                                                                                                                        |
+| `data/batch/`         | `scripts/prepare_batch.py`; `scripts/submit_batch.py`                                            | `gpt_teacher_batch.jsonl`, `gpt_teacher_jobs.jsonl`, `last_batch_id.txt`, `gpt_teacher_results.jsonl` under `data/batch/<date>/`                                                                          |
+| `data/staging/`       | `scripts/merge_batch_results.py`; skills-fit seed/review scripts; `scripts/sample_for_review.py` | `to_review.jsonl` append; `skills_fit_seed_template.jsonl` overwrite; `skills_fit_seed_proposed.jsonl` append; `skills_fit_review/*.md` write; `review_batch.jsonl` overwrite                             |
+| `data/eval/`          | Streamlit review UI; eval runners; eval batch scripts; skills-fit gold parsers/scorer            | `ground_truth.jsonl` append; `skills_fit_ground_truth.jsonl` append; `runs.jsonl` append; `mismatches_<run_id>.jsonl` overwrite; `eval_batch_<run_id>.json`; `batch/eval_requests/results/errors_*.jsonl` |
+| `data/archive/`       | No implemented repo writer found                                                                 | Current contents appear manually archived, likely from `data/staging/skills_fit_review/`                                                                                                                  |
+| `data/run_telemetry/` | `RunTracker` (`src/utils/run_tracker.py`) — wrapping every pipeline component run                | `data/run_telemetry/runs.jsonl`; append-only                                                                                                                                                              |
+| `data/pipeline_runs/` | Overnight pipeline (`planner`, `worker`, `consolidation`, `scoring`)                             | `data/pipeline_runs/<run_id>/_consolidated/*.jsonl` + `<run_id>/<slug>/{scrape,skills_fit}/*.jsonl` and the per-run config snapshot `.yml`; run-first partition, gitignored (PII)                         |
+| `data/user_configs/`  | `scripts/pull_user_configs.py` — materializes live DB configs per user                           | `data/user_configs/<slug>/{search,candidate_profile,policies}.yml`; overwritten, gitignored (PII)                                                                                                         |
 
 `data/scored/` is documented separately under "Planned but not yet implemented" below.
 
@@ -206,20 +208,39 @@ Evidence:
 
 No implemented repo writer was found for `data/archive/`. Existing files under `data/archive/skills_fit_review_v3_20260521/` look like manually archived Markdown review artifacts, likely copied or moved from `data/staging/skills_fit_review/` outside the tracked scripts.
 
-### `data/runs/`
+### `data/pipeline_runs/`
+
+**Purpose:** Working files for the overnight pipeline, partitioned **run-first** so an entire run is one subtree: `data/pipeline_runs/<run_id>/`. The `run_id` is unique and sortable (`<date>T<HHMM>-overnight`), so same-day re-runs don't collide.
+
+```
+data/pipeline_runs/<run_id>/
+  _consolidated/   classified_pass.jsonl  classified_trash.jsonl  postings.jsonl
+  <slug>/
+    scrape/<source>.jsonl
+    skills_fit/input.jsonl  scored.jsonl
+    {search,policies,candidate_profile}.yml   # planner's per-run snapshot
+```
+
+Run-first co-locates every user plus the shared `_consolidated/` stage, makes the upload / local-ingest walk a trivial `<run_id>/*/skills_fit/scored.jsonl`, and reduces retention to "drop old run dirs." Written by `src/pipeline/{planner,worker,consolidation,scoring}.py`; gitignored because the config snapshots carry PII. The DB remains the searchable index for per-user/date queries — this tree is ephemeral working files.
+
+### `data/user_configs/`
+
+**Purpose:** Live materialized per-user configs, pulled from the DB by `scripts/pull_user_configs.py`. `data/user_configs/<slug>/{search,candidate_profile,policies}.yml` — the YAML shapes the pipeline consumes, regenerated from `app.candidate_profiles` / `app.user_search_configs`. These outlive any single run (hence separate from `data/pipeline_runs/`); gitignored (PII).
+
+### `data/run_telemetry/`
 
 **Purpose:** Per-run telemetry — one structured record per pipeline component invocation (scraper, prefilter, remote_filter, skills_fit, eval). Captures timing, input/output counts, git provenance, LLM model + token usage + cost estimate, cache stats, rate-limit events, and parent-run linkage.
 
-Append-only JSONL at `data/runs/runs.jsonl`. Written by the `RunTracker` context manager in `src/utils/run_tracker.py`; each pipeline component wraps its work in a `with RunTracker(component="...") as run:` block. Cost reconciliation against OpenAI's authoritative numbers is handled by `scripts/sync_openai_costs.py`, which queries the OpenAI Costs API (requires `OPENAI_ADMIN_KEY`) and back-fills the `cost.actual_provider_total` field.
+Append-only JSONL at `data/run_telemetry/runs.jsonl`. Written by the `RunTracker` context manager in `src/utils/run_tracker.py`; each pipeline component wraps its work in a `with RunTracker(component="...") as run:` block. Cost reconciliation against OpenAI's authoritative numbers is handled by `scripts/sync_openai_costs.py`, which queries the OpenAI Costs API (requires `OPENAI_ADMIN_KEY`) and back-fills the `cost.actual_provider_total` field.
 
 Query examples:
 
 ```bash
 # Today's total estimated cost by component
-jq -s 'map(select(.timing.started_at | startswith("2026-05-21"))) | group_by(.component) | map({component: .[0].component, cost: (map(.cost.estimated_total // 0) | add)})' data/runs/runs.jsonl
+jq -s 'map(select(.timing.started_at | startswith("2026-05-21"))) | group_by(.component) | map({component: .[0].component, cost: (map(.cost.estimated_total // 0) | add)})' data/run_telemetry/runs.jsonl
 
 # Median per-record cost for remote_filter, grouped by model
-jq -s 'map(select(.component == "remote_filter" and .cost != null)) | group_by(.llm.model) | map({model: .[0].llm.model, median: ([.[].cost.estimated_per_record] | sort | .[length/2])})' data/runs/runs.jsonl
+jq -s 'map(select(.component == "remote_filter" and .cost != null)) | group_by(.llm.model) | map({model: .[0].llm.model, median: ([.[].cost.estimated_per_record] | sort | .[length/2])})' data/run_telemetry/runs.jsonl
 ```
 
 ## Planned but not yet implemented

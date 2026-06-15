@@ -87,6 +87,12 @@ frontend/openapi.json
 infra/*.bicepparam
 infra/*.json
 
-# Materialized per-user configs (pull_user_configs.py) — contain personal
-# profile data; regenerated from the DB, never committed.
+# Pipeline run artifacts (planner/worker/scoring) and materialized per-user
+# configs (pull_user_configs.py) — contain personal profile data in .yml that
+# the data/**/* globs above don't catch. Regenerated from the DB, never committed.
+data/pipeline_runs/
+data/user_configs/
+data/run_telemetry/
+# Legacy pre-Phase-15 location (now data/pipeline_runs/ + data/user_configs/);
+# kept ignored so stale local artifacts here are never committed.
 runs/

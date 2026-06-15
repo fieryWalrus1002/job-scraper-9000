@@ -41,7 +41,7 @@ from pipeline.consolidation import (
     TRASH_NAME,
     consolidated_dir,
 )
-from pipeline.planner import _slug
+from pipeline.worker import run_user_dir
 from user_config import UserPolicies
 
 log = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ _SELECT_USER_POSTINGS = """
 
 
 def skills_fit_dir(runs_dir: Path, email: str, run_id: str) -> Path:
-    return runs_dir / _slug(email) / run_id / SKILLS_FIT_DIRNAME
+    return run_user_dir(runs_dir, run_id, email) / SKILLS_FIT_DIRNAME
 
 
 def _load_classified(runs_dir: Path, run_id: str) -> dict[str, dict[str, Any]]:
@@ -244,7 +244,9 @@ def score_and_ingest_run(
                     f.write(json.dumps(rec) + "\n")
             scored_path = out_dir / SCORED_NAME
 
-            profile_file = runs_dir / _slug(email) / run_id / "candidate_profile.yml"
+            profile_file = (
+                run_user_dir(runs_dir, run_id, email) / "candidate_profile.yml"
+            )
             if not profile_file.exists():
                 raise FileNotFoundError(
                     f"Materialized profile for {email} (run_id={run_id}) is missing: "

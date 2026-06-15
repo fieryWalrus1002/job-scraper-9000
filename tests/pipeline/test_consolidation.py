@@ -50,7 +50,7 @@ def _seed_scrape_job(
     if postings is None:
         return
     slug = email.strip().lower().replace("@", "_").replace(".", "_")
-    dest = runs_dir / slug / run_id / "scrape" / f"{source}.jsonl"
+    dest = runs_dir / run_id / slug / "scrape" / f"{source}.jsonl"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text("".join(json.dumps(p) + "\n" for p in postings))
 
@@ -378,6 +378,7 @@ def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
 
     summary = run_overnight(
         run_date="2026-06-12",
+        run_id="overnight-2026-06-12",
         runs_dir=tmp_path,
         database_url=migrated_pg,
         scrape_fn=lambda source, payload: [posting],
@@ -403,7 +404,7 @@ def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
     assert len(score_calls) == 1
     assert score_calls[0]["run_date"] == "2026-06-12"
     assert score_calls[0]["profile_file"] == (
-        tmp_path / "e2e_example_com" / "overnight-2026-06-12" / "candidate_profile.yml"
+        tmp_path / "overnight-2026-06-12" / "e2e_example_com" / "candidate_profile.yml"
     )
     assert score_calls[0]["parent_run_id"] == "overnight-2026-06-12"
 
@@ -431,6 +432,7 @@ def test_run_overnight_all_scrapes_failed_is_all_failed(migrated_pg, tmp_path):
 
     summary = run_overnight(
         run_date="2026-06-12",
+        run_id="overnight-2026-06-12",
         runs_dir=tmp_path,
         database_url=migrated_pg,
         scrape_fn=_boom,
@@ -457,6 +459,7 @@ def test_run_overnight_skips_tail_when_nothing_consolidated(migrated_pg, tmp_pat
 
     summary = run_overnight(
         run_date="2026-06-12",
+        run_id="overnight-2026-06-12",
         runs_dir=tmp_path,
         database_url=migrated_pg,
         scrape_fn=lambda source, payload: [],

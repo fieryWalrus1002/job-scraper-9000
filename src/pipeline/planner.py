@@ -32,6 +32,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from pipeline.queue import enqueue
+from pipeline.worker import run_user_dir
 from user_config import (
     CandidateProfileInput,
     SearchConfigInput,
@@ -139,7 +140,7 @@ def plan_run(
             summary["skipped_emails"].append(email)
             continue
 
-        run_dir = runs_dir / _slug(email) / run_id
+        run_dir = run_user_dir(runs_dir, run_id, email)
         pipeline_search = _materialize_user(
             run_dir=run_dir,
             profile_payload=row["profile_payload"],

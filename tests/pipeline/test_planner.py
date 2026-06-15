@@ -40,7 +40,7 @@ def test_plan_run_materializes_yaml_and_enqueues_rows(migrated_pg, tmp_path):
     assert summary["rows_enqueued"] >= 1
 
     # YAML files written for magnus.
-    run_dir = tmp_path / "magnus_example_com" / "overnight-2026-06-12"
+    run_dir = tmp_path / "overnight-2026-06-12" / "magnus_example_com"
     assert (run_dir / "search.yml").exists()
     assert (run_dir / "policies.yml").exists()
     assert (run_dir / "candidate_profile.yml").exists()
@@ -81,9 +81,9 @@ def test_plan_run_skips_users_missing_one_config(migrated_pg, tmp_path):
     assert "complete@example.com" not in summary["skipped_emails"]
 
     # No run dirs for the skipped users.
-    assert not (tmp_path / "profile_only_example_com").exists()
-    assert not (tmp_path / "search_only_example_com").exists()
-    assert (tmp_path / "complete_example_com" / "r").exists()
+    assert not (tmp_path / "r" / "profile_only_example_com").exists()
+    assert not (tmp_path / "r" / "search_only_example_com").exists()
+    assert (tmp_path / "r" / "complete_example_com").exists()
 
 
 @skip_if_no_docker
