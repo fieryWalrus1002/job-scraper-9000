@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reconcile estimated run costs against OpenAI's authoritative numbers.
 
-Walks ``data/runs/runs.jsonl``, finds OpenAI-provider runs whose
+Walks ``data/run_telemetry/runs.jsonl``, finds OpenAI-provider runs whose
 ``cost.actual_provider_total`` is not yet populated (and that ended at least
 SETTLING_DELAY_SECONDS ago), queries the OpenAI Costs API per-day for the
 project, and attributes the day's total spend back to each run.
@@ -33,7 +33,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-DEFAULT_RUNS_PATH = Path("data/runs/runs.jsonl")
+DEFAULT_RUNS_PATH = Path("data/run_telemetry/runs.jsonl")
 SETTLING_DELAY_SECONDS = 600  # 10 min; usage often shows up sooner but not guaranteed
 
 

@@ -31,15 +31,15 @@ from uuid import UUID
 
 import psycopg
 
-from pipeline.worker import _slug
+from pipeline.worker import run_user_dir
 from utils.dedup import dedup_jobs
 
 log = logging.getLogger(__name__)
 
-# Lives alongside the per-user dirs under runs/. Worker/planner slugs never
-# contain a dot (the slug rule rewrites them to "_"), so a dot-prefixed name
-# cannot collide with a user's dir.
-CONSOLIDATED_DIRNAME = ".consolidated"
+# The shared (all-users) stage of a run, a sibling of the per-user slug dirs
+# under <run_id>/. Underscore-prefixed and reserved: it is not a valid email
+# slug the planner/worker would ever emit for a user.
+CONSOLIDATED_DIRNAME = "_consolidated"
 
 UNION_NAME = "postings.jsonl"
 PASS_NAME = "classified_pass.jsonl"
@@ -50,7 +50,7 @@ ClassifyFn = Callable[..., dict[str, Any]]
 
 
 def consolidated_dir(runs_dir: Path, run_id: str) -> Path:
-    return runs_dir / CONSOLIDATED_DIRNAME / run_id
+    return runs_dir / run_id / CONSOLIDATED_DIRNAME
 
 
 def _posting_key(job: dict[str, Any]) -> str | None:
@@ -93,7 +93,7 @@ def consolidate_run(
     keyless_skipped = 0
 
     for email, user_id, source in rows:
-        path = runs_dir / _slug(email) / run_id / "scrape" / f"{source}.jsonl"
+        path = run_user_dir(runs_dir, run_id, email) / "scrape" / f"{source}.jsonl"
         if not path.exists():
             raise FileNotFoundError(
                 f"pipe.scrape_jobs row for {email}/{source} (run_id={run_id}) is "

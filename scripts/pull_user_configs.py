@@ -8,8 +8,11 @@ eats, plus a ``policies.yml`` for traceability (the pipeline doesn't consume
 policies yet — Phase 13's concern; they're emitted so the admin can diff and
 Phase 13 has a materialized artifact).
 
-Output: ``runs/<email-slug>/{search.yml,candidate_profile.yml,policies.yml}``.
-The email slug ( @ and . → _ ) keys the dir so two users never collide.
+Output: ``data/user_configs/<email-slug>/{search.yml,candidate_profile.yml,policies.yml}``.
+The email slug ( @ and . → _ ) keys the dir so two users never collide. These
+are the *live* materialized configs (pulled from the DB, outliving any single
+run); the planner writes its own per-run snapshot under
+``data/pipeline_runs/<run_id>/<slug>/`` separately.
 
 Per §8 verification: the emitted search.yml / candidate_profile.yml should diff
 functionally identical to the hand-maintained files. policies.yml is new (the
@@ -48,7 +51,7 @@ from user_config import (  # noqa: E402
 load_dotenv()
 log = logging.getLogger(__name__)
 
-RUNS_DIR = REPO_ROOT / "runs"
+USER_CONFIGS_DIR = REPO_ROOT / "data" / "user_configs"
 
 # Pull both config rows for a user in one query. LEFT JOINs so a user with only
 # one of the two configured still materializes what they have (and we warn on
@@ -79,7 +82,7 @@ def _materialize(row: dict) -> None:
         log.info("%s — no configs yet, skipping", email)
         return
 
-    run_dir = RUNS_DIR / _slug(email)
+    run_dir = USER_CONFIGS_DIR / _slug(email)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     if row["search_payload"] is not None:
@@ -138,7 +141,7 @@ def main() -> int:
     for row in rows:
         _materialize(row)
 
-    log.info("Done — materialized %d user(s) under %s", len(rows), RUNS_DIR)
+    log.info("Done — materialized %d user(s) under %s", len(rows), USER_CONFIGS_DIR)
     return 0
 
 

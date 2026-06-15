@@ -190,7 +190,7 @@ push-user-config-az *ARGS:
     DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
         uv run scripts/push_user_config.py {{ARGS}}
 
-# Materialize user configs FROM the AZURE DB into runs/<user>/ (not local).
+# Materialize user configs FROM the AZURE DB into data/user_configs/<user>/ (not local).
 #   just pull-user-configs-az --all   |   just pull-user-configs-az --user-email a@b.com
 pull-user-configs-az *ARGS:
     #!/usr/bin/env bash

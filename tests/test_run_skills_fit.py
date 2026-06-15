@@ -351,7 +351,7 @@ def test_run_skills_fit_override_mode_works_without_run_date(tmp_path, monkeypat
     assert rows[0]["metadata"]["input_source"] == "remote_filter_pass"
     assert rows[0]["metadata"]["input_path"] == str(remote_input)
 
-    runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
+    runs = read_jsonl(tmp_path / "data/run_telemetry/runs.jsonl")
     assert len(runs) == 1
     assert runs[0]["run_date"] is None
     assert runs[0]["input"]["path"] == str(remote_input)
@@ -865,7 +865,7 @@ def test_run_skills_fit_writes_run_tracker_record(tmp_path, monkeypatch):
     summary = module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
 
     assert summary["run_id"] == "skillsfit_tracker"
-    runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
+    runs = read_jsonl(tmp_path / "data/run_telemetry/runs.jsonl")
     assert len(runs) == 1
 
     run = runs[0]
@@ -973,7 +973,7 @@ def test_run_skills_fit_writes_run_tracker_record_on_interrupt(tmp_path, monkeyp
     else:
         raise AssertionError("expected KeyboardInterrupt")
 
-    runs = read_jsonl(tmp_path / "data/runs/runs.jsonl")
+    runs = read_jsonl(tmp_path / "data/run_telemetry/runs.jsonl")
     assert len(runs) == 1
 
     run = runs[0]

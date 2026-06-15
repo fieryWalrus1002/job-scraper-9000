@@ -41,14 +41,25 @@ from pipeline.worker import ScrapeFn, default_scrape_fn, run_worker
 
 log = logging.getLogger(__name__)
 
-DEFAULT_RUNS_DIR = Path("runs")
+DEFAULT_RUNS_DIR = Path("data/pipeline_runs")
 DEFAULT_LOGS_DIR = Path("logs")
 _LOG_FILE_HANDLE: TextIO | None = None
+
+
+def make_run_id(
+    run_date: str, started_at: datetime, *, run_type: str = "overnight"
+) -> str:
+    """Unique, sortable run id: ``<run_date>T<HHMM>-<run_type>`` (e.g.
+    ``2026-06-12T1635-overnight``). Folding the wall-clock time into the id
+    means a second run on the same date no longer clobbers the first's
+    artifacts under ``data/pipeline_runs/<run_id>/``."""
+    return f"{run_date}T{started_at:%H%M}-{run_type}"
 
 
 def run_overnight(
     *,
     run_date: str,
+    run_id: str | None = None,
     runs_dir: Path = DEFAULT_RUNS_DIR,
     scrape_only: bool = False,
     database_url: str | None = None,
@@ -66,13 +77,16 @@ def run_overnight(
     (spec §7).
 
     ``scrape_fn`` / ``classify_fn`` / ``score_fn`` / ``ingest_fn`` are
-    injectable for tests; production callers take the defaults.
+    injectable for tests; production callers take the defaults. ``run_id`` is
+    normally minted by the CLI (so the log file and run dir share one
+    timestamp); it defaults to a freshly-minted id for direct callers.
     """
     url = database_url or os.environ.get("DATABASE_URL")
     if not url:
         raise SystemExit("DATABASE_URL not set")
 
-    run_id = f"overnight-{run_date}"
+    if run_id is None:
+        run_id = make_run_id(run_date, datetime.now())
     summary: dict[str, Any] = {"run_id": run_id}
 
     with psycopg.connect(url, autocommit=True) as conn:
@@ -177,9 +191,8 @@ class _Tee:
             stream.flush()
 
 
-def _default_log_file(run_date: str) -> Path:
-    started_at = datetime.now().strftime("%H%M%S")
-    return DEFAULT_LOGS_DIR / f"overnight_{run_date}_{started_at}.log"
+def _default_log_file(run_date: str, started_at: datetime) -> Path:
+    return DEFAULT_LOGS_DIR / f"overnight_{run_date}_{started_at:%H%M%S}.log"
 
 
 def _configure_overnight_logging(*, run_date: str, log_file: Path | None) -> None:
@@ -241,16 +254,21 @@ def _requeue_interrupted_run(*, run_id: str, reason: str) -> None:
 
 
 def _cmd_overnight(args: argparse.Namespace) -> None:
+    # One timestamp for the whole invocation: the log file and the run_id (and
+    # thus the run dir) share it, so a run is traceable from log name to artifacts.
+    started_at = datetime.now()
+    run_id = make_run_id(args.run_date, started_at)
+
     log_file = None
     if not args.no_log_file:
-        log_file = Path(args.log_file or _default_log_file(args.run_date))
+        log_file = Path(args.log_file or _default_log_file(args.run_date, started_at))
     _configure_overnight_logging(run_date=args.run_date, log_file=log_file)
     _install_interrupt_handlers()
 
-    run_id = f"overnight-{args.run_date}"
     try:
         summary = run_overnight(
             run_date=args.run_date,
+            run_id=run_id,
             runs_dir=Path(args.runs_dir),
             scrape_only=args.scrape_only,
         )
@@ -293,7 +311,7 @@ def _add_overnight(sub: argparse._SubParsersAction) -> None:
         dest="run_date",
         metavar="YYYY-MM-DD",
         type=_parse_run_date,
-        help="Date label for this run (becomes run_id 'overnight-YYYY-MM-DD')",
+        help="Date for this run (run_id becomes 'YYYY-MM-DDT<HHMM>-overnight')",
     )
     p.add_argument(
         "--runs-dir",

@@ -90,6 +90,15 @@ def _slug(email: str) -> str:
     return re.sub(r"[^a-z0-9._-]", "_", email.strip().lower()).replace(".", "_")
 
 
+def run_user_dir(runs_dir: Path, run_id: str, email: str) -> Path:
+    """Per-user artifact dir for a run, partitioned **run-first**:
+    ``<runs_dir>/<run_id>/<slug>``. Run-first co-locates every user (and the
+    shared ``_consolidated/`` stage) under one run dir, so a whole run is one
+    subtree to upload, ingest, or drop. Canonical home for the layout so the
+    planner, worker, consolidation, and scoring agree on one definition."""
+    return runs_dir / run_id / _slug(email)
+
+
 def _to_dict(job: Any) -> dict[str, Any]:
     """Normalize a scraped posting to a plain dict for serialization."""
     if dataclasses.is_dataclass(job) and not isinstance(job, type):
@@ -167,7 +176,7 @@ def process_job(
     Exceptions inside this function bubble up — :func:`run_worker` catches
     them at the boundary and stamps ``mark_failed``."""
     email = _resolve_user_email(conn, job["user_id"])
-    run_dir = runs_dir / _slug(email) / job["run_id"]
+    run_dir = run_user_dir(runs_dir, job["run_id"], email)
     policies = _load_policies(run_dir)
 
     raw_jobs = list(scrape_fn(job["source"], job["query_payload"]))

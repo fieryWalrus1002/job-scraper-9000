@@ -2,7 +2,7 @@
 
 Used as a context manager. Captures timing, git provenance, input/output
 counts, LLM model/usage, cost estimates, cache stats, and notable events.
-Writes append-only to ``data/runs/runs.jsonl`` by default.
+Writes append-only to ``data/run_telemetry/runs.jsonl`` by default.
 
 Designed to handle three cases by making the LLM/cost blocks nullable:
   - Cloud LLM (OpenAI): tokens + estimated cost + later actual cost backfill
@@ -32,7 +32,7 @@ from utils.git_info import get_git_metadata
 
 log = logging.getLogger(__name__)
 
-DEFAULT_RUNS_PATH = Path("data/runs/runs.jsonl")
+DEFAULT_RUNS_PATH = Path("data/run_telemetry/runs.jsonl")
 
 
 def _iso8601_z(ts: float | None = None) -> str:

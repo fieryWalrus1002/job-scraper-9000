@@ -62,7 +62,7 @@ def _write_classified(
 
 
 def _materialize_profile(runs_dir: Path, email: str) -> None:
-    profile = runs_dir / _slug(email) / RUN_ID / "candidate_profile.yml"
+    profile = runs_dir / RUN_ID / _slug(email) / "candidate_profile.yml"
     profile.parent.mkdir(parents=True, exist_ok=True)
     profile.write_text("profile_version: test\n")
 
@@ -156,8 +156,8 @@ def test_scores_each_user_against_their_own_profile(migrated_pg, tmp_path):
     assert summary["scores_inserted"] == 3
 
     by_email = {
-        c["profile_file"].parts[-3]: c
-        for c in score_calls  # slug dir
+        c["profile_file"].parts[-2]: c  # <run_id>/<slug>/candidate_profile.yml
+        for c in score_calls
     }
     alice = by_email[_slug("alice@example.com")]
     bob = by_email[_slug("bob@example.com")]

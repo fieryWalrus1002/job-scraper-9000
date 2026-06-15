@@ -83,7 +83,7 @@ def run_remote_filter(
 
     Within-batch duplicates (by `dedup_hash` / `source_job_id`) are collapsed to
     a single LLM call. Pass `cache_path=None` to disable the across-batch cache.
-    Telemetry is written to ``data/runs/runs.jsonl`` via ``RunTracker``.
+    Telemetry is written to ``data/run_telemetry/runs.jsonl`` via ``RunTracker``.
     """
     input_path = Path(input_path)
     pass_path = Path(pass_path)

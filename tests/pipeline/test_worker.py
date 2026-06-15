@@ -44,7 +44,7 @@ def _seed_user_with_runs_dir(
 
     # Same slug convention the worker uses internally.
     slug = email.strip().lower().replace("@", "_").replace(".", "_")
-    run_dir = runs_dir / slug / run_id
+    run_dir = runs_dir / run_id / slug
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "policies.yml").write_text(
         yaml.safe_dump(
@@ -139,7 +139,7 @@ def test_process_job_writes_filtered_jsonl_and_returns_count(migrated_pg, tmp_pa
         count = process_job(conn, job, runs_dir=tmp_path, scrape_fn=scrape_fn)
 
     assert count == 1
-    out_path = tmp_path / "proc_example_com" / "r" / "scrape" / "linkedin.jsonl"
+    out_path = tmp_path / "r" / "proc_example_com" / "scrape" / "linkedin.jsonl"
     lines = [json.loads(line) for line in out_path.read_text().splitlines()]
     assert len(lines) == 1
     assert lines[0]["title"] == "ML Engineer"
