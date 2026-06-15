@@ -164,11 +164,17 @@ materialization writers (`scripts/pull_user_configs.py`), `.gitignore`, and
   it). Moving the Job to managed identity is a worthwhile follow-up but is an
   auth refactor out of scope here — file as a separate hardening issue (no
   milestone / backlog).
-- **D4 — Per-user blob.** One blob per user
-  (`pending/<run_id>/<slug>__scored.jsonl`). Records self-route either way, but
-  per-user keeps the dead-letter failure isolation and lets the KEDA trigger fan
-  out one Job execution per user (`blobCountPerJob=1`) instead of one execution
-  swallowing 2–1000 users.
+- **D4 — Per-user blob.** One blob per user, keeping per-user dead-letter
+  failure isolation. **Correction (post-impl):** the name must be **flat at the
+  container root** — `pending/<run_id>__<slug>__scored.jsonl`, not the originally
+  specced nested `pending/<run_id>/<slug>...`. The KEDA `azure-blob` scaler
+  counts only root-level blobs (default `blobDelimiter` is `/`), so a nested key
+  lands in a virtual folder the scaler never counts and the trigger never fires
+  (verified: a nested blob sat un-ingested for a week). Note the consumer
+  (`_ingest_from_blob`) lists `pending` recursively and drains all blobs in one
+  execution, so the "one execution per user" fan-out is aspirational — KEDA
+  scales to `min(blobs, maxExecutions=1)` and that single execution ingests
+  everything. Self-routing by stamped `user_email` makes that correct regardless.
 - **D5 — Run-artifact layout (see §4).** Artifacts move to
   `data/pipeline_runs/<run_id>/`, **run-first** partition; RunTracker telemetry
   to `data/run_telemetry/runs.jsonl`; live materialized configs to

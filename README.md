@@ -153,10 +153,10 @@ The `just run-overnight` recipe builds `DATABASE_URL` from the same `AZURE_POSTG
 # Cloud: upload one blob per user to the `pending` container. The in-Azure ACA
 # ingest job (KEDA blob-triggered) ingests them next to the DB — no home-machine
 # DB write. Needs `az login` + the Storage Blob Data Contributor role.
-just upload-blob RUN_ID=<run_id>
+just upload-blob <run_id>
 
 # Local dev: ingest the same run straight into your local DB (DATABASE_URL) instead.
-just ingest-run RUN_ID=<run_id>
+just ingest-run <run_id>
 ```
 
 Records self-route to their owning user on ingest (each carries a stamped `user_email`), so no per-user flag is needed. See [`infra/README.md`](infra/README.md) for the blob → ACA Job ingest path.

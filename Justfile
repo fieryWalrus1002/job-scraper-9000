@@ -1,5 +1,5 @@
 # Justfile
-# Main flow: just run-overnight  →  just upload-blob RUN_ID=…  (or just ingest-run RUN_ID=… for local)
+# Main flow: just run-overnight  →  just upload-blob <run-id>  (or just ingest-run <run-id> for local)
 
 # Automatically load a .env file from the repo root into all recipes
 set dotenv-load
@@ -9,14 +9,14 @@ set dotenv-load
 # and feeds each through the ingest CLI; records self-route by their stamped
 # user_email. Uses DATABASE_URL from .env (point it at your local DB) — the
 # cloud path is blob → ACA Job (`just upload-blob`), not this.
-#   just ingest-run RUN_ID=2026-06-12T1635-overnight
+#   just ingest-run 2026-06-12T1635-overnight
 ingest-run RUN_ID:
     uv run scripts/ingest_run.py --run-id {{RUN_ID}}
 
 # Run the multi-user overnight pipeline. PRODUCE-ONLY: writes per-user scored
 # files to data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl and does
-# NOT write job_scores. To land scores, follow with `just upload-blob RUN_ID=…`
-# (cloud → ACA ingest) or `just ingest-run RUN_ID=…` (local DB). run_id is in
+# NOT write job_scores. To land scores, follow with `just upload-blob <run-id>`
+# (cloud → ACA ingest) or `just ingest-run <run-id>` (local DB). run_id is in
 # the run summary. Reads the Azure DB for planning/queue only.
 run-overnight:
     #!/usr/bin/env bash
@@ -64,7 +64,7 @@ build-images:
 # per-blob --user-email is needed.
 # Requires AZURE_STORAGE_ACCOUNT in .env and an active `az login` session
 # (AAD --auth-mode login; needs the Storage Blob Data Contributor role).
-#   just upload-blob RUN_ID=2026-06-12T1635-overnight
+#   just upload-blob 2026-06-12T1635-overnight
 upload-blob RUN_ID:
     uv run scripts/upload_blob.py --run-id {{RUN_ID}}
 
