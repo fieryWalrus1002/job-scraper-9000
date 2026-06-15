@@ -84,7 +84,7 @@ def test_raises_loud_when_run_has_no_outputs(tmp_path):
 
 def test_cli_ingest_builds_expected_command(tmp_path, monkeypatch):
     """The default ingest_fn shells to `job-scraper-9000 ingest` with the
-    file, the (legacy) schema path, and --dry-run only when asked."""
+    file and --dry-run only when asked."""
     mod = load_module()
     captured: list[list[str]] = []
 
@@ -95,16 +95,8 @@ def test_cli_ingest_builds_expected_command(tmp_path, monkeypatch):
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
 
     scored = tmp_path / "scored.jsonl"
-    schema = tmp_path / "schema.sql"
-    mod._cli_ingest(scored_path=scored, schema_path=schema, dry_run=False)
-    mod._cli_ingest(scored_path=scored, schema_path=schema, dry_run=True)
+    mod._cli_ingest(scored_path=scored, dry_run=False)
+    mod._cli_ingest(scored_path=scored, dry_run=True)
 
-    assert captured[0] == [
-        "job-scraper-9000",
-        "ingest",
-        "--input",
-        str(scored),
-        "--schema-path",
-        str(schema),
-    ]
+    assert captured[0] == ["job-scraper-9000", "ingest", "--input", str(scored)]
     assert captured[1][-1] == "--dry-run"

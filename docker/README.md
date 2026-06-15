@@ -81,8 +81,7 @@ docker run --rm \
   -v "$(pwd)/data:/app/data" \
   jobscraper-ingest:latest \
   --db-url "postgresql://jobscraper:jobscraper@127.0.0.1:5432/jobscraper" \
-  --input "/app/data/scored/2026-06-04/skills_fit_scored.jsonl" \
-  --schema-path "/app/db/schema.sql"
+  --input "/app/data/scored/2026-06-04/skills_fit_scored.jsonl"
 
 # 3. Test blob mode locally (needs a real storage account or Azurite)
 docker run --rm \
@@ -90,7 +89,8 @@ docker run --rm \
   -e DATABASE_URL="postgresql://jobscraper:jobscraper@127.0.0.1:5432/jobscraper" \
   -e AZURE_STORAGE_CONNECTION_STRING="<connection-string>" \
   jobscraper-ingest:latest \
-  --schema-path "db/schema.sql" \
-  --apply-schema \
   --blob-mode
 ```
+
+Ingest never applies DDL — Alembic owns the schema (migrations run on API
+startup), so the target DB must already be migrated.

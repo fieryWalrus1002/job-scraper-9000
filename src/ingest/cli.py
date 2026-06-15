@@ -5,14 +5,18 @@ Registered as a subcommand of job-scraper-9000 via register().
 Also callable standalone (docker container entrypoint) via main().
 
 Usage (pipeline CLI — DATABASE_URL read from .env automatically):
-    uv run job-scraper-9000 ingest --input <path> --schema-path db/schema.sql
+    uv run job-scraper-9000 ingest --input <path>
 
 Usage (standalone / container — must pass --db-url explicitly):
-    python -m ingest.cli --db-url $DATABASE_URL --input <path> --schema-path db/schema.sql
+    python -m ingest.cli --db-url $DATABASE_URL --input <path>
 
 Usage (blob mode — ACA Job entrypoint):
-    python -m ingest.cli --schema-path db/schema.sql --apply-schema --blob-mode
+    python -m ingest.cli --blob-mode
     Requires AZURE_STORAGE_CONNECTION_STRING env var.
+
+Ingest never applies DDL: Alembic owns the schema (migrations run on API
+lifespan startup), and ingest resolves user_email against app.users, which
+only Alembic creates. There is no schema-bootstrap path here (#173).
     Processes all blobs in the "pending" container:
       - on success → moved to "processed"
       - empty blob → moved to "processed" (no-op success)
@@ -34,17 +38,10 @@ log = logging.getLogger(__name__)
 def _connect_and_ingest(records, args, database_url: str) -> dict:
     import psycopg
 
-    from .core import ensure_schema, ingest
-
-    schema_path = Path(args.schema_path)
-    if args.apply_schema and not schema_path.exists():
-        log.error("Schema file not found: %s", schema_path)
-        sys.exit(1)
+    from .core import ingest
 
     try:
         with psycopg.connect(database_url) as conn:
-            if args.apply_schema:
-                ensure_schema(conn, schema_path)
             return ingest(
                 records,
                 conn=conn,
@@ -151,7 +148,6 @@ def _ingest_from_blob(args: argparse.Namespace, database_url: str) -> None:
                     metadata={"reason": "unresolvable_user", "error": str(exc)[:200]},
                 )
             continue
-        args.apply_schema = False  # only apply once per process run
         total += result["total"]
         postings_inserted += result["postings_inserted"]
         scores_inserted += result["scores_inserted"]
@@ -233,10 +229,6 @@ def _add_ingest(sub: argparse._SubParsersAction) -> None:
         default=None,
         help="Path to scored JSONL file (required unless --blob-mode)",
     )
-    p.add_argument("--schema-path", required=True, help="Path to db/schema.sql")
-    p.add_argument(
-        "--apply-schema", action="store_true", help="Apply schema DDL before ingesting"
-    )
     p.add_argument(
         "--dry-run", action="store_true", help="Parse records but do not write to DB"
     )
@@ -272,8 +264,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--db-url", default=None)
     parser.add_argument("--input", default=None)
-    parser.add_argument("--schema-path", required=True)
-    parser.add_argument("--apply-schema", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--user-email", default=None)
     parser.add_argument(
