@@ -51,7 +51,7 @@ async def test_jobs_empty_result(client: AsyncClient, fake_conn) -> None:
     assert body["items"] == []
 
 
-async def test_jobs_excludes_triaged_applications_by_default(
+async def test_jobs_excludes_application_rows_by_default(
     client: AsyncClient, fake_conn
 ) -> None:
     setup_list_response(fake_conn, [FAKE_JOB_ROW])

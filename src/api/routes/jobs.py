@@ -81,6 +81,9 @@ async def list_jobs(
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
+    # In the triage funnel, Jobs is the only untriaged bucket. Any
+    # app.user_applications row means the job belongs on another tab
+    # (Shortlist/Tracking/Trash), regardless of its specific status.
     filters: list[str] = ["s.user_id = %(user_id)s", "a.dedup_hash IS NULL"]
     params: dict = {"user_id": user.id}
 
