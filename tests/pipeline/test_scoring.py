@@ -1,9 +1,10 @@
 """Integration tests for ``src/pipeline/scoring.py`` — the per-user
-skills_fit + ingest fan-out (Phase 13 slice 6).
+skills_fit fan-out (Phase 13 slice 6; produce-only per Phase 15 D1).
 
-Fake ``score_fn`` / ``ingest_fn`` keep the LLM and the score-write out of the
-loop; the real work under test is the per-user policy gate over the
-classified union and the routing of each user's survivors. Consolidation
+A fake ``score_fn`` keeps the LLM out of the loop; the real work under test
+is the per-user policy gate over the classified union and the routing of
+each user's survivors to their own ``scored.jsonl``. The phase is
+produce-only — it never touches ``job_scores`` (Phase 15 D1). Consolidation
 state is seeded against a real Postgres so the inverted ``requested_by``
 query runs its actual SQL.
 """
@@ -20,7 +21,7 @@ from psycopg.types.json import Json
 
 from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
 from pipeline.planner import _slug
-from pipeline.scoring import score_and_ingest_run, skills_fit_dir
+from pipeline.scoring import SCORED_NAME, score_run, skills_fit_dir
 
 from .conftest import seed_user, skip_if_no_docker
 
@@ -100,18 +101,15 @@ def _score_factory(calls: list[dict]):
     return _fn
 
 
-def _ingest_factory(calls: list[dict]):
-    def _fn(*, scored_path, user_email, conn):
-        n = len([ln for ln in scored_path.read_text().splitlines() if ln.strip()])
-        calls.append({"user_email": user_email, "n": n})
-        return {
-            "total": n,
-            "postings_inserted": n,
-            "scores_inserted": n,
-            "scores_updated": 0,
-        }
-
-    return _fn
+def _scored_hashes(runs_dir: Path, email: str) -> list[str]:
+    """dedup_hashes in a user's written ``scored.jsonl`` (the fake score_fn
+    copies its input through, so this is the user's scored survivors)."""
+    path = skills_fit_dir(runs_dir, email, RUN_ID) / SCORED_NAME
+    return sorted(
+        json.loads(ln)["dedup_hash"]
+        for ln in path.read_text().splitlines()
+        if ln.strip()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -140,20 +138,17 @@ def test_scores_each_user_against_their_own_profile(migrated_pg, tmp_path):
     )
 
     score_calls: list[dict] = []
-    ingest_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        summary = score_and_ingest_run(
+        summary = score_run(
             conn,
             run_id=RUN_ID,
             run_date=RUN_DATE,
             runs_dir=tmp_path,
             score_fn=_score_factory(score_calls),
-            ingest_fn=_ingest_factory(ingest_calls),
         )
 
     assert summary["users_scored"] == 2
     assert summary["postings_scored"] == 3  # alice: 2, bob: 1
-    assert summary["scores_inserted"] == 3
 
     by_email = {
         c["profile_file"].parts[-2]: c  # <run_id>/<slug>/candidate_profile.yml
@@ -164,10 +159,9 @@ def test_scores_each_user_against_their_own_profile(migrated_pg, tmp_path):
     assert sorted(alice["hashes"]) == ["h-alice", "h-shared"]
     assert bob["hashes"] == ["h-shared"]
     assert alice["run_date"] == RUN_DATE
-    assert {c["user_email"] for c in ingest_calls} == {
-        "alice@example.com",
-        "bob@example.com",
-    }
+    # Produce-only: each user's survivors land in their own scored.jsonl.
+    assert _scored_hashes(tmp_path, "alice@example.com") == ["h-alice", "h-shared"]
+    assert _scored_hashes(tmp_path, "bob@example.com") == ["h-shared"]
 
 
 @skip_if_no_docker
@@ -189,13 +183,12 @@ def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
 
     score_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        summary = score_and_ingest_run(
+        summary = score_run(
             conn,
             run_id=RUN_ID,
             run_date=RUN_DATE,
             runs_dir=tmp_path,
             score_fn=_score_factory(score_calls),
-            ingest_fn=_ingest_factory([]),
         )
 
     assert summary["postings_scored"] == 1
@@ -219,13 +212,12 @@ def test_default_policy_accepts_all_classifications(migrated_pg, tmp_path):
 
     score_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        summary = score_and_ingest_run(
+        summary = score_run(
             conn,
             run_id=RUN_ID,
             run_date=RUN_DATE,
             runs_dir=tmp_path,
             score_fn=_score_factory(score_calls),
-            ingest_fn=_ingest_factory([]),
         )
 
     assert summary["postings_scored"] == 2
@@ -246,22 +238,19 @@ def test_skips_user_with_no_surviving_postings(migrated_pg, tmp_path):
     )
 
     score_calls: list[dict] = []
-    ingest_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        summary = score_and_ingest_run(
+        summary = score_run(
             conn,
             run_id=RUN_ID,
             run_date=RUN_DATE,
             runs_dir=tmp_path,
             score_fn=_score_factory(score_calls),
-            ingest_fn=_ingest_factory(ingest_calls),
         )
 
     assert summary["users_scored"] == 0
     assert summary["users_skipped_no_postings"] == 1
     assert score_calls == []
-    assert ingest_calls == []
-    # No input file written for a skipped user.
+    # No input or scored file written for a skipped user.
     assert not (skills_fit_dir(tmp_path, "nomatch@example.com", RUN_ID)).exists()
 
 
@@ -279,13 +268,12 @@ def test_counts_postings_with_no_classification(migrated_pg, tmp_path):
 
     score_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        summary = score_and_ingest_run(
+        summary = score_run(
             conn,
             run_id=RUN_ID,
             run_date=RUN_DATE,
             runs_dir=tmp_path,
             score_fn=_score_factory(score_calls),
-            ingest_fn=_ingest_factory([]),
         )
 
     assert summary["postings_scored"] == 1
@@ -295,7 +283,7 @@ def test_counts_postings_with_no_classification(migrated_pg, tmp_path):
 
 @skip_if_no_docker
 def test_isolates_a_failing_user_and_finishes_the_rest(migrated_pg, tmp_path):
-    """Spec §7: one user's skills_fit/ingest exception is isolated — logged,
+    """Spec §7: one user's skills_fit exception is isolated — logged,
     recorded ``failed`` in the summary — and the run finishes for everyone
     else. Here the failure surfaces as a missing materialized profile (a
     broken planner contract), but any raise inside the per-user step is
@@ -317,21 +305,19 @@ def test_isolates_a_failing_user_and_finishes_the_rest(migrated_pg, tmp_path):
     )
 
     score_calls: list[dict] = []
-    ingest_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        summary = score_and_ingest_run(
+        summary = score_run(
             conn,
             run_id=RUN_ID,
             run_date=RUN_DATE,
             runs_dir=tmp_path,
             score_fn=_score_factory(score_calls),
-            ingest_fn=_ingest_factory(ingest_calls),
         )
 
     assert summary["users_scored"] == 1
     assert summary["users_failed"] == 1
-    # The good user still got scored and ingested.
-    assert [c["user_email"] for c in ingest_calls] == ["fine@example.com"]
+    # The good user still got scored — their scored.jsonl is written.
+    assert _scored_hashes(tmp_path, "fine@example.com") == ["h-ok"]
     failed = [u for u in summary["per_user"] if u.get("failed")]
     assert len(failed) == 1
     assert failed[0]["email"] == "noprofile@example.com"
