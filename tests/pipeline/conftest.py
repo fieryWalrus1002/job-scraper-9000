@@ -190,6 +190,7 @@ def seed_user(
     *,
     with_profile: bool = True,
     with_search: bool = True,
+    pipeline_enabled: bool = True,
 ) -> str:
     uid_row = conn.execute(
         "INSERT INTO app.users (email) VALUES (%s) RETURNING id::text", (email,)
@@ -200,10 +201,11 @@ def seed_user(
     if with_search:
         conn.execute(
             """
-            INSERT INTO app.user_search_configs (user_id, payload, policies)
-            VALUES (%s::uuid, %s, %s)
+            INSERT INTO app.user_search_configs
+                (user_id, payload, policies, pipeline_enabled)
+            VALUES (%s::uuid, %s, %s, %s)
             """,
-            (uid, Json(valid_search_payload()), Json({})),
+            (uid, Json(valid_search_payload()), Json({}), pipeline_enabled),
         )
     if with_profile:
         conn.execute(
