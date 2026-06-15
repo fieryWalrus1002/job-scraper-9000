@@ -87,6 +87,31 @@ def test_plan_run_skips_users_missing_one_config(migrated_pg, tmp_path):
 
 
 @skip_if_no_docker
+def test_plan_run_skips_pipeline_disabled_user(migrated_pg, tmp_path):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        _seed_user(conn, "dormant@example.com", pipeline_enabled=False)
+        _seed_user(conn, "active@example.com")
+
+        summary = plan_run(conn, run_id="r", runs_dir=tmp_path)
+
+    # Only the active user is planned; the disabled one surfaces in the run
+    # summary (issue #245 — deactivation must not vanish silently).
+    assert summary["users_planned"] == 1
+    assert "dormant@example.com" in summary["skipped_emails"]
+    assert "active@example.com" not in summary["skipped_emails"]
+
+    # No run dir or queue rows for the disabled user.
+    assert not (tmp_path / "r" / "dormant_example_com").exists()
+    assert (tmp_path / "r" / "active_example_com").exists()
+    with psycopg.connect(migrated_pg) as conn:
+        rows = conn.execute(
+            "SELECT u.email FROM pipe.scrape_jobs sj "
+            "JOIN app.users u ON u.id = sj.user_id WHERE sj.run_id = 'r'"
+        ).fetchall()
+    assert all(email != "dormant@example.com" for (email,) in rows)
+
+
+@skip_if_no_docker
 def test_plan_run_is_idempotent(migrated_pg, tmp_path):
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         _seed_user(conn, "rerun@example.com")

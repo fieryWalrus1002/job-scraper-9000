@@ -55,7 +55,8 @@ _SELECT_USERS = """
         cp.payload               AS profile_payload,
         cp.profile_version       AS profile_version,
         sc.payload               AS search_payload,
-        sc.policies              AS policies
+        sc.policies              AS policies,
+        sc.pipeline_enabled      AS pipeline_enabled
     FROM app.users u
     LEFT JOIN app.candidate_profiles  cp ON cp.user_id = u.id
     LEFT JOIN app.user_search_configs sc ON sc.user_id = u.id
@@ -136,6 +137,16 @@ def plan_run(
                 if payload is None
             ]
             log.warning("%s — missing %s; skipping", email, " and ".join(missing))
+            summary["users_skipped"] += 1
+            summary["skipped_emails"].append(email)
+            continue
+
+        # #245: deactivated users keep their config but are gated out of the
+        # overnight run (cost saver). Skip in the loop — not the SQL WHERE — so
+        # the deactivation surfaces in skipped_emails / the run summary rather
+        # than vanishing silently.
+        if not row["pipeline_enabled"]:
+            log.warning("%s — pipeline_enabled=false; skipping", email)
             summary["users_skipped"] += 1
             summary["skipped_emails"].append(email)
             continue
