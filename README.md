@@ -147,6 +147,20 @@ uv run job-scraper-9000 overnight --run-date "$(date +%F)"
 
 The `just run-overnight` recipe builds `DATABASE_URL` from the same `AZURE_POSTGRES_*` variables used by the Azure DB recipes, then invokes the CLI. The `overnight` command writes human-readable logs to stderr and, by default, `logs/overnight_<run-date>_<HHMMSS>.log` so each invocation gets its own log. Use `--log-file <path>` to choose a different file or `--no-log-file` for terminal-only debugging. If interrupted with Ctrl-C, SIGTERM, or Ctrl-Z, running scrape jobs are requeued to `pending` so rerunning the same date can resume.
 
+**The pipeline is produce-only (Phase 15).** It plans, scrapes, consolidates, classifies, and scores — but it does **not** write scores to the database. Each user's scored postings land on disk at `data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl`, where `run_id` is `<date>T<HHMM>-overnight` (printed in the end-of-run summary). Getting those scores into a database is a separate, decoupled step:
+
+```bash
+# Cloud: upload one blob per user to the `pending` container. The in-Azure ACA
+# ingest job (KEDA blob-triggered) ingests them next to the DB — no home-machine
+# DB write. Needs `az login` + the Storage Blob Data Contributor role.
+just upload-blob RUN_ID=<run_id>
+
+# Local dev: ingest the same run straight into your local DB (DATABASE_URL) instead.
+just ingest-run RUN_ID=<run_id>
+```
+
+Records self-route to their owning user on ingest (each carries a stamped `user_email`), so no per-user flag is needed. See [`infra/README.md`](infra/README.md) for the blob → ACA Job ingest path.
+
 **Schedule a run overnight with `at`:**
 
 ```bash

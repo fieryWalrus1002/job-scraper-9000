@@ -81,7 +81,7 @@ docker run --rm \
   -v "$(pwd)/data:/app/data" \
   jobscraper-ingest:latest \
   --db-url "postgresql://jobscraper:jobscraper@127.0.0.1:5432/jobscraper" \
-  --input "/app/data/scored/2026-06-04/skills_fit_scored.jsonl"
+  --input "/app/data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl"
 
 # 3. Test blob mode locally (needs a real storage account or Azurite)
 docker run --rm \
