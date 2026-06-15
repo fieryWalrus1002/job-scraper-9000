@@ -43,7 +43,9 @@ def main() -> int:
 
     diff = sys.stdin.read()
     if not diff.strip():
-        print("_AI review: empty diff, nothing to review._")
+        # Nothing to review — emit no stdout so the workflow's `[ -s review.md ]`
+        # guard skips the comment rather than posting a content-free note.
+        print("Empty diff, nothing to review.", file=sys.stderr)
         return 0
 
     truncated = len(diff) > max_chars

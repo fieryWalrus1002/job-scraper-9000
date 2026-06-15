@@ -31,7 +31,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
           # Verify this model id is valid/available on the account — a wrong id
           # makes the OpenAI call (and this step) fail loudly.
-          OPENAI_MODEL: gpt-5.4-mini
+          OPENAI_MODEL: gpt-5.4 #gpt-5.4-mini
           PR: ${{ github.event.pull_request.number }}
           REVIEW_PROMPT: >-
             You are a senior engineer reviewing a pull request for a Python
@@ -53,7 +53,12 @@ jobs:
             If the diff looks clean, say so rather than inventing problems.
         # Default shell is `bash -eo pipefail`, so a non-zero exit anywhere in
         # the pipe fails the step (and skips the comment) rather than posting
-        # an empty review.
+        # an empty review. The `-s` guard skips commenting when there's nothing
+        # to say (empty diff → the script writes no stdout).
         run: |
           gh pr diff "$PR" | python3 .github/scripts/ai_review.py > review.md
-          gh pr comment "$PR" --body-file review.md
+          if [ -s review.md ]; then
+            gh pr comment "$PR" --body-file review.md
+          else
+            echo "No review output — skipping comment."
+          fi
