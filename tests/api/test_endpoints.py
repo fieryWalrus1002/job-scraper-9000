@@ -51,6 +51,22 @@ async def test_jobs_empty_result(client: AsyncClient, fake_conn) -> None:
     assert body["items"] == []
 
 
+async def test_jobs_excludes_triaged_applications_by_default(
+    client: AsyncClient, fake_conn
+) -> None:
+    setup_list_response(fake_conn, [FAKE_JOB_ROW])
+    resp = await client.get("/api/jobs")
+    assert resp.status_code == 200
+
+    count_sql = fake_conn.execute.await_args_list[0].args[0]
+    list_sql = fake_conn.execute.await_args_list[1].args[0]
+    combined_sql = f"{count_sql}\n{list_sql}"
+    assert "LEFT JOIN app.user_applications a" in combined_sql
+    assert "a.user_id = s.user_id" in combined_sql
+    assert "a.dedup_hash = s.dedup_hash" in combined_sql
+    assert "a.dedup_hash IS NULL" in combined_sql
+
+
 async def test_jobs_item_fields(client: AsyncClient, fake_conn) -> None:
     setup_list_response(fake_conn, [FAKE_JOB_ROW])
     resp = await client.get("/api/jobs")
