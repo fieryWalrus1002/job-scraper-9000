@@ -78,17 +78,15 @@ build-images:
     docker build --target scraper -t job-scraper -f docker/app.Dockerfile .
     docker build -t job-ingest -f docker/ingest.Dockerfile .
 
-# Upload scored JSONL to Azure Blob Storage pending container.
+# Upload a run's per-user scored files to the `pending` blob container.
+# One blob per user (pending/<run-id>/<slug>__scored.jsonl) → one KEDA ingest
+# Job execution each; records self-route by their stamped user_email, so no
+# per-blob --user-email is needed.
 # Requires AZURE_STORAGE_ACCOUNT in .env and an active `az login` session
-# (uses --auth-mode login; no AZURE_STORAGE_KEY needed).
-upload-blob DATE=DATE:
-    az storage blob upload \
-      --account-name "$AZURE_STORAGE_ACCOUNT" \
-      --container-name pending \
-      --name "{{DATE}}/skills_fit_scored.jsonl" \
-      --file "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
-      --auth-mode login \
-      --overwrite
+# (AAD --auth-mode login; needs the Storage Blob Data Contributor role).
+#   just upload-blob RUN_ID=2026-06-12T1635-overnight
+upload-blob RUN_ID:
+    uv run scripts/upload_blob.py --run-id {{RUN_ID}}
 
 # Build and push the API container image to Azure Container Registry and trigger a new revision
 ship-api:
