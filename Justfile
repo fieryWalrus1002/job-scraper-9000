@@ -28,6 +28,11 @@ filter-skills:
 ingest-run RUN_ID:
     uv run scripts/ingest_run.py --run-id {{RUN_ID}}
 
+# Run the multi-user overnight pipeline. PRODUCE-ONLY: writes per-user scored
+# files to data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl and does
+# NOT write job_scores. To land scores, follow with `just upload-blob RUN_ID=…`
+# (cloud → ACA ingest) or `just ingest-run RUN_ID=…` (local DB). run_id is in
+# the run summary. Reads the Azure DB for planning/queue only.
 run-overnight:
     #!/usr/bin/env bash
     set -euo pipefail

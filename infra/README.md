@@ -222,6 +222,75 @@ Schema is owned by Alembic (migrations run on API lifespan startup); the ingest
 job applies no DDL and ingests against the already-migrated database, which is
 not exposed externally.
 
+## Ingest: decoupled blob → ACA Job (Phase 15)
+
+The overnight pipeline is **produce-only** — it writes per-user scored files
+locally and never writes `raw.job_scores`. Ingest is fully decoupled and runs
+*inside* Azure, next to the DB, so the home machine never needs a Postgres
+firewall rule against the private-endpoint DB.
+
+Flow:
+
+1. **Produce** — `just run-overnight` writes
+   `data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl` per user. Each
+   record is stamped with its owning `user_email`.
+
+1. **Upload** — `just upload-blob RUN_ID=<run_id>` walks the run and uploads
+   one blob per user to the `pending` container as
+   `pending/<run_id>/<slug>__scored.jsonl`. Auth is AAD (`az --auth-mode login`);
+   the operator's identity needs the **Storage Blob Data Contributor** role on
+   the storage account (no account key on the laptop).
+
+1. **Ingest** — the `<prefix>-ingest-job` ACA Job (`modules/ingestJob.bicep`)
+   has a KEDA `azure-blob` trigger on `pending` (`blobCountPerJob=1`,
+   `parallelism=1`), so **one blob per user fans out one Job execution per
+   user**. It runs `python -m ingest.cli --blob-mode` and, per blob:
+
+   - success → moves the blob to the `processed` container;
+   - empty blob → `processed` (no-op success);
+   - unparseable JSONL or unresolvable user → `failed` with a `reason` metadata
+     tag (dead-letter, so KEDA doesn't re-trigger on the same poison blob).
+
+   Records self-route by their stamped `user_email`, so the Job passes no global
+   `--user-email`. The DB is reached over the private endpoint; storage uses an
+   account-key connection string secret (moving the Job to managed identity is a
+   tracked follow-up).
+
+Watch executions:
+
+```bash
+just watch-az-ingest    # az containerapp job execution list, refreshed
+```
+
+### End-to-end dry-run validation (non-prod)
+
+Validate the whole chain against a **non-prod** DB + storage account before
+trusting a real overnight run — point `DATABASE_URL` / storage at a throwaway
+target, never prod:
+
+```bash
+# 1. Produce a small run locally (or reuse an existing data/pipeline_runs/<run_id>).
+just run-overnight                      # note the run_id from the summary
+
+# 2. Dry-run the local ingest first — parses + resolves every user, writes nothing.
+uv run scripts/ingest_run.py --run-id <run_id> --dry-run
+
+# 3. Upload to the NON-PROD storage account's `pending` container.
+AZURE_STORAGE_ACCOUNT=<nonprod-account> just upload-blob RUN_ID=<run_id>
+
+# 4. Watch the ACA Job fan out one execution per blob; confirm blobs land in
+#    `processed` (success) and none in `failed`.
+just watch-az-ingest
+
+# 5. Confirm scores in the non-prod DB, routed to the right users.
+#    psql/pgcli: SELECT u.email, count(*) FROM raw.job_scores s
+#                JOIN app.users u ON u.id = s.user_id GROUP BY u.email;
+```
+
+A blob in `failed/` carries a `reason` tag (`unparseable_jsonl` /
+`unresolvable_user`) — inspect it, fix the cause, and re-upload; the dead-letter
+means it won't silently retry.
+
 ## Injecting DATABASE_URL
 
 `DATABASE_URL` must be set as a secret-backed env var — not a plain env var — so the connection string isn't exposed in the ACA config.

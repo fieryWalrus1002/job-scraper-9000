@@ -20,7 +20,7 @@ This repo treats `data/` as the local pipeline workspace. Most JSONL contents ar
 | `data/pipeline_runs/` | Overnight pipeline (`planner`, `worker`, `consolidation`, `scoring`)                             | `data/pipeline_runs/<run_id>/_consolidated/*.jsonl` + `<run_id>/<slug>/{scrape,skills_fit}/*.jsonl` and the per-run config snapshot `.yml`; run-first partition, gitignored (PII)                         |
 | `data/user_configs/`  | `scripts/pull_user_configs.py` — materializes live DB configs per user                           | `data/user_configs/<slug>/{search,candidate_profile,policies}.yml`; overwritten, gitignored (PII)                                                                                                         |
 
-`data/scored/` is documented separately under "Planned but not yet implemented" below.
+`data/scored/` is the retired single-user output path, documented under "Retired paths" below.
 
 ## Details and code evidence
 
@@ -243,13 +243,11 @@ jq -s 'map(select(.timing.started_at | startswith("2026-05-21"))) | group_by(.co
 jq -s 'map(select(.component == "remote_filter" and .cost != null)) | group_by(.llm.model) | map({model: .[0].llm.model, median: ([.[].cost.estimated_per_record] | sort | .[length/2])})' data/run_telemetry/runs.jsonl
 ```
 
-## Planned but not yet implemented
+## Retired paths
 
 ### `data/scored/`
 
-**Purpose (planned):** Skills_fit production-runner output. Will hold per-job 1-5 ordinal fit scores, rationale, and matching evidence — the dispatch-ready output that drives the daily shortlist.
-
-**Status:** No writer implemented. Mentioned in specs as the planned skills_fit production output path, e.g. `data/scored/<DATE>/skills_fit_scored.jsonl`. Will land with Phase B of the skills_fit agent plan.
+**Status: retired (superseded).** This was the single-user skills_fit output path, e.g. `data/scored/<DATE>/skills_fit_scored.jsonl`. The multi-user overnight pipeline (Phase 13+) writes scored output **per user, per run** instead, at `data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl` (see [`data/pipeline_runs/`](#datapipeline_runs) above). Nothing writes to `data/scored/` anymore; the single-user `ingest` / `pipeline` Justfile recipes that consumed it were removed with #173/#212.
 
 ## Notes
 
