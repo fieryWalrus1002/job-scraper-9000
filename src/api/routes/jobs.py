@@ -17,9 +17,10 @@ router = APIRouter(prefix="/jobs", tags=["Jobs"])
 # Feed queries join shared postings (p) to the current user's scores (s);
 # the join itself is the visibility rule — no score row, not your job.
 _LIST_COLS = """
-    dedup_hash, p.source, p.source_url, p.title, p.company, p.location, p.posted_at,
-    p.remote_classification::TEXT, p.salary_min_usd, p.salary_max_usd, p.salary_period,
-    s.fit_score, s.confidence::TEXT, s.score_rationale, s.failure_reason, s.scored_at
+    p.dedup_hash AS dedup_hash, p.source, p.source_url, p.title, p.company, p.location,
+    p.posted_at, p.remote_classification::TEXT, p.salary_min_usd, p.salary_max_usd,
+    p.salary_period, s.fit_score, s.confidence::TEXT, s.score_rationale,
+    s.failure_reason, s.scored_at
 """
 
 _DETAIL_COLS = """
@@ -36,6 +37,13 @@ _DETAIL_COLS = """
 _FROM = """
     FROM raw.job_postings p
     JOIN raw.job_scores s USING (dedup_hash)
+"""
+
+_LIST_FROM = """
+    FROM raw.job_postings p
+    JOIN raw.job_scores s USING (dedup_hash)
+    LEFT JOIN app.user_applications a
+        ON a.user_id = s.user_id AND a.dedup_hash = s.dedup_hash
 """
 
 
@@ -73,7 +81,10 @@ async def list_jobs(
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
-    filters: list[str] = ["s.user_id = %(user_id)s"]
+    # In the triage funnel, Jobs is the only untriaged bucket. Any
+    # app.user_applications row means the job belongs on another tab
+    # (Shortlist/Tracking/Trash), regardless of its specific status.
+    filters: list[str] = ["s.user_id = %(user_id)s", "a.dedup_hash IS NULL"]
     params: dict = {"user_id": user.id}
 
     if min_score is not None:
@@ -107,10 +118,10 @@ async def list_jobs(
 
     where = "WHERE " + " AND ".join(filters)
 
-    count_sql = f"SELECT COUNT(*) AS n {_FROM} {where}"
+    count_sql = f"SELECT COUNT(*) AS n {_LIST_FROM} {where}"
     list_sql = f"""
         SELECT {_LIST_COLS}
-        {_FROM}
+        {_LIST_FROM}
         {where}
         ORDER BY s.fit_score DESC NULLS LAST, s.scored_at DESC
         LIMIT %(limit)s OFFSET %(offset)s
