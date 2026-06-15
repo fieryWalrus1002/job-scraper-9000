@@ -3,14 +3,20 @@
 
 Walks ``data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl`` via
 :func:`pipeline.scoring.iter_run_user_outputs` and uploads each to
-``pending/<run_id>/<slug>__scored.jsonl``.
+``pending/<run_id>__<slug>__scored.jsonl``.
 
 One blob per user (D4): the in-Azure ACA ingest job is KEDA ``azure-blob``
-triggered with ``blobCountPerJob=1``, so one blob per user fans out one Job
-execution per user and preserves the dead-letter failure isolation (a bad
-record dead-letters that user's blob alone). Records self-route on ingest by
-their stamped ``user_email`` (slice 2), so no per-blob ``--user-email`` is
-needed.
+triggered with ``blobCountPerJob=1``, so one blob per user preserves the
+dead-letter failure isolation (a bad record dead-letters that user's blob
+alone). Records self-route on ingest by their stamped ``user_email`` (slice 2),
+so no per-blob ``--user-email`` is needed.
+
+**Blob names are flat (no ``/``), at the container root.** The KEDA azure-blob
+scaler counts blobs at the container root only (default ``blobDelimiter`` is
+``/``), so a nested ``<run_id>/<slug>...`` key sits in a virtual folder the
+scaler ignores and the trigger never fires. Encoding ``run_id`` and ``slug``
+into a flat ``<run_id>__<slug>__scored.jsonl`` name keeps the blob countable
+while preserving traceability (revises D4's nested layout).
 
 Auth: AAD via ``az ... --auth-mode login`` (D3). The uploader runs on a laptop
 with ``az login`` — no account key on disk. The operator's identity needs the
@@ -84,7 +90,7 @@ def upload_run(
     upload_fn: UploadFn = _az_upload,
 ) -> list[str]:
     """Upload each of a run's per-user scored files to
-    ``<container>/<run_id>/<slug>__scored.jsonl`` (overwrite/idempotent).
+    ``<container>/<run_id>__<slug>__scored.jsonl`` (overwrite/idempotent).
 
     Returns the blob names uploaded, in the walk's deterministic order.
     ``upload_fn`` is injectable so tests run without touching Azure. Raises
@@ -93,7 +99,7 @@ def upload_run(
     """
     blob_names: list[str] = []
     for out in iter_run_user_outputs(runs_dir, run_id):
-        blob_name = f"{run_id}/{out.slug}__scored.jsonl"
+        blob_name = f"{run_id}__{out.slug}__scored.jsonl"
         log.info("Uploading %s → %s/%s", out.user_email, container, blob_name)
         upload_fn(
             account_name=account_name,
