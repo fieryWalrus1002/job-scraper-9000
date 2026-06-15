@@ -18,7 +18,14 @@ import uuid
 
 import pytest
 
-_AZURITE_IMAGE = "mcr.microsoft.com/azure-storage/azurite"
+# Pinned to a digest, not :latest, for reproducible runs (#257). MCR
+# intermittently 401s anonymous pulls of the mutable :latest tag; a digest is
+# immutable and dodges that class of failure. To refresh: pull the new image
+# and read `docker inspect --format '{{index .RepoDigests 0}}' <image>`.
+_AZURITE_IMAGE = (
+    "mcr.microsoft.com/azure-storage/azurite"
+    "@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37"
+)
 _HOST_BLOB_PORT = 20010
 
 # Well-known Azurite development account (public, from Azurite source constants.js)
@@ -47,6 +54,41 @@ def _port_available(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 
+def _image_present(image: str) -> bool:
+    """True if ``image`` is already cached locally (no registry contact)."""
+    return (
+        subprocess.run(
+            ["docker", "image", "inspect", image], capture_output=True
+        ).returncode
+        == 0
+    )
+
+
+def _ensure_image(image: str, *, attempts: int = 3, base_delay: float = 2.0) -> None:
+    """Make sure ``image`` is available locally, pulling with backoff if not.
+
+    The azurite image lives on MCR, which intermittently 401s anonymous pulls
+    (#257). We only pull when the image is missing — a cached image keeps
+    working offline and doesn't newly depend on the registry — and retry a
+    needed pull so a transient blip becomes a slow success instead of a hard
+    failure. Fails loud if every attempt is exhausted: never skip, or CI would
+    go green without exercising the ingest path at all.
+    """
+    if _image_present(image):
+        return
+    last: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(1, attempts + 1):
+        last = subprocess.run(["docker", "pull", image], capture_output=True, text=True)
+        if last.returncode == 0:
+            return
+        if attempt < attempts:
+            time.sleep(base_delay * 2 ** (attempt - 1))
+    raise RuntimeError(
+        f"docker pull {image!r} failed after {attempts} attempts; last stderr:\n"
+        f"{last.stderr if last else '(no output)'}"
+    )
+
+
 @pytest.fixture(scope="session")
 def azurite_conn_str():
     """Start Azurite blob emulator in Docker; yield its connection string for the session."""
@@ -54,6 +96,10 @@ def azurite_conn_str():
         pytest.skip("Docker not available")
     if not _port_available(_HOST_BLOB_PORT):
         pytest.skip(f"Port {_HOST_BLOB_PORT} is already in use")
+
+    # Pull (with retry) before `docker run` so a flaky registry surfaces as a
+    # clear error here rather than a cryptic `docker run` exit 125.
+    _ensure_image(_AZURITE_IMAGE)
 
     name = f"azurite-ingest-{uuid.uuid4().hex[:8]}"
     subprocess.run(
