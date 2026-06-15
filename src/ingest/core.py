@@ -70,15 +70,6 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def ensure_schema(conn: psycopg.Connection, schema_path: Path) -> None:
-    """Explicitly injected schema dependency."""
-    raw_sql = schema_path.read_text(encoding="utf-8")
-    with conn.cursor() as cur:
-        cur.execute(raw_sql)  # type: ignore[argument-type]
-    conn.commit()
-    log.info("Schema applied successfully from %s", schema_path)
-
-
 def _strip_nul(record: dict) -> dict:
     """Recursively drop NUL bytes (U+0000) from every string in the record.
 

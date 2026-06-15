@@ -24,8 +24,6 @@ def _ns(**kwargs) -> argparse.Namespace:
     defaults = dict(
         db_url=None,
         input=None,
-        schema_path="db/schema.sql",
-        apply_schema=False,
         dry_run=False,
         blob_mode=False,
         user_email=None,
@@ -59,7 +57,7 @@ def test_input_omitted_without_blob_mode_exits_1(monkeypatch):
 def test_main_rejects_missing_input_without_blob_mode():
     """main() flat parser exits 2 (argparse error) when --input is omitted and --blob-mode is unset."""
     with pytest.raises(SystemExit) as exc:
-        main(["--schema-path", "db/schema.sql"])
+        main([])
     assert exc.value.code == 2
 
 

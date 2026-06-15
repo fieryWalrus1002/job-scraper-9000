@@ -10,6 +10,5 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY src/ingest ./ingest
-COPY db/schema.sql ./db/schema.sql
 ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT ["python", "-m", "ingest.cli"]

@@ -218,8 +218,9 @@ az deployment group create \
 > the connection string is not exposed in plain-text env vars. Managed Identity
 > would be the next step up in security posture but requires more Entra ID setup.
 
-Schema migration (`db/schema.sql`) is applied from inside Azure by the ingest job —
-the database is not exposed externally.
+Schema is owned by Alembic (migrations run on API lifespan startup); the ingest
+job applies no DDL and ingests against the already-migrated database, which is
+not exposed externally.
 
 ## Injecting DATABASE_URL
 

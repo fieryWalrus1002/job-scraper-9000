@@ -277,9 +277,9 @@ def test_0006_downgrade_drops_users(fresh_pg):
 
 
 def _legacy_schema_sql() -> str:
-    """The pre-0007 raw.scored_job_postings DDL, inlined: db/schema.sql now
-    describes the split tables, but 0007 must be tested against the legacy
-    shape it migrates."""
+    """The pre-0007 raw.scored_job_postings DDL, inlined: 0007 must be tested
+    against the legacy single-table shape it migrates (the hand-maintained
+    db/schema.sql that once described it has since been retired, #173)."""
     return """
     CREATE SCHEMA IF NOT EXISTS raw;
     DO $$ BEGIN
@@ -408,8 +408,9 @@ def test_0007_composite_pk_allows_second_user_rows(fresh_pg):
 
 @skip_if_no_docker
 def test_0007_upgrade_on_fresh_db_without_legacy_table(fresh_pg):
-    """A fresh DB never had raw.scored_job_postings (it came from
-    db/schema.sql, not Alembic) — 0007 must bootstrap raw itself."""
+    """A fresh DB never had raw.scored_job_postings (it came from the
+    now-retired hand-maintained schema, not Alembic) — 0007 must bootstrap
+    raw itself."""
     _run_alembic("0007", fresh_pg, extra_env=_BOOTSTRAP)
 
     with psycopg.connect(fresh_pg) as conn:

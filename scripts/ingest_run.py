@@ -39,29 +39,18 @@ from pipeline.scoring import iter_run_user_outputs  # noqa: E402
 log = logging.getLogger(__name__)
 
 DEFAULT_RUNS_DIR = REPO_ROOT / "data" / "pipeline_runs"
-# Legacy positional still required by the ingest CLI; unused without
-# --apply-schema (which this recipe never passes — the local DB is already
-# migrated). Goes away with #173 (slice 5).
-DEFAULT_SCHEMA_PATH = REPO_ROOT / "db" / "schema.sql"
 
 IngestFn = Callable[..., None]
-"""``(scored_path=, schema_path=, dry_run=) -> None``."""
+"""``(scored_path=, dry_run=) -> None``."""
 
 
-def _cli_ingest(*, scored_path: Path, schema_path: Path, dry_run: bool) -> None:
+def _cli_ingest(*, scored_path: Path, dry_run: bool) -> None:
     """Ingest one file through the existing ``ingest`` CLI subcommand.
 
     ``check=True`` so a failed file raises rather than being silently skipped;
     DATABASE_URL is inherited from the environment (the CLI reads it).
     """
-    cmd = [
-        "job-scraper-9000",
-        "ingest",
-        "--input",
-        str(scored_path),
-        "--schema-path",
-        str(schema_path),
-    ]
+    cmd = ["job-scraper-9000", "ingest", "--input", str(scored_path)]
     if dry_run:
         cmd.append("--dry-run")
     subprocess.run(cmd, check=True)
@@ -71,7 +60,6 @@ def ingest_run(
     *,
     run_id: str,
     runs_dir: Path = DEFAULT_RUNS_DIR,
-    schema_path: Path = DEFAULT_SCHEMA_PATH,
     dry_run: bool = False,
     ingest_fn: IngestFn = _cli_ingest,
 ) -> list[Path]:
@@ -85,7 +73,7 @@ def ingest_run(
     ingested: list[Path] = []
     for out in iter_run_user_outputs(runs_dir, run_id):
         log.info("Ingesting %s ← %s", out.user_email, out.scored_path)
-        ingest_fn(scored_path=out.scored_path, schema_path=schema_path, dry_run=dry_run)
+        ingest_fn(scored_path=out.scored_path, dry_run=dry_run)
         ingested.append(out.scored_path)
 
     if not ingested:
@@ -104,7 +92,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True, dest="run_id")
     parser.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR, type=Path)
-    parser.add_argument("--schema-path", default=DEFAULT_SCHEMA_PATH, type=Path)
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -115,7 +102,6 @@ def main() -> int:
     ingest_run(
         run_id=args.run_id,
         runs_dir=args.runs_dir,
-        schema_path=args.schema_path,
         dry_run=args.dry_run,
     )
     return 0

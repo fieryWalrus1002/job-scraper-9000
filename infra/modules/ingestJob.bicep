@@ -77,9 +77,6 @@ resource ingestJob 'Microsoft.App/jobs@2024-03-01' = {
             'python'
             '-m'
             'ingest.cli'
-            '--schema-path'
-            'db/schema.sql'
-            '--apply-schema'
             '--blob-mode'
           ]
           env: [

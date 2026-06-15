@@ -19,18 +19,6 @@ filter-remote:
 filter-skills:
     uv run job-scraper-9000 skills-fit --run-date {{DATE}}
 
-ingest DATE=DATE:
-    uv run job-scraper-9000 ingest \
-      --input "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
-      --schema-path "db/schema.sql"
-
-# Ingest a fresh db with this one
-ingest-init DATE=DATE:
-    uv run job-scraper-9000 ingest \
-      --input "data/scored/{{DATE}}/skills_fit_scored.jsonl" \
-      --schema-path "db/schema.sql" \
-      --apply-schema
-
 # Ingest a completed overnight run's per-user scored files into the LOCAL DB
 # (dev only). Walks data/pipeline_runs/<RUN_ID>/<slug>/skills_fit/scored.jsonl
 # and feeds each through the ingest CLI; records self-route by their stamped
@@ -39,13 +27,6 @@ ingest-init DATE=DATE:
 #   just ingest-run RUN_ID=2026-06-12T1635-overnight
 ingest-run RUN_ID:
     uv run scripts/ingest_run.py --run-id {{RUN_ID}}
-
-pipeline:
-    just scrape
-    just prefilter
-    just filter-remote
-    just filter-skills
-    just ingest
 
 run-overnight:
     #!/usr/bin/env bash
