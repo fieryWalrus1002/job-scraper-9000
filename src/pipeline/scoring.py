@@ -16,7 +16,10 @@ consolidated union (profile-free), this phase splits back out per user:
 This phase is **produce-only** (Phase 15 D1): it never writes
 ``raw.job_scores``. Ingest is a separate downstream concern — the blob → ACA
 Job path in the cloud, a standalone local-dev recipe locally — so the
-pipeline and ingest are fully decoupled.
+pipeline and ingest are fully decoupled. Each scored record is stamped with
+its owning ``user_email`` (Phase 15 G2) so the file self-routes on ingest;
+:func:`iter_run_user_outputs` is the shared walk both downstream paths use to
+find a run's per-user scored files.
 
 Each user scores against their own materialized
 ``data/pipeline_runs/<run_id>/<slug>/candidate_profile.yml`` (written by the
@@ -36,8 +39,9 @@ from __future__ import annotations
 import json
 import logging
 import traceback
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, NamedTuple
 
 import psycopg
 from psycopg.rows import dict_row
@@ -80,6 +84,77 @@ _SELECT_USER_POSTINGS = """
 
 def skills_fit_dir(runs_dir: Path, email: str, run_id: str) -> Path:
     return run_user_dir(runs_dir, run_id, email) / SKILLS_FIT_DIRNAME
+
+
+class RunUserOutput(NamedTuple):
+    """One user's scored output within a run (Phase 15 §5)."""
+
+    user_email: str
+    slug: str
+    scored_path: Path
+
+
+def _stamp_user_email(scored_path: Path, user_email: str) -> None:
+    """Stamp ``user_email`` into every scored record so the file self-routes
+    on ingest (Phase 15 G2). ``ingest.core.resolve_user_ids`` reads a
+    per-record ``user_email``; the consolidated postings are profile-free and
+    carry none, so the producer — the only place that knows which user a
+    scored file belongs to — stamps it here at write time.
+
+    Idempotent and authoritative: the owning user overwrites any existing
+    value. Fails loud (the file is small, fully rewritten) per the repo's
+    fail-fast rule.
+    """
+    records = [
+        json.loads(line)
+        for line in scored_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    with scored_path.open("w", encoding="utf-8") as f:
+        for rec in records:
+            rec["user_email"] = user_email
+            f.write(json.dumps(rec) + "\n")
+
+
+def iter_run_user_outputs(runs_dir: Path, run_id: str) -> Iterator[RunUserOutput]:
+    """Yield one :class:`RunUserOutput` per user with a scored file in a run.
+
+    The single definition of where a run's per-user outputs live (Phase 15
+    §5), shared by the blob uploader (slice 3) and the local-dev ingest recipe
+    (slice 4) so they can't drift. Walks the run-first tree
+    ``data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl`` — the
+    ``_consolidated`` stage dir has no ``skills_fit/`` child and is naturally
+    skipped. ``user_email`` is read back from the file's first stamped record
+    (:func:`_stamp_user_email` guarantees every record carries it), so the
+    walk needs no DB. Sorted by path for a deterministic order.
+    """
+    run_dir = runs_dir / run_id
+    pattern = f"*/{SKILLS_FIT_DIRNAME}/{SCORED_NAME}"
+    for scored_path in sorted(run_dir.glob(pattern)):
+        slug = scored_path.parent.parent.name
+        yield RunUserOutput(
+            user_email=_first_record_user_email(scored_path),
+            slug=slug,
+            scored_path=scored_path,
+        )
+
+
+def _first_record_user_email(scored_path: Path) -> str:
+    """``user_email`` from the first record of a scored file. Fails loud if the
+    file is empty or the field is missing — a stamped file must have it, and a
+    silent skip would orphan a user's scores downstream."""
+    with scored_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            email = json.loads(line).get("user_email")
+            if not email:
+                raise ValueError(
+                    f"{scored_path} first record has no user_email — "
+                    "score_run should have stamped it"
+                )
+            return email
+    raise ValueError(f"{scored_path} is empty — cannot determine user_email")
 
 
 def _load_classified(runs_dir: Path, run_id: str) -> dict[str, dict[str, Any]]:
@@ -239,6 +314,7 @@ def score_run(
                 run_date=run_date,
                 parent_run_id=run_id,
             )
+            _stamp_user_email(scored_path, email)
 
             summary["users_scored"] += 1
             summary["postings_scored"] += len(survivors)
