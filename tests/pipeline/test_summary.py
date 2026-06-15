@@ -3,7 +3,7 @@ and the all-failed exit verdict (Phase 13 slice 7, spec §7).
 
 Scrape outcomes are seeded straight into ``pipe.scrape_jobs`` against a real
 Postgres so the grouping query runs its actual SQL; the scoring summary is
-the in-memory dict ``score_and_ingest_run`` returns.
+the in-memory dict ``score_run`` returns.
 """
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ def test_all_users_failed_exits_nonzero(migrated_pg, tmp_path):
 
 @skip_if_no_docker
 def test_scoring_failure_marks_user_failed(migrated_pg, tmp_path):
-    """A user whose scrape succeeded but whose skills_fit/ingest raised is
+    """A user whose scrape succeeded but whose skills_fit step raised is
     failed overall — and is the only user, so the run all-failed."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "scorefail@example.com")
@@ -117,7 +117,7 @@ def test_scoring_failure_marks_user_failed(migrated_pg, tmp_path):
 
     assert summary["all_failed"] is True
     assert summary["users_failed"] == 1
-    assert "skills_fit/ingest: ValueError: bad profile" in summary["text"]
+    assert "skills_fit: ValueError: bad profile" in summary["text"]
 
 
 @skip_if_no_docker

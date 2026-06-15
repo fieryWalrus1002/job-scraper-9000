@@ -30,11 +30,9 @@ from pipeline.consolidation import (
 from pipeline.planner import plan_run
 from pipeline.queue import pending_count, requeue_running
 from pipeline.scoring import (
-    IngestFn,
     ScoreFn,
-    default_ingest_fn,
     default_score_fn,
-    score_and_ingest_run,
+    score_run,
 )
 from pipeline.summary import build_overnight_summary
 from pipeline.worker import ScrapeFn, default_scrape_fn, run_worker
@@ -66,20 +64,20 @@ def run_overnight(
     scrape_fn: ScrapeFn = default_scrape_fn,
     classify_fn: ClassifyFn = default_classify_fn,
     score_fn: ScoreFn = default_score_fn,
-    ingest_fn: IngestFn = default_ingest_fn,
 ) -> dict[str, Any]:
-    """Plan + scrape + consolidate + classify + score + ingest.
+    """Plan + scrape + consolidate + classify + score (produce-only).
 
     Returns a summary the CLI prints. ``scrape_only=True`` stops after the
     scrape phase. The default invocation runs the full pipeline through
-    per-user ingest. Every return path attaches ``summary["run_summary"]`` —
-    the per-user, stderr-ready end-of-run rollup with the all-failed verdict
-    (spec §7).
+    per-user scoring, emitting per-user scored JSONL files; ingest into
+    ``raw.job_scores`` is a separate downstream concern (Phase 15 D1). Every
+    return path attaches ``summary["run_summary"]`` — the per-user,
+    stderr-ready end-of-run rollup with the all-failed verdict (spec §7).
 
-    ``scrape_fn`` / ``classify_fn`` / ``score_fn`` / ``ingest_fn`` are
-    injectable for tests; production callers take the defaults. ``run_id`` is
-    normally minted by the CLI (so the log file and run dir share one
-    timestamp); it defaults to a freshly-minted id for direct callers.
+    ``scrape_fn`` / ``classify_fn`` / ``score_fn`` are injectable for tests;
+    production callers take the defaults. ``run_id`` is normally minted by the
+    CLI (so the log file and run dir share one timestamp); it defaults to a
+    freshly-minted id for direct callers.
     """
     url = database_url or os.environ.get("DATABASE_URL")
     if not url:
@@ -119,17 +117,17 @@ def run_overnight(
         runs_dir=runs_dir, run_id=run_id, classify_fn=classify_fn
     )
 
-    # skills_fit + ingest fan back out per user. A fresh connection: the
-    # classification phase ran entirely on disk, and ingest wants its own
-    # transactions per user batch.
+    # skills_fit fans back out per user, writing per-user scored JSONL files
+    # (produce-only — no job_scores write; Phase 15 D1). A fresh connection:
+    # the classification phase ran entirely on disk, and scoring needs the DB
+    # only to read each user's requested postings + remote policy.
     with psycopg.connect(url, autocommit=True) as conn:
-        summary["scoring"] = score_and_ingest_run(
+        summary["scoring"] = score_run(
             conn,
             run_id=run_id,
             run_date=run_date,
             runs_dir=runs_dir,
             score_fn=score_fn,
-            ingest_fn=ingest_fn,
         )
 
     return _finalize(url, summary)

@@ -5,9 +5,8 @@ surfaces of an overnight run into a per-user verdict:
 
 - **scrape jobs** — ``pipe.scrape_jobs`` rows the worker marked ``failed``
   (full traceback already captured in ``error`` and logged at failure time).
-- **skills_fit / ingest** — per-user steps that raised, isolated by
-  :func:`pipeline.scoring.score_and_ingest_run` into its summary's
-  ``per_user`` entries.
+- **skills_fit** — per-user scoring steps that raised, isolated by
+  :func:`pipeline.scoring.score_run` into its summary's ``per_user`` entries.
 
 A user is **ok** when at least one of their scrapes succeeded *and* their
 scoring step (if reached) did not raise — they may legitimately have scored
@@ -136,5 +135,5 @@ def _format(
         for source, exc in u["scrape_failed"]:
             lines.append(f"      ✗ {source}: {exc}")
         if u["scoring_failed"]:
-            lines.append(f"    ✗ skills_fit/ingest: {u['scoring_error']}")
+            lines.append(f"    ✗ skills_fit: {u['scoring_error']}")
     return "\n".join(lines)

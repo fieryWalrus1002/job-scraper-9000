@@ -1,25 +1,31 @@
-"""skills_fit + ingest phase (Phase 13 spec §8 steps 5–6, slice 6).
+"""skills_fit scoring phase (Phase 13 spec §8 steps 5–6; produce-only per
+Phase 15 §5/§6 D1).
 
 The closing fan-out of the pipeline. After classification has labelled the
 consolidated union (profile-free), this phase splits back out per user:
 
-1. :func:`score_and_ingest_run` — for each user that requested at least one
-   posting, gate the union by *that user's*
+1. :func:`score_run` — for each user that requested at least one posting,
+   gate the union by *that user's*
    ``policies.remote.acceptable_classifications`` (the per-user remote
-   policy, applied post-classification per spec §3), run skills_fit over the
-   survivors as **one batch per user** (prompt-cache warmth is per
+   policy, applied post-classification per spec §3), then run skills_fit
+   over the survivors as **one batch per user** (prompt-cache warmth is per
    ``(user, profile_version)`` — a cross-user batch would carry the wrong
-   candidate profile in its system prompt), then ingest the scored JSONL
-   into that user's ``raw.job_scores`` rows.
+   candidate profile in its system prompt), writing the scored JSONL to
+   ``data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl``.
+
+This phase is **produce-only** (Phase 15 D1): it never writes
+``raw.job_scores``. Ingest is a separate downstream concern — the blob → ACA
+Job path in the cloud, a standalone local-dev recipe locally — so the
+pipeline and ingest are fully decoupled.
 
 Each user scores against their own materialized
-``runs/<slug>/<run_id>/candidate_profile.yml`` (written by the planner), so
-the score embeds the right profile and records the right ``profile_version``.
+``data/pipeline_runs/<run_id>/<slug>/candidate_profile.yml`` (written by the
+planner), so the score embeds the right profile and records the right
+``profile_version``.
 
-``score_fn`` / ``ingest_fn`` are injectable to keep tests off the LLM and,
-for ``score_fn``, off the network — mirroring the worker's ``scrape_fn`` and
-consolidation's ``classify_fn``. Production wires in :func:`default_score_fn`
-and :func:`default_ingest_fn`.
+``score_fn`` is injectable to keep tests off the LLM and off the network —
+mirroring the worker's ``scrape_fn`` and consolidation's ``classify_fn``.
+Production wires in :func:`default_score_fn`.
 
 Per-user failure isolation (capturing an exception from one user without
 sinking the run) is slice 7 (#201); this slice fails loud.
@@ -52,9 +58,6 @@ SCORED_NAME = "scored.jsonl"
 
 ScoreFn = Callable[..., dict[str, Any]]
 """``(input_path=, output_path=, profile_file=, run_date=, parent_run_id=) -> summary``."""
-
-IngestFn = Callable[..., dict[str, Any]]
-"""``(scored_path=, user_email=, conn=) -> summary``."""
 
 # Per-user query: invert consolidated_postings.requested_by into one row per
 # user with the dedup_hashes they want, plus their stored policies. A user
@@ -138,52 +141,30 @@ def default_score_fn(
     )
 
 
-def default_ingest_fn(
-    *,
-    scored_path: Path,
-    user_email: str,
-    conn: psycopg.Connection,
-) -> dict[str, Any]:
-    """Production ingest: route one user's scored JSONL to their job_scores.
-
-    ``default_user_email`` is the owning user — the consolidated postings are
-    profile-free and carry no ``user_email`` field, so the rows route by this
-    argument alone.
-    """
-    from ingest.core import ingest, read_jsonl
-
-    records = read_jsonl(scored_path)
-    if not records:
-        return {
-            "total": 0,
-            "postings_inserted": 0,
-            "scores_inserted": 0,
-            "scores_updated": 0,
-        }
-    return ingest(records, conn=conn, default_user_email=user_email)
-
-
-def score_and_ingest_run(
+def score_run(
     conn: psycopg.Connection,
     *,
     run_id: str,
     run_date: str | None,
     runs_dir: Path,
     score_fn: ScoreFn = default_score_fn,
-    ingest_fn: IngestFn = default_ingest_fn,
 ) -> dict[str, Any]:
-    """Per-user skills_fit + ingest over the classified union.
+    """Per-user skills_fit over the classified union — **produce-only**.
+
+    Writes each user's scored survivors to
+    ``data/pipeline_runs/<run_id>/<slug>/skills_fit/scored.jsonl`` and never
+    touches ``raw.job_scores`` (Phase 15 D1); ingest is a separate downstream
+    concern. ``conn`` is read-only here — it serves the per-user postings +
+    policy query only.
 
     Returns a summary: ``{"users_scored": N, "users_skipped_no_postings": M,
-    "users_failed": F, "postings_scored": K, "scores_inserted": …,
-    "scores_updated": …, "postings_unclassified": …, "per_user": [...]}``.
-    The end-of-run summary (:mod:`pipeline.summary`) builds on it.
+    "users_failed": F, "postings_scored": K, "postings_unclassified": …,
+    "per_user": [...]}``. The end-of-run summary (:mod:`pipeline.summary`)
+    builds on it.
 
-    Per-user failure isolation (spec §7): a user whose skills_fit or ingest
-    step raises is logged with its full traceback, recorded ``failed`` in the
-    summary, and skipped — the loop carries on for everyone else. ``ingest``
-    runs each user inside its own DB transaction, so a mid-batch raise leaves
-    no partial scores for that user.
+    Per-user failure isolation (spec §7): a user whose skills_fit step raises
+    is logged with its full traceback, recorded ``failed`` in the summary,
+    and skipped — the loop carries on for everyone else.
     """
     classified = _load_classified(runs_dir, run_id)
 
@@ -196,8 +177,6 @@ def score_and_ingest_run(
         "users_skipped_no_postings": 0,
         "users_failed": 0,
         "postings_scored": 0,
-        "scores_inserted": 0,
-        "scores_updated": 0,
         "postings_unclassified": 0,
         "per_user": [],
     }
@@ -260,45 +239,35 @@ def score_and_ingest_run(
                 run_date=run_date,
                 parent_run_id=run_id,
             )
-            ingest_summary = ingest_fn(
-                scored_path=scored_path, user_email=email, conn=conn
-            )
 
-            scores_inserted = ingest_summary.get("scores_inserted", 0)
-            scores_updated = ingest_summary.get("scores_updated", 0)
             summary["users_scored"] += 1
             summary["postings_scored"] += len(survivors)
-            summary["scores_inserted"] += scores_inserted
-            summary["scores_updated"] += scores_updated
             summary["per_user"].append(
                 {
                     "email": email,
                     "postings_scored": len(survivors),
-                    "scores_inserted": scores_inserted,
-                    "scores_updated": scores_updated,
                     "skipped": False,
                 }
             )
             log.info(
-                "%s — scored %d posting(s) → %d new, %d re-scored",
+                "%s — scored %d posting(s) → %s",
                 email,
                 len(survivors),
-                scores_inserted,
-                scores_updated,
+                scored_path,
             )
         except Exception:
             # Per-user isolation (spec §7): one user's failure must not sink
             # everyone else's scores. Full traceback to the log now; the
             # end-of-run summary surfaces the one-liner for the morning admin.
             tb = traceback.format_exc()
-            log.error("%s — skills_fit/ingest failed; isolating:\n%s", email, tb)
+            log.error("%s — skills_fit failed; isolating:\n%s", email, tb)
             summary["users_failed"] += 1
             summary["per_user"].append(
                 {"email": email, "postings_scored": 0, "failed": True, "error": tb}
             )
 
     log.info(
-        "skills_fit + ingest phase done for run_id=%s: %d scored, %d skipped "
+        "skills_fit phase done for run_id=%s: %d scored, %d skipped "
         "(no postings), %d failed, %d posting(s) scored",
         run_id,
         summary["users_scored"],

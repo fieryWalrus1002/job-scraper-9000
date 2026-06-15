@@ -1,8 +1,9 @@
 """Integration tests for ``src/pipeline/consolidation.py`` + the full overnight
-wiring (plan → scrape → consolidate → classify → score → ingest).
+wiring (plan → scrape → consolidate → classify → score; produce-only).
 
-Fake ``classify_fn`` / ``score_fn`` / ``ingest_fn`` are injected so no test
-touches an LLM, mirroring how the worker tests inject ``scrape_fn``.
+Fake ``classify_fn`` / ``score_fn`` are injected so no test touches an LLM,
+mirroring how the worker tests inject ``scrape_fn``. The pipeline is
+produce-only (Phase 15 D1) — scoring writes per-user JSONL and never ingests.
 Consolidation still talks to a real Postgres so the upsert and the
 succeeded-rows query exercise their actual SQL.
 """
@@ -115,20 +116,6 @@ def _fake_score_factory(calls: list[dict]):
             }
         )
         return {"scored": len(lines)}
-
-    return _fn
-
-
-def _fake_ingest_factory(calls: list[dict]):
-    def _fn(*, scored_path: Path, user_email: str, conn):
-        n = len([ln for ln in scored_path.read_text().splitlines() if ln.strip()])
-        calls.append({"scored_path": scored_path, "user_email": user_email})
-        return {
-            "total": n,
-            "postings_inserted": n,
-            "scores_inserted": n,
-            "scores_updated": 0,
-        }
 
     return _fn
 
@@ -354,15 +341,16 @@ def test_classify_consolidated_invokes_classify_fn_with_run_paths(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# run_overnight wiring — plan → scrape → consolidate → classify → score → ingest
+# run_overnight wiring — plan → scrape → consolidate → classify → score
 # ---------------------------------------------------------------------------
 
 
 @skip_if_no_docker
-def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
+def test_run_overnight_runs_full_pipeline_through_scoring(migrated_pg, tmp_path):
     """End-to-end with fakes at every injection point. Every phase from plan
-    through per-user ingest must complete, and the per-user score/ingest tail
-    must see the right profile and owning email."""
+    through per-user scoring must complete, and the per-user score tail must
+    see the right profile and write the user's scored JSONL (produce-only —
+    no ingest)."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         seed_user(conn, "e2e@example.com")
 
@@ -374,7 +362,6 @@ def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
     }
     classify_calls: list[dict] = []
     score_calls: list[dict] = []
-    ingest_calls: list[dict] = []
 
     summary = run_overnight(
         run_date="2026-06-12",
@@ -384,7 +371,6 @@ def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
         scrape_fn=lambda source, payload: [posting],
         classify_fn=_fake_classify_factory(classify_calls),
         score_fn=_fake_score_factory(score_calls),
-        ingest_fn=_fake_ingest_factory(ingest_calls),
     )
 
     with psycopg.connect(migrated_pg) as conn:
@@ -408,9 +394,18 @@ def test_run_overnight_runs_full_pipeline_through_ingest(migrated_pg, tmp_path):
     )
     assert score_calls[0]["parent_run_id"] == "overnight-2026-06-12"
 
-    # Ingest routed that user's scored file under their email.
-    assert len(ingest_calls) == 1
-    assert ingest_calls[0]["user_email"] == "e2e@example.com"
+    # Produce-only: the scored JSONL lands under the user's run dir and
+    # carries their survivor (the fake score_fn copies input through).
+    scored_path = score_calls[0]["output_path"]
+    assert scored_path == (
+        tmp_path
+        / "overnight-2026-06-12"
+        / "e2e_example_com"
+        / "skills_fit"
+        / "scored.jsonl"
+    )
+    scored_lines = [ln for ln in scored_path.read_text().splitlines() if ln.strip()]
+    assert [json.loads(ln)["dedup_hash"] for ln in scored_lines] == ["h-e2e"]
 
     # End-of-run summary is attached and reflects the one successful user.
     rs = summary["run_summary"]
