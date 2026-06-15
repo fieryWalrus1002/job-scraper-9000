@@ -144,8 +144,10 @@ def plan_run(
         # #245: deactivated users keep their config but are gated out of the
         # overnight run (cost saver). Skip in the loop — not the SQL WHERE — so
         # the deactivation surfaces in skipped_emails / the run summary rather
-        # than vanishing silently.
-        if not row["pipeline_enabled"]:
+        # than vanishing silently. Gate on explicit False, not falsiness: a
+        # missing search config leaves this column NULL, but that case is
+        # already handled by the missing-config skip above.
+        if row["pipeline_enabled"] is False:
             log.warning("%s — pipeline_enabled=false; skipping", email)
             summary["users_skipped"] += 1
             summary["skipped_emails"].append(email)
