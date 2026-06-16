@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
-      - feature/**
-      - feat/**
-      - fix/**
-      - chore/**
   pull_request:
-    branches: [main]
+    branches:
+      - main
+
+# cancel if we're running on a PR, since the PR workflow will run the same tests
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   test:

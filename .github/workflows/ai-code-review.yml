@@ -8,6 +8,7 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  packages: read
 
 # A PR's `synchronize` event fires on every push; cancel an in-flight review
 # when a newer push arrives so we don't pay for (or comment from) stale runs.
