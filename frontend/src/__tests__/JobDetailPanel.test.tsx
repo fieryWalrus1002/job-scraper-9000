@@ -29,6 +29,12 @@ beforeEach(() => {
       if (url === '/api/applications' && init?.method === 'POST') {
         return new Response(JSON.stringify(APPLICATION), { status: 201 })
       }
+      if (url === '/api/applications/hash-a' && init?.method === 'PATCH') {
+        return new Response(JSON.stringify(APPLICATION), { status: 200 })
+      }
+      if (url === '/api/applications/hash-a' && init?.method === 'DELETE') {
+        return new Response(null, { status: 204 })
+      }
       return new Response('Not found', { status: 404, statusText: 'Not Found' })
     }),
   )
@@ -98,16 +104,68 @@ describe('JobDetailPanel triage actions', () => {
     })
   })
 
-  it('preserves the existing non-Jobs header actions until stage-specific panels land', async () => {
-    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surface="tracking" />, {
+  it('uses second-pass decision actions for the Shortlist surface', async () => {
+    render(
+      <JobDetailPanel
+        dedupHash="hash-a"
+        onClose={vi.fn()}
+        application={APPLICATION}
+        surface="shortlist"
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
+    expect(within(toolbar).getByRole('button', { name: /Pursue/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Back to Jobs/ })).toBeInTheDocument()
+    const buttons = within(toolbar).getAllByRole('button')
+    expect(buttons[0]).toHaveAccessibleName('Trash')
+    expect(buttons[1]).toHaveAccessibleName('Back to Jobs')
+    expect(buttons[2]).toHaveAccessibleName('Pursue')
+    expect(within(toolbar).queryByRole('button', { name: /To Apply/ })).not.toBeInTheDocument()
+
+    fireEvent.click(within(toolbar).getByRole('button', { name: /Pursue/ }))
+
+    await waitFor(() => expect(applicationPatches()).toHaveLength(1))
+    expect(applicationPatches()[0]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'to_apply' }),
+    })
+  })
+
+  it('puts application tracking first for the Tracking surface', async () => {
+    render(
+      <JobDetailPanel
+        dedupHash="hash-a"
+        onClose={vi.fn()}
+        application={{ ...APPLICATION, status: 'to_apply' }}
+        surface="tracking"
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
+    expect(within(toolbar).getByRole('button', { name: /Back to Shortlist/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: 'Shortlist' })).not.toBeInTheDocument()
+
+    expect(await screen.findByText('Status')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'To Apply' })).toBeInTheDocument()
+  })
+
+  it('uses recovery actions for the Trash surface', async () => {
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surface="trash" />, {
       wrapper: makeWrapper(),
     })
 
     const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
-    expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
-    expect(within(toolbar).getByRole('button', { name: /Maybe/ })).toBeInTheDocument()
-    expect(within(toolbar).getByRole('button', { name: /To Apply/ })).toBeInTheDocument()
-    expect(within(toolbar).queryByRole('button', { name: /Shortlist/ })).not.toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Restore to Jobs/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Shortlist/ })).toBeInTheDocument()
+
+    fireEvent.click(within(toolbar).getByRole('button', { name: /Restore to Jobs/ }))
+
+    await waitFor(() => expect(applicationDeletes()).toHaveLength(1))
   })
 })
 
@@ -116,5 +174,21 @@ function applicationPosts() {
     .mocked(fetch)
     .mock.calls.filter(
       ([url, init]) => String(url) === '/api/applications' && init?.method === 'POST',
+    )
+}
+
+function applicationPatches() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([url, init]) => String(url) === '/api/applications/hash-a' && init?.method === 'PATCH',
+    )
+}
+
+function applicationDeletes() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([url, init]) => String(url) === '/api/applications/hash-a' && init?.method === 'DELETE',
     )
 }

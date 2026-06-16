@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from '../App'
@@ -110,6 +110,100 @@ describe('App auth gate', () => {
     )
   })
 
+  it('passes the clicked application row into status-tab detail panels', async () => {
+    vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
+      userId: 'u1',
+      userDetails: 'test@example.com',
+      userRoles: ['authenticated'],
+    })
+
+    const app = {
+      dedup_hash: 'hash-a',
+      status: 'maybe',
+      applied_at: null,
+      notes: null,
+      created_at: '2026-01-16T00:00:00Z',
+      updated_at: '2026-01-16T00:00:00Z',
+      title: 'Example Role',
+      company: 'Acme',
+      fit_score: 4,
+      source_url: null,
+    }
+    const jobDetail = {
+      dedup_hash: 'hash-a',
+      source: 'linkedin',
+      source_job_id: 'source-1',
+      source_url: 'https://example.com/job',
+      title: 'Example Role',
+      company: 'Acme',
+      location: 'Remote',
+      posted_at: '2026-01-15',
+      description: 'A useful job description.',
+      scraped_at: '2026-01-15T00:00:00Z',
+      remote_classification: 'fully_remote',
+      salary_min_usd: null,
+      salary_max_usd: null,
+      salary_period: null,
+      fit_score: 4,
+      confidence: 'high',
+      score_rationale: 'Looks relevant.',
+      ai_fit_detail: null,
+      pipeline_metadata: {},
+      run_id: 'run-1',
+      scored_at: '2026-01-16T00:00:00Z',
+      model: 'test-model',
+      provider: 'test-provider',
+      profile_version: 'v1',
+      failure_reason: null,
+      metadata: {},
+      ingested_at: '2026-01-16T00:00:00Z',
+    }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url === '/api/applications?status=maybe') {
+          return Promise.resolve(new Response(JSON.stringify([app]), { status: 200 }))
+        }
+        if (url === '/api/applications') {
+          return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+        }
+        if (url === '/api/jobs/hash-a') {
+          return Promise.resolve(new Response(JSON.stringify(jobDetail), { status: 200 }))
+        }
+        if (url === '/api/eval/corrections/hash-a') {
+          return Promise.resolve(
+            new Response('Not found', { status: 404, statusText: 'Not Found' }),
+          )
+        }
+        if (url === '/api/applications/hash-a' && init?.method === 'PATCH') {
+          return Promise.resolve(
+            new Response(JSON.stringify({ ...app, status: 'to_apply' }), { status: 200 }),
+          )
+        }
+        if (url.startsWith('/api/jobs?')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 }),
+          )
+        }
+        return Promise.resolve(new Response('Not found', { status: 404, statusText: 'Not Found' }))
+      }),
+    )
+
+    renderApp(['/shortlist'])
+
+    fireEvent.click(await screen.findByText('Example Role'))
+    const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
+    fireEvent.click(within(toolbar).getByRole('button', { name: /Pursue/ }))
+
+    await waitFor(() => expect(applicationPatches()).toHaveLength(1))
+    expect(applicationPatches()[0]?.[1]).toMatchObject({
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'to_apply' }),
+    })
+  })
+
   it('redirects unknown paths to jobs', async () => {
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
       userId: 'u1',
@@ -122,3 +216,11 @@ describe('App auth gate', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/jobs'))
   })
 })
+
+function applicationPatches() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([url, init]) => String(url) === '/api/applications/hash-a' && init?.method === 'PATCH',
+    )
+}

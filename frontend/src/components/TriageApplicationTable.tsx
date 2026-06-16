@@ -8,7 +8,7 @@ type SortDir = 'asc' | 'desc'
 
 interface Props {
   statuses: ApplicationStatus[]
-  onSelect: (hash: string) => void
+  onSelect: (application: Application) => void
   emptyMessage: string
 }
 
@@ -85,7 +85,7 @@ export function TriageApplicationTable({ statuses, onSelect, emptyMessage }: Pro
             <tr
               key={app.dedup_hash}
               className="cursor-pointer transition-colors hover:bg-hover"
-              onClick={() => onSelect(app.dedup_hash)}
+              onClick={() => onSelect(app)}
             >
               <td>
                 <Badge variant="secondary">{STATUS_LABELS[app.status]}</Badge>
