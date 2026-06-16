@@ -43,3 +43,18 @@ ENV PATH="/app/.venv/bin:$PATH"
 # TODO: Still gotta set up the mounting for the data volumes it will write to,
 # but this is the basic idea for the scraper container target.
 CMD ["job-scraper-9000", "pipeline"]
+
+# STAGE 4: CI/CD Utility Target (Reviewer & Summarizer)
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm AS ci-runner
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
+
+COPY src/ /app/src/
+COPY scripts/ /app/scripts/
+
+RUN uv sync --frozen
+
+CMD ["/bin/bash"]

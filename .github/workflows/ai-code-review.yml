@@ -65,7 +65,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           if [ -s review.md ]; then
-            # Scan existing issue comments for our script's unique tracking identifier.
+            # FIXED: Scan existing issue comments specifically for our script's unique tracking identifier.
             EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("")) | .id' | head -n 1)
 
             if [ -n "$EXISTING_COMMENT_ID" ]; then

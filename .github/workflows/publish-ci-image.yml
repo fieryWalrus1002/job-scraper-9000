@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/ci/**'
-      - 'Dockerfile'
+      - 'docker/app.Dockerfile'
 
 jobs:
   publish:
@@ -31,11 +31,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # STEP 2: Reference the environment variable via env.REPO_LOWER
       - name: Build and Push to GitHub Packages
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/app.Dockerfile
+          target: ci-runner
           push: true
           tags: ghcr.io/${{ env.REPO_LOWER }}/ai-reviewer:latest
 
