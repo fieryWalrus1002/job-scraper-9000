@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
 
 # A PR's `synchronize` event fires on every push; cancel an in-flight review
@@ -17,72 +18,57 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-latest
-    # Prevent running on forks where secrets are inaccessible
+    # Prevent running on forks where secrets are inaccessible.
     if: github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       # Only first-party pieces touch the secrets: actions/checkout, the runner's
-      # preinstalled `gh` CLI, and our own .github/scripts/ai_review.py.
+      # preinstalled `gh` CLI, and our own src/ci/ai_review.py.
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetches full history so git can calculate a proper diff
+          fetch-depth: 0
 
-      - name: Review PR diff
-        id: run_review
+      - name: Generate review diff
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Ensure local git tracking knows about the target branch base.
+          git fetch origin "$BASE_REF"
+
+          # `gh pr diff` does not support --function-context; use git's diff flag directly.
+          git diff --function-context FETCH_HEAD...HEAD > raw_diff.txt
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Generate AI review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
-          OPENAI_MODEL: gpt-5.4-mini # Ultra-fast reasoning tier for production workflows
           PR: ${{ github.event.pull_request.number }}
-          REVIEW_PROMPT: >-
-            You are a senior engineer reviewing a pull request for a Python
-            data-pipeline repo (scrapes job postings, then LLM agents filter
-            and rank them). Focus on, in priority order:
-            (1) Correctness bugs and logic errors.
-            (2) Security issues — committed secrets or credentials, unsafe
-            subprocess/SQL/deserialization, secrets logged or sent to third
-            parties. Note that .env holds secrets and must never be committed.
-            (3) Silent failures. This codebase's rule is fail fast and log
-            loudly: flag swallowed exceptions, bare excepts, empty results
-            returned in place of an error, or error paths with no log/stack
-            trace.
-            (4) Clear design and reuse — duplicated logic, dead code, leaky
-            abstractions.
-            Skip pure formatting, import order, and lint nits: ruff and pyright
-            already gate those in pre-commit. Be concise, cite specific lines,
-            and prefer a few high-confidence findings over an exhaustive list.
-            If the diff looks clean, say so rather than inventing problems.
-        run: |
-          # Ensure local git tracking knows about the target branch base
-          git fetch origin ${{ github.base_ref }}
+        run: uv run python scripts/ai_review_pr.py --pr "$PR"
 
-          # Use --function-context to pass complete logical blocks surrounding the changes
-          gh pr diff "$PR" --function-context > raw_diff.txt
-
-          # Pipe the functional diff into the script and redirect outputs
-          python3 .github/scripts/ai_review.py < raw_diff.txt > review.md 2> error.log
-
-          if [ $? -ne 0 ]; then
-            cat error.log >&2
-            exit 1
-          fi
-
-      - name: Post or Update PR Comment
+      - name: Post or update PR comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           if [ -s review.md ]; then
-            # Scan existing comments to see if our script's unique tracking identifier is present
-            EXISTING_COMMENT_ID=$(gh pr view "$PR_URL" --json comments --jq '.comments[] | select(.body | startswith("")) | .id' | head -n 1)
+            # Scan existing issue comments for our script's unique tracking identifier.
+            EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- ai-code-review -->")) | .id' | head -n 1)
 
             if [ -n "$EXISTING_COMMENT_ID" ]; then
               echo "Updating existing review comment ID: $EXISTING_COMMENT_ID"
               gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -F body=@review.md
             else
               echo "No previous review found. Posting a fresh comment."
-              gh pr comment "$PR_URL" --body-file review.md
+              gh pr comment "$PR" --body-file review.md
             fi
           else
             echo "No review output — skipping comment."
