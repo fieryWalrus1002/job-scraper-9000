@@ -57,6 +57,20 @@ describe('useApplications', () => {
     expect(map.get('hash-b')?.status).toBe('applied')
   })
 
+  it('normalizes repeated status filters before calling the applications endpoint', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(MOCK_APPLICATIONS), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(() => useApplications(['maybe', 'applied', 'maybe']), {
+      wrapper,
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(fetchMock).toHaveBeenCalledWith('/api/applications?status=applied&status=maybe')
+  })
+
   it('enters error state on fetch failure', async () => {
     vi.stubGlobal(
       'fetch',

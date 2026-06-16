@@ -1,6 +1,7 @@
 import type {
   Application,
   ApplicationCreate,
+  ApplicationStatus,
   ApplicationUpdate,
   CandidateProfileInput,
   EvalCorrectionIn,
@@ -71,8 +72,15 @@ export async function fetchJobDetail(dedupHash: string): Promise<JobDetail> {
   return res.json() as Promise<JobDetail>
 }
 
-export async function fetchApplications(): Promise<Application[]> {
-  const res = await fetch(`${API_BASE}/api/applications`)
+export function normalizeApplicationStatuses(statuses?: ApplicationStatus[]): ApplicationStatus[] {
+  return Array.from(new Set(statuses ?? [])).sort()
+}
+
+export async function fetchApplications(statuses?: ApplicationStatus[]): Promise<Application[]> {
+  const params = new URLSearchParams()
+  normalizeApplicationStatuses(statuses).forEach((status) => params.append('status', status))
+  const query = params.toString()
+  const res = await fetch(`${API_BASE}/api/applications${query ? `?${query}` : ''}`)
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<Application[]>
 }
