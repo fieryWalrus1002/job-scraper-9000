@@ -20,21 +20,12 @@ import { JobDetailPanel, type JobDetailSurface } from './components/JobDetailPan
 import SettingsPage from './components/SettingsPage'
 import AddJobModal from './components/AddJobModal'
 import { TriageApplicationTable } from './components/TriageApplicationTable'
+import { TrackingBoard } from './components/TrackingBoard'
+import { TRACKING_STATUSES } from './lib/trackingGroups'
 import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { cn } from './lib/utils'
 
 const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
-const TRACKING_STATUSES: ApplicationStatus[] = [
-  'to_apply',
-  'applied',
-  'screening',
-  'interview',
-  'offer',
-  'rejected',
-  'candidate_withdrew',
-  'hired',
-  'ghosted',
-]
 const TRASH_STATUSES: ApplicationStatus[] = ['passed']
 
 export default function App() {
@@ -196,10 +187,8 @@ function AppShell({ email }: { email: string }) {
             <Route
               path="/tracking"
               element={
-                <TriageApplicationTable
-                  statuses={TRACKING_STATUSES}
+                <TrackingBoard
                   onSelect={(app) => selectCurrentJob(app.dedup_hash, 'tracking', app)}
-                  emptyMessage="No tracking jobs yet."
                 />
               }
             />
