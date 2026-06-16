@@ -26,10 +26,11 @@ import { X } from 'lucide-react'
 import { QuickActions } from '@/components/ui/quick-actions'
 import { cn } from '@/lib/utils'
 
+// Funnel's fast binary, shown as the panel's primary triage actions on every tab.
+// The full status set lives in the collapsible "Application Tracking" section below.
 const TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
   { value: 'passed', label: 'Trash', shortcut: 'T' },
-  { value: 'maybe', label: 'Maybe', shortcut: 'M' },
-  { value: 'to_apply', label: 'To Apply', shortcut: 'A' },
+  { value: 'maybe', label: 'Shortlist', shortcut: 'S' },
 ]
 
 interface Props {
@@ -490,8 +491,7 @@ function JobDetailHeader(props: JobDetailHeaderProps) {
                   shortcut: s.shortcut,
                   active: currentStatus === s.value,
                   disabled: triagePending,
-                  variant:
-                    s.value === 'passed' ? 'danger' : s.value === 'to_apply' ? 'success' : 'warn',
+                  variant: s.value === 'passed' ? 'danger' : 'warn',
                   onSelect: () => setTriage(s.value),
                 }))}
               />

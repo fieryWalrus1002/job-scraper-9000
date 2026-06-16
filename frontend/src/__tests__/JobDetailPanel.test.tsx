@@ -1,0 +1,101 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
+import { JobDetailPanel } from '../components/JobDetailPanel'
+import type { Application, JobDetail } from '../types'
+
+function makeWrapper() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/jobs/hash-a') {
+        return new Response(JSON.stringify(JOB_DETAIL), { status: 200 })
+      }
+      if (url === '/api/eval/corrections/hash-a') {
+        return new Response('Not found', { status: 404, statusText: 'Not Found' })
+      }
+      if (url === '/api/applications' && init?.method === 'POST') {
+        return new Response(JSON.stringify(APPLICATION), { status: 201 })
+      }
+      return new Response('Not found', { status: 404, statusText: 'Not Found' })
+    }),
+  )
+})
+
+afterEach(() => vi.unstubAllGlobals())
+
+const JOB_DETAIL: JobDetail = {
+  dedup_hash: 'hash-a',
+  source: 'linkedin',
+  source_job_id: 'source-1',
+  source_url: 'https://example.com/job',
+  title: 'Example Role',
+  company: 'Acme',
+  location: 'Remote',
+  posted_at: '2026-01-15',
+  description: 'A useful job description.',
+  scraped_at: '2026-01-15T00:00:00Z',
+  remote_classification: 'fully_remote',
+  salary_min_usd: null,
+  salary_max_usd: null,
+  salary_period: null,
+  fit_score: 4,
+  confidence: 'high',
+  score_rationale: 'Looks relevant.',
+  ai_fit_detail: null,
+  pipeline_metadata: {},
+  run_id: 'run-1',
+  scored_at: '2026-01-16T00:00:00Z',
+  model: 'test-model',
+  provider: 'test-provider',
+  profile_version: 'v1',
+  failure_reason: null,
+  metadata: {},
+  ingested_at: '2026-01-16T00:00:00Z',
+}
+
+const APPLICATION: Application = {
+  dedup_hash: 'hash-a',
+  status: 'maybe',
+  applied_at: null,
+  notes: null,
+  created_at: '2026-01-16T00:00:00Z',
+  updated_at: '2026-01-16T00:00:00Z',
+  title: 'Example Role',
+  company: 'Acme',
+}
+
+describe('JobDetailPanel triage actions', () => {
+  it('uses binary Trash and Shortlist header actions and marks Shortlist', async () => {
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} />, { wrapper: makeWrapper() })
+
+    const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
+    expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Shortlist/ })).toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: /Maybe/ })).not.toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: /To Apply/ })).not.toBeInTheDocument()
+
+    fireEvent.click(within(toolbar).getByRole('button', { name: /Shortlist/ }))
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/applications', expect.anything()))
+    const postCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url) === '/api/applications')
+    expect(postCall?.[1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ dedup_hash: 'hash-a', status: 'maybe' }),
+    })
+  })
+})
