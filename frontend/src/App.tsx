@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
   Navigate,
-  NavLink,
   Route,
   Routes,
   useLocation,
@@ -14,13 +13,13 @@ import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
 import { filtersFromParams, filtersToParams } from './lib/filters'
 import type { Application, ApplicationStatus, Filters, JobSummary } from './types'
+import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
 import { JobDetailPanel } from './components/JobDetailPanel'
 import SettingsPage from './components/SettingsPage'
 import AddJobModal from './components/AddJobModal'
 import { TriageApplicationTable } from './components/TriageApplicationTable'
-import { Button } from './components/ui/button'
 import { cn } from './lib/utils'
 
 const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
@@ -36,15 +35,6 @@ const TRACKING_STATUSES: ApplicationStatus[] = [
   'ghosted',
 ]
 const TRASH_STATUSES: ApplicationStatus[] = ['passed']
-
-type FunnelPath = '/trash' | '/jobs' | '/shortlist' | '/tracking'
-
-const FUNNEL_TABS: { path: FunnelPath; label: string; muted?: boolean }[] = [
-  { path: '/trash', label: 'Trash', muted: true },
-  { path: '/jobs', label: 'Jobs' },
-  { path: '/shortlist', label: 'Shortlist' },
-  { path: '/tracking', label: 'Tracking' },
-]
 
 export default function App() {
   const { principal, isLoading: authLoading, isAuthenticated } = useAuth()
@@ -108,83 +98,16 @@ function AppShell({ email }: { email: string }) {
   const trashCount = countStatuses(allApplications, TRASH_STATUSES)
   const jobsCount = search ? filteredItems.length : data?.total
 
-  const tabBtn =
-    'group relative inline-flex items-center gap-2 h-8 px-3 border-none bg-transparent text-muted text-[13px] font-medium cursor-pointer rounded-md transition-all hover:text-fg hover:bg-hover/50 no-underline'
-  const tabBtnActive =
-    'text-fg bg-card border border-border shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-  const tabBtnMuted = 'text-faint hover:text-muted'
-  const tabCount =
-    'inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded text-[10.5px] font-mono tabular-nums font-medium ' +
-    'bg-bg-elevated/80 text-faint border border-border/60 ' +
-    'group-hover:text-muted group-hover:border-border transition-colors'
-  const tabCountActive = 'text-primary-hov bg-primary/15 border-primary/30'
+  const tabCounts: Record<FunnelPath, number | undefined> = {
+    '/trash': trashCount,
+    '/jobs': jobsCount,
+    '/shortlist': shortlistCount,
+    '/tracking': trackingCount,
+  }
 
   return (
     <div className="flex flex-col h-svh overflow-hidden">
-      <header className="flex items-center gap-6 px-5 h-[52px] border-b border-border shrink-0 bg-card/60 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <div className="size-6 rounded-md bg-gradient-to-br from-primary to-primary-dim flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_4px_rgba(99,102,241,0.4)]">
-            <span className="text-[11px] font-bold text-white tracking-tight">JS</span>
-          </div>
-          <span className="font-semibold text-[14px] text-fg whitespace-nowrap tracking-tight">
-            Job Scraper <span className="text-muted font-normal">9000</span>
-          </span>
-        </div>
-        <nav className="flex items-center gap-1.5" aria-label="Triage funnel">
-          {FUNNEL_TABS.map((tab) => {
-            const count =
-              tab.path === '/trash'
-                ? trashCount
-                : tab.path === '/jobs'
-                  ? jobsCount
-                  : tab.path === '/shortlist'
-                    ? shortlistCount
-                    : trackingCount
-            return (
-              <NavLink
-                key={tab.path}
-                to={{ pathname: tab.path, search: tab.path === '/jobs' ? location.search : '' }}
-                className={({ isActive }) =>
-                  cn(tabBtn, tab.muted && tabBtnMuted, isActive && tabBtnActive)
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span>{tab.label}</span>
-                    {count != null && (count > 0 || tab.path !== '/trash') && (
-                      <span className={cn(tabCount, isActive && tabCountActive)}>
-                        {count.toLocaleString()}
-                      </span>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            )
-          })}
-        </nav>
-        <div className="flex-1" />
-        <button
-          type="button"
-          className={cn(
-            'bg-transparent border-none p-0 text-[12px] cursor-pointer transition-colors',
-            currentPath === '/settings' ? 'text-fg' : 'text-muted hover:text-fg',
-          )}
-          onClick={() => navigate('/settings')}
-        >
-          Settings
-        </button>
-        <a
-          href="/.auth/logout"
-          className="text-[12px] text-muted hover:text-fg transition-colors"
-          title="Sign out"
-        >
-          {email}
-        </a>
-        <Button onClick={() => setAddJobOpen(true)}>
-          <span className="text-[15px] leading-none mr-0.5">+</span>
-          Add job
-        </Button>
-      </header>
+      <AppHeader email={email} counts={tabCounts} onAddJob={() => setAddJobOpen(true)} />
 
       <div className="flex-1 flex flex-row overflow-hidden">
         <Routes>
