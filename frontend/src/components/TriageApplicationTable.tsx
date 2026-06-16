@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useApplications } from '../hooks/useApplications'
 import { STATUS_LABELS, type Application, type ApplicationStatus } from '../types'
 import { Badge } from './ui/badge'
@@ -10,9 +10,16 @@ interface Props {
   statuses: ApplicationStatus[]
   onSelect: (application: Application) => void
   emptyMessage: string
+  /** Optional per-row actions; when set, a trailing actions column is rendered. */
+  renderRowActions?: (application: Application) => ReactNode
 }
 
-export function TriageApplicationTable({ statuses, onSelect, emptyMessage }: Props) {
+export function TriageApplicationTable({
+  statuses,
+  onSelect,
+  emptyMessage,
+  renderRowActions,
+}: Props) {
   const { data, isLoading, isError, error } = useApplications(statuses)
   const [sortCol, setSortCol] = useState<ApplicationSortCol>('updated')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -62,6 +69,7 @@ export function TriageApplicationTable({ statuses, onSelect, emptyMessage }: Pro
           <col style={{ width: '70px' }} />
           <col style={{ width: '110px' }} />
           <col />
+          {renderRowActions && <col style={{ width: '150px' }} />}
         </colgroup>
         <thead>
           <tr>
@@ -78,6 +86,7 @@ export function TriageApplicationTable({ statuses, onSelect, emptyMessage }: Pro
               Updated{sortIndicator('updated')}
             </th>
             <th>Notes</th>
+            {renderRowActions && <th className="text-right pr-3">Actions</th>}
           </tr>
         </thead>
         <tbody>
@@ -138,6 +147,11 @@ export function TriageApplicationTable({ statuses, onSelect, emptyMessage }: Pro
                   {app.notes ?? <span className="text-faint">—</span>}
                 </span>
               </td>
+              {renderRowActions && (
+                <td className="text-right pr-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="inline-flex justify-end">{renderRowActions(app)}</div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
