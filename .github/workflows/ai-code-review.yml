@@ -6,7 +6,9 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
+  packages: read
 
 # A PR's `synchronize` event fires on every push; cancel an in-flight review
 # when a newer push arrives so we don't pay for (or comment from) stale runs.
@@ -17,48 +19,71 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-latest
+    # Prevent running on forks where secrets are inaccessible.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
     steps:
-      # Only first-party pieces touch the secrets: actions/checkout (for the
-      # review script), the runner's preinstalled `gh` CLI, and our own
-      # .github/scripts/ai_review.py. No third-party Action runs with the
-      # OpenAI key or the write-capable GitHub token.
+      # Only first-party pieces touch the secrets: actions/checkout, the runner's
+      # preinstalled `gh` CLI, and our container image.
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Review PR diff
+      - name: Generate review diff
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
-          # Verify this model id is valid/available on the account — a wrong id
-          # makes the OpenAI call (and this step) fail loudly.
-          OPENAI_MODEL: gpt-5.4 #gpt-5.4-mini
-          PR: ${{ github.event.pull_request.number }}
-          REVIEW_PROMPT: >-
-            You are a senior engineer reviewing a pull request for a Python
-            data-pipeline repo (scrapes job postings, then LLM agents filter
-            and rank them). Focus on, in priority order:
-            (1) Correctness bugs and logic errors.
-            (2) Security issues — committed secrets or credentials, unsafe
-            subprocess/SQL/deserialization, secrets logged or sent to third
-            parties. Note that .env holds secrets and must never be committed.
-            (3) Silent failures. This codebase's rule is fail fast and log
-            loudly: flag swallowed exceptions, bare excepts, empty results
-            returned in place of an error, or error paths with no log/stack
-            trace.
-            (4) Clear design and reuse — duplicated logic, dead code, leaky
-            abstractions.
-            Skip pure formatting, import order, and lint nits: ruff and pyright
-            already gate those in pre-commit. Be concise, cite specific lines,
-            and prefer a few high-confidence findings over an exhaustive list.
-            If the diff looks clean, say so rather than inventing problems.
-        # Default shell is `bash -eo pipefail`, so a non-zero exit anywhere in
-        # the pipe fails the step (and skips the comment) rather than posting
-        # an empty review. The `-s` guard skips commenting when there's nothing
-        # to say (empty diff → the script writes no stdout).
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          gh pr diff "$PR" | python3 .github/scripts/ai_review.py > review.md
+          # Ensure local git tracking knows about the target branch base.
+          git fetch origin "$BASE_REF"
+
+          # Use git's diff flag directly for full function context.
+          git diff --function-context FETCH_HEAD...HEAD > raw_diff.txt
+
+      # Authenticate the runner daemon against GHCR to stop the 'denied' error
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate AI review via Container
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
+          PR: ${{ github.event.pull_request.number }}
+          # Pass the raw repository path into the environment
+          REPO_RAW: ${{ github.repository }}
+        run: |
+          # Convert the repository path to strictly lowercase using bash
+          REPO_LOWER=$(echo "$REPO_RAW" | tr '[:upper:]' '[:lower:]')
+
+          echo "Pulling image from: ghcr.io/${REPO_LOWER}/ai-reviewer:latest"
+
+          # Spin up your precompiled package using the verified lowercase string
+          docker run --rm \
+            -e OPENAI_API_KEY \
+            -v $(pwd):/workspace \
+            -w /workspace \
+            ghcr.io/${REPO_LOWER}/ai-reviewer:latest \
+            uv run python src/ci/ai_review.py --pr "$PR" < raw_diff.txt > review.md
+
+      - name: Post or update PR comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
           if [ -s review.md ]; then
-            gh pr comment "$PR" --body-file review.md
+            # FIXED: Scan existing issue comments specifically for our script's unique tracking identifier.
+            EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("")) | .id' | head -n 1)
+
+            if [ -n "$EXISTING_COMMENT_ID" ]; then
+              echo "Updating existing review comment ID: $EXISTING_COMMENT_ID"
+              gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -F body=@review.md
+            else
+              echo "No previous review found. Posting a fresh comment."
+              gh pr comment "$PR" --body-file review.md
+            fi
           else
             echo "No review output — skipping comment."
           fi

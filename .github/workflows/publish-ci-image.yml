@@ -1,0 +1,51 @@
+name: Publish CI Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/ci/**'
+      - 'docker/app.Dockerfile'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Crucial for pushing and deleting images from GHCR
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      # STEP 1: Compute the lowercase repo string and save it to the environment
+      - name: Set lower-case environment variables
+        env:
+          REPO_RAW: ${{ github.repository }}
+        run: |
+          echo "REPO_LOWER=$(echo "$REPO_RAW" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push to GitHub Packages
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          target: ci-runner
+          push: true
+          tags: ghcr.io/${{ env.REPO_LOWER }}/ai-reviewer:latest
+
+      - name: Prune Old Untagged Images
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Changed from orgs/ to users/ to match your personal account scope
+          gh api users/${{ github.repository_owner }}/packages/container/ai-reviewer/versions --jq '.[] | select(.metadata.container.tags | length == 0) | .id' | while read -r id; do
+            gh api "users/${{ github.repository_owner }}/packages/container/ai-reviewer/versions/$id" -X DELETE
+          done
