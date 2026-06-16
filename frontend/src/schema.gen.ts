@@ -966,7 +966,9 @@ export interface operations {
     };
     list_applications_api_applications_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: ("maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed")[] | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -980,6 +982,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Application"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

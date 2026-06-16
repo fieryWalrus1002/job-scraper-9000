@@ -1,6 +1,13 @@
-from fastapi import APIRouter, HTTPException, Response
+from typing import Annotated
 
-from ..schemas import Application, ApplicationCreate, ApplicationUpdate
+from fastapi import APIRouter, HTTPException, Query, Response
+
+from ..schemas import (
+    Application,
+    ApplicationCreate,
+    ApplicationStatus,
+    ApplicationUpdate,
+)
 from ..dependencies import Pool, CurrentUser
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
@@ -15,18 +22,29 @@ _JOINS = """
 
 
 @router.get("", response_model=list[Application])
-async def list_applications(pool: Pool, user: CurrentUser):
+async def list_applications(
+    pool: Pool,
+    user: CurrentUser,
+    status: Annotated[list[ApplicationStatus] | None, Query()] = None,
+):
+    filters = ["a.user_id = %(user_id)s"]
+    params: dict[str, object] = {"user_id": user.id}
+    if status:
+        filters.append("a.status = ANY(%(statuses)s::text[])")
+        params["statuses"] = list(status)
+
+    where = "WHERE " + " AND ".join(filters)
     sql = f"""
         SELECT
             a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
             p.title, p.company, s.fit_score, p.source_url
         FROM app.user_applications a
         {_JOINS}
-        WHERE a.user_id = %(user_id)s
+        {where}
         ORDER BY a.updated_at DESC
     """
     async with pool.connection() as conn:
-        cur = await conn.execute(sql, {"user_id": user.id})  # type: ignore[arg-type]
+        cur = await conn.execute(sql, params)  # type: ignore[arg-type]
         rows = await cur.fetchall()
     return [Application.model_validate(r) for r in rows]
 
