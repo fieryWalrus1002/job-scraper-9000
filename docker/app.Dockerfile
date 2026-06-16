@@ -56,11 +56,15 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 
-# Source and scripts for the review/summarizer tooling.
+# Source and scripts for the review/summarizer tooling. `prompts/` is
+# force-included by the hatch wheel build (pyproject.toml), so the sync below
+# fails without it.
 COPY src/ /app/src/
 COPY scripts/ /app/scripts/
+COPY prompts/ /app/prompts/
 
-# Manifests are present, so this resolves against the locked dependencies.
+# Manifests and force-included assets are present, so this resolves against the
+# locked dependencies.
 RUN uv sync --frozen
 
 # Default to an interactive shell for the CI/CD utility container.
