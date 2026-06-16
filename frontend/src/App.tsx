@@ -20,6 +20,7 @@ import { JobDetailPanel, type JobDetailSurface } from './components/JobDetailPan
 import SettingsPage from './components/SettingsPage'
 import AddJobModal from './components/AddJobModal'
 import { TriageApplicationTable } from './components/TriageApplicationTable'
+import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { cn } from './lib/utils'
 
 const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
@@ -188,6 +189,7 @@ function AppShell({ email }: { email: string }) {
                   statuses={SHORTLIST_STATUSES}
                   onSelect={(app) => selectCurrentJob(app.dedup_hash, 'shortlist', app)}
                   emptyMessage="No shortlisted jobs yet."
+                  renderRowActions={(app) => <ShortlistRowActions application={app} />}
                 />
               }
             />
