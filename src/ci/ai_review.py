@@ -91,7 +91,8 @@ class AICodeReviewer:
             response = self.client.chat.completions.create(
                 model=model,
                 temperature=self.llm_config.get("temperature", 0.2),
-                max_tokens=self.llm_config.get("max_tokens"),
+                # Newer OpenAI models reject the legacy `max_tokens`.
+                max_completion_tokens=self.llm_config.get("max_tokens"),
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {

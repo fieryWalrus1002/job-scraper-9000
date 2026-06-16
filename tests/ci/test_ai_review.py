@@ -192,7 +192,7 @@ def test_generate_returns_marked_review_and_passes_expected_params(tmp_path):
     call_kwargs = mock_client.chat.completions.create.call_args.kwargs
     assert call_kwargs["model"] == "gpt-5.4-mini"
     assert call_kwargs["temperature"] == 0.2
-    assert call_kwargs["max_tokens"] == 1600
+    assert call_kwargs["max_completion_tokens"] == 1600
 
 
 def test_generate_returns_empty_string_for_empty_diff(tmp_path):
