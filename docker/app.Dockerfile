@@ -48,20 +48,20 @@ CMD ["job-scraper-9000", "pipeline"]
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm AS ci-runner
 WORKDIR /app
 
-# 1. Copy the configuration files so uv knows the project context
+# Project manifests, so the frozen sync below has project context.
 COPY pyproject.toml uv.lock ./
 
-# 2. Inherit the exact same cached virtualenv from your builder stage
+# Reuse the resolved virtualenv from the builder stage.
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 
-# 3. Copy your source code, local tests, and scripts
+# Source and scripts for the review/summarizer tooling.
 COPY src/ /app/src/
 COPY scripts/ /app/scripts/
 
-# 4. This will now run flawlessly because pyproject.toml is right there!
+# Manifests are present, so this resolves against the locked dependencies.
 RUN uv sync --frozen
 
-# Drop into a clean bash interface by default
+# Default to an interactive shell for the CI/CD utility container.
 CMD ["/bin/bash"]
