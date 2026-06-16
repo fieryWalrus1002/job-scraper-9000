@@ -30,15 +30,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate review diff
+      - name: Generate review diff and PR metadata
         env:
           BASE_REF: ${{ github.base_ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           # Ensure local git tracking knows about the target branch base.
           git fetch origin "$BASE_REF"
 
           # Use git's diff flag directly for full function context.
           git diff --function-context FETCH_HEAD...HEAD > raw_diff.txt
+
+          # Fetch PR metadata here on the host, where gh is authenticated — the
+          # container image has no gh. The reviewer reads this file instead.
+          gh pr view "$PR" --json title,body,milestone,comments > pr_meta.json
 
       # Authenticate the runner daemon against GHCR to stop the 'denied' error
       - name: Log in to GHCR
@@ -51,7 +57,6 @@ jobs:
       - name: Generate AI review via Container
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
-          PR: ${{ github.event.pull_request.number }}
           # Pass the raw repository path into the environment
           REPO_RAW: ${{ github.repository }}
         run: |
@@ -60,13 +65,25 @@ jobs:
 
           echo "Pulling image from: ghcr.io/${REPO_LOWER}/ai-reviewer:latest"
 
-          # Spin up your precompiled package using the verified lowercase string
+          # Run the review wrapper in the container. It reads raw_diff.txt and
+          # pr_meta.json from the mounted workspace and writes review.md — no gh
+          # needed inside the container.
+          #
+          # Use the image's baked venv (on PATH) for deps, but point PYTHONPATH at
+          # the mounted /workspace/src so the *PR's* reviewer code runs — the image
+          # bakes PYTHONPATH=/app/src, which would otherwise shadow it with stale
+          # published code. Running `python` directly (not `uv run`) also skips a
+          # full re-sync of the mounted project.
           docker run --rm \
             -e OPENAI_API_KEY \
+            -e PYTHONPATH=/workspace/src \
             -v $(pwd):/workspace \
             -w /workspace \
             ghcr.io/${REPO_LOWER}/ai-reviewer:latest \
-            uv run python src/ci/ai_review.py --pr "$PR" < raw_diff.txt > review.md
+            python scripts/ai_review_pr.py \
+              --diff-file raw_diff.txt \
+              --metadata-file pr_meta.json \
+              --output review.md
 
       - name: Post or update PR comment
         env:
@@ -74,8 +91,10 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           if [ -s review.md ]; then
-            # FIXED: Scan existing issue comments specifically for our script's unique tracking identifier.
-            EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("")) | .id' | head -n 1)
+            # Find our own prior review by its marker so we update it in place
+            # rather than clobbering an unrelated comment. The marker must match
+            # AI_REVIEW_MARKER in src/ci/ai_review.py, which the review body starts with.
+            EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- ai-code-review -->")) | .id' | head -n 1)
 
             if [ -n "$EXISTING_COMMENT_ID" ]; then
               echo "Updating existing review comment ID: $EXISTING_COMMENT_ID"

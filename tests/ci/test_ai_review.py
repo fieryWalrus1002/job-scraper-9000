@@ -109,6 +109,28 @@ def test_fetch_pr_metadata_passes_pr_to_gh_and_parses_response():
     assert metadata.milestone == "Phase X"
 
 
+def test_load_pr_metadata_from_file_parses_gh_json(tmp_path):
+    from ci.ai_review import load_pr_metadata_from_file
+
+    meta_file = tmp_path / "pr_meta.json"
+    meta_file.write_text(
+        json.dumps(
+            {
+                "title": "PR title",
+                "body": "PR body",
+                "milestone": {"title": "Phase X"},
+                "comments": [{"author": {"login": "octo"}, "body": "ship it"}],
+            }
+        )
+    )
+
+    metadata = load_pr_metadata_from_file(str(meta_file))
+
+    assert metadata.title == "PR title"
+    assert metadata.milestone == "Phase X"
+    assert metadata.comments == ("- octo: ship it",)
+
+
 def test_fetch_pr_metadata_fails_loudly_on_gh_error():
     from ci.ai_review import fetch_pr_metadata
 
@@ -170,7 +192,7 @@ def test_generate_returns_marked_review_and_passes_expected_params(tmp_path):
     call_kwargs = mock_client.chat.completions.create.call_args.kwargs
     assert call_kwargs["model"] == "gpt-5.4-mini"
     assert call_kwargs["temperature"] == 0.2
-    assert call_kwargs["max_tokens"] == 1600
+    assert call_kwargs["max_completion_tokens"] == 1600
 
 
 def test_generate_returns_empty_string_for_empty_diff(tmp_path):

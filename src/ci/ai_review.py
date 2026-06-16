@@ -91,7 +91,8 @@ class AICodeReviewer:
             response = self.client.chat.completions.create(
                 model=model,
                 temperature=self.llm_config.get("temperature", 0.2),
-                max_tokens=self.llm_config.get("max_tokens"),
+                # Newer OpenAI models reject the legacy `max_tokens`.
+                max_completion_tokens=self.llm_config.get("max_tokens"),
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {
@@ -157,6 +158,15 @@ def fetch_pr_metadata(
         ) from exc
 
     return parse_pr_metadata(json.loads(result.stdout))
+
+
+def load_pr_metadata_from_file(path: str) -> PRMetadata:
+    """Parse PR metadata from a file holding `gh pr view --json …` output.
+
+    Lets CI fetch metadata on the host (where `gh` is authenticated) and hand it
+    to the container, which has no `gh`.
+    """
+    return parse_pr_metadata(json.loads(pathlib.Path(path).read_text()))
 
 
 def parse_pr_metadata(raw: dict[str, Any]) -> PRMetadata:
