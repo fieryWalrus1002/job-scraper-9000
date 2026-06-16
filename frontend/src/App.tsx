@@ -16,7 +16,7 @@ import type { Application, ApplicationStatus, Filters, JobSummary } from './type
 import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
-import { JobDetailPanel } from './components/JobDetailPanel'
+import { JobDetailPanel, type JobDetailSurface } from './components/JobDetailPanel'
 import SettingsPage from './components/SettingsPage'
 import AddJobModal from './components/AddJobModal'
 import { TriageApplicationTable } from './components/TriageApplicationTable'
@@ -213,7 +213,7 @@ function AppShell({ email }: { email: string }) {
           dedupHash={selectedJob.hash}
           onClose={() => setSelectedJob(null)}
           application={applications?.get(selectedJob.hash)}
-          surfacePath={selectedJob.path}
+          surface={jobDetailSurfaceFromPath(selectedJob.path)}
         />
       )}
 
@@ -245,4 +245,19 @@ function filterJobsBySearch(items: JobSummary[], search: string): JobSummary[] {
 
 function normalizePath(pathname: string): string {
   return pathname.replace(/\/+$/, '') || '/'
+}
+
+function jobDetailSurfaceFromPath(path: string): JobDetailSurface {
+  switch (path) {
+    case '/jobs':
+      return 'jobs'
+    case '/shortlist':
+      return 'shortlist'
+    case '/tracking':
+      return 'tracking'
+    case '/trash':
+      return 'trash'
+    default:
+      throw new Error(`Unsupported job detail surface: ${path}`)
+  }
 }

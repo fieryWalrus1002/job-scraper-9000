@@ -79,7 +79,7 @@ const APPLICATION: Application = {
 
 describe('JobDetailPanel triage actions', () => {
   it('uses binary Trash and Shortlist header actions for the Jobs surface', async () => {
-    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surfacePath="/jobs" />, {
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surface="jobs" />, {
       wrapper: makeWrapper(),
     })
 
@@ -99,7 +99,7 @@ describe('JobDetailPanel triage actions', () => {
   })
 
   it('preserves the existing non-Jobs header actions until stage-specific panels land', async () => {
-    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surfacePath="/tracking" />, {
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surface="tracking" />, {
       wrapper: makeWrapper(),
     })
 

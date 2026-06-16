@@ -26,6 +26,8 @@ import { X } from 'lucide-react'
 import { QuickActions } from '@/components/ui/quick-actions'
 import { cn } from '@/lib/utils'
 
+export type JobDetailSurface = 'jobs' | 'shortlist' | 'tracking' | 'trash'
+
 const DEFAULT_TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
   { value: 'passed', label: 'Trash', shortcut: 'T' },
   { value: 'maybe', label: 'Maybe', shortcut: 'M' },
@@ -44,7 +46,7 @@ interface Props {
   dedupHash: string | null
   onClose: () => void
   application?: Application
-  surfacePath?: string
+  surface?: JobDetailSurface
 }
 
 function scoreVariant(score: number | null | undefined) {
@@ -408,16 +410,16 @@ interface JobDetailHeaderProps {
   correction: EvalCorrectionOut | null | undefined
   application: Application | undefined
   onClose: () => void
-  surfacePath?: string
+  surface?: JobDetailSurface
 }
 
 function JobDetailHeader(props: JobDetailHeaderProps) {
-  const { jobData, correction, application, onClose, surfacePath } = props
+  const { jobData, correction, application, onClose, surface } = props
   const mark = useMarkApplication()
   const update = useUpdateApplication()
   const triagePending = mark.isPending || update.isPending
   const currentStatus = application?.status ?? null
-  const triageStatuses = surfacePath === '/jobs' ? JOBS_TRIAGE_STATUSES : DEFAULT_TRIAGE_STATUSES
+  const triageStatuses = surface === 'jobs' ? JOBS_TRIAGE_STATUSES : DEFAULT_TRIAGE_STATUSES
 
   function setTriage(status: ApplicationStatus) {
     if (!jobData) return
@@ -561,7 +563,7 @@ function DevMetadataSection({ jobData }: { jobData: JobDetail }) {
   )
 }
 
-export function JobDetailPanel({ dedupHash, onClose, application, surfacePath }: Props) {
+export function JobDetailPanel({ dedupHash, onClose, application, surface }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
     queryFn: () => fetchJobDetail(dedupHash!),
@@ -583,7 +585,7 @@ export function JobDetailPanel({ dedupHash, onClose, application, surfacePath }:
           correction={correction}
           application={application}
           onClose={onClose}
-          surfacePath={surfacePath}
+          surface={surface}
         />
 
         {/* ── Body ─────────────────────────────────── */}
