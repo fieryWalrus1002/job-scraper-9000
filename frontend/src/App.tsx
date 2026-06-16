@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Navigate, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom'
 import { useJobs } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
@@ -100,16 +108,6 @@ function AppShell({ email }: { email: string }) {
   const trashCount = countStatuses(allApplications, TRASH_STATUSES)
   const jobsCount = search ? filteredItems.length : data?.total
 
-  const activeTotal =
-    currentPath === '/trash'
-      ? trashCount
-      : currentPath === '/shortlist'
-        ? shortlistCount
-        : currentPath === '/tracking'
-          ? trackingCount
-          : jobsCount
-  const showFilterPane = currentPath === '/jobs'
-
   const tabBtn =
     'group relative inline-flex items-center gap-2 h-8 px-3 border-none bg-transparent text-muted text-[13px] font-medium cursor-pointer rounded-md transition-all hover:text-fg hover:bg-hover/50 no-underline'
   const tabBtnActive =
@@ -189,87 +187,101 @@ function AppShell({ email }: { email: string }) {
       </header>
 
       <div className="flex-1 flex flex-row overflow-hidden">
-        {showFilterPane && (
-          <div
-            className={cn(
-              'flex flex-row shrink-0 relative transition-[width] duration-200 ease',
-              paneOpen ? 'w-[224px]' : 'w-5',
-            )}
-          >
-            <FilterPane
-              filters={filters}
-              search={search}
-              onFiltersChange={setFilters}
-              onSearchChange={setSearch}
-              visibleColumns={visible}
-              onToggleColumn={toggle}
-              total={activeTotal}
-              collapsed={!paneOpen}
-            />
-            <button
-              className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-10 bg-card border border-border border-l-0 rounded-r-md text-faint text-xs cursor-pointer flex items-center justify-center z-10 p-0 hover:text-fg hover:bg-hover hover:border-border-strong transition-colors"
-              onClick={() => setPaneOpen((v) => !v)}
-              title={paneOpen ? 'Collapse filters' : 'Expand filters'}
-              aria-label={paneOpen ? 'Collapse filters' : 'Expand filters'}
-            >
-              {paneOpen ? '‹' : '›'}
-            </button>
-          </div>
-        )}
+        <Routes>
+          <Route
+            path="/jobs"
+            element={
+              <div
+                className={cn(
+                  'flex flex-row shrink-0 relative transition-[width] duration-200 ease',
+                  paneOpen ? 'w-[224px]' : 'w-5',
+                )}
+              >
+                <FilterPane
+                  filters={filters}
+                  search={search}
+                  onFiltersChange={setFilters}
+                  onSearchChange={setSearch}
+                  visibleColumns={visible}
+                  onToggleColumn={toggle}
+                  total={jobsCount}
+                  collapsed={!paneOpen}
+                />
+                <button
+                  className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-10 bg-card border border-border border-l-0 rounded-r-md text-faint text-xs cursor-pointer flex items-center justify-center z-10 p-0 hover:text-fg hover:bg-hover hover:border-border-strong transition-colors"
+                  onClick={() => setPaneOpen((v) => !v)}
+                  title={paneOpen ? 'Collapse filters' : 'Expand filters'}
+                  aria-label={paneOpen ? 'Collapse filters' : 'Expand filters'}
+                >
+                  {paneOpen ? '‹' : '›'}
+                </button>
+              </div>
+            }
+          />
+        </Routes>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {currentPath === '/' && (
-            <Navigate to={{ pathname: '/jobs', search: location.search }} replace />
-          )}
-
-          {currentPath === '/jobs' && (
-            <>
-              {isLoading && <div className="py-12 text-center text-muted text-sm">Loading…</div>}
-              {isError && (
-                <div className="py-12 text-center text-score-low text-sm">
-                  Failed to load jobs: {(error as Error).message}
-                </div>
-              )}
-              {!isLoading && !isError && (
-                <JobTable
-                  items={filteredItems}
-                  visibleColumns={visible}
+          <Routes>
+            <Route
+              path="/"
+              element={<Navigate to={{ pathname: '/jobs', search: location.search }} replace />}
+            />
+            <Route
+              path="/jobs"
+              element={
+                <>
+                  {isLoading && (
+                    <div className="py-12 text-center text-muted text-sm">Loading…</div>
+                  )}
+                  {isError && (
+                    <div className="py-12 text-center text-score-low text-sm">
+                      Failed to load jobs: {(error as Error).message}
+                    </div>
+                  )}
+                  {!isLoading && !isError && (
+                    <JobTable
+                      items={filteredItems}
+                      visibleColumns={visible}
+                      onSelect={selectCurrentJob}
+                      applications={applications}
+                    />
+                  )}
+                </>
+              }
+            />
+            <Route
+              path="/shortlist"
+              element={
+                <TriageApplicationTable
+                  statuses={SHORTLIST_STATUSES}
                   onSelect={selectCurrentJob}
-                  applications={applications}
+                  emptyMessage="No shortlisted jobs yet."
                 />
-              )}
-            </>
-          )}
-
-          {currentPath === '/shortlist' && (
-            <TriageApplicationTable
-              statuses={SHORTLIST_STATUSES}
-              onSelect={selectCurrentJob}
-              emptyMessage="No shortlisted jobs yet."
+              }
             />
-          )}
-
-          {currentPath === '/tracking' && (
-            <TriageApplicationTable
-              statuses={TRACKING_STATUSES}
-              onSelect={selectCurrentJob}
-              emptyMessage="No tracking jobs yet."
+            <Route
+              path="/tracking"
+              element={
+                <TriageApplicationTable
+                  statuses={TRACKING_STATUSES}
+                  onSelect={selectCurrentJob}
+                  emptyMessage="No tracking jobs yet."
+                />
+              }
             />
-          )}
-
-          {currentPath === '/trash' && (
-            <TriageApplicationTable
-              statuses={TRASH_STATUSES}
-              onSelect={selectCurrentJob}
-              emptyMessage="Trash is empty."
+            <Route
+              path="/trash"
+              element={
+                <TriageApplicationTable
+                  statuses={TRASH_STATUSES}
+                  onSelect={selectCurrentJob}
+                  emptyMessage="Trash is empty."
+                />
+              }
             />
-          )}
-
-          {currentPath === '/settings' && <SettingsPage />}
-
-          {!['/', '/jobs', '/shortlist', '/tracking', '/trash', '/settings'].includes(
-            currentPath,
-          ) && <Navigate to="/jobs" replace />}
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/jobs" replace />} />
+          </Routes>
         </div>
       </div>
 
