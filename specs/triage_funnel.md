@@ -83,8 +83,13 @@ Ships the whole IA with plain controls (buttons, not gestures).
 
 1. **BE:** `list_jobs` untriaged-only default (LEFT JOIN); tests.
 1. **BE:** applications endpoint status-set filter; tests.
-1. **FE:** 4-tab nav + routing (`/jobs`, `/shortlist`, `/tracking`, `/trash`),
-   each a status-filtered view reusing `JobTable`.
+1. **FE:** 4-tab nav + routing (`/jobs`, `/shortlist`, `/tracking`, `/trash`).
+   Jobs keeps `JobTable` (job-centric: Track column + context menu); the
+   status tabs render a separate application-centric `TriageApplicationTable`
+   (Status / Job / Score / Updated / Notes) since they show
+   `user_applications` rows, not raw job summaries. *(Deviation from the
+   original "reuse `JobTable`" note — the two row shapes differ; ratified in
+   build, #261.)*
 1. **FE:** Jobs feed = untriaged + click-to-set-status actions (Trash /
    Shortlist buttons on the row + detail panel).
 1. **FE:** Shortlist tab — `maybe` only; second-pass review with a **Pursue**
