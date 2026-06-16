@@ -23,6 +23,7 @@ import { TriageApplicationTable } from './components/TriageApplicationTable'
 import { TrackingBoard } from './components/TrackingBoard'
 import { TRACKING_STATUSES } from './lib/trackingGroups'
 import { ShortlistRowActions } from './components/ShortlistRowActions'
+import { TrashRowActions } from './components/TrashRowActions'
 import { cn } from './lib/utils'
 
 const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
@@ -199,6 +200,7 @@ function AppShell({ email }: { email: string }) {
                   statuses={TRASH_STATUSES}
                   onSelect={(app) => selectCurrentJob(app.dedup_hash, 'trash', app)}
                   emptyMessage="Trash is empty."
+                  renderRowActions={(app) => <TrashRowActions application={app} />}
                 />
               }
             />
