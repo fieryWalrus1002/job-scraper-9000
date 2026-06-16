@@ -30,15 +30,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate review diff
+      - name: Generate review diff and PR metadata
         env:
           BASE_REF: ${{ github.base_ref }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           # Ensure local git tracking knows about the target branch base.
           git fetch origin "$BASE_REF"
 
           # Use git's diff flag directly for full function context.
           git diff --function-context FETCH_HEAD...HEAD > raw_diff.txt
+
+          # Fetch PR metadata here on the host, where gh is authenticated — the
+          # container image has no gh. The reviewer reads this file instead.
+          gh pr view "$PR" --json title,body,milestone,comments > pr_meta.json
 
       # Authenticate the runner daemon against GHCR to stop the 'denied' error
       - name: Log in to GHCR
@@ -51,7 +57,6 @@ jobs:
       - name: Generate AI review via Container
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
-          PR: ${{ github.event.pull_request.number }}
           # Pass the raw repository path into the environment
           REPO_RAW: ${{ github.repository }}
         run: |
@@ -60,13 +65,18 @@ jobs:
 
           echo "Pulling image from: ghcr.io/${REPO_LOWER}/ai-reviewer:latest"
 
-          # Spin up your precompiled package using the verified lowercase string
+          # Run the review wrapper in the container. It reads raw_diff.txt and
+          # pr_meta.json from the mounted workspace and writes review.md — no gh
+          # needed inside the container.
           docker run --rm \
             -e OPENAI_API_KEY \
             -v $(pwd):/workspace \
             -w /workspace \
             ghcr.io/${REPO_LOWER}/ai-reviewer:latest \
-            uv run python src/ci/ai_review.py --pr "$PR" < raw_diff.txt > review.md
+            uv run python scripts/ai_review_pr.py \
+              --diff-file raw_diff.txt \
+              --metadata-file pr_meta.json \
+              --output review.md
 
       - name: Post or update PR comment
         env:

@@ -159,6 +159,15 @@ def fetch_pr_metadata(
     return parse_pr_metadata(json.loads(result.stdout))
 
 
+def load_pr_metadata_from_file(path: str) -> PRMetadata:
+    """Parse PR metadata from a file holding `gh pr view --json …` output.
+
+    Lets CI fetch metadata on the host (where `gh` is authenticated) and hand it
+    to the container, which has no `gh`.
+    """
+    return parse_pr_metadata(json.loads(pathlib.Path(path).read_text()))
+
+
 def parse_pr_metadata(raw: dict[str, Any]) -> PRMetadata:
     """Parse gh's JSON shape into prompt-safe metadata."""
     milestone = raw.get("milestone") or {}
