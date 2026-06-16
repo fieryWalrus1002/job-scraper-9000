@@ -24,9 +24,9 @@ export function DevMetadataSection({ jobData }: { jobData: JobDetail }) {
               className="text-fg font-mono break-all cursor-pointer hover:text-primary-hov transition-colors"
               title="Click to copy"
               onClick={() => {
-                // Swallow rejection — clipboard can fail in insecure contexts
-                // or when permission is denied; no unhandled-rejection noise.
-                void navigator.clipboard?.writeText(String(value)).catch(() => {})
+                void navigator.clipboard?.writeText(String(value)).catch((err: unknown) => {
+                  console.warn('Failed to copy dev metadata value', { label, err })
+                })
               }}
             >
               {value}

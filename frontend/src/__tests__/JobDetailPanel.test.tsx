@@ -119,11 +119,10 @@ describe('JobDetailPanel triage actions', () => {
     expect(within(toolbar).getByRole('button', { name: /Pursue/ })).toBeInTheDocument()
     expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
     expect(within(toolbar).getByRole('button', { name: /Back to Jobs/ })).toBeInTheDocument()
-    expect(
-      within(toolbar)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual(['TrashT', 'Back to JobsB', 'PursueP'])
+    const buttons = within(toolbar).getAllByRole('button')
+    expect(buttons[0]).toHaveAccessibleName('Trash')
+    expect(buttons[1]).toHaveAccessibleName('Back to Jobs')
+    expect(buttons[2]).toHaveAccessibleName('Pursue')
     expect(within(toolbar).queryByRole('button', { name: /To Apply/ })).not.toBeInTheDocument()
 
     fireEvent.click(within(toolbar).getByRole('button', { name: /Pursue/ }))
@@ -156,15 +155,9 @@ describe('JobDetailPanel triage actions', () => {
   })
 
   it('uses recovery actions for the Trash surface', async () => {
-    render(
-      <JobDetailPanel
-        dedupHash="hash-a"
-        onClose={vi.fn()}
-        application={{ ...APPLICATION, status: 'passed' }}
-        surface="trash"
-      />,
-      { wrapper: makeWrapper() },
-    )
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surface="trash" />, {
+      wrapper: makeWrapper(),
+    })
 
     const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
     expect(within(toolbar).getByRole('button', { name: /Restore to Jobs/ })).toBeInTheDocument()

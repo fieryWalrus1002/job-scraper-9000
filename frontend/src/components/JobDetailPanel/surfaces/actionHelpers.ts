@@ -25,7 +25,7 @@ export function useApplicationDetailActions(
   }
 
   function removeTracking() {
-    if (application) del.mutate(dedupHash)
+    del.mutate(dedupHash)
   }
 
   function statusAction({
@@ -67,7 +67,7 @@ export function useApplicationDetailActions(
       id,
       label,
       shortcut,
-      disabled: isPending || !application,
+      disabled: isPending,
       variant,
       onSelect: removeTracking,
     }
