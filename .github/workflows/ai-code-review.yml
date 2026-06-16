@@ -91,8 +91,10 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           if [ -s review.md ]; then
-            # FIXED: Scan existing issue comments specifically for our script's unique tracking identifier.
-            EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("")) | .id' | head -n 1)
+            # Find our own prior review by its marker so we update it in place
+            # rather than clobbering an unrelated comment. The marker must match
+            # AI_REVIEW_MARKER in src/ci/ai_review.py, which the review body starts with.
+            EXISTING_COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- ai-code-review -->")) | .id' | head -n 1)
 
             if [ -n "$EXISTING_COMMENT_ID" ]; then
               echo "Updating existing review comment ID: $EXISTING_COMMENT_ID"
