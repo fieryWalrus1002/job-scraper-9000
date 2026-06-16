@@ -68,12 +68,19 @@ jobs:
           # Run the review wrapper in the container. It reads raw_diff.txt and
           # pr_meta.json from the mounted workspace and writes review.md — no gh
           # needed inside the container.
+          #
+          # Use the image's baked venv (on PATH) for deps, but point PYTHONPATH at
+          # the mounted /workspace/src so the *PR's* reviewer code runs — the image
+          # bakes PYTHONPATH=/app/src, which would otherwise shadow it with stale
+          # published code. Running `python` directly (not `uv run`) also skips a
+          # full re-sync of the mounted project.
           docker run --rm \
             -e OPENAI_API_KEY \
+            -e PYTHONPATH=/workspace/src \
             -v $(pwd):/workspace \
             -w /workspace \
             ghcr.io/${REPO_LOWER}/ai-reviewer:latest \
-            uv run python scripts/ai_review_pr.py \
+            python scripts/ai_review_pr.py \
               --diff-file raw_diff.txt \
               --metadata-file pr_meta.json \
               --output review.md
