@@ -75,6 +75,7 @@ function AppShell({ email }: { email: string }) {
     hash: string
     path: string
     surface: JobDetailSurface
+    applicationSnapshot?: Application
   } | null>(null)
   const [paneOpen, setPaneOpen] = useState(true)
   const [addJobOpen, setAddJobOpen] = useState(false)
@@ -89,8 +90,12 @@ function AppShell({ email }: { email: string }) {
 
   const currentPath = normalizePath(location.pathname)
 
-  function selectCurrentJob(hash: string, surface: JobDetailSurface) {
-    setSelectedJob({ hash, path: currentPath, surface })
+  function selectCurrentJob(
+    hash: string,
+    surface: JobDetailSurface,
+    applicationSnapshot?: Application,
+  ) {
+    setSelectedJob({ hash, path: currentPath, surface, applicationSnapshot })
   }
 
   const allItems = data?.items ?? []
@@ -181,7 +186,7 @@ function AppShell({ email }: { email: string }) {
               element={
                 <TriageApplicationTable
                   statuses={SHORTLIST_STATUSES}
-                  onSelect={(hash) => selectCurrentJob(hash, 'shortlist')}
+                  onSelect={(app) => selectCurrentJob(app.dedup_hash, 'shortlist', app)}
                   emptyMessage="No shortlisted jobs yet."
                 />
               }
@@ -191,7 +196,7 @@ function AppShell({ email }: { email: string }) {
               element={
                 <TriageApplicationTable
                   statuses={TRACKING_STATUSES}
-                  onSelect={(hash) => selectCurrentJob(hash, 'tracking')}
+                  onSelect={(app) => selectCurrentJob(app.dedup_hash, 'tracking', app)}
                   emptyMessage="No tracking jobs yet."
                 />
               }
@@ -201,7 +206,7 @@ function AppShell({ email }: { email: string }) {
               element={
                 <TriageApplicationTable
                   statuses={TRASH_STATUSES}
-                  onSelect={(hash) => selectCurrentJob(hash, 'trash')}
+                  onSelect={(app) => selectCurrentJob(app.dedup_hash, 'trash', app)}
                   emptyMessage="Trash is empty."
                 />
               }
@@ -216,7 +221,7 @@ function AppShell({ email }: { email: string }) {
         <JobDetailPanel
           dedupHash={selectedJob.hash}
           onClose={() => setSelectedJob(null)}
-          application={applications?.get(selectedJob.hash)}
+          application={applications?.get(selectedJob.hash) ?? selectedJob.applicationSnapshot}
           surface={selectedJob.surface}
         />
       )}
