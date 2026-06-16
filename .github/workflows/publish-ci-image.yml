@@ -17,6 +17,13 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
+      # STEP 1: Compute the lowercase repo string and save it to the environment
+      - name: Set lower-case environment variables
+        env:
+          REPO_RAW: ${{ github.repository }}
+        run: |
+          echo "REPO_LOWER=$(echo "$REPO_RAW" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -24,18 +31,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # STEP 2: Reference the environment variable via env.REPO_LOWER
       - name: Build and Push to GitHub Packages
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/ai-reviewer:latest
+          tags: ghcr.io/${{ env.REPO_LOWER }}/ai-reviewer:latest
 
       - name: Prune Old Untagged Images
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # List untagged versions and delete them via gh api
-          gh api orgs/${{ github.repository_owner }}/packages/container/ai-reviewer/versions --jq '.[] | select(.metadata.container.tags | length == 0) | .id' | while read -r id; do
-            gh api "orgs/${{ github.repository_owner }}/packages/container/ai-reviewer/versions/$id" -X DELETE
+          # Changed from orgs/ to users/ to match your personal account scope
+          gh api users/${{ github.repository_owner }}/packages/container/ai-reviewer/versions --jq '.[] | select(.metadata.container.tags | length == 0) | .id' | while read -r id; do
+            gh api "users/${{ github.repository_owner }}/packages/container/ai-reviewer/versions/$id" -X DELETE
           done

@@ -43,14 +43,20 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}
           PR: ${{ github.event.pull_request.number }}
+          # Pass the raw repository path into the environment
+          REPO_RAW: ${{ github.repository }}
         run: |
-          # Spin up your precompiled package from GHCR, passing the diff file
-          # and pulling the resulting review.md back out into the workspace root.
+          # Convert the repository path to strictly lowercase using bash
+          REPO_LOWER=$(echo "$REPO_RAW" | tr '[:upper:]' '[:lower:]')
+
+          echo "Pulling image from: ghcr.io/${REPO_LOWER}/ai-reviewer:latest"
+
+          # Spin up your precompiled package using the verified lowercase string
           docker run --rm \
             -e OPENAI_API_KEY \
             -v $(pwd):/workspace \
             -w /workspace \
-            ghcr.io/${{ github.repository }}/ai-reviewer:latest \
+            ghcr.io/${REPO_LOWER}/ai-reviewer:latest \
             uv run python src/ci/ai_review.py --pr "$PR" < raw_diff.txt > review.md
 
       - name: Post or update PR comment
