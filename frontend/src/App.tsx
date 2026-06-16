@@ -213,6 +213,7 @@ function AppShell({ email }: { email: string }) {
           dedupHash={selectedJob.hash}
           onClose={() => setSelectedJob(null)}
           application={applications?.get(selectedJob.hash)}
+          surfacePath={selectedJob.path}
         />
       )}
 

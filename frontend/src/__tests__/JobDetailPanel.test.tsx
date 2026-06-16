@@ -78,8 +78,10 @@ const APPLICATION: Application = {
 }
 
 describe('JobDetailPanel triage actions', () => {
-  it('uses binary Trash and Shortlist header actions and marks Shortlist', async () => {
-    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} />, { wrapper: makeWrapper() })
+  it('uses binary Trash and Shortlist header actions for the Jobs surface', async () => {
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surfacePath="/jobs" />, {
+      wrapper: makeWrapper(),
+    })
 
     const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
     expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
@@ -89,13 +91,30 @@ describe('JobDetailPanel triage actions', () => {
 
     fireEvent.click(within(toolbar).getByRole('button', { name: /Shortlist/ }))
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/applications', expect.anything()))
-    const postCall = vi
-      .mocked(fetch)
-      .mock.calls.find(([url]) => String(url) === '/api/applications')
-    expect(postCall?.[1]).toMatchObject({
+    await waitFor(() => expect(applicationPosts()).toHaveLength(1))
+    expect(applicationPosts()[0]?.[1]).toMatchObject({
       method: 'POST',
       body: JSON.stringify({ dedup_hash: 'hash-a', status: 'maybe' }),
     })
   })
+
+  it('preserves the existing non-Jobs header actions until stage-specific panels land', async () => {
+    render(<JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surfacePath="/tracking" />, {
+      wrapper: makeWrapper(),
+    })
+
+    const toolbar = await screen.findByRole('toolbar', { name: 'Triage status' })
+    expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /Maybe/ })).toBeInTheDocument()
+    expect(within(toolbar).getByRole('button', { name: /To Apply/ })).toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: /Shortlist/ })).not.toBeInTheDocument()
+  })
 })
+
+function applicationPosts() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([url, init]) => String(url) === '/api/applications' && init?.method === 'POST',
+    )
+}

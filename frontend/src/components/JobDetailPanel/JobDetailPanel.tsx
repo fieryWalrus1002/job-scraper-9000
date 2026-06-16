@@ -26,9 +26,16 @@ import { X } from 'lucide-react'
 import { QuickActions } from '@/components/ui/quick-actions'
 import { cn } from '@/lib/utils'
 
-// Funnel's fast binary, shown as the panel's primary triage actions on every tab.
-// The full status set lives in the collapsible "Application Tracking" section below.
-const TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
+const DEFAULT_TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
+  { value: 'passed', label: 'Trash', shortcut: 'T' },
+  { value: 'maybe', label: 'Maybe', shortcut: 'M' },
+  { value: 'to_apply', label: 'To Apply', shortcut: 'A' },
+]
+
+// Jobs is the funnel's fast binary: Trash (passed) or Shortlist (maybe).
+// Other tabs keep their existing header actions until their stage-specific
+// detail panels land.
+const JOBS_TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
   { value: 'passed', label: 'Trash', shortcut: 'T' },
   { value: 'maybe', label: 'Shortlist', shortcut: 'S' },
 ]
@@ -37,6 +44,7 @@ interface Props {
   dedupHash: string | null
   onClose: () => void
   application?: Application
+  surfacePath?: string
 }
 
 function scoreVariant(score: number | null | undefined) {
@@ -400,14 +408,16 @@ interface JobDetailHeaderProps {
   correction: EvalCorrectionOut | null | undefined
   application: Application | undefined
   onClose: () => void
+  surfacePath?: string
 }
 
 function JobDetailHeader(props: JobDetailHeaderProps) {
-  const { jobData, correction, application, onClose } = props
+  const { jobData, correction, application, onClose, surfacePath } = props
   const mark = useMarkApplication()
   const update = useUpdateApplication()
   const triagePending = mark.isPending || update.isPending
   const currentStatus = application?.status ?? null
+  const triageStatuses = surfacePath === '/jobs' ? JOBS_TRIAGE_STATUSES : DEFAULT_TRIAGE_STATUSES
 
   function setTriage(status: ApplicationStatus) {
     if (!jobData) return
@@ -485,13 +495,14 @@ function JobDetailHeader(props: JobDetailHeaderProps) {
               <QuickActions
                 aria-label="Triage status"
                 size="sm"
-                actions={TRIAGE_STATUSES.map((s) => ({
+                actions={triageStatuses.map((s) => ({
                   id: s.value,
                   label: s.label,
                   shortcut: s.shortcut,
                   active: currentStatus === s.value,
                   disabled: triagePending,
-                  variant: s.value === 'passed' ? 'danger' : 'warn',
+                  variant:
+                    s.value === 'passed' ? 'danger' : s.value === 'to_apply' ? 'success' : 'warn',
                   onSelect: () => setTriage(s.value),
                 }))}
               />
@@ -550,7 +561,7 @@ function DevMetadataSection({ jobData }: { jobData: JobDetail }) {
   )
 }
 
-export function JobDetailPanel({ dedupHash, onClose, application }: Props) {
+export function JobDetailPanel({ dedupHash, onClose, application, surfacePath }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
     queryFn: () => fetchJobDetail(dedupHash!),
@@ -572,6 +583,7 @@ export function JobDetailPanel({ dedupHash, onClose, application }: Props) {
           correction={correction}
           application={application}
           onClose={onClose}
+          surfacePath={surfacePath}
         />
 
         {/* ── Body ─────────────────────────────────── */}

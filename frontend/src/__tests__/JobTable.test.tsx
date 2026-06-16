@@ -77,11 +77,8 @@ describe('JobTable triage actions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Shortlist' }))
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/applications', expect.anything()))
-    const postCall = vi
-      .mocked(fetch)
-      .mock.calls.find(([url]) => String(url) === '/api/applications')
-    expect(postCall?.[1]).toMatchObject({
+    await waitFor(() => expect(applicationPosts()).toHaveLength(1))
+    expect(applicationPosts()[0]?.[1]).toMatchObject({
       method: 'POST',
       body: JSON.stringify({ dedup_hash: 'hash-a', status: 'maybe' }),
     })
@@ -101,3 +98,11 @@ describe('JobTable triage actions', () => {
     expect(screen.queryByRole('button', { name: 'Remove tracking' })).not.toBeInTheDocument()
   })
 })
+
+function applicationPosts() {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(
+      ([url, init]) => String(url) === '/api/applications' && init?.method === 'POST',
+    )
+}
