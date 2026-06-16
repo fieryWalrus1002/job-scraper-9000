@@ -16,7 +16,7 @@ import type { Application, ApplicationStatus, Filters, JobSummary } from './type
 import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
-import { JobDetailPanel } from './components/JobDetailPanel'
+import { JobDetailPanel, type JobDetailSurface } from './components/JobDetailPanel'
 import SettingsPage from './components/SettingsPage'
 import AddJobModal from './components/AddJobModal'
 import { TriageApplicationTable } from './components/TriageApplicationTable'
@@ -71,7 +71,11 @@ function AppShell({ email }: { email: string }) {
   const navigate = useNavigate()
   const filters = filtersFromParams(urlParams)
   const [search, setSearch] = useState('')
-  const [selectedJob, setSelectedJob] = useState<{ hash: string; path: string } | null>(null)
+  const [selectedJob, setSelectedJob] = useState<{
+    hash: string
+    path: string
+    surface: JobDetailSurface
+  } | null>(null)
   const [paneOpen, setPaneOpen] = useState(true)
   const [addJobOpen, setAddJobOpen] = useState(false)
 
@@ -85,8 +89,8 @@ function AppShell({ email }: { email: string }) {
 
   const currentPath = normalizePath(location.pathname)
 
-  function selectCurrentJob(hash: string) {
-    setSelectedJob({ hash, path: currentPath })
+  function selectCurrentJob(hash: string, surface: JobDetailSurface) {
+    setSelectedJob({ hash, path: currentPath, surface })
   }
 
   const allItems = data?.items ?? []
@@ -165,7 +169,7 @@ function AppShell({ email }: { email: string }) {
                     <JobTable
                       items={filteredItems}
                       visibleColumns={visible}
-                      onSelect={selectCurrentJob}
+                      onSelect={(hash) => selectCurrentJob(hash, 'jobs')}
                       applications={applications}
                     />
                   )}
@@ -177,7 +181,7 @@ function AppShell({ email }: { email: string }) {
               element={
                 <TriageApplicationTable
                   statuses={SHORTLIST_STATUSES}
-                  onSelect={selectCurrentJob}
+                  onSelect={(hash) => selectCurrentJob(hash, 'shortlist')}
                   emptyMessage="No shortlisted jobs yet."
                 />
               }
@@ -187,7 +191,7 @@ function AppShell({ email }: { email: string }) {
               element={
                 <TriageApplicationTable
                   statuses={TRACKING_STATUSES}
-                  onSelect={selectCurrentJob}
+                  onSelect={(hash) => selectCurrentJob(hash, 'tracking')}
                   emptyMessage="No tracking jobs yet."
                 />
               }
@@ -197,7 +201,7 @@ function AppShell({ email }: { email: string }) {
               element={
                 <TriageApplicationTable
                   statuses={TRASH_STATUSES}
-                  onSelect={selectCurrentJob}
+                  onSelect={(hash) => selectCurrentJob(hash, 'trash')}
                   emptyMessage="Trash is empty."
                 />
               }
@@ -213,6 +217,7 @@ function AppShell({ email }: { email: string }) {
           dedupHash={selectedJob.hash}
           onClose={() => setSelectedJob(null)}
           application={applications?.get(selectedJob.hash)}
+          surface={selectedJob.surface}
         />
       )}
 

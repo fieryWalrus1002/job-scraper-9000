@@ -17,7 +17,7 @@ import {
   saveColumnSizing,
   tableColumns,
 } from '../lib/columns'
-import { useDeleteApplication, useMarkApplication } from '../hooks/useApplications'
+import { useMarkApplication } from '../hooks/useApplications'
 import ContextMenu from './ContextMenu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -146,10 +146,11 @@ const qBtnActive =
 
 function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
   const { mutate, isPending } = useMarkApplication()
+  // Jobs is the funnel's fast binary: Trash (passed) or Shortlist (maybe).
+  // Forward moves into Tracking (to_apply etc.) happen from the Shortlist/Tracking tabs.
   const buttons: { status: ApplicationStatus; label: string }[] = [
     { status: 'passed', label: 'Trash' },
-    { status: 'maybe', label: 'Maybe' },
-    { status: 'to_apply', label: 'To Apply' },
+    { status: 'maybe', label: 'Shortlist' },
   ]
   return (
     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -176,7 +177,6 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
   const [ctx, setCtx] = useState<ContextState | null>(null)
   const { mutate: mark } = useMarkApplication()
-  const { mutate: del } = useDeleteApplication()
 
   const columnVisibility = Object.fromEntries(
     tableColumns.map((col) => [col.id!, visibleColumns.has(col.id!)]),
@@ -362,31 +362,10 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
               onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'passed' }),
             },
             {
-              label: 'Maybe',
+              label: 'Shortlist',
               active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe',
               onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe' }),
             },
-            {
-              label: 'To Apply',
-              active: applications?.get(ctx.job.dedup_hash)?.status === 'to_apply',
-              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'to_apply' }),
-            },
-            {
-              label: 'Applied',
-              active: applications?.get(ctx.job.dedup_hash)?.status === 'applied',
-              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'applied' }),
-            },
-            ...(applications?.has(ctx.job.dedup_hash)
-              ? [
-                  {
-                    label: 'Remove tracking',
-                    active: false,
-                    onClick: () => {
-                      if (window.confirm('Remove tracking for this job?')) del(ctx.job.dedup_hash)
-                    },
-                  },
-                ]
-              : []),
           ]}
         />
       )}

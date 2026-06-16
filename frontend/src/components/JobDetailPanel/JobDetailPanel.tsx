@@ -26,16 +26,27 @@ import { X } from 'lucide-react'
 import { QuickActions } from '@/components/ui/quick-actions'
 import { cn } from '@/lib/utils'
 
-const TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
+export type JobDetailSurface = 'jobs' | 'shortlist' | 'tracking' | 'trash'
+
+const DEFAULT_TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
   { value: 'passed', label: 'Trash', shortcut: 'T' },
   { value: 'maybe', label: 'Maybe', shortcut: 'M' },
   { value: 'to_apply', label: 'To Apply', shortcut: 'A' },
+]
+
+// Jobs is the funnel's fast binary: Trash (passed) or Shortlist (maybe).
+// Other tabs keep their existing header actions until their stage-specific
+// detail panels land.
+const JOBS_TRIAGE_STATUSES: { value: ApplicationStatus; label: string; shortcut: string }[] = [
+  { value: 'passed', label: 'Trash', shortcut: 'T' },
+  { value: 'maybe', label: 'Shortlist', shortcut: 'S' },
 ]
 
 interface Props {
   dedupHash: string | null
   onClose: () => void
   application?: Application
+  surface?: JobDetailSurface
 }
 
 function scoreVariant(score: number | null | undefined) {
@@ -399,14 +410,16 @@ interface JobDetailHeaderProps {
   correction: EvalCorrectionOut | null | undefined
   application: Application | undefined
   onClose: () => void
+  surface?: JobDetailSurface
 }
 
 function JobDetailHeader(props: JobDetailHeaderProps) {
-  const { jobData, correction, application, onClose } = props
+  const { jobData, correction, application, onClose, surface } = props
   const mark = useMarkApplication()
   const update = useUpdateApplication()
   const triagePending = mark.isPending || update.isPending
   const currentStatus = application?.status ?? null
+  const triageStatuses = surface === 'jobs' ? JOBS_TRIAGE_STATUSES : DEFAULT_TRIAGE_STATUSES
 
   function setTriage(status: ApplicationStatus) {
     if (!jobData) return
@@ -484,7 +497,7 @@ function JobDetailHeader(props: JobDetailHeaderProps) {
               <QuickActions
                 aria-label="Triage status"
                 size="sm"
-                actions={TRIAGE_STATUSES.map((s) => ({
+                actions={triageStatuses.map((s) => ({
                   id: s.value,
                   label: s.label,
                   shortcut: s.shortcut,
@@ -550,7 +563,7 @@ function DevMetadataSection({ jobData }: { jobData: JobDetail }) {
   )
 }
 
-export function JobDetailPanel({ dedupHash, onClose, application }: Props) {
+export function JobDetailPanel({ dedupHash, onClose, application, surface }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
     queryFn: () => fetchJobDetail(dedupHash!),
@@ -572,6 +585,7 @@ export function JobDetailPanel({ dedupHash, onClose, application }: Props) {
           correction={correction}
           application={application}
           onClose={onClose}
+          surface={surface}
         />
 
         {/* ── Body ─────────────────────────────────── */}
