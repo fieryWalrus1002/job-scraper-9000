@@ -53,6 +53,30 @@ async def test_list_applications_returns_rows(
     assert data[0]["title"] == FAKE_JOB_ROW["title"]
 
 
+async def test_list_applications_filters_by_status_set(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    applied = {**FAKE_APP_ROW, "dedup_hash": "cafebabe" * 8, "status": "applied"}
+    fake_conn.execute = AsyncMock(return_value=_make_cursor(FAKE_APP_ROW, applied))
+    resp = await client.get(
+        "/api/applications", params=[("status", "maybe"), ("status", "applied")]
+    )
+    assert resp.status_code == 200
+    assert [row["status"] for row in resp.json()] == ["maybe", "applied"]
+
+    sql, params = fake_conn.execute.await_args.args
+    assert "a.status = ANY(%(statuses)s::text[])" in sql
+    assert params["statuses"] == ["maybe", "applied"]
+
+
+async def test_list_applications_invalid_status_rejected(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    resp = await client.get("/api/applications", params={"status": "not_real"})
+    assert resp.status_code == 422
+    fake_conn.execute.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # POST /api/applications
 # ---------------------------------------------------------------------------
