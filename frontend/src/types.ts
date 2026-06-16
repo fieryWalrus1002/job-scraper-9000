@@ -43,7 +43,7 @@ export const APPLICATION_STATUSES = [
   'passed',
 ] as const satisfies readonly ApplicationStatus[]
 
-// Used in tracking jobs, mostly in WorkflowTab, but also in AddJobModal for the status dropdown.
+// Status display labels — used across the triage tabs and in AddJobModal's status dropdown.
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   maybe: 'Maybe',
   to_apply: 'To Apply',
