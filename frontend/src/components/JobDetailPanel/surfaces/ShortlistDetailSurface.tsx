@@ -21,6 +21,8 @@ export function ShortlistDetailSurface({
     application,
   )
   const actions = [
+    statusAction({ label: 'Trash', status: 'passed', shortcut: 'T', variant: 'danger' }),
+    removeAction({ id: 'back-to-jobs', label: 'Back to Jobs', shortcut: 'B' }),
     statusAction({
       id: 'pursue',
       label: 'Pursue',
@@ -28,8 +30,6 @@ export function ShortlistDetailSurface({
       shortcut: 'P',
       variant: 'success',
     }),
-    statusAction({ label: 'Trash', status: 'passed', shortcut: 'T', variant: 'danger' }),
-    removeAction({ id: 'back-to-jobs', label: 'Back to Jobs', shortcut: 'B' }),
   ]
 
   return (

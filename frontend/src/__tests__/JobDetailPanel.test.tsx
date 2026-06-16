@@ -119,6 +119,11 @@ describe('JobDetailPanel triage actions', () => {
     expect(within(toolbar).getByRole('button', { name: /Pursue/ })).toBeInTheDocument()
     expect(within(toolbar).getByRole('button', { name: /Trash/ })).toBeInTheDocument()
     expect(within(toolbar).getByRole('button', { name: /Back to Jobs/ })).toBeInTheDocument()
+    expect(
+      within(toolbar)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['TrashT', 'Back to JobsB', 'PursueP'])
     expect(within(toolbar).queryByRole('button', { name: /To Apply/ })).not.toBeInTheDocument()
 
     fireEvent.click(within(toolbar).getByRole('button', { name: /Pursue/ }))
