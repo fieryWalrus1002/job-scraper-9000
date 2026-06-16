@@ -40,6 +40,14 @@ jobs:
           # Use git's diff flag directly for full function context.
           git diff --function-context FETCH_HEAD...HEAD > raw_diff.txt
 
+      # Authenticate the runner daemon against GHCR to stop the 'denied' error
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate AI review via Container
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_CODE_REVIEW_API_KEY }}

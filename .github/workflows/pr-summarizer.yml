@@ -31,6 +31,14 @@ jobs:
           echo -e "\n### LOGIC CHANGES" >> context.md
           git diff FETCH_HEAD...HEAD -- src/ >> context.md
 
+      # Authenticater the runner daemon against GHCR to stop the 'denied' error
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: AI Synthesis via Container
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
