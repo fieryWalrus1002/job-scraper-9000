@@ -5,6 +5,7 @@ import {
   useReactTable,
   type ColumnOrderState,
   type ColumnSizingState,
+  type Row,
 } from '@tanstack/react-table'
 import type { Application, ApplicationStatus, JobSummary } from '../types'
 import {
@@ -16,11 +17,13 @@ import {
   tableColumns,
 } from '../lib/columns'
 import { useTriageAction } from '../hooks/useTriage'
+import { useRowSwipe } from './JobTable/useRowSwipe'
 import { TitleCell } from './JobTable/cells/TitleCell'
 import { PostedAtCell } from './JobTable/cells/PostedAtCell'
 import { RationaleCell } from './JobTable/cells/RationaleCell'
 import { DefaultCell } from './JobTable/cells/DefaultCell'
 import { SalaryCell } from './JobTable/cells/SalaryCell'
+import { Star, Trash2 } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -158,7 +161,13 @@ function QuickMark({
     { status: 'maybe', label: 'Shortlist' },
   ]
   return (
-    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+    // Stop pointer/click bubbling so pressing a Track button never starts a row
+    // swipe or opens the detail panel.
+    <div
+      className="flex gap-1"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       {buttons.map(({ status, label }) => (
         <button
           key={status}
@@ -170,6 +179,131 @@ function QuickMark({
         </button>
       ))}
     </div>
+  )
+}
+
+// ── Swipeable row ─────────────────────────────────────────────────────────────
+
+const SWIPE_ACTIONS = {
+  left: { label: 'Trash', icon: Trash2, color: 'var(--color-score-low)' },
+  right: { label: 'Shortlist', icon: Star, color: 'var(--color-score-mid)' },
+} as const
+
+// The action affordance revealed in the gap a swipe opens up. It lives inside an
+// edge cell (which we let overflow) but counter-translates by the row's offset so
+// it stays pinned at the table edge — i.e. it appears to sit still while the row
+// slides off it. Fades/scales in with progress and flips to a solid "armed" fill
+// once releasing would commit.
+function SwipeAffordance({
+  direction,
+  progress,
+  armed,
+  offset,
+}: {
+  direction: 'left' | 'right'
+  progress: number
+  armed: boolean
+  offset: number
+}) {
+  const { label, icon: Icon, color } = SWIPE_ACTIONS[direction]
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute top-1/2 z-20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap"
+      style={{
+        [direction === 'left' ? 'right' : 'left']: 12,
+        transform: `translateY(-50%) translateX(${-offset}px) scale(${0.85 + progress * 0.15})`,
+        opacity: Math.min(progress * 1.5, 1),
+        color: armed ? '#fff' : color,
+        backgroundColor: armed ? color : `color-mix(in oklab, ${color} 16%, transparent)`,
+      }}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </span>
+  )
+}
+
+// A single Jobs-feed row. Swipe left = Trash, right = Shortlist — both route
+// through the same triage primitive as the buttons, so undo comes for free. The
+// row slides (rubber-banded), tints toward the action color, and reveals an
+// armed affordance once releasing would commit.
+function JobRow({
+  row,
+  rank,
+  appStatus,
+  onSelect,
+  onContextMenu,
+  triage,
+}: {
+  row: Row<JobSummary>
+  rank: number
+  appStatus: ApplicationStatus | undefined
+  onSelect: (hash: string) => void
+  onContextMenu: (job: JobSummary, x: number, y: number) => void
+  triage: ReturnType<typeof useTriageAction>['triage']
+}) {
+  const job = row.original
+  const { offset, progress, armed, direction, settling, handlers, consumeClickSuppression } =
+    useRowSwipe({
+      onCommit: (dir) =>
+        triage({
+          dedupHash: job.dedup_hash,
+          from: appStatus ?? null,
+          to: dir === 'left' ? 'passed' : 'maybe',
+        }),
+    })
+
+  const tint = direction
+    ? `color-mix(in oklab, ${SWIPE_ACTIONS[direction].color} ${armed ? 22 : 6 + progress * 10}%, transparent)`
+    : undefined
+  // Edge cells host the affordance, so they must not clip it.
+  const edgeCell = direction
+    ? { position: 'relative' as const, overflow: 'visible' as const }
+    : undefined
+
+  return (
+    <tr
+      {...handlers}
+      className={cn(
+        'cursor-pointer hover:bg-hover',
+        settling
+          ? 'transition-[transform,background-color] duration-150 ease-out'
+          : 'transition-colors',
+      )}
+      style={{
+        transform: direction ? `translateX(${offset}px)` : undefined,
+        backgroundColor: tint,
+        touchAction: 'pan-y',
+      }}
+      onClick={() => {
+        // A horizontal swipe also fires a click on release; swallow that one.
+        if (consumeClickSuppression()) return
+        onSelect(job.dedup_hash)
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu(job, e.clientX, e.clientY)
+      }}
+    >
+      <td className="w-11 max-w-11 text-right text-muted" style={edgeCell}>
+        {direction === 'right' && (
+          <SwipeAffordance direction="right" progress={progress} armed={armed} offset={offset} />
+        )}
+        {rank}
+      </td>
+      {row.getVisibleCells().map((cell) => (
+        <td key={cell.id} style={{ width: cell.column.getSize(), maxWidth: cell.column.getSize() }}>
+          {renderCell(cell.column.id, job)}
+        </td>
+      ))}
+      <td className="w-[220px] min-w-[220px] max-w-[220px]" style={edgeCell}>
+        {direction === 'left' && (
+          <SwipeAffordance direction="left" progress={progress} armed={armed} offset={offset} />
+        )}
+        <QuickMark dedupHash={job.dedup_hash} current={appStatus} />
+      </td>
+    </tr>
   )
 }
 
@@ -347,38 +481,17 @@ export default function JobTable({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row, i) => {
-              const job = row.original
-              const appStatus = applications?.get(job.dedup_hash)?.status
-              const rank = page * pageSize + i + 1
-              return (
-                <tr
-                  key={row.id}
-                  className={cn(
-                    'cursor-pointer transition-colors hover:bg-hover',
-                    appStatus && 'bg-primary-dim/15',
-                  )}
-                  onClick={() => onSelect(job.dedup_hash)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setCtx({ x: e.clientX, y: e.clientY, job })
-                  }}
-                >
-                  <td className="w-11 max-w-11 text-right text-muted">{rank}</td>
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      style={{ width: cell.column.getSize(), maxWidth: cell.column.getSize() }}
-                    >
-                      {renderCell(cell.column.id, job)}
-                    </td>
-                  ))}
-                  <td className="w-[220px] min-w-[220px] max-w-[220px]">
-                    <QuickMark dedupHash={job.dedup_hash} current={appStatus} />
-                  </td>
-                </tr>
-              )
-            })}
+            {table.getRowModel().rows.map((row, i) => (
+              <JobRow
+                key={row.id}
+                row={row}
+                rank={page * pageSize + i + 1}
+                appStatus={applications?.get(row.original.dedup_hash)?.status}
+                onSelect={onSelect}
+                onContextMenu={(job, x, y) => setCtx({ x, y, job })}
+                triage={triage}
+              />
+            ))}
           </tbody>
         </table>
       </div>
