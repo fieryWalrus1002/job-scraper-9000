@@ -26,6 +26,7 @@ function renderJobTable(
     total?: number
     sort?: SortState
     onSortChange?: (next: SortState) => void
+    onSelect?: (hash: string) => void
   },
 ) {
   return render(
@@ -34,7 +35,7 @@ function renderJobTable(
       visibleColumns={
         new Set(['fit_score', 'title', 'company', 'location', 'salary_min_usd', 'posted_at'])
       }
-      onSelect={vi.fn()}
+      onSelect={overrides?.onSelect ?? vi.fn()}
       applications={applications}
       page={overrides?.page ?? 0}
       pageSize={50}
@@ -114,6 +115,48 @@ describe('JobTable triage actions', () => {
     expect(rankCell?.textContent).toBe('51')
   })
 
+  it('swipes a row left to Trash (passed) and right to Shortlist (maybe)', async () => {
+    const { unmount } = renderJobTable()
+    swipeRow(screen.getByText('Example Role').closest('tr')!, -120)
+    await waitFor(() => expect(applicationPosts()).toHaveLength(1))
+    expect(applicationPosts()[0]?.[1]).toMatchObject({
+      body: JSON.stringify({ dedup_hash: 'hash-a', status: 'passed' }),
+    })
+    unmount()
+    vi.mocked(fetch).mockClear()
+
+    renderJobTable()
+    swipeRow(screen.getByText('Example Role').closest('tr')!, 120)
+    await waitFor(() => expect(applicationPosts()).toHaveLength(1))
+    expect(applicationPosts()[0]?.[1]).toMatchObject({
+      body: JSON.stringify({ dedup_hash: 'hash-a', status: 'maybe' }),
+    })
+  })
+
+  it('does not triage when the drag stays under the commit threshold', () => {
+    renderJobTable()
+    swipeRow(screen.getByText('Example Role').closest('tr')!, -20)
+    expect(applicationPosts()).toHaveLength(0)
+  })
+
+  it('opens the detail panel on a tap but not after a horizontal swipe', () => {
+    const onSelect = vi.fn()
+    renderJobTable(undefined, { onSelect })
+    const row = () => screen.getByText('Example Role').closest('tr')!
+
+    // A plain tap (no movement) selects the row.
+    fireEvent.pointerDown(row(), { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 80 })
+    fireEvent.pointerUp(row(), { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 80 })
+    fireEvent.click(row())
+    expect(onSelect).toHaveBeenCalledTimes(1)
+
+    // A swipe should not also open the detail panel.
+    onSelect.mockClear()
+    swipeRow(row(), -120)
+    fireEvent.click(row())
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   it('limits the Jobs context menu to the same binary funnel actions', () => {
     renderJobTable(new Map([['hash-a', { ...APPLICATION, status: 'to_apply' }]]))
 
@@ -179,6 +222,14 @@ describe('JobTable column resize cleanup', () => {
     expect(removeSpy).toHaveBeenCalledWith('mouseup', expect.any(Function))
   })
 })
+
+function swipeRow(row: HTMLElement, deltaX: number) {
+  const startX = 200
+  const opts = { pointerId: 1, pointerType: 'touch', clientY: 100 }
+  fireEvent.pointerDown(row, { ...opts, clientX: startX })
+  fireEvent.pointerMove(row, { ...opts, clientX: startX + deltaX })
+  fireEvent.pointerUp(row, { ...opts, clientX: startX + deltaX })
+}
 
 function applicationPosts() {
   return vi
