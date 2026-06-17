@@ -19,6 +19,22 @@ function makeWrapper() {
   )
 }
 
+// Same as makeWrapper but exposes the QueryClient so tests can spy on
+// invalidateQueries and assert which caches a mutation touches.
+function makeWrapperWithClient() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+  return { qc, wrapper }
+}
+
+function invalidatedKeys(spy: ReturnType<typeof vi.spyOn>): string[] {
+  return spy.mock.calls.map((call) => (call[0] as { queryKey: string[] }).queryKey[0])
+}
+
 beforeEach(() => vi.restoreAllMocks())
 afterEach(() => vi.unstubAllGlobals())
 
@@ -47,6 +63,24 @@ describe('useMarkApplication', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  })
+
+  it('invalidates applications but not jobs (status-only change)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_APPLICATION), { status: 200 })),
+    )
+    const { qc, wrapper } = makeWrapperWithClient()
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useMarkApplication(), { wrapper })
+    await act(async () => {
+      await result.current.mutateAsync({ dedupHash: 'hash-a', status: 'maybe' })
+    })
+
+    const keys = invalidatedKeys(invalidateSpy)
+    expect(keys).toContain('applications')
+    expect(keys).not.toContain('jobs')
   })
 
   it('enters error state on fetch failure', async () => {
@@ -138,6 +172,29 @@ describe('useCreateManualJob', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  })
+
+  it('invalidates both applications and jobs (adds a job)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_APPLICATION), { status: 200 })),
+    )
+    const { qc, wrapper } = makeWrapperWithClient()
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+
+    const { result } = renderHook(() => useCreateManualJob(), { wrapper })
+    await act(async () => {
+      await result.current.mutateAsync({
+        title: 'Software Engineer',
+        fit_score: 4,
+        company: 'Acme',
+        status: 'maybe',
+      })
+    })
+
+    const keys = invalidatedKeys(invalidateSpy)
+    expect(keys).toContain('applications')
+    expect(keys).toContain('jobs')
   })
 
   it('throws a specific error message on 409 conflict', async () => {
