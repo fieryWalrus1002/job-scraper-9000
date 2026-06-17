@@ -426,7 +426,14 @@ export default function JobTable({
           <thead>
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
-                <th className="w-11 max-w-11 text-right">#</th>
+                <th
+                  className="w-11 max-w-11 text-right"
+                  // The number is the row's position on this page, not a global
+                  // rank — clarify on hover since the column is too narrow to say so.
+                  title="Position on this page"
+                >
+                  #
+                </th>
                 {hg.headers.map((header, i) => {
                   const prevHeader = i > 0 ? hg.headers[i - 1] : null
                   const isLast = i === hg.headers.length - 1
