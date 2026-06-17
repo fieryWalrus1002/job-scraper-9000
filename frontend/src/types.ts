@@ -60,6 +60,7 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
 
 // Frontend-only — not part of the API schema.
 export interface Filters {
+  search: string
   minScore: string
   maxScore: string
   remoteClassification: string[]

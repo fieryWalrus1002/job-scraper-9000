@@ -219,7 +219,7 @@ export default function JobTable({
 
   const dragCol = useRef<string | null>(null)
   const isResizing = useRef(false)
-  const totalPages = total ? Math.ceil(total / pageSize) : 1
+  const totalPages = total && total > 0 ? Math.ceil(total / pageSize) : 0
 
   if (items.length === 0) {
     return (

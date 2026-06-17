@@ -1,6 +1,7 @@
 import type { Filters } from '../types'
 
 export const EMPTY_FILTERS: Filters = {
+  search: '',
   minScore: '',
   maxScore: '',
   remoteClassification: [],
@@ -12,6 +13,7 @@ export const EMPTY_FILTERS: Filters = {
 
 export function filtersFromParams(params: URLSearchParams): Filters {
   return {
+    search: params.get('q') ?? '',
     minScore: params.get('minScore') ?? '',
     maxScore: params.get('maxScore') ?? '',
     remoteClassification: params.getAll('rc'),
@@ -24,6 +26,7 @@ export function filtersFromParams(params: URLSearchParams): Filters {
 
 export function filtersToParams(filters: Filters): URLSearchParams {
   const p = new URLSearchParams()
+  if (filters.search) p.set('q', filters.search)
   if (filters.minScore) p.set('minScore', filters.minScore)
   if (filters.maxScore) p.set('maxScore', filters.maxScore)
   filters.remoteClassification.forEach((v) => p.append('rc', v))
@@ -36,6 +39,7 @@ export function filtersToParams(filters: Filters): URLSearchParams {
 
 export function hasActiveFilters(filters: Filters): boolean {
   return (
+    Boolean(filters.search) ||
     Boolean(filters.minScore) ||
     Boolean(filters.maxScore) ||
     filters.remoteClassification.length > 0 ||

@@ -56,6 +56,7 @@ export async function fetchJobs(
   pageSize: number,
 ): Promise<JobListResponse> {
   const params = new URLSearchParams()
+  if (filters.search) params.set('search', filters.search)
   if (filters.minScore) params.set('min_score', filters.minScore)
   if (filters.maxScore) params.set('max_score', filters.maxScore)
   filters.remoteClassification.forEach((v) => params.append('remote_classification', v))

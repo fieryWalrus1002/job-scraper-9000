@@ -17,9 +17,8 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   filters: Filters
-  search: string
   onFiltersChange: (f: Filters) => void
-  onSearchChange: (s: string) => void
+
   visibleColumns: Set<string>
   onToggleColumn: (key: string) => void
   total: number | undefined
@@ -115,9 +114,7 @@ function Disclosure({
 
 export default function FilterPane({
   filters,
-  search,
   onFiltersChange,
-  onSearchChange,
   visibleColumns,
   onToggleColumn,
   total,
@@ -127,6 +124,7 @@ export default function FilterPane({
   const [remoteOpen, setRemoteOpen] = useState(false)
 
   type StringFilterKey =
+    | 'search'
     | 'minScore'
     | 'maxScore'
     | 'minPostedAt'
@@ -145,7 +143,7 @@ export default function FilterPane({
     onFiltersChange({ ...filters, remoteClassification: next })
   }
 
-  const active = hasActiveFilters(filters) || search.length > 0
+  const active = hasActiveFilters(filters)
   const defaultMinPostedAt = getRelativeDateString(-14)
   const defaultMaxPostedAt = getRelativeDateString(0)
 
@@ -161,8 +159,8 @@ export default function FilterPane({
         <Input
           type="text"
           placeholder="title, company…"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+          value={filters.search}
+          onChange={(e) => set('search', e.target.value)}
         />
       </Section>
 
@@ -301,7 +299,6 @@ export default function FilterPane({
             className="w-full justify-start"
             onClick={() => {
               onFiltersChange(EMPTY_FILTERS)
-              onSearchChange('')
             }}
           >
             Clear filters
