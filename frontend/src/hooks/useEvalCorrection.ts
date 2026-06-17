@@ -5,7 +5,7 @@ import type { EvalCorrectionIn, EvalCorrectionOut } from '../types'
 export function useEvalCorrection(dedupHash: string | null) {
   return useQuery<EvalCorrectionOut | null, Error>({
     queryKey: ['eval-correction', dedupHash],
-    queryFn: () => fetchEvalCorrection(dedupHash!),
+    queryFn: ({ signal }) => fetchEvalCorrection(dedupHash!, signal),
     enabled: !!dedupHash,
   })
 }

@@ -54,6 +54,7 @@ export async function fetchJobs(
   filters: Filters,
   page: number,
   pageSize: number,
+  signal?: AbortSignal,
 ): Promise<JobListResponse> {
   const params = new URLSearchParams()
   if (filters.search) params.set('search', filters.search)
@@ -67,13 +68,13 @@ export async function fetchJobs(
   params.set('limit', String(pageSize))
   params.set('offset', String(page * pageSize))
 
-  const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`)
+  const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`, { signal })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<JobListResponse>
 }
 
-export async function fetchJobDetail(dedupHash: string): Promise<JobDetail> {
-  const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(dedupHash)}`)
+export async function fetchJobDetail(dedupHash: string, signal?: AbortSignal): Promise<JobDetail> {
+  const res = await fetch(`${API_BASE}/api/jobs/${encodeURIComponent(dedupHash)}`, { signal })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<JobDetail>
 }
@@ -82,11 +83,14 @@ export function normalizeApplicationStatuses(statuses?: ApplicationStatus[]): Ap
   return Array.from(new Set(statuses ?? [])).sort()
 }
 
-export async function fetchApplications(statuses?: ApplicationStatus[]): Promise<Application[]> {
+export async function fetchApplications(
+  statuses?: ApplicationStatus[],
+  signal?: AbortSignal,
+): Promise<Application[]> {
   const params = new URLSearchParams()
   normalizeApplicationStatuses(statuses).forEach((status) => params.append('status', status))
   const query = params.toString()
-  const res = await fetch(`${API_BASE}/api/applications${query ? `?${query}` : ''}`)
+  const res = await fetch(`${API_BASE}/api/applications${query ? `?${query}` : ''}`, { signal })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<Application[]>
 }
@@ -134,8 +138,8 @@ export async function updateApplication(
 
 // ───── Settings ─────
 
-export async function fetchSettings(): Promise<SettingsResponse> {
-  const res = await fetch(`${API_BASE}/api/settings`)
+export async function fetchSettings(signal?: AbortSignal): Promise<SettingsResponse> {
+  const res = await fetch(`${API_BASE}/api/settings`, { signal })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<SettingsResponse>
 }
@@ -170,8 +174,13 @@ export async function saveSearch(body: SearchConfigInput): Promise<SearchSaveRes
 
 // ───── Eval corrections ─────
 
-export async function fetchEvalCorrection(dedupHash: string): Promise<EvalCorrectionOut | null> {
-  const res = await fetch(`${API_BASE}/api/eval/corrections/${encodeURIComponent(dedupHash)}`)
+export async function fetchEvalCorrection(
+  dedupHash: string,
+  signal?: AbortSignal,
+): Promise<EvalCorrectionOut | null> {
+  const res = await fetch(`${API_BASE}/api/eval/corrections/${encodeURIComponent(dedupHash)}`, {
+    signal,
+  })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<EvalCorrectionOut>

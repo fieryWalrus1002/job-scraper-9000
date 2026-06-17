@@ -5,7 +5,7 @@ import type { CandidateProfileInput, SearchConfigInput, SettingsResponse } from 
 export function useSettings() {
   return useQuery<SettingsResponse, Error>({
     queryKey: ['settings'],
-    queryFn: fetchSettings,
+    queryFn: ({ signal }) => fetchSettings(signal),
   })
 }
 
