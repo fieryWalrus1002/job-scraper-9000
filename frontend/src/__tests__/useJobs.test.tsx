@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useJobs } from '../hooks/useJobs'
 import { EMPTY_FILTERS } from '../lib/filters'
+import { DEFAULT_SORT } from '../lib/sort'
 import type { Filters, JobListResponse } from '../types'
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -61,7 +62,7 @@ describe('useJobs', () => {
 
   it('starts in loading state', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
-    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0), { wrapper })
+    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0, DEFAULT_SORT), { wrapper })
     expect(result.current.isLoading).toBe(true)
     expect(result.current.data).toBeUndefined()
   })
@@ -72,7 +73,7 @@ describe('useJobs', () => {
       vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_RESPONSE), { status: 200 })),
     )
 
-    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0), { wrapper })
+    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0, DEFAULT_SORT), { wrapper })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.total).toBe(120)
@@ -89,7 +90,7 @@ describe('useJobs', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const filters: Filters = { ...EMPTY_FILTERS, minScore: '3', company: 'Acme' }
-    const { result } = renderHook(() => useJobs(filters, 0), { wrapper })
+    const { result } = renderHook(() => useJobs(filters, 0, DEFAULT_SORT), { wrapper })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     const url = fetchMock.mock.calls[0][0] as string
@@ -105,12 +106,29 @@ describe('useJobs', () => {
       )
     vi.stubGlobal('fetch', fetchMock)
 
-    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 2), { wrapper })
+    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 2, DEFAULT_SORT), { wrapper })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     const url = fetchMock.mock.calls[0][0] as string
     expect(url).toContain('limit=50')
     expect(url).toContain('offset=100')
+  })
+
+  it('includes sort + order in the fetch URL', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(MOCK_RESPONSE), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = renderHook(
+      () => useJobs(EMPTY_FILTERS, 0, { sort: 'company', order: 'asc' }),
+      { wrapper },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('sort=company')
+    expect(url).toContain('order=asc')
   })
 
   it('enters error state on fetch failure', async () => {
@@ -124,7 +142,7 @@ describe('useJobs', () => {
       ),
     )
 
-    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0), { wrapper })
+    const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0, DEFAULT_SORT), { wrapper })
 
     // useJobs sets retry: 1, which overrides the wrapper's retry: false and adds
     // a ~1s backoff before the error surfaces — extend the wait accordingly.

@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchJobs } from '../api'
 import type { Filters } from '../types'
+import type { SortState } from '../lib/sort'
 
 const PAGE_SIZE = 50
 
-export function useJobs(filters: Filters, page: number) {
+export function useJobs(filters: Filters, page: number, sort: SortState) {
   const safePage = Math.max(0, page)
   return useQuery({
-    queryKey: ['jobs', filters, page],
-    queryFn: ({ signal }) => fetchJobs(filters, safePage, PAGE_SIZE, signal),
+    queryKey: ['jobs', filters, page, sort],
+    queryFn: ({ signal }) => fetchJobs(filters, safePage, PAGE_SIZE, sort, signal),
     staleTime: 1000 * 60 * 5,
     // Default is 3 retries with exponential backoff (~7s of stale view before
     // an error surfaces). staleTime already serves cached data through transient

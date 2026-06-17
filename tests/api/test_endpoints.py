@@ -102,6 +102,9 @@ async def test_jobs_multiple_rows(client: AsyncClient, fake_conn) -> None:
         ("limit", "0"),
         ("limit", "1001"),
         ("offset", "-1"),
+        ("sort", "bogus"),
+        ("sort", "scored_at"),  # intentionally not a sortable key
+        ("order", "sideways"),
     ],
 )
 async def test_jobs_invalid_params_return_422(
@@ -143,6 +146,52 @@ async def test_jobs_pagination_params_reflected(client: AsyncClient, fake_conn) 
     body = resp.json()
     assert body["limit"] == 10
     assert body["offset"] == 20
+
+
+# ---------------------------------------------------------------------------
+# GET /api/jobs — sorting
+# ---------------------------------------------------------------------------
+
+
+def _list_sql(fake_conn) -> str:
+    """The list SELECT is the second execute() call (the first is the count)."""
+    return " ".join(fake_conn.execute.call_args_list[1][0][0].split())
+
+
+async def test_jobs_default_sort_is_fit_score_desc(
+    client: AsyncClient, fake_conn
+) -> None:
+    setup_list_response(fake_conn, [FAKE_JOB_ROW])
+    resp = await client.get("/api/jobs")
+    assert resp.status_code == 200
+    assert (
+        "ORDER BY s.fit_score DESC NULLS LAST, s.scored_at DESC, p.dedup_hash"
+        in _list_sql(fake_conn)
+    )
+
+
+@pytest.mark.parametrize(
+    "sort,order,expected_col,expected_dir",
+    [
+        ("fit_score", "asc", "s.fit_score", "ASC"),
+        ("posted_at", "desc", "p.posted_at", "DESC"),
+        ("company", "asc", "p.company", "ASC"),
+        ("title", "desc", "p.title", "DESC"),
+        ("salary_min_usd", "asc", "p.salary_min_usd", "ASC"),
+    ],
+)
+async def test_jobs_sort_builds_whitelisted_order_by(
+    client: AsyncClient, fake_conn, sort, order, expected_col, expected_dir
+) -> None:
+    setup_list_response(fake_conn, [FAKE_JOB_ROW])
+    resp = await client.get("/api/jobs", params={"sort": sort, "order": order})
+    assert resp.status_code == 200
+    sql = _list_sql(fake_conn)
+    # Primary sort is the whitelisted column + direction, with a stable tiebreaker.
+    assert (
+        f"ORDER BY {expected_col} {expected_dir} NULLS LAST, s.scored_at DESC, p.dedup_hash"
+        in sql
+    )
 
 
 # ---------------------------------------------------------------------------

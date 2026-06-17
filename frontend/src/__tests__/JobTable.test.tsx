@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import JobTable from '../components/JobTable'
+import { DEFAULT_SORT, type SortState } from '../lib/sort'
 import type { Application, JobSummary } from '../types'
 
 function makeWrapper() {
@@ -16,18 +17,28 @@ function makeWrapper() {
 
 function renderJobTable(
   applications?: Map<string, Application>,
-  overrides?: { items?: JobSummary[]; page?: number; total?: number },
+  overrides?: {
+    items?: JobSummary[]
+    page?: number
+    total?: number
+    sort?: SortState
+    onSortChange?: (next: SortState) => void
+  },
 ) {
   return render(
     <JobTable
       items={overrides?.items ?? [JOB]}
-      visibleColumns={new Set(['fit_score', 'title', 'company', 'location', 'posted_at'])}
+      visibleColumns={
+        new Set(['fit_score', 'title', 'company', 'location', 'salary_min_usd', 'posted_at'])
+      }
       onSelect={vi.fn()}
       applications={applications}
       page={overrides?.page ?? 0}
       pageSize={50}
       total={overrides?.total ?? 1}
       onPageChange={vi.fn()}
+      sort={overrides?.sort ?? DEFAULT_SORT}
+      onSortChange={overrides?.onSortChange ?? vi.fn()}
     />,
     { wrapper: makeWrapper() },
   )
@@ -112,6 +123,41 @@ describe('JobTable triage actions', () => {
     expect(screen.queryByRole('button', { name: 'To Apply' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Applied' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove tracking' })).not.toBeInTheDocument()
+  })
+})
+
+describe('JobTable sorting', () => {
+  it('selects a new sort column with its default direction (text → asc)', () => {
+    const onSortChange = vi.fn()
+    renderJobTable(undefined, { onSortChange })
+
+    fireEvent.click(screen.getByText('Company'))
+
+    expect(onSortChange).toHaveBeenCalledWith({ sort: 'company', order: 'asc' })
+  })
+
+  it('toggles direction when the active sort column is clicked again', () => {
+    const onSortChange = vi.fn()
+    renderJobTable(undefined, { sort: { sort: 'fit_score', order: 'desc' }, onSortChange })
+
+    fireEvent.click(screen.getByText('Score'))
+
+    expect(onSortChange).toHaveBeenCalledWith({ sort: 'fit_score', order: 'asc' })
+  })
+
+  it('marks the active sort column with aria-sort', () => {
+    renderJobTable(undefined, { sort: { sort: 'company', order: 'asc' } })
+
+    const companyHeader = screen.getByText('Company').closest('th')
+    expect(companyHeader).toHaveAttribute('aria-sort', 'ascending')
+    expect(screen.getByText('Score').closest('th')).not.toHaveAttribute('aria-sort')
+  })
+
+  it('renders a salary range in the Salary column', () => {
+    const withSalary: JobSummary = { ...JOB, salary_min_usd: 120000, salary_max_usd: 160000 }
+    renderJobTable(undefined, { items: [withSalary] })
+
+    expect(screen.getByText('$120–160k')).toBeInTheDocument()
   })
 })
 

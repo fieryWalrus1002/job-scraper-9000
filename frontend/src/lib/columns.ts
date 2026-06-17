@@ -1,23 +1,55 @@
 import { createColumnHelper } from '@tanstack/react-table'
 import type { JobSummary } from '../types'
+import type { SortKey } from './sort'
 
 export interface ColumnMeta {
   key: keyof JobSummary
   label: string
   defaultVisible: boolean
   defaultWidth: number
+  // When set, the column header is clickable to sort the whole result set
+  // server-side by this key. Must match a backend-whitelisted SortKey.
+  sortKey?: SortKey
 }
 
 export const COLUMNS: ColumnMeta[] = [
-  { key: 'fit_score', label: 'Score', defaultVisible: true, defaultWidth: 100 },
-  { key: 'title', label: 'Title', defaultVisible: true, defaultWidth: 100 },
-  { key: 'company', label: 'Company', defaultVisible: true, defaultWidth: 100 },
+  {
+    key: 'fit_score',
+    label: 'Score',
+    defaultVisible: true,
+    defaultWidth: 100,
+    sortKey: 'fit_score',
+  },
+  { key: 'title', label: 'Title', defaultVisible: true, defaultWidth: 100, sortKey: 'title' },
+  { key: 'company', label: 'Company', defaultVisible: true, defaultWidth: 100, sortKey: 'company' },
   { key: 'location', label: 'Location', defaultVisible: true, defaultWidth: 100 },
   { key: 'remote_classification', label: 'Remote', defaultVisible: false, defaultWidth: 100 },
-  { key: 'posted_at', label: 'Posted', defaultVisible: true, defaultWidth: 100 },
+  {
+    key: 'salary_min_usd',
+    label: 'Salary',
+    defaultVisible: true,
+    defaultWidth: 110,
+    sortKey: 'salary_min_usd',
+  },
+  {
+    key: 'posted_at',
+    label: 'Posted',
+    defaultVisible: true,
+    defaultWidth: 100,
+    sortKey: 'posted_at',
+  },
   { key: 'confidence', label: 'Confidence', defaultVisible: false, defaultWidth: 100 },
   { key: 'source', label: 'Source', defaultVisible: false, defaultWidth: 100 },
 ]
+
+const SORT_KEY_BY_COLUMN = new Map<string, SortKey>(
+  COLUMNS.filter((c) => c.sortKey).map((c) => [c.key as string, c.sortKey!]),
+)
+
+/** The SortKey a column header sorts by, or undefined if not sortable. */
+export function sortKeyForColumn(columnId: string): SortKey | undefined {
+  return SORT_KEY_BY_COLUMN.get(columnId)
+}
 
 const helper = createColumnHelper<JobSummary>()
 
