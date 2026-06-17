@@ -15,7 +15,7 @@ import {
   sortKeyForColumn,
   tableColumns,
 } from '../lib/columns'
-import { useMarkApplication } from '../hooks/useApplications'
+import { useTriageAction } from '../hooks/useTriage'
 import { TitleCell } from './JobTable/cells/TitleCell'
 import { PostedAtCell } from './JobTable/cells/PostedAtCell'
 import { RationaleCell } from './JobTable/cells/RationaleCell'
@@ -143,8 +143,14 @@ const qBtn =
 const qBtnActive =
   'bg-primary/15 border-primary/40 text-primary-hov shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
 
-function QuickMark({ dedupHash, current }: { dedupHash: string; current: string | undefined }) {
-  const { mutate, isPending } = useMarkApplication()
+function QuickMark({
+  dedupHash,
+  current,
+}: {
+  dedupHash: string
+  current: ApplicationStatus | undefined
+}) {
+  const { triage, isPending } = useTriageAction()
   // Jobs is the funnel's fast binary: Trash (passed) or Shortlist (maybe).
   // Forward moves into Tracking (to_apply etc.) happen from the Shortlist/Tracking tabs.
   const buttons: { status: ApplicationStatus; label: string }[] = [
@@ -158,7 +164,7 @@ function QuickMark({ dedupHash, current }: { dedupHash: string; current: string 
           key={status}
           className={cn(qBtn, current === status && qBtnActive)}
           disabled={isPending}
-          onClick={() => mutate({ dedupHash, status })}
+          onClick={() => triage({ dedupHash, from: current ?? null, to: status })}
         >
           {label}
         </button>
@@ -184,7 +190,7 @@ export default function JobTable({
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(loadColumnOrder)
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
   const [ctx, setCtx] = useState<ContextState | null>(null)
-  const { mutate: mark } = useMarkApplication()
+  const { triage } = useTriageAction()
 
   const columnVisibility = Object.fromEntries(
     tableColumns.map((col) => [col.id!, visibleColumns.has(col.id!)]),
@@ -386,12 +392,22 @@ export default function JobTable({
             {
               label: 'Trash',
               active: applications?.get(ctx.job.dedup_hash)?.status === 'passed',
-              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'passed' }),
+              onClick: () =>
+                triage({
+                  dedupHash: ctx.job.dedup_hash,
+                  from: applications?.get(ctx.job.dedup_hash)?.status ?? null,
+                  to: 'passed',
+                }),
             },
             {
               label: 'Shortlist',
               active: applications?.get(ctx.job.dedup_hash)?.status === 'maybe',
-              onClick: () => mark({ dedupHash: ctx.job.dedup_hash, status: 'maybe' }),
+              onClick: () =>
+                triage({
+                  dedupHash: ctx.job.dedup_hash,
+                  from: applications?.get(ctx.job.dedup_hash)?.status ?? null,
+                  to: 'maybe',
+                }),
             },
           ]}
         />

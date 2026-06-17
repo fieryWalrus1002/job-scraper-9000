@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import { SnackbarProvider } from '../components/ui/snackbar'
 import { TriageApplicationTable } from '../components/TriageApplicationTable'
 import { ShortlistRowActions } from '../components/ShortlistRowActions'
 import type { Application } from '../types'
@@ -11,7 +12,9 @@ function makeWrapper() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      <SnackbarProvider>{children}</SnackbarProvider>
+    </QueryClientProvider>
   )
 }
 
