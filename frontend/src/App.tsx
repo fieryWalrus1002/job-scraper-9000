@@ -11,8 +11,8 @@ import { useJobs, PAGE_SIZE } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
-import { filtersFromParams, filtersToParams } from './lib/filters'
-import { sortFromParams, applySortParams, type SortState } from './lib/sort'
+import { filtersFromParams, buildJobsParams } from './lib/filters'
+import { sortFromParams, type SortState } from './lib/sort'
 import type { Application, ApplicationStatus, Filters, JobSummary } from './types'
 import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
@@ -108,18 +108,15 @@ function AppShell({ email }: { email: string }) {
   function setFilters(next: Filters, opts?: { replace?: boolean }) {
     // The debounced search path passes replace:true so settling keystrokes
     // don't each stack a browser-history entry. Sort lives in the same URL, so
-    // preserve it across filter writes.
-    setUrlParams(
-      applySortParams(filtersToParams(next), sort),
-      opts?.replace ? { replace: true } : undefined,
-    )
+    // buildJobsParams preserves it across filter writes.
+    setUrlParams(buildJobsParams(next, sort), opts?.replace ? { replace: true } : undefined)
     setPage(0)
   }
 
   function setSort(next: SortState) {
     // Preserve active filters; reset to page 0 (mirrors the filter-change reset)
     // so the user lands on the first page of the newly-ordered results.
-    setUrlParams(applySortParams(filtersToParams(filters), next))
+    setUrlParams(buildJobsParams(filters, next))
     setPage(0)
   }
 
