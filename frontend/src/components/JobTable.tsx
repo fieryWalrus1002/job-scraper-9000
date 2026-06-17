@@ -15,6 +15,10 @@ import {
   tableColumns,
 } from '../lib/columns'
 import { useMarkApplication } from '../hooks/useApplications'
+import { TitleCell } from './JobTable/cells/TitleCell'
+import { PostedAtCell } from './JobTable/cells/PostedAtCell'
+import { RationaleCell } from './JobTable/cells/RationaleCell'
+import { DefaultCell } from './JobTable/cells/DefaultCell'
 import ContextMenu from './ContextMenu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -93,45 +97,17 @@ function renderCell(key: string, job: JobSummary): ReactNode {
     case 'fit_score':
       return <ScoreBadge score={job.fit_score} />
     case 'title':
-      return (
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">
-            {job.title ?? '—'}
-          </span>
-          {job.source_url && (
-            <a
-              className="shrink-0 text-[11px] text-muted no-underline opacity-60 leading-none hover:text-primary hover:opacity-100"
-              href={job.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title="Open job posting"
-              aria-label="Open job posting in a new tab"
-            >
-              ↗
-            </a>
-          )}
-        </div>
-      )
+      return <TitleCell job={job} />
     case 'remote_classification':
       return <ClassificationBadge value={job.remote_classification} />
     case 'confidence':
       return <ConfidenceBadge value={job.confidence} />
     case 'posted_at':
-      return <span className="text-muted font-mono text-[12px]">{job.posted_at ?? '—'}</span>
+      return <PostedAtCell value={job.posted_at} />
     case 'score_rationale':
-      return (
-        <span
-          className="overflow-hidden text-muted text-[12px] leading-[1.45]"
-          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
-        >
-          {job.score_rationale ?? <span className="text-faint">—</span>}
-        </span>
-      )
-    default: {
-      const v = (job[key as keyof JobSummary] as string | null) ?? null
-      return v ? <span>{v}</span> : <span className="text-faint">—</span>
-    }
+      return <RationaleCell value={job.score_rationale} />
+    default:
+      return <DefaultCell value={(job[key as keyof JobSummary] as string | null) ?? null} />
   }
 }
 
