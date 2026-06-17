@@ -4,6 +4,7 @@ import { useDeleteEvalCorrection, useSetEvalCorrection } from '../../../hooks/us
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { sectionLabel } from './variants'
+import { MutationError } from './MutationError'
 
 export function EvalCorrectionSection({
   dedupHash,
@@ -90,6 +91,8 @@ export function EvalCorrectionSection({
           onChange={(e) => setReason(e.target.value)}
         />
       </div>
+
+      <MutationError error={upsert.error ?? del.error} />
 
       <div className="flex items-center gap-3 pt-3 border-t border-border/60 -mx-0">
         {existing && (

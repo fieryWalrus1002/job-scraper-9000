@@ -8,6 +8,7 @@ import {
   updateApplication,
 } from '../api'
 import type { Application, ApplicationStatus, ApplicationUpdate, ManualJobCreate } from '../types'
+import { logMutationError } from '../lib/mutations'
 
 export function useApplications(statuses?: ApplicationStatus[]) {
   const normalizedStatuses = normalizeApplicationStatuses(statuses)
@@ -31,6 +32,7 @@ export function useMarkApplication() {
       notes?: string
     }) => createApplication({ dedup_hash: dedupHash, status, notes }),
     onSuccess: () => invalidateJobApplicationQueries(qc),
+    onError: logMutationError('mark application'),
   })
 }
 
@@ -40,6 +42,7 @@ export function useUpdateApplication() {
     mutationFn: ({ dedupHash, update }: { dedupHash: string; update: ApplicationUpdate }) =>
       updateApplication(dedupHash, update),
     onSuccess: () => invalidateJobApplicationQueries(qc),
+    onError: logMutationError('update application'),
   })
 }
 
@@ -48,6 +51,7 @@ export function useDeleteApplication() {
   return useMutation({
     mutationFn: (dedupHash: string) => deleteApplication(dedupHash),
     onSuccess: () => invalidateJobApplicationQueries(qc),
+    onError: logMutationError('delete application'),
   })
 }
 
@@ -56,6 +60,7 @@ export function useCreateManualJob() {
   return useMutation({
     mutationFn: (body: ManualJobCreate) => createManualJob(body),
     onSuccess: () => invalidateJobApplicationQueries(qc),
+    onError: logMutationError('create manual job'),
   })
 }
 

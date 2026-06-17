@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { sectionLabel } from './variants'
+import { MutationError } from './MutationError'
 
 export function ApplicationTrackingSection({
   dedupHash,
@@ -47,6 +48,8 @@ export function ApplicationTrackingSection({
 
   return (
     <div className="flex flex-col gap-4">
+      <MutationError error={mark.error ?? update.error ?? del.error} />
+
       <div className="flex flex-col gap-2">
         <div className={sectionLabel}>Status</div>
         <div className="flex flex-wrap gap-1.5">
