@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils'
 interface Props {
   filters: Filters
   onFiltersChange: (f: Filters) => void
-
   visibleColumns: Set<string>
   onToggleColumn: (key: string) => void
   total: number | undefined

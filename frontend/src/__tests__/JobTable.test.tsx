@@ -14,16 +14,19 @@ function makeWrapper() {
   )
 }
 
-function renderJobTable(applications?: Map<string, Application>) {
+function renderJobTable(
+  applications?: Map<string, Application>,
+  overrides?: { items?: JobSummary[]; page?: number; total?: number },
+) {
   return render(
     <JobTable
-      items={[JOB]}
+      items={overrides?.items ?? [JOB]}
       visibleColumns={new Set(['fit_score', 'title', 'company', 'location', 'posted_at'])}
       onSelect={vi.fn()}
       applications={applications}
-      page={0}
+      page={overrides?.page ?? 0}
       pageSize={50}
-      total={1}
+      total={overrides?.total ?? 1}
       onPageChange={vi.fn()}
     />,
     { wrapper: makeWrapper() },
@@ -86,6 +89,15 @@ describe('JobTable triage actions', () => {
       method: 'POST',
       body: JSON.stringify({ dedup_hash: 'hash-a', status: 'maybe' }),
     })
+  })
+
+  it('ranks rows by absolute position across pages (page * pageSize + offset)', () => {
+    // Server returns one page already ordered; the first row on page 1 is the
+    // 51st overall result, so its rank must read 51 — not 1.
+    renderJobTable(undefined, { items: [JOB], page: 1, total: 120 })
+
+    const rankCell = screen.getByText('Example Role').closest('tr')?.querySelector('td')
+    expect(rankCell?.textContent).toBe('51')
   })
 
   it('limits the Jobs context menu to the same binary funnel actions', () => {

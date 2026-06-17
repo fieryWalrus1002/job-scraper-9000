@@ -76,13 +76,13 @@ function AppShell({ email }: { email: string }) {
   const { data, isLoading, isError, error } = useJobs(filters, page)
 
   // Clamp page when total shrinks (e.g. jobs deleted, reindexed) so we don't
-  // sit on an empty page while results exist on earlier pages.
-  useEffect(() => {
-    if (data?.total && data.total > 0) {
-      const maxPage = Math.ceil(data.total / PAGE_SIZE) - 1
-      if (page > maxPage) setPage(maxPage)
-    }
-  }, [data?.total, page])
+  // sit on an empty page while results exist on earlier pages. Adjusting state
+  // during render (guarded) is React's recommended pattern here — it re-renders
+  // before paint, avoiding the cascading-render an effect would cause.
+  if (data?.total && data.total > 0) {
+    const maxPage = Math.ceil(data.total / PAGE_SIZE) - 1
+    if (page > maxPage) setPage(maxPage)
+  }
 
   const { visible, toggle } = useColumnConfig()
   const { data: applications } = useApplications()

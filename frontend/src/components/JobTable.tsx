@@ -2,11 +2,9 @@ import { useRef, useState, type ReactNode } from 'react'
 import {
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
   useReactTable,
   type ColumnOrderState,
   type ColumnSizingState,
-  type SortingState,
 } from '@tanstack/react-table'
 import type { Application, ApplicationStatus, JobSummary } from '../types'
 import {
@@ -181,7 +179,6 @@ export default function JobTable({
   total,
   onPageChange,
 }: Props) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'fit_score', desc: true }])
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(loadColumnOrder)
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
   const [ctx, setCtx] = useState<ContextState | null>(null)
@@ -195,8 +192,7 @@ export default function JobTable({
   const table = useReactTable({
     data: items,
     columns: tableColumns,
-    state: { sorting, columnOrder, columnSizing, columnVisibility },
-    onSortingChange: setSorting,
+    state: { columnOrder, columnSizing, columnVisibility },
     getRowId: (row) => row.dedup_hash,
     onColumnOrderChange: (updater) => {
       setColumnOrder((prev) => {
@@ -213,7 +209,6 @@ export default function JobTable({
       })
     },
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     columnResizeMode: 'onChange',
   })
 
@@ -284,7 +279,6 @@ export default function JobTable({
                         table.setColumnOrder(next)
                         dragCol.current = null
                       }}
-                      onClick={header.column.getToggleSortingHandler()}
                     >
                       {prevHeader?.column.getCanResize() && (
                         <div
@@ -297,13 +291,6 @@ export default function JobTable({
                         />
                       )}
                       {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getIsSorted() === 'desc' ? (
-                        ' ↓'
-                      ) : header.column.getIsSorted() === 'asc' ? (
-                        ' ↑'
-                      ) : (
-                        <span className="text-muted text-[10px]"> ↕</span>
-                      )}
                       {isLast && header.column.getCanResize() && (
                         <div
                           className="col-resize-handle"
