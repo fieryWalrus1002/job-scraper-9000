@@ -31,7 +31,7 @@ export function useMarkApplication() {
       status: ApplicationStatus
       notes?: string
     }) => createApplication({ dedup_hash: dedupHash, status, notes }),
-    onSuccess: () => invalidateJobApplicationQueries(qc),
+    onSuccess: () => invalidateApplications(qc),
     onError: logMutationError('mark application'),
   })
 }
@@ -41,7 +41,7 @@ export function useUpdateApplication() {
   return useMutation({
     mutationFn: ({ dedupHash, update }: { dedupHash: string; update: ApplicationUpdate }) =>
       updateApplication(dedupHash, update),
-    onSuccess: () => invalidateJobApplicationQueries(qc),
+    onSuccess: () => invalidateApplications(qc),
     onError: logMutationError('update application'),
   })
 }
@@ -50,7 +50,7 @@ export function useDeleteApplication() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (dedupHash: string) => deleteApplication(dedupHash),
-    onSuccess: () => invalidateJobApplicationQueries(qc),
+    onSuccess: () => invalidateApplications(qc),
     onError: logMutationError('delete application'),
   })
 }
@@ -59,12 +59,20 @@ export function useCreateManualJob() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: ManualJobCreate) => createManualJob(body),
-    onSuccess: () => invalidateJobApplicationQueries(qc),
+    onSuccess: () => invalidateApplicationsAndJobs(qc),
     onError: logMutationError('create manual job'),
   })
 }
 
-function invalidateJobApplicationQueries(qc: QueryClient) {
+// Status mark/update/delete only change application state, not the job list, so
+// invalidating ['jobs'] would trigger a pointless refetch (and a loading flash)
+// of the current page on every triage action.
+function invalidateApplications(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ['applications'], exact: false })
+}
+
+// Adding a manual job genuinely changes the job list, so refresh both.
+function invalidateApplicationsAndJobs(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['applications'], exact: false })
   void qc.invalidateQueries({ queryKey: ['jobs'], exact: false })
 }
