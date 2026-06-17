@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { DialogTitle } from '@/components/ui/dialog'
 import { fetchJobDetail } from '../../api'
 import { useEvalCorrection } from '../../hooks/useEvalCorrection'
-import type { Application, EvalCorrectionOut, JobDetail } from '../../types'
+import type { Application, EvalCorrectionOut, JobDetail, JobSummary } from '../../types'
 import { JobDetailShell } from './shared/JobDetailShell'
 import { JobsDetailSurface } from './surfaces/JobsDetailSurface'
 import { ShortlistDetailSurface } from './surfaces/ShortlistDetailSurface'
@@ -15,13 +15,43 @@ interface Props {
   onClose: () => void
   application?: Application
   surface?: JobDetailSurface
+  /** List-row data already in memory, used as a placeholder so the panel
+   * renders instantly instead of flashing "Loading…" during the detail fetch. */
+  summary?: JobSummary
 }
 
-export function JobDetailPanel({ dedupHash, onClose, application, surface = 'jobs' }: Props) {
+// The list row (JobSummary) overlaps the detail header fields, so we can render
+// those instantly. Detail-only fields (description, dev metadata, skills-fit)
+// aren't known yet — fill them with empty defaults until the real fetch lands.
+function placeholderFromSummary(s: JobSummary): JobDetail {
+  return {
+    ...s,
+    source_job_id: null,
+    description: null,
+    scraped_at: null,
+    ai_fit_detail: null,
+    pipeline_metadata: {},
+    run_id: '',
+    model: '',
+    provider: '',
+    profile_version: '',
+    metadata: {},
+    ingested_at: s.scored_at,
+  }
+}
+
+export function JobDetailPanel({
+  dedupHash,
+  onClose,
+  application,
+  surface = 'jobs',
+  summary,
+}: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
     queryFn: () => fetchJobDetail(dedupHash!),
     enabled: !!dedupHash,
+    placeholderData: summary ? placeholderFromSummary(summary) : undefined,
   })
   const { data: correction } = useEvalCorrection(dedupHash)
 

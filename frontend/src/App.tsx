@@ -12,7 +12,7 @@ import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
 import { filtersFromParams, filtersToParams } from './lib/filters'
-import type { Application, ApplicationStatus, Filters } from './types'
+import type { Application, ApplicationStatus, Filters, JobSummary } from './types'
 import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
@@ -68,6 +68,7 @@ function AppShell({ email }: { email: string }) {
     path: string
     surface: JobDetailSurface
     applicationSnapshot?: Application
+    summary?: JobSummary
   } | null>(null)
   const [paneOpen, setPaneOpen] = useState(true)
   const [addJobOpen, setAddJobOpen] = useState(false)
@@ -98,8 +99,9 @@ function AppShell({ email }: { email: string }) {
     hash: string,
     surface: JobDetailSurface,
     applicationSnapshot?: Application,
+    summary?: JobSummary,
   ) {
-    setSelectedJob({ hash, path: currentPath, surface, applicationSnapshot })
+    setSelectedJob({ hash, path: currentPath, surface, applicationSnapshot, summary })
   }
 
   const allApplications = Array.from(applications?.values() ?? [])
@@ -173,7 +175,14 @@ function AppShell({ email }: { email: string }) {
                     <JobTable
                       items={data?.items ?? []}
                       visibleColumns={visible}
-                      onSelect={(hash) => selectCurrentJob(hash, 'jobs')}
+                      onSelect={(hash) =>
+                        selectCurrentJob(
+                          hash,
+                          'jobs',
+                          undefined,
+                          data?.items.find((j) => j.dedup_hash === hash),
+                        )
+                      }
                       applications={applications}
                       page={page}
                       pageSize={PAGE_SIZE}
@@ -226,6 +235,7 @@ function AppShell({ email }: { email: string }) {
           onClose={() => setSelectedJob(null)}
           application={applications?.get(selectedJob.hash) ?? selectedJob.applicationSnapshot}
           surface={selectedJob.surface}
+          summary={selectedJob.summary}
         />
       )}
 
