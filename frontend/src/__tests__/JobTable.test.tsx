@@ -115,6 +115,22 @@ describe('JobTable triage actions', () => {
   })
 })
 
+describe('JobTable column resize cleanup', () => {
+  it('removes the window mouseup listener if unmounted mid-resize', () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const { container, unmount } = renderJobTable()
+
+    const handle = container.querySelector('.col-resize-handle')
+    expect(handle).not.toBeNull()
+    // Begin a resize: this registers a window 'mouseup' listener that would
+    // normally self-remove on release. We unmount before release instead.
+    fireEvent.mouseDown(handle!)
+    unmount()
+
+    expect(removeSpy).toHaveBeenCalledWith('mouseup', expect.any(Function))
+  })
+})
+
 function applicationPosts() {
   return vi
     .mocked(fetch)
