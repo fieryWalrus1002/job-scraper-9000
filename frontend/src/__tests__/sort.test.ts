@@ -24,6 +24,19 @@ describe('sortFromParams', () => {
     // riding alongside an invalid column.
     expect(sortFromParams(new URLSearchParams('sort=scored_at&order=asc'))).toEqual(DEFAULT_SORT)
   })
+
+  it('keeps a valid column but uses its natural direction when order is invalid', () => {
+    // company's natural (header-click) direction is asc — not the global default.
+    expect(sortFromParams(new URLSearchParams('sort=company&order=bogus'))).toEqual({
+      sort: 'company',
+      order: 'asc',
+    })
+    // and a numeric column resolves to desc the same way.
+    expect(sortFromParams(new URLSearchParams('sort=posted_at'))).toEqual({
+      sort: 'posted_at',
+      order: 'desc',
+    })
+  })
 })
 
 describe('applySortParams', () => {
