@@ -53,13 +53,6 @@ export function useTriageAction() {
   const apply = useCallback(
     (move: TriageMove) => {
       const { dedupHash, to, restoreNotes } = move
-      if (to === 'remove') {
-        del.mutate(dedupHash)
-      } else if (move.from === null) {
-        mark.mutate({ dedupHash, status: to })
-      } else {
-        update.mutate({ dedupHash, update: { status: to } })
-      }
 
       const undo = () => {
         if (move.from === null) {
@@ -71,7 +64,20 @@ export function useTriageAction() {
         }
       }
 
-      show({ message: move.label ?? triageMessage(to), action: { label: 'Undo', onClick: undo } })
+      // Only offer Undo once the forward move actually lands — a failed mutation
+      // logs loudly (logMutationError) and shows no snackbar, so we never present
+      // an undo for something that didn't happen. (Per-call onSuccess runs in
+      // addition to the hook's cache invalidation.)
+      const onSuccess = () =>
+        show({ message: move.label ?? triageMessage(to), action: { label: 'Undo', onClick: undo } })
+
+      if (to === 'remove') {
+        del.mutate(dedupHash, { onSuccess })
+      } else if (move.from === null) {
+        mark.mutate({ dedupHash, status: to }, { onSuccess })
+      } else {
+        update.mutate({ dedupHash, update: { status: to } }, { onSuccess })
+      }
     },
     [mark, update, del, show],
   )

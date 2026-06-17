@@ -127,4 +127,22 @@ describe('useTriageAction undo', () => {
     fireEvent.click(screen.getByText('go'))
     await waitFor(() => expect(screen.getByText('Shortlisted')).toBeInTheDocument())
   })
+
+  it('shows no undo affordance when the forward move fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(new Response('Bad Request', { status: 400, statusText: 'Bad Request' })),
+    )
+    vi.spyOn(console, 'error').mockImplementation(() => {}) // mutation logs loudly; keep test output clean
+
+    render(<TriageProbe move={{ dedupHash: 'hash-a', from: null, to: 'passed' }} />, {
+      wrapper: makeWrapper(),
+    })
+    fireEvent.click(screen.getByText('go'))
+
+    await waitFor(() => expect(fetchCalls()).toHaveLength(1))
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+  })
 })
