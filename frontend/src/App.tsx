@@ -11,7 +11,8 @@ import { useJobs, PAGE_SIZE } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
-import { filtersFromParams, filtersToParams } from './lib/filters'
+import { filtersFromParams, buildJobsParams } from './lib/filters'
+import { sortFromParams, type SortState } from './lib/sort'
 import type { Application, ApplicationStatus, Filters, JobSummary } from './types'
 import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
@@ -78,6 +79,7 @@ function AppShell({ email }: { email: string }) {
   const location = useLocation()
   const navigate = useNavigate()
   const filters = filtersFromParams(urlParams)
+  const sort = sortFromParams(urlParams)
   const [selectedJob, setSelectedJob] = useState<{
     hash: string
     path: string
@@ -89,7 +91,7 @@ function AppShell({ email }: { email: string }) {
   const [addJobOpen, setAddJobOpen] = useState(false)
 
   const [page, setPage] = useState(0)
-  const { data, isLoading, isError, error } = useJobs(filters, page)
+  const { data, isLoading, isError, error } = useJobs(filters, page, sort)
 
   // Clamp page when total shrinks (e.g. jobs deleted, reindexed) so we don't
   // sit on an empty page while results exist on earlier pages. Adjusting state
@@ -105,8 +107,16 @@ function AppShell({ email }: { email: string }) {
 
   function setFilters(next: Filters, opts?: { replace?: boolean }) {
     // The debounced search path passes replace:true so settling keystrokes
-    // don't each stack a browser-history entry.
-    setUrlParams(filtersToParams(next), opts?.replace ? { replace: true } : undefined)
+    // don't each stack a browser-history entry. Sort lives in the same URL, so
+    // buildJobsParams preserves it across filter writes.
+    setUrlParams(buildJobsParams(next, sort), opts?.replace ? { replace: true } : undefined)
+    setPage(0)
+  }
+
+  function setSort(next: SortState) {
+    // Preserve active filters; reset to page 0 (mirrors the filter-change reset)
+    // so the user lands on the first page of the newly-ordered results.
+    setUrlParams(buildJobsParams(filters, next))
     setPage(0)
   }
 
@@ -206,6 +216,8 @@ function AppShell({ email }: { email: string }) {
                         pageSize={PAGE_SIZE}
                         total={data?.total}
                         onPageChange={setPage}
+                        sort={sort}
+                        onSortChange={setSort}
                       />
                     </ErrorBoundary>
                   )}

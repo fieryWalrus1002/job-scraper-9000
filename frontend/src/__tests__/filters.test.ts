@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_FILTERS, filtersFromParams, filtersToParams, hasActiveFilters } from '../lib/filters'
+import {
+  EMPTY_FILTERS,
+  buildJobsParams,
+  filtersFromParams,
+  filtersToParams,
+  hasActiveFilters,
+} from '../lib/filters'
+import { DEFAULT_SORT } from '../lib/sort'
 import type { Filters } from '../types'
 
 describe('filtersFromParams', () => {
@@ -69,6 +76,25 @@ describe('filtersFromParams / filtersToParams round-trip', () => {
       minSalaryK: '80',
     }
     expect(filtersFromParams(filtersToParams(original))).toEqual(original)
+  })
+})
+
+describe('buildJobsParams', () => {
+  it('combines filter params with non-default sort params', () => {
+    const p = buildJobsParams(
+      { ...EMPTY_FILTERS, search: 'eng' },
+      { sort: 'company', order: 'asc' },
+    )
+    expect(p.get('q')).toBe('eng')
+    expect(p.get('sort')).toBe('company')
+    expect(p.get('order')).toBe('asc')
+  })
+
+  it('omits sort params when sort is the default (clean URLs)', () => {
+    const p = buildJobsParams({ ...EMPTY_FILTERS, company: 'Acme' }, DEFAULT_SORT)
+    expect(p.get('co')).toBe('Acme')
+    expect(p.has('sort')).toBe(false)
+    expect(p.has('order')).toBe(false)
   })
 })
 

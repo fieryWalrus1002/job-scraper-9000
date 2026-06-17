@@ -1,4 +1,5 @@
 import type { Filters } from '../types'
+import { applySortParams, type SortState } from './sort'
 
 export const EMPTY_FILTERS: Filters = {
   search: '',
@@ -35,6 +36,15 @@ export function filtersToParams(filters: Filters): URLSearchParams {
   if (filters.company) p.set('co', filters.company)
   if (filters.minSalaryK) p.set('salMin', filters.minSalaryK)
   return p
+}
+
+/**
+ * Single source of truth for the Jobs feed's URL query string: filters + sort.
+ * Both URL writers (filter changes and sort changes) go through this, so adding
+ * a new param means touching one place.
+ */
+export function buildJobsParams(filters: Filters, sort: SortState): URLSearchParams {
+  return applySortParams(filtersToParams(filters), sort)
 }
 
 export function hasActiveFilters(filters: Filters): boolean {

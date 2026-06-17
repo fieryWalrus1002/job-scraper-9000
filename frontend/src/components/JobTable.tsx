@@ -12,6 +12,7 @@ import {
   loadColumnSizing,
   saveColumnOrder,
   saveColumnSizing,
+  sortKeyForColumn,
   tableColumns,
 } from '../lib/columns'
 import { useMarkApplication } from '../hooks/useApplications'
@@ -19,10 +20,12 @@ import { TitleCell } from './JobTable/cells/TitleCell'
 import { PostedAtCell } from './JobTable/cells/PostedAtCell'
 import { RationaleCell } from './JobTable/cells/RationaleCell'
 import { DefaultCell } from './JobTable/cells/DefaultCell'
+import { SalaryCell } from './JobTable/cells/SalaryCell'
 import ContextMenu from './ContextMenu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { defaultDirectionFor, type SortKey, type SortOrder, type SortState } from '@/lib/sort'
 
 interface Props {
   items: JobSummary[]
@@ -33,6 +36,8 @@ interface Props {
   pageSize: number
   total: number | undefined
   onPageChange: (page: number) => void
+  sort: SortState
+  onSortChange: (next: SortState) => void
 }
 
 interface ContextState {
@@ -92,6 +97,23 @@ function ConfidenceBadge({ value }: { value: string | null }) {
   )
 }
 
+// Faint indicator on every sortable header; brightened and flipped to match
+// direction on the column currently driving the server-side sort.
+function SortArrow({ active, order }: { active: boolean; order: SortOrder }) {
+  const glyph = active ? (order === 'asc' ? '▲' : '▼') : '▾'
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'ml-1 inline-block text-[9px] align-middle transition-colors',
+        active ? 'text-fg' : 'text-faint/50',
+      )}
+    >
+      {glyph}
+    </span>
+  )
+}
+
 function renderCell(key: string, job: JobSummary): ReactNode {
   switch (key) {
     case 'fit_score':
@@ -104,6 +126,8 @@ function renderCell(key: string, job: JobSummary): ReactNode {
       return <ConfidenceBadge value={job.confidence} />
     case 'posted_at':
       return <PostedAtCell value={job.posted_at} />
+    case 'salary_min_usd':
+      return <SalaryCell job={job} />
     case 'score_rationale':
       return <RationaleCell value={job.score_rationale} />
     default:
@@ -154,6 +178,8 @@ export default function JobTable({
   pageSize,
   total,
   onPageChange,
+  sort,
+  onSortChange,
 }: Props) {
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(loadColumnOrder)
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
@@ -203,6 +229,14 @@ export default function JobTable({
   }, [])
   const totalPages = total && total > 0 ? Math.ceil(total / pageSize) : 0
 
+  function toggleSort(key: SortKey) {
+    if (sort.sort === key) {
+      onSortChange({ sort: key, order: sort.order === 'asc' ? 'desc' : 'asc' })
+    } else {
+      onSortChange({ sort: key, order: defaultDirectionFor(key) })
+    }
+  }
+
   if (items.length === 0) {
     return (
       <div className="py-20 text-center">
@@ -225,6 +259,8 @@ export default function JobTable({
                 {hg.headers.map((header, i) => {
                   const prevHeader = i > 0 ? hg.headers[i - 1] : null
                   const isLast = i === hg.headers.length - 1
+                  const sortKey = sortKeyForColumn(header.column.id)
+                  const sortActive = sortKey != null && sort.sort === sortKey
                   const startResize = (h: typeof header) => (e: React.MouseEvent) => {
                     isResizing.current = true
                     h.getResizeHandler()(e)
@@ -242,6 +278,13 @@ export default function JobTable({
                       key={header.id}
                       style={{ position: 'relative', width: header.getSize() }}
                       className="cursor-pointer select-none hover:text-fg"
+                      aria-sort={
+                        sortActive ? (sort.order === 'asc' ? 'ascending' : 'descending') : undefined
+                      }
+                      onClick={() => {
+                        // Resize handles stopPropagation; a drag won't fire click.
+                        if (sortKey && !isResizing.current) toggleSort(sortKey)
+                      }}
                       draggable
                       onDragStart={(e) => {
                         if (isResizing.current) {
@@ -281,6 +324,7 @@ export default function JobTable({
                         />
                       )}
                       {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sortKey && <SortArrow active={sortActive} order={sort.order} />}
                       {isLast && header.column.getCanResize() && (
                         <div
                           className="col-resize-handle"

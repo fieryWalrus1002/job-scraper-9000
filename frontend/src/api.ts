@@ -15,6 +15,7 @@ import type {
   SearchSaveResponse,
   SettingsResponse,
 } from './types'
+import type { SortState } from './lib/sort'
 
 // Empty in dev/prod (Vite proxy + Azure SWA both handle /api/* routing).
 // Set VITE_API_URL only if calling the backend directly without a proxy.
@@ -54,6 +55,7 @@ export async function fetchJobs(
   filters: Filters,
   page: number,
   pageSize: number,
+  sort: SortState,
   signal?: AbortSignal,
 ): Promise<JobListResponse> {
   const params = new URLSearchParams()
@@ -65,6 +67,8 @@ export async function fetchJobs(
   if (filters.maxPostedAt) params.set('max_posted_at', filters.maxPostedAt)
   if (filters.company) params.set('company', filters.company)
   if (filters.minSalaryK) params.set('min_salary_usd', String(Number(filters.minSalaryK) * 1000))
+  params.set('sort', sort.sort)
+  params.set('order', sort.order)
   params.set('limit', String(pageSize))
   params.set('offset', String(page * pageSize))
 

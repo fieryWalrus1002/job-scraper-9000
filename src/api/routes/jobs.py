@@ -39,6 +39,20 @@ _FROM = """
     JOIN raw.job_scores s USING (dedup_hash)
 """
 
+# Whitelist of sortable columns → their qualified SQL expression. Sorting is
+# driven only by this dict (keyed off a Literal query param), so no caller text
+# is ever interpolated into the ORDER BY.
+_SORT_COLUMNS: dict[str, str] = {
+    "fit_score": "s.fit_score",
+    "posted_at": "p.posted_at",
+    "company": "p.company",
+    "title": "p.title",
+    "salary_min_usd": "p.salary_min_usd",
+}
+
+SortKey = Literal["fit_score", "posted_at", "company", "title", "salary_min_usd"]
+SortOrder = Literal["asc", "desc"]
+
 _LIST_FROM = """
     FROM raw.job_postings p
     JOIN raw.job_scores s USING (dedup_hash)
@@ -78,6 +92,8 @@ async def list_jobs(
     min_salary_usd: Annotated[int | None, Query(ge=0)] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
     company: Annotated[str | None, Query(max_length=200)] = None,
+    sort: Annotated[SortKey, Query()] = "fit_score",
+    order: Annotated[SortOrder, Query()] = "desc",
     limit: Annotated[int, Query(ge=1, le=1000)] = 500,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -118,12 +134,21 @@ async def list_jobs(
 
     where = "WHERE " + " AND ".join(filters)
 
+    # sort/order are Literals and the column is a dict lookup, so this string is
+    # built only from whitelisted values. scored_at + dedup_hash are a stable
+    # tiebreaker so pagination stays deterministic when the sort column ties.
+    sort_col = _SORT_COLUMNS[sort]
+    direction = "ASC" if order == "asc" else "DESC"
+    order_by = (
+        f"ORDER BY {sort_col} {direction} NULLS LAST, s.scored_at DESC, p.dedup_hash"
+    )
+
     count_sql = f"SELECT COUNT(*) AS n {_LIST_FROM} {where}"
     list_sql = f"""
         SELECT {_LIST_COLS}
         {_LIST_FROM}
         {where}
-        ORDER BY s.fit_score DESC NULLS LAST, s.scored_at DESC
+        {order_by}
         LIMIT %(limit)s OFFSET %(offset)s
     """
     params["limit"] = limit
