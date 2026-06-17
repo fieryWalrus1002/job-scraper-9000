@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   SearchIcon,
   Building2Icon,
@@ -17,12 +17,14 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   filters: Filters
-  onFiltersChange: (f: Filters) => void
+  onFiltersChange: (f: Filters, opts?: { replace?: boolean }) => void
   visibleColumns: Set<string>
   onToggleColumn: (key: string) => void
   total: number | undefined
   collapsed?: boolean
 }
+
+const SEARCH_DEBOUNCE_MS = 280
 
 const getRelativeDateString = (daysOffset: number) => {
   const targetDate = new Date()
@@ -122,6 +124,25 @@ export default function FilterPane({
   const [colsOpen, setColsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(false)
 
+  // Search is debounced: the input stays instantly responsive via local state,
+  // but the URL write (which drives the fetch + history) only fires once typing
+  // settles, and uses replace so keystrokes don't stack history entries.
+  const [searchInput, setSearchInput] = useState(filters.search)
+
+  // Re-sync when search changes outside the box (Clear filters, back/forward).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSearchInput(filters.search)
+  }, [filters.search])
+
+  useEffect(() => {
+    if (searchInput === filters.search) return
+    const t = setTimeout(() => {
+      onFiltersChange({ ...filters, search: searchInput }, { replace: true })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [searchInput, filters, onFiltersChange])
+
   type StringFilterKey =
     | 'search'
     | 'minScore'
@@ -158,8 +179,8 @@ export default function FilterPane({
         <Input
           type="text"
           placeholder="title, company…"
-          value={filters.search}
-          onChange={(e) => set('search', e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
       </Section>
 
