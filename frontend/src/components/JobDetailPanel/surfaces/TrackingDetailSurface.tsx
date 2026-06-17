@@ -16,7 +16,7 @@ export function TrackingDetailSurface({
   application,
   onClose,
 }: DetailSurfaceProps) {
-  const { statusAction } = useApplicationDetailActions(jobData.dedup_hash, application)
+  const { statusAction } = useApplicationDetailActions(jobData.dedup_hash, application, onClose)
   const actions = [
     statusAction({
       id: 'back-to-shortlist',

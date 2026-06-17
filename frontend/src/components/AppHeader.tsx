@@ -27,9 +27,10 @@ interface Props {
   /** Badge count per funnel tab; undefined hides the badge (e.g. jobs total still loading). */
   counts: Record<FunnelPath, number | undefined>
   onAddJob: () => void
+  onShowShortcuts: () => void
 }
 
-export function AppHeader({ email, counts, onAddJob }: Props) {
+export function AppHeader({ email, counts, onAddJob, onShowShortcuts }: Props) {
   const location = useLocation()
   const navigate = useNavigate()
   const onSettings = location.pathname === '/settings'
@@ -70,6 +71,15 @@ export function AppHeader({ email, counts, onAddJob }: Props) {
         })}
       </nav>
       <div className="flex-1" />
+      <button
+        type="button"
+        onClick={onShowShortcuts}
+        title="Keyboard shortcuts (?)"
+        aria-label="Keyboard shortcuts"
+        className="inline-flex items-center justify-center size-6 rounded-md border border-border bg-card text-faint text-[12px] font-mono cursor-pointer hover:text-fg hover:border-border-strong transition-colors"
+      >
+        ?
+      </button>
       <Button
         variant="ghost"
         size="sm"

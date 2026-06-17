@@ -26,6 +26,8 @@ import { TRACKING_STATUSES } from './lib/trackingGroups'
 import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { TrashRowActions } from './components/TrashRowActions'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ShortcutsOverlay } from './components/ShortcutsOverlay'
+import { isEditableTarget } from './lib/keyboard'
 import { cn } from './lib/utils'
 
 const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
@@ -90,6 +92,21 @@ function AppShell({ email }: { email: string }) {
   const [paneOpen, setPaneOpen] = useState(true)
   const [addJobOpen, setAddJobOpen] = useState(false)
 
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  // `?` opens the shortcuts reference from anywhere (even over an open panel), so
+  // the single-key triage features are discoverable without a manual.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === '?' && !isEditableTarget(e.target)) {
+        e.preventDefault()
+        setShortcutsOpen(true)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   const [page, setPage] = useState(0)
   const { data, isLoading, isError, error } = useJobs(filters, page, sort)
 
@@ -153,7 +170,12 @@ function AppShell({ email }: { email: string }) {
 
   return (
     <div className="flex flex-col h-svh overflow-hidden">
-      <AppHeader email={email} counts={tabCounts} onAddJob={() => setAddJobOpen(true)} />
+      <AppHeader
+        email={email}
+        counts={tabCounts}
+        onAddJob={() => setAddJobOpen(true)}
+        onShowShortcuts={() => setShortcutsOpen(true)}
+      />
 
       <div className="flex-1 flex flex-row overflow-hidden">
         <Routes>
@@ -293,6 +315,8 @@ function AppShell({ email }: { email: string }) {
           }}
         />
       )}
+
+      <ShortcutsOverlay open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   )
 }

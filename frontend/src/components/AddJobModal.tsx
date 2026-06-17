@@ -3,6 +3,7 @@ import { useCreateManualJob } from '../hooks/useApplications'
 import { APPLICATION_STATUSES, STATUS_LABELS } from '../types'
 import type { ApplicationStatus } from '../types'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { isQuitKey } from '@/lib/keyboard'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -65,7 +66,16 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0">
+      <DialogContent
+        className="sm:max-w-[600px] p-0 gap-0"
+        // `q` closes the panel like Escape; the guard keeps it typeable in fields.
+        onKeyDown={(e) => {
+          if (isQuitKey(e)) {
+            e.preventDefault()
+            onClose()
+          }
+        }}
+      >
         <div className="px-6 pt-5 pb-4 border-b border-border">
           <DialogTitle className="text-[15px] font-semibold tracking-tight text-fg">
             Add job manually

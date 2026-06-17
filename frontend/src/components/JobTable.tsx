@@ -18,6 +18,7 @@ import {
 } from '../lib/columns'
 import { useTriageAction } from '../hooks/useTriage'
 import { useRowSwipe } from './JobTable/useRowSwipe'
+import { useTriageKeys } from './JobTable/useTriageKeys'
 import { TitleCell } from './JobTable/cells/TitleCell'
 import { PostedAtCell } from './JobTable/cells/PostedAtCell'
 import { RationaleCell } from './JobTable/cells/RationaleCell'
@@ -232,6 +233,7 @@ function JobRow({
   row,
   rank,
   appStatus,
+  focused,
   onSelect,
   onContextMenu,
   triage,
@@ -239,11 +241,18 @@ function JobRow({
   row: Row<JobSummary>
   rank: number
   appStatus: ApplicationStatus | undefined
+  focused: boolean
   onSelect: (hash: string) => void
   onContextMenu: (job: JobSummary, x: number, y: number) => void
   triage: ReturnType<typeof useTriageAction>['triage']
 }) {
   const job = row.original
+  const rowRef = useRef<HTMLTableRowElement>(null)
+
+  // Keep the keyboard cursor on screen as it moves through a long feed.
+  useEffect(() => {
+    if (focused) rowRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [focused])
   const { offset, progress, armed, direction, settling, handlers, consumeClickSuppression } =
     useRowSwipe({
       onCommit: (dir) =>
@@ -264,9 +273,12 @@ function JobRow({
 
   return (
     <tr
+      ref={rowRef}
       {...handlers}
       className={cn(
         'cursor-pointer hover:bg-hover',
+        // Keyboard cursor: a left accent bar + subtle fill, distinct from hover.
+        focused && 'bg-hover shadow-[inset_2px_0_0_var(--color-primary)]',
         settling
           ? 'transition-[transform,background-color] duration-150 ease-out'
           : 'transition-colors',
@@ -325,6 +337,25 @@ export default function JobTable({
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
   const [ctx, setCtx] = useState<ContextState | null>(null)
   const { triage } = useTriageAction()
+
+  // Single-key triage on the focused row — the keyboard twin of the swipe
+  // gestures, routed through the same triage primitive so undo comes for free.
+  const { focusedIndex } = useTriageKeys({
+    count: items.length,
+    onTrash: (i) =>
+      triage({
+        dedupHash: items[i].dedup_hash,
+        from: applications?.get(items[i].dedup_hash)?.status ?? null,
+        to: 'passed',
+      }),
+    onShortlist: (i) =>
+      triage({
+        dedupHash: items[i].dedup_hash,
+        from: applications?.get(items[i].dedup_hash)?.status ?? null,
+        to: 'maybe',
+      }),
+    onOpen: (i) => onSelect(items[i].dedup_hash),
+  })
 
   const columnVisibility = Object.fromEntries(
     tableColumns.map((col) => [col.id!, visibleColumns.has(col.id!)]),
@@ -487,6 +518,7 @@ export default function JobTable({
                 row={row}
                 rank={page * pageSize + i + 1}
                 appStatus={applications?.get(row.original.dedup_hash)?.status}
+                focused={i === focusedIndex}
                 onSelect={onSelect}
                 onContextMenu={(job, x, y) => setCtx({ x, y, job })}
                 triage={triage}
