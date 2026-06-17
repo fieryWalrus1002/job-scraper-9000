@@ -5,16 +5,23 @@ import type { DetailAction } from '../shared/DetailActionBar'
 export function useApplicationDetailActions(
   dedupHash: string,
   application: Application | undefined,
+  // Triaging from the detail panel is a decision: dismiss the panel afterward so
+  // you land back on the feed (where the row has dropped out) ready for the next
+  // job. Both the buttons and the keyboard shortcuts route through here, so the
+  // two input paths stay in lockstep.
+  onTriaged?: () => void,
 ) {
   const { triage, isPending } = useTriageAction()
   const currentStatus = application?.status ?? null
 
   function setStatus(status: ApplicationStatus) {
     triage({ dedupHash, from: currentStatus, to: status })
+    onTriaged?.()
   }
 
   function removeTracking() {
     triage({ dedupHash, from: currentStatus, to: 'remove', restoreNotes: application?.notes })
+    onTriaged?.()
   }
 
   function statusAction({

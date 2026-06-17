@@ -19,6 +19,7 @@ export function ShortlistDetailSurface({
   const { removeAction, statusAction } = useApplicationDetailActions(
     jobData.dedup_hash,
     application,
+    onClose,
   )
   const actions = [
     statusAction({ label: 'Trash', status: 'passed', shortcut: 'T', variant: 'danger' }),

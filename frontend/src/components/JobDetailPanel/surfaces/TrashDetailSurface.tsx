@@ -19,6 +19,7 @@ export function TrashDetailSurface({
   const { removeAction, statusAction } = useApplicationDetailActions(
     jobData.dedup_hash,
     application,
+    onClose,
   )
   const actions = [
     removeAction({ id: 'restore', label: 'Restore to Jobs', shortcut: 'R' }),

@@ -16,7 +16,7 @@ export function JobsDetailSurface({
   application,
   onClose,
 }: DetailSurfaceProps) {
-  const { statusAction } = useApplicationDetailActions(jobData.dedup_hash, application)
+  const { statusAction } = useApplicationDetailActions(jobData.dedup_hash, application, onClose)
   const actions = [
     statusAction({ label: 'Trash', status: 'passed', shortcut: 'T', variant: 'danger' }),
     statusAction({ label: 'Shortlist', status: 'maybe', shortcut: 'S', variant: 'warn' }),
