@@ -63,6 +63,19 @@ describe('useTriageKeys', () => {
     expect(onOpen).toHaveBeenCalledWith(1)
   })
 
+  it('acts on the latest cursor when nav + action fire back-to-back', () => {
+    // All three keys dispatch inside one act() — i.e. before a re-subscribing
+    // effect could refresh the closure. The handler must still trash row 1, not
+    // the dormant/previous cursor. Guards the stale-closure regression.
+    const { onTrash } = setup()
+    act(() => {
+      fireEvent.keyDown(document.body, { key: 'ArrowDown' }) // -> 0
+      fireEvent.keyDown(document.body, { key: 'j' }) // -> 1
+      fireEvent.keyDown(document.body, { key: 't' }) // act on 1
+    })
+    expect(onTrash).toHaveBeenCalledWith(1)
+  })
+
   it('keeps the cursor on the row that slides up as the feed shrinks', () => {
     const { result, rerender } = setup(3)
     press('ArrowDown')

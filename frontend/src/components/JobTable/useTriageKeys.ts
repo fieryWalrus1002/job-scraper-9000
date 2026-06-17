@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isEditableTarget } from '../../lib/keyboard'
 
 interface UseTriageKeysArgs {
@@ -41,51 +41,68 @@ export function useTriageKeys({
     setFocusedIndex(count - 1)
   }
 
-  // Re-subscribed when count/focus/callbacks change so the handler always closes
-  // over live values (no stale closure); attaching one document listener is cheap.
+  // `focusedRef` is the synchronous source of truth the keydown handler reads and
+  // writes, so a burst of keys (e.g. `j` then `t` in one tick) always acts on the
+  // row the cursor just moved to — never a value stale-closured from React's
+  // commit timing. The layout effect reconciles it with committed state (incl. the
+  // render clamp above) before the next paint; `liveRef` carries the other inputs.
+  const focusedRef = useRef(focusedIndex)
+  const liveRef = useRef({ count, onTrash, onShortlist, onOpen })
+  useLayoutEffect(() => {
+    focusedRef.current = focusedIndex
+    liveRef.current = { count, onTrash, onShortlist, onOpen }
+  })
+
   useEffect(() => {
+    function setFocused(next: number) {
+      focusedRef.current = next
+      setFocusedIndex(next)
+    }
     function handleKey(e: KeyboardEvent) {
       // Leave browser/OS chords and text entry alone, and don't steal keys while
       // a modal (e.g. Add job) owns the screen.
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (isEditableTarget(e.target)) return
       if (document.querySelector('[role="dialog"]')) return
+
+      const { count, onTrash, onShortlist, onOpen } = liveRef.current
       if (count === 0) return
+      const i = focusedRef.current
 
       switch (e.key) {
         case 'j':
         case 'ArrowDown':
           e.preventDefault()
-          setFocusedIndex((i) => Math.min(i < 0 ? 0 : i + 1, count - 1))
+          setFocused(Math.min(i < 0 ? 0 : i + 1, count - 1))
           break
         case 'k':
         case 'ArrowUp':
           e.preventDefault()
-          setFocusedIndex((i) => Math.max(i < 0 ? 0 : i - 1, 0))
+          setFocused(Math.max(i < 0 ? 0 : i - 1, 0))
           break
         case 't':
-          if (focusedIndex >= 0) {
+          if (i >= 0) {
             e.preventDefault()
-            onTrash(focusedIndex)
+            onTrash(i)
           }
           break
         case 's':
-          if (focusedIndex >= 0) {
+          if (i >= 0) {
             e.preventDefault()
-            onShortlist(focusedIndex)
+            onShortlist(i)
           }
           break
         case 'Enter':
-          if (focusedIndex >= 0) {
+          if (i >= 0) {
             e.preventDefault()
-            onOpen(focusedIndex)
+            onOpen(i)
           }
           break
       }
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [count, focusedIndex, onTrash, onShortlist, onOpen])
+  }, [])
 
   return { focusedIndex }
 }
