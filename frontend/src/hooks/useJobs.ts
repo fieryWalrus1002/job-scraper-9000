@@ -8,7 +8,7 @@ export function useJobs(filters: Filters, page: number) {
   const safePage = Math.max(0, page)
   return useQuery({
     queryKey: ['jobs', filters, page],
-    queryFn: () => fetchJobs(filters, safePage, PAGE_SIZE),
+    queryFn: ({ signal }) => fetchJobs(filters, safePage, PAGE_SIZE, signal),
     staleTime: 1000 * 60 * 5,
   })
 }

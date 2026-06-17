@@ -20,7 +20,7 @@ interface Props {
 export function JobDetailPanel({ dedupHash, onClose, application, surface = 'jobs' }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['job', dedupHash],
-    queryFn: () => fetchJobDetail(dedupHash!),
+    queryFn: ({ signal }) => fetchJobDetail(dedupHash!, signal),
     enabled: !!dedupHash,
   })
   const { data: correction } = useEvalCorrection(dedupHash)

@@ -13,7 +13,7 @@ export function useApplications(statuses?: ApplicationStatus[]) {
   const normalizedStatuses = normalizeApplicationStatuses(statuses)
   return useQuery<Application[], Error, Map<string, Application>>({
     queryKey: ['applications', normalizedStatuses.length > 0 ? normalizedStatuses : 'all'],
-    queryFn: () => fetchApplications(normalizedStatuses),
+    queryFn: ({ signal }) => fetchApplications(normalizedStatuses, signal),
     select: (data: Application[]) => new Map(data.map((a) => [a.dedup_hash, a])),
   })
 }

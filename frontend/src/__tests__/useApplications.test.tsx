@@ -68,7 +68,11 @@ describe('useApplications', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(fetchMock).toHaveBeenCalledWith('/api/applications?status=applied&status=maybe')
+    // The query passes React Query's AbortSignal through as a second fetch arg.
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/applications?status=applied&status=maybe',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
   })
 
   it('enters error state on fetch failure', async () => {
