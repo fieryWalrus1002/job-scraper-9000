@@ -30,7 +30,10 @@ export function JobDetailShell({
           }
         }}
         onKeyDown={(e) => {
-          // `q` quits the panel, alongside Radix's built-in Escape.
+          // `q` quits the panel, alongside Radix's built-in Escape. This handler
+          // is on the dialog content and Radix focus-traps the topmost dialog, so
+          // a stacked overlay (e.g. the `?` reference) receives `q` instead — i.e.
+          // `q` closes only the top panel without any explicit topmost check.
           if (isQuitKey(e)) {
             e.preventDefault()
             onClose()

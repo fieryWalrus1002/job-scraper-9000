@@ -13,6 +13,11 @@ import type { DetailAction } from './DetailActionBar'
  * `shortcut` case-insensitively and fires it unless that action is disabled
  * (e.g. a mutation in flight). It stands down while text entry or the shortcuts
  * reference overlay is on top.
+ *
+ * Assumes a single detail surface is mounted at a time (true today —
+ * `DetailSurface` renders one surface via a `switch`). If a future layout keeps
+ * multiple panels alive, this document listener would need a topmost-panel guard
+ * so a hidden surface can't win a shortcut.
  */
 export function useActionShortcuts(actions: DetailAction[]) {
   useEffect(() => {
