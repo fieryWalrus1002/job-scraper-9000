@@ -24,6 +24,7 @@ import { TrackingBoard } from './components/TrackingBoard'
 import { TRACKING_STATUSES } from './lib/trackingGroups'
 import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { TrashRowActions } from './components/TrashRowActions'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { cn } from './lib/utils'
 
 const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
@@ -188,23 +189,25 @@ function AppShell({ email }: { email: string }) {
                     </div>
                   )}
                   {!isLoading && !isError && (
-                    <JobTable
-                      items={data?.items ?? []}
-                      visibleColumns={visible}
-                      onSelect={(hash) =>
-                        selectCurrentJob(
-                          hash,
-                          'jobs',
-                          undefined,
-                          data?.items.find((j) => j.dedup_hash === hash),
-                        )
-                      }
-                      applications={applications}
-                      page={page}
-                      pageSize={PAGE_SIZE}
-                      total={data?.total}
-                      onPageChange={setPage}
-                    />
+                    <ErrorBoundary label="Jobs" resetKeys={[currentPath]}>
+                      <JobTable
+                        items={data?.items ?? []}
+                        visibleColumns={visible}
+                        onSelect={(hash) =>
+                          selectCurrentJob(
+                            hash,
+                            'jobs',
+                            undefined,
+                            data?.items.find((j) => j.dedup_hash === hash),
+                          )
+                        }
+                        applications={applications}
+                        page={page}
+                        pageSize={PAGE_SIZE}
+                        total={data?.total}
+                        onPageChange={setPage}
+                      />
+                    </ErrorBoundary>
                   )}
                 </>
               }
@@ -239,7 +242,14 @@ function AppShell({ email }: { email: string }) {
                 />
               }
             />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route
+              path="/settings"
+              element={
+                <ErrorBoundary label="Settings" resetKeys={[currentPath]}>
+                  <SettingsPage />
+                </ErrorBoundary>
+              }
+            />
             <Route path="*" element={<Navigate to="/jobs" replace />} />
           </Routes>
         </div>
