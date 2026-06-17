@@ -105,11 +105,22 @@ Ships the whole IA with plain controls (buttons, not gestures).
 
 Makes it feel good. Each is independently shippable on top of the skeleton.
 
-1. **FE:** swipe gestures on Jobs — left = Trash, right = Shortlist(`maybe`).
-1. **FE:** undo affordance (snackbar) after any triage action.
-1. **FE:** reversibility escapes wired across tabs (the §3.3 reverse moves).
-1. **FE:** count badges on each tab (Trash badge only when non-empty).
-1. **FE (optional):** keyboard shortcuts for triage (single-key trash/shortlist).
+1. **FE:** swipe gestures on Jobs — left = Trash, right = Shortlist(`maybe`). (#354)
+1. **FE:** undo affordance (snackbar) after any triage action. (#355)
+1. **FE:** reversibility escapes wired across tabs (the §3.3 reverse moves). (#356)
+1. **FE:** count badges on each tab (Trash badge only when non-empty). Landed
+   early in the skeleton cleanup (#264); #357 closed as already-shipped.
+1. **FE:** keyboard shortcuts for triage (#358, #361). Shipped wider than the
+   original "single-key trash/shortlist" note, since shortcuts are unusable
+   without focus + discoverability:
+   - **Jobs feed:** a row cursor (`j`/`k`/arrows) with `t` trash, `s` shortlist,
+     `Enter` open — through the same triage primitive as swipes, so undo is free.
+   - **Job detail:** wires the per-surface action letters the chips already
+     advertised (`T`/`S`/`P`/`B`/`R`), auto-scoped to the tab; triaging from the
+     panel (key or click) closes it and returns to the feed; `j`/`k`/arrows scroll
+     the description (`data-detail-scroll` target, so it survives the panel
+     redesign); `q` quits any panel alongside Esc.
+   - **Reference:** `?` (or a header button) opens a grouped shortcuts overlay.
 
 ## 7. Out of scope
 
