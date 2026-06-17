@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { JobDetailPanel } from '../components/JobDetailPanel'
-import type { Application, JobDetail } from '../types'
+import type { Application, JobDetail, JobSummary } from '../types'
 
 function makeWrapper() {
   const qc = new QueryClient({
@@ -72,6 +72,25 @@ const JOB_DETAIL: JobDetail = {
   ingested_at: '2026-01-16T00:00:00Z',
 }
 
+const JOB_SUMMARY: JobSummary = {
+  dedup_hash: 'hash-a',
+  source: 'linkedin',
+  source_url: 'https://example.com/job',
+  title: 'Example Role',
+  company: 'Acme',
+  location: 'Remote',
+  posted_at: '2026-01-15',
+  remote_classification: 'fully_remote',
+  salary_min_usd: null,
+  salary_max_usd: null,
+  salary_period: null,
+  fit_score: 4,
+  confidence: 'high',
+  score_rationale: 'Looks relevant.',
+  failure_reason: null,
+  scored_at: '2026-01-16T00:00:00Z',
+}
+
 const APPLICATION: Application = {
   dedup_hash: 'hash-a',
   status: 'maybe',
@@ -102,6 +121,24 @@ describe('JobDetailPanel triage actions', () => {
       method: 'POST',
       body: JSON.stringify({ dedup_hash: 'hash-a', status: 'maybe' }),
     })
+  })
+
+  it('renders summary placeholder data immediately, before the detail fetch resolves', () => {
+    // Detail fetch never settles; with a summary placeholder the panel must
+    // still render the header content instantly instead of flashing "Loading…".
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    )
+
+    render(
+      <JobDetailPanel dedupHash="hash-a" onClose={vi.fn()} surface="jobs" summary={JOB_SUMMARY} />,
+      { wrapper: makeWrapper() },
+    )
+
+    // Synchronous (no findBy/await): the placeholder is shown on first render.
+    expect(screen.getByText('Example Role')).toBeInTheDocument()
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
   })
 
   it('uses second-pass decision actions for the Shortlist surface', async () => {
