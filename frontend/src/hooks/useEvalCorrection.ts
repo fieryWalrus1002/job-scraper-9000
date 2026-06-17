@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { deleteEvalCorrection, fetchEvalCorrection, upsertEvalCorrection } from '../api'
 import type { EvalCorrectionIn, EvalCorrectionOut } from '../types'
+import { logMutationError } from '../lib/mutations'
 
 export function useEvalCorrection(dedupHash: string | null) {
   return useQuery<EvalCorrectionOut | null, Error>({
@@ -17,6 +18,7 @@ export function useSetEvalCorrection() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['eval-correction', data.dedup_hash] })
     },
+    onError: logMutationError('save eval correction'),
   })
 }
 
@@ -27,5 +29,6 @@ export function useDeleteEvalCorrection() {
     onSuccess: (_data, dedupHash) => {
       qc.invalidateQueries({ queryKey: ['eval-correction', dedupHash] })
     },
+    onError: logMutationError('delete eval correction'),
   })
 }
