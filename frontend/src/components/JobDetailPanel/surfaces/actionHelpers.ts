@@ -1,31 +1,20 @@
 import type { Application, ApplicationStatus } from '../../../types'
-import {
-  useDeleteApplication,
-  useMarkApplication,
-  useUpdateApplication,
-} from '../../../hooks/useApplications'
+import { useTriageAction } from '../../../hooks/useTriage'
 import type { DetailAction } from '../shared/DetailActionBar'
 
 export function useApplicationDetailActions(
   dedupHash: string,
   application: Application | undefined,
 ) {
-  const mark = useMarkApplication()
-  const update = useUpdateApplication()
-  const del = useDeleteApplication()
-  const isPending = mark.isPending || update.isPending || del.isPending
+  const { triage, isPending } = useTriageAction()
   const currentStatus = application?.status ?? null
 
   function setStatus(status: ApplicationStatus) {
-    if (application) {
-      update.mutate({ dedupHash, update: { status } })
-    } else {
-      mark.mutate({ dedupHash, status })
-    }
+    triage({ dedupHash, from: currentStatus, to: status })
   }
 
   function removeTracking() {
-    del.mutate(dedupHash)
+    triage({ dedupHash, from: currentStatus, to: 'remove', restoreNotes: application?.notes })
   }
 
   function statusAction({

@@ -1,14 +1,14 @@
-import { useDeleteApplication } from '../hooks/useApplications'
+import { useTriageAction } from '../hooks/useTriage'
 import { QuickActions } from './ui/quick-actions'
 import type { Application } from '../types'
 
 /**
  * Row-level action for the Trash tab: Un-trash deletes the `user_applications`
- * row so the job falls back into the untriaged Jobs feed.
+ * row so the job falls back into the untriaged Jobs feed. Undo recreates the row
+ * as `passed`, restoring its notes.
  */
 export function TrashRowActions({ application }: { application: Application }) {
-  const del = useDeleteApplication()
-  const pending = del.isPending
+  const { triage, isPending } = useTriageAction()
 
   return (
     <QuickActions
@@ -19,8 +19,14 @@ export function TrashRowActions({ application }: { application: Application }) {
           id: 'untrash',
           label: 'Un-trash',
           variant: 'default',
-          disabled: pending,
-          onSelect: () => del.mutate(application.dedup_hash),
+          disabled: isPending,
+          onSelect: () =>
+            triage({
+              dedupHash: application.dedup_hash,
+              from: application.status,
+              to: 'remove',
+              restoreNotes: application.notes,
+            }),
         },
       ]}
     />

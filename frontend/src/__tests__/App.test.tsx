@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from '../App'
 import * as auth from '../lib/auth'
+import { SnackbarProvider } from '../components/ui/snackbar'
 
 function renderApp(initialEntries: string[] = ['/jobs']) {
   const qc = new QueryClient({
@@ -11,10 +12,12 @@ function renderApp(initialEntries: string[] = ['/jobs']) {
   })
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={initialEntries}>
-        <LocationProbe />
-        <App />
-      </MemoryRouter>
+      <SnackbarProvider>
+        <MemoryRouter initialEntries={initialEntries}>
+          <LocationProbe />
+          <App />
+        </MemoryRouter>
+      </SnackbarProvider>
     </QueryClientProvider>,
   )
 }
