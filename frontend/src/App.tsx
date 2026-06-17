@@ -87,8 +87,10 @@ function AppShell({ email }: { email: string }) {
   const { visible, toggle } = useColumnConfig()
   const { data: applications } = useApplications()
 
-  function setFilters(next: Filters) {
-    setUrlParams(filtersToParams(next))
+  function setFilters(next: Filters, opts?: { replace?: boolean }) {
+    // The debounced search path passes replace:true so settling keystrokes
+    // don't each stack a browser-history entry.
+    setUrlParams(filtersToParams(next), opts?.replace ? { replace: true } : undefined)
     setPage(0)
   }
 
