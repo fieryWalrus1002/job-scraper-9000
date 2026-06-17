@@ -18,6 +18,12 @@ describe('sortFromParams', () => {
       DEFAULT_SORT,
     )
   })
+
+  it('falls back to the whole default pair when only the sort key is invalid', () => {
+    // Guard against a mismatched pair like {fit_score, asc} from a valid order
+    // riding alongside an invalid column.
+    expect(sortFromParams(new URLSearchParams('sort=scored_at&order=asc'))).toEqual(DEFAULT_SORT)
+  })
 })
 
 describe('applySortParams', () => {

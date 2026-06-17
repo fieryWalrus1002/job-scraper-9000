@@ -32,11 +32,12 @@ function isSortKey(v: string | null): v is SortKey {
 
 export function sortFromParams(params: URLSearchParams): SortState {
   const sort = params.get('sort')
+  // An invalid/absent sort key falls back to the whole default pair, not just
+  // the column — otherwise a hand-edited URL like `?sort=bogus&order=asc` would
+  // yield {fit_score, asc}, a direction the user never chose for that column.
+  if (!isSortKey(sort)) return DEFAULT_SORT
   const order = params.get('order')
-  return {
-    sort: isSortKey(sort) ? sort : DEFAULT_SORT.sort,
-    order: order === 'asc' || order === 'desc' ? order : DEFAULT_SORT.order,
-  }
+  return { sort, order: order === 'asc' || order === 'desc' ? order : DEFAULT_SORT.order }
 }
 
 /** Apply sort onto an existing params object (mutates + returns it). Omits the
