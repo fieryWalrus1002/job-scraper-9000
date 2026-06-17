@@ -126,7 +126,9 @@ describe('useJobs', () => {
 
     const { result } = renderHook(() => useJobs(EMPTY_FILTERS, 0), { wrapper })
 
-    await waitFor(() => expect(result.current.isError).toBe(true))
+    // useJobs sets retry: 1, which overrides the wrapper's retry: false and adds
+    // a ~1s backoff before the error surfaces — extend the wait accordingly.
+    await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 3000 })
     expect(result.current.data).toBeUndefined()
   })
 })
