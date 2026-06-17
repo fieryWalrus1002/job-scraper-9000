@@ -46,5 +46,17 @@ describe('useAuth', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false))
     expect(result.current.principal).toBeNull()
     expect(result.current.isAuthenticated).toBe(false)
+    expect(result.current.isError).toBe(false)
+  })
+
+  it('surfaces isError (not unauthenticated) when fetchPrincipal throws', async () => {
+    vi.spyOn(auth, 'fetchPrincipal').mockRejectedValue(new Error('network down'))
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+    expect(result.current.isError).toBe(true)
+    expect(result.current.error).toBeInstanceOf(Error)
+    expect(result.current.isAuthenticated).toBe(false)
   })
 })

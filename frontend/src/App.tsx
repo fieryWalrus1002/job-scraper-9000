@@ -30,16 +30,30 @@ const SHORTLIST_STATUSES: ApplicationStatus[] = ['maybe']
 const TRASH_STATUSES: ApplicationStatus[] = ['passed']
 
 export default function App() {
-  const { principal, isLoading: authLoading, isAuthenticated } = useAuth()
+  const { principal, isLoading: authLoading, isAuthenticated, isError: authError } = useAuth()
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated && !import.meta.env.DEV) {
+    // Only redirect to login for a genuine logged-out state, never on a
+    // transport/server error — that would bounce the user into a login loop
+    // instead of showing them the failure.
+    if (!authLoading && !authError && !isAuthenticated && !import.meta.env.DEV) {
       window.location.assign('/.auth/login/aad?post_login_redirect_uri=/')
     }
-  }, [authLoading, isAuthenticated])
+  }, [authLoading, authError, isAuthenticated])
 
   if (authLoading) {
     return <div className="flex h-svh items-center justify-center text-muted text-sm">Loading…</div>
+  }
+
+  if (authError) {
+    return (
+      <div
+        data-testid="auth-error"
+        className="flex h-svh items-center justify-center text-muted text-sm"
+      >
+        Couldn’t verify your session. Check your connection and reload.
+      </div>
+    )
   }
 
   if (!isAuthenticated) {
