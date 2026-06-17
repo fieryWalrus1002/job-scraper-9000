@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -214,6 +214,17 @@ export default function JobTable({
 
   const dragCol = useRef<string | null>(null)
   const isResizing = useRef(false)
+  // mouseup listeners added during a column resize self-remove on release, but
+  // if the component unmounts mid-resize that release never fires and the
+  // listener leaks. Track each removal fn so unmount can clear any in flight.
+  const resizeCleanups = useRef<Set<() => void>>(new Set())
+  useEffect(() => {
+    const cleanups = resizeCleanups.current
+    return () => {
+      cleanups.forEach((remove) => remove())
+      cleanups.clear()
+    }
+  }, [])
   const totalPages = total && total > 0 ? Math.ceil(total / pageSize) : 0
 
   if (items.length === 0) {
@@ -244,7 +255,10 @@ export default function JobTable({
                     const reset = () => {
                       isResizing.current = false
                       window.removeEventListener('mouseup', reset)
+                      resizeCleanups.current.delete(remove)
                     }
+                    const remove = () => window.removeEventListener('mouseup', reset)
+                    resizeCleanups.current.add(remove)
                     window.addEventListener('mouseup', reset)
                   }
                   return (
