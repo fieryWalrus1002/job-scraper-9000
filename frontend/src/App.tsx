@@ -7,12 +7,12 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom'
-import { useJobs } from './hooks/useJobs'
+import { useJobs, PAGE_SIZE } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
 import { filtersFromParams, filtersToParams } from './lib/filters'
-import type { Application, ApplicationStatus, Filters, JobSummary } from './types'
+import type { Application, ApplicationStatus, Filters } from './types'
 import { AppHeader, type FunnelPath } from './components/AppHeader'
 import FilterPane from './components/FilterPane'
 import JobTable from './components/JobTable'
@@ -63,7 +63,6 @@ function AppShell({ email }: { email: string }) {
   const location = useLocation()
   const navigate = useNavigate()
   const filters = filtersFromParams(urlParams)
-  const [search, setSearch] = useState('')
   const [selectedJob, setSelectedJob] = useState<{
     hash: string
     path: string
@@ -73,12 +72,24 @@ function AppShell({ email }: { email: string }) {
   const [paneOpen, setPaneOpen] = useState(true)
   const [addJobOpen, setAddJobOpen] = useState(false)
 
-  const { data, isLoading, isError, error } = useJobs(filters)
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError, error } = useJobs(filters, page)
+
+  // Clamp page when total shrinks (e.g. jobs deleted, reindexed) so we don't
+  // sit on an empty page while results exist on earlier pages. Adjusting state
+  // during render (guarded) is React's recommended pattern here — it re-renders
+  // before paint, avoiding the cascading-render an effect would cause.
+  if (data?.total && data.total > 0) {
+    const maxPage = Math.ceil(data.total / PAGE_SIZE) - 1
+    if (page > maxPage) setPage(maxPage)
+  }
+
   const { visible, toggle } = useColumnConfig()
   const { data: applications } = useApplications()
 
   function setFilters(next: Filters) {
     setUrlParams(filtersToParams(next))
+    setPage(0)
   }
 
   const currentPath = normalizePath(location.pathname)
@@ -91,14 +102,11 @@ function AppShell({ email }: { email: string }) {
     setSelectedJob({ hash, path: currentPath, surface, applicationSnapshot })
   }
 
-  const allItems = data?.items ?? []
-  const filteredItems = filterJobsBySearch(allItems, search)
-
   const allApplications = Array.from(applications?.values() ?? [])
   const shortlistCount = countStatuses(allApplications, SHORTLIST_STATUSES)
   const trackingCount = countStatuses(allApplications, TRACKING_STATUSES)
   const trashCount = countStatuses(allApplications, TRASH_STATUSES)
-  const jobsCount = search ? filteredItems.length : data?.total
+  const jobsCount = data?.total
 
   const tabCounts: Record<FunnelPath, number | undefined> = {
     '/trash': trashCount,
@@ -124,9 +132,7 @@ function AppShell({ email }: { email: string }) {
               >
                 <FilterPane
                   filters={filters}
-                  search={search}
                   onFiltersChange={setFilters}
-                  onSearchChange={setSearch}
                   visibleColumns={visible}
                   onToggleColumn={toggle}
                   total={jobsCount}
@@ -165,10 +171,14 @@ function AppShell({ email }: { email: string }) {
                   )}
                   {!isLoading && !isError && (
                     <JobTable
-                      items={filteredItems}
+                      items={data?.items ?? []}
                       visibleColumns={visible}
                       onSelect={(hash) => selectCurrentJob(hash, 'jobs')}
                       applications={applications}
+                      page={page}
+                      pageSize={PAGE_SIZE}
+                      total={data?.total}
+                      onPageChange={setPage}
                     />
                   )}
                 </>
@@ -234,15 +244,6 @@ function AppShell({ email }: { email: string }) {
 
 function countStatuses(applications: Application[], statuses: ApplicationStatus[]): number {
   return applications.filter((app) => statuses.includes(app.status)).length
-}
-
-function filterJobsBySearch(items: JobSummary[], search: string): JobSummary[] {
-  const needle = search.trim().toLowerCase()
-  if (!needle) return items
-  return items.filter((j) => {
-    const hay = `${j.title ?? ''} ${j.company ?? ''} ${j.score_rationale ?? ''}`.toLowerCase()
-    return hay.includes(needle)
-  })
 }
 
 function normalizePath(pathname: string): string {

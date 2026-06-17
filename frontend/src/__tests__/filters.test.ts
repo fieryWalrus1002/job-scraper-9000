@@ -9,9 +9,10 @@ describe('filtersFromParams', () => {
 
   it('maps scalar params to filter fields', () => {
     const p = new URLSearchParams(
-      'minScore=3&maxScore=5&from=2024-01-01&to=2024-12-31&co=Acme&salMin=100',
+      'q=engineer&minScore=3&maxScore=5&from=2024-01-01&to=2024-12-31&co=Acme&salMin=100',
     )
     expect(filtersFromParams(p)).toEqual({
+      search: 'engineer',
       minScore: '3',
       maxScore: '5',
       remoteClassification: [],
@@ -30,6 +31,7 @@ describe('filtersFromParams', () => {
   it('defaults missing scalar params to empty string', () => {
     const p = new URLSearchParams('rc=hybrid')
     const f = filtersFromParams(p)
+    expect(f.search).toBe('')
     expect(f.minScore).toBe('')
     expect(f.company).toBe('')
   })
@@ -57,6 +59,7 @@ describe('filtersToParams', () => {
 describe('filtersFromParams / filtersToParams round-trip', () => {
   it('round-trips a fully-populated filter', () => {
     const original: Filters = {
+      search: 'engineer',
       minScore: '2',
       maxScore: '4',
       remoteClassification: ['fully_remote', 'hybrid'],
@@ -75,6 +78,7 @@ describe('hasActiveFilters', () => {
   })
 
   it('returns true when any scalar field is set', () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, search: 'engineer' })).toBe(true)
     expect(hasActiveFilters({ ...EMPTY_FILTERS, minScore: '3' })).toBe(true)
     expect(hasActiveFilters({ ...EMPTY_FILTERS, company: 'Acme' })).toBe(true)
     expect(hasActiveFilters({ ...EMPTY_FILTERS, minSalaryK: '100' })).toBe(true)

@@ -50,8 +50,13 @@ function parseValidationErrors(detail: FastApiDetailItem[]): FieldErrors {
   return fields
 }
 
-export async function fetchJobs(filters: Filters): Promise<JobListResponse> {
+export async function fetchJobs(
+  filters: Filters,
+  page: number,
+  pageSize: number,
+): Promise<JobListResponse> {
   const params = new URLSearchParams()
+  if (filters.search) params.set('search', filters.search)
   if (filters.minScore) params.set('min_score', filters.minScore)
   if (filters.maxScore) params.set('max_score', filters.maxScore)
   filters.remoteClassification.forEach((v) => params.append('remote_classification', v))
@@ -59,7 +64,8 @@ export async function fetchJobs(filters: Filters): Promise<JobListResponse> {
   if (filters.maxPostedAt) params.set('max_posted_at', filters.maxPostedAt)
   if (filters.company) params.set('company', filters.company)
   if (filters.minSalaryK) params.set('min_salary_usd', String(Number(filters.minSalaryK) * 1000))
-  params.set('limit', '1000')
+  params.set('limit', String(pageSize))
+  params.set('offset', String(page * pageSize))
 
   const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`)
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
