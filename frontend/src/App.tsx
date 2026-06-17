@@ -105,6 +105,13 @@ function AppShell({ email }: { email: string }) {
   const { visible, toggle } = useColumnConfig()
   const { data: applications } = useApplications()
 
+  // Jobs is the untriaged surface: the moment a job gains any application row
+  // (trashed, shortlisted, tracked) it belongs to another tab, so drop it from
+  // the feed right away rather than waiting for the next jobs refetch. The jobs
+  // query is intentionally not invalidated on triage (avoids a loading flash),
+  // so we filter client-side; Undo deletes the row and the job reappears here.
+  const untriagedJobs = (data?.items ?? []).filter((j) => !applications?.has(j.dedup_hash))
+
   function setFilters(next: Filters, opts?: { replace?: boolean }) {
     // The debounced search path passes replace:true so settling keystrokes
     // don't each stack a browser-history entry. Sort lives in the same URL, so
@@ -201,14 +208,14 @@ function AppShell({ email }: { email: string }) {
                   {!isLoading && !isError && (
                     <ErrorBoundary label="Jobs" resetKeys={[currentPath]}>
                       <JobTable
-                        items={data?.items ?? []}
+                        items={untriagedJobs}
                         visibleColumns={visible}
                         onSelect={(hash) =>
                           selectCurrentJob(
                             hash,
                             'jobs',
                             undefined,
-                            data?.items.find((j) => j.dedup_hash === hash),
+                            untriagedJobs.find((j) => j.dedup_hash === hash),
                           )
                         }
                         applications={applications}

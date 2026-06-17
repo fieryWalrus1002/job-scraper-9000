@@ -207,6 +207,66 @@ describe('App auth gate', () => {
     })
   })
 
+  it('hides already-triaged jobs from the Jobs feed', async () => {
+    vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
+      userId: 'u1',
+      userDetails: 'test@example.com',
+      userRoles: ['authenticated'],
+    })
+
+    const summary = (dedup_hash: string, title: string) => ({
+      dedup_hash,
+      source: 'linkedin',
+      source_url: 'https://example.com/job',
+      title,
+      company: 'Acme',
+      location: 'Remote',
+      posted_at: '2026-01-15',
+      remote_classification: 'fully_remote',
+      salary_min_usd: null,
+      salary_max_usd: null,
+      salary_period: null,
+      fit_score: 4,
+      confidence: 'high',
+      score_rationale: 'Looks relevant.',
+      failure_reason: null,
+      scored_at: '2026-01-16T00:00:00Z',
+    })
+    // hash-a is shortlisted (has an application row); the backend would already
+    // exclude it on a fresh fetch, but the jobs query isn't refetched on triage
+    // (#345), so the feed must filter it out client-side.
+    const triagedApp = {
+      dedup_hash: 'hash-a',
+      status: 'maybe',
+      applied_at: null,
+      notes: null,
+      created_at: '2026-01-16T00:00:00Z',
+      updated_at: '2026-01-16T00:00:00Z',
+      title: 'Triaged Role',
+      company: 'Acme',
+    }
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url === '/api/applications') {
+          return Promise.resolve(new Response(JSON.stringify([triagedApp]), { status: 200 }))
+        }
+        if (url.startsWith('/api/jobs?')) {
+          const items = [summary('hash-a', 'Triaged Role'), summary('hash-b', 'Untriaged Role')]
+          return Promise.resolve(new Response(JSON.stringify({ items, total: 2 }), { status: 200 }))
+        }
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+      }),
+    )
+
+    renderApp(['/jobs'])
+
+    expect(await screen.findByText('Untriaged Role')).toBeInTheDocument()
+    expect(screen.queryByText('Triaged Role')).not.toBeInTheDocument()
+  })
+
   it('redirects unknown paths to jobs', async () => {
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
       userId: 'u1',
