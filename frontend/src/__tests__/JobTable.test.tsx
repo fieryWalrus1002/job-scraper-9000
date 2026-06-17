@@ -21,6 +21,10 @@ function renderJobTable(applications?: Map<string, Application>) {
       visibleColumns={new Set(['fit_score', 'title', 'company', 'location', 'posted_at'])}
       onSelect={vi.fn()}
       applications={applications}
+      page={0}
+      pageSize={50}
+      total={1}
+      onPageChange={vi.fn()}
     />,
     { wrapper: makeWrapper() },
   )

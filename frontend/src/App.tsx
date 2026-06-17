@@ -7,7 +7,7 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom'
-import { useJobs } from './hooks/useJobs'
+import { useJobs, PAGE_SIZE } from './hooks/useJobs'
 import { useColumnConfig } from './hooks/useColumnConfig'
 import { useApplications } from './hooks/useApplications'
 import { useAuth } from './hooks/useAuth'
@@ -73,12 +73,14 @@ function AppShell({ email }: { email: string }) {
   const [paneOpen, setPaneOpen] = useState(true)
   const [addJobOpen, setAddJobOpen] = useState(false)
 
-  const { data, isLoading, isError, error } = useJobs(filters)
+  const [page, setPage] = useState(0)
+  const { data, isLoading, isError, error } = useJobs(filters, page)
   const { visible, toggle } = useColumnConfig()
   const { data: applications } = useApplications()
 
   function setFilters(next: Filters) {
     setUrlParams(filtersToParams(next))
+    setPage(0)
   }
 
   const currentPath = normalizePath(location.pathname)
@@ -93,6 +95,11 @@ function AppShell({ email }: { email: string }) {
 
   const allItems = data?.items ?? []
   const filteredItems = filterJobsBySearch(allItems, search)
+
+  function handleSearchChange(s: string) {
+    setSearch(s)
+    setPage(0)
+  }
 
   const allApplications = Array.from(applications?.values() ?? [])
   const shortlistCount = countStatuses(allApplications, SHORTLIST_STATUSES)
@@ -126,7 +133,7 @@ function AppShell({ email }: { email: string }) {
                   filters={filters}
                   search={search}
                   onFiltersChange={setFilters}
-                  onSearchChange={setSearch}
+                  onSearchChange={handleSearchChange}
                   visibleColumns={visible}
                   onToggleColumn={toggle}
                   total={jobsCount}
@@ -169,6 +176,10 @@ function AppShell({ email }: { email: string }) {
                       visibleColumns={visible}
                       onSelect={(hash) => selectCurrentJob(hash, 'jobs')}
                       applications={applications}
+                      page={page}
+                      pageSize={PAGE_SIZE}
+                      total={data?.total}
+                      onPageChange={setPage}
                     />
                   )}
                 </>

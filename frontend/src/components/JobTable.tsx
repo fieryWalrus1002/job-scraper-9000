@@ -2,7 +2,6 @@ import { useRef, useState, type ReactNode } from 'react'
 import {
   flexRender,
   getCoreRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnOrderState,
@@ -23,13 +22,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const PAGE_SIZE = 50
-
 interface Props {
   items: JobSummary[]
   visibleColumns: Set<string>
   onSelect: (hash: string) => void
   applications?: Map<string, Application>
+  page: number
+  pageSize: number
+  total: number | undefined
+  onPageChange: (page: number) => void
 }
 
 interface ContextState {
@@ -170,9 +171,17 @@ function QuickMark({ dedupHash, current }: { dedupHash: string; current: string 
 
 // ── Main component ──────────────────────────────────────────────────────────
 
-export default function JobTable({ items, visibleColumns, onSelect, applications }: Props) {
+export default function JobTable({
+  items,
+  visibleColumns,
+  onSelect,
+  applications,
+  page,
+  pageSize,
+  total,
+  onPageChange,
+}: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'fit_score', desc: true }])
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: PAGE_SIZE })
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(loadColumnOrder)
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(loadColumnSizing)
   const [ctx, setCtx] = useState<ContextState | null>(null)
@@ -186,9 +195,8 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
   const table = useReactTable({
     data: items,
     columns: tableColumns,
-    state: { sorting, pagination, columnOrder, columnSizing, columnVisibility },
+    state: { sorting, columnOrder, columnSizing, columnVisibility },
     onSortingChange: setSorting,
-    onPaginationChange: setPagination,
     getRowId: (row) => row.dedup_hash,
     onColumnOrderChange: (updater) => {
       setColumnOrder((prev) => {
@@ -206,14 +214,12 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode: 'onChange',
   })
 
   const dragCol = useRef<string | null>(null)
   const isResizing = useRef(false)
-  const { pageIndex } = table.getState().pagination
-  const totalPages = table.getPageCount()
+  const totalPages = total ? Math.ceil(total / pageSize) : 1
 
   if (items.length === 0) {
     return (
@@ -317,7 +323,7 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
             {table.getRowModel().rows.map((row, i) => {
               const job = row.original
               const appStatus = applications?.get(job.dedup_hash)?.status
-              const rank = pageIndex * PAGE_SIZE + i + 1
+              const rank = page * pageSize + i + 1
               return (
                 <tr
                   key={row.id}
@@ -375,37 +381,37 @@ export default function JobTable({ items, visibleColumns, onSelect, applications
           <Button
             variant="secondary"
             size="icon-sm"
-            onClick={() => table.setPageIndex(0)}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => onPageChange(0)}
+            disabled={page === 0}
           >
             «
           </Button>
           <Button
             variant="secondary"
             size="icon-sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 0}
           >
             ‹
           </Button>
           <span className="text-[12px] text-muted px-3 font-mono tabular-nums">
-            <span className="text-fg">{pageIndex + 1}</span>
+            <span className="text-fg">{page + 1}</span>
             <span className="text-faint mx-1">/</span>
             {totalPages}
           </span>
           <Button
             variant="secondary"
             size="icon-sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages - 1}
           >
             ›
           </Button>
           <Button
             variant="secondary"
             size="icon-sm"
-            onClick={() => table.setPageIndex(totalPages - 1)}
-            disabled={!table.getCanNextPage()}
+            onClick={() => onPageChange(totalPages - 1)}
+            disabled={page >= totalPages - 1}
           >
             »
           </Button>
