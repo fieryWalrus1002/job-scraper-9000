@@ -96,3 +96,7 @@ data/run_telemetry/
 # Legacy pre-Phase-15 location (now data/pipeline_runs/ + data/user_configs/);
 # kept ignored so stale local artifacts here are never committed.
 runs/
+
+# gmail stuff for email scraper module
+config/email_scraper/secrets/
+data/emails/

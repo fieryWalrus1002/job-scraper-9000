@@ -6,7 +6,9 @@ from agents.remote_filter import cli as remote_filter_cli
 from agents.skills_fit import cli as skills_fit_cli
 from job_scraper import cli as job_scraper_cli
 from prefilter import cli as prefilter_cli
+from email_scraper import enrich_cli as email_enrich_cli
 from ingest import cli as ingest_cli
+from pipeline import email_overnight as email_overnight_cli
 from pipeline import overnight as overnight_cli
 
 
@@ -24,6 +26,8 @@ def main() -> None:
     skills_fit_cli.register(sub)
     ingest_cli.register(sub)
     overnight_cli.register(sub)
+    email_overnight_cli.register(sub)
+    email_enrich_cli.register(sub)
 
     args = parser.parse_args()
     args.func(args)

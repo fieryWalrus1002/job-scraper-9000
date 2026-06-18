@@ -24,6 +24,26 @@ run-overnight:
     DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
         uv run job-scraper-9000 overnight --run-date "$(date +%F)"
 
+# Local-only email pipeline: enrich ZR alert emails (via your Chrome profile) and
+# run them through the SAME stages as run-overnight, producing a per-user
+# scored.jsonl under the same run layout. Lands in the same place: follow with
+# `just upload-blob <run-id>`. Chrome MUST be closed (profile lock). USER_EMAIL is
+# the provisioned user to score for.
+run-email USER_EMAIL:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
+        uv run job-scraper-9000 email-overnight --run-date "$(date +%F)" --user-email {{USER_EMAIL}}
+
+# Score half of the seam: run a pre-enriched enriched.jsonl (from `email-enrich` on
+# any worker, or a recovered run's scrape file) through consolidate/classify/score —
+# no re-enrichment. Lands in the same place: follow with `just upload-blob <run-id>`.
+score-email USER_EMAIL ENRICHED:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
+        uv run job-scraper-9000 email-overnight --run-date "$(date +%F)" --user-email {{USER_EMAIL}} --enriched-input {{ENRICHED}}
+
 sync-types:
     uv run scripts/export_openapi.py --out frontend/openapi.json
     cd frontend && npx --no-install openapi-typescript openapi.json -o src/schema.gen.ts

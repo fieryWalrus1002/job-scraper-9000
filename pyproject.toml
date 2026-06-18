@@ -20,6 +20,12 @@ dependencies = [
     "alembic>=1.16.0",
     "sqlalchemy>=2.0.0",
     "azure-storage-blob>=12.0.0",
+    "google-api-python-client>=2.197.0",
+    "google-auth-httplib2>=0.4.0",
+    "google-auth-oauthlib>=1.4.0",
+    "curl-cffi>=0.15.0",
+    "playwright>=1.60.0",
+    "playwright-stealth>=2.0.3",
 ]
 
 [project.scripts]
@@ -43,6 +49,7 @@ packages = [
     "src/review_ui",
     "src/user_config",
     "src/utils",
+    "src/email_scraper"
 ]
 
 [tool.hatch.build.targets.wheel.force-include]

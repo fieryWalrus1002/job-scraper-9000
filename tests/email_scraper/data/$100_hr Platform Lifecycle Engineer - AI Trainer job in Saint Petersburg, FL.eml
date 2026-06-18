@@ -1,0 +1,1770 @@
+Delivered-To: woodmagnus@gmail.com
+Received: by 2002:a05:6021:421b:b0:775:614c:2f60 with SMTP id rh27csp1104718wdb;
+        Wed, 17 Jun 2026 13:49:39 -0700 (PDT)
+X-Received: by 2002:a05:6a00:2e19:b0:842:684e:b3b6 with SMTP id d2e1a72fcca58-8453b1721b3mr269794b3a.4.1781729379366;
+        Wed, 17 Jun 2026 13:49:39 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1781729379; cv=none;
+        d=google.com; s=arc-20240605;
+        b=FBttjU3pFTRD7fZWlIAhadBAtIigRRCx/7KD24Ow00DI3mqVeWuphqTIoPXyY2Untw
+         y6d0LQGqZuUaa6UWU1PctEIbMFyTpZwQx0CMdKtmECj68cHk+D7Am07ikjDSVaZ2CeO5
+         6zG39nzM7rTQGkaAaaX9fVCaOSpnrokXZhvI2ClbTJLfSIM9Nwg+50P/36qxQ9zG1HCo
+         KqHKw8O1HsO/oRFi58mxIbWgYlRRrBnGYC4f0+UIeyNKgCb7dO+NHZ94haSTuYaTdlrs
+         Ggy7G3qL84wlppoqS7bEmBB7kn3e7EFozw74nqpK/4uF1KQCrTXyAdHFa90R6UgUWAyb
+         +PXA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=message-id:feedback-id:list-id:list-unsubscribe-post
+         :list-unsubscribe:to:from:subject:mime-version:date:sender
+         :dkim-signature:dkim-signature;
+        bh=j7mQTd7Wm5nnV7jcI7dJ5arDqadexPAy3GblNptPo2Y=;
+        fh=KPjKAQBj/92rRfUnbnhSTIBhbXPzgqjpaq4Y0wU9g2U=;
+        b=iza2bOgedPUOLxPo7SFKoNCfNPLVQnyb5VNVYeJ1/4slgniDLr7H+fbiecfNwZqHHi
+         L8cebwSb3fGhSv2J+cHTjg1bmEExlC1kzn8kmJ6x+h5ZlUoSKWAPh5PWajKfCSkQ3/lP
+         8oP3YXIa7jGbr+VJ97/Fn8oQo+6qgsYDz5MWNcEvQJYSzMkaNBwn/0H0RdLQ1cVPse92
+         V5pU98JQlm8Bwp2Qz2YmwrGZC88UQ/FM85kg7uzO9Bsco/flj3QevhswVh5NtMIE/B6Y
+         vFCbb/56YXZf4NuXp6kAOPh6UQDAXZBCL9XIlVNISdSExJoXxg1UdEKpSb5VZts/mQ90
+         THMQ==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@mg.ziprecruiter.com header.s=pdk2 header.b=ChHfQ44U;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=nXqyKEli;
+       spf=pass (google.com: domain of bounce+bf0fda.2ba27-woodmagnus=gmail.com@mg.ziprecruiter.com designates 161.38.201.109 as permitted sender) smtp.mailfrom="bounce+bf0fda.2ba27-woodmagnus=gmail.com@mg.ziprecruiter.com";
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=ziprecruiter.com
+Return-Path: <bounce+bf0fda.2ba27-woodmagnus=gmail.com@mg.ziprecruiter.com>
+Received: from v5109.v5075e2e3.usw1.send.mailgun.net (v5109.v5075e2e3.usw1.send.mailgun.net. [161.38.201.109])
+        by mx.google.com with UTF8SMTPS id d2e1a72fcca58-8434afa04besi40301831b3a.180.2026.06.17.13.49.38
+        for <woodmagnus@gmail.com>
+        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+        Wed, 17 Jun 2026 13:49:39 -0700 (PDT)
+Received-SPF: pass (google.com: domain of bounce+bf0fda.2ba27-woodmagnus=gmail.com@mg.ziprecruiter.com designates 161.38.201.109 as permitted sender) client-ip=161.38.201.109;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@mg.ziprecruiter.com header.s=pdk2 header.b=ChHfQ44U;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=nXqyKEli;
+       spf=pass (google.com: domain of bounce+bf0fda.2ba27-woodmagnus=gmail.com@mg.ziprecruiter.com designates 161.38.201.109 as permitted sender) smtp.mailfrom="bounce+bf0fda.2ba27-woodmagnus=gmail.com@mg.ziprecruiter.com";
+       dmarc=pass (p=QUARANTINE sp=QUARANTINE dis=NONE) header.from=ziprecruiter.com
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=mg.ziprecruiter.com; q=dns/txt; s=pdk2; t=1781729378; x=1781736578;
+ h=Message-Id: List-Id: List-Unsubscribe-Post: List-Unsubscribe: To: To: From: From: Subject: Subject: Content-Type: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=j7mQTd7Wm5nnV7jcI7dJ5arDqadexPAy3GblNptPo2Y=;
+ b=ChHfQ44U2fcW6cK65D93E7Xro1blgQiSWG6zxvBSzX3JdQYL7fXoTgzZl9vKJI2wnTMqKa0aHt9ovF1/Tw59V0qtKvfnM5c/5V8GmpGfq7Lk4hXnz8GP1ut0fnnhBpKIbw/AH/4PcTuj3KWqjUB4xWOUAeZSPD1MAZiMKayqt95BpqxjP3r4S7Gtxv+aceVHcirUodXKpbxqOosVMZ9hw/5XZ3FiEZIXdH5US0GwKGAFl/PvwLDhJ5AbtTJeGBJmzmPbZQhAybR2MVTmE6H8t8RDNH4vFKQ7IE9gVLJUZ9vk0I4zoI6jjAMZHbP8tkC72YiHMUxOMLVcGoDB9U9wdQ==
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=mailgun.org; q=dns/txt; s=mg; t=1781729378; x=1781736578;
+ h=Message-Id: List-Id: List-Unsubscribe-Post: List-Unsubscribe: To: To: From: From: Subject: Subject: Content-Type: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=j7mQTd7Wm5nnV7jcI7dJ5arDqadexPAy3GblNptPo2Y=;
+ b=nXqyKEliO8j5nVhGKiZXYwJv7NEFaRBMFQEKQMThMDDbrOK4ZKz8MTWjkUF8kimfFTPZB4uvmcQ57VWi4LA7XvRQ8nuVvvt6xdL+9km1vhQ4seiqRgmOARXguEF47AXzcm55y9vyscux5iNDB5Ih5kmEuIpZ3CFByqRsjLzYB0A=
+X-Mailgun-Sid: WyJiZDJiNSIsIndvb2RtYWdudXNAZ21haWwuY29tIiwiMmJhMjciXQ==
+X-Feedback-Id: postmaster@mg.ziprecruiter.com:templateclass=job_alert_candidate_ziprecruiter-platform-email:605394984488ec639d14149e:mailgun
+Received: by f2f9475cb71a7834449111adf3aeb8f9bdbc486a649fa9d966c080dd60dd649c with HTTP
+ id 6a330862a581e8cffef3dd41; Wed, 17 Jun 2026 20:49:38 GMT
+X-Mailgun-Sending-Ip: 161.38.201.109
+Sender: alerts=ziprecruiter.com@mg.ziprecruiter.com
+Date: Wed, 17 Jun 2026 20:49:38 +0000
+Mime-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="30bb290e2c4110740410f47d21cebe0133ac356987a44525a4118508a921"
+Subject: $100/hr Platform Lifecycle Engineer - AI Trainer job in Saint Petersburg, FL
+From: ZipRecruiter <alerts@ziprecruiter.com>
+To: woodmagnus@gmail.com
+X-Mailgun-Tag: templateclass=job_alert_candidate_ziprecruiter
+X-Mailgun-Tag: platform-email
+List-Unsubscribe: <https://www.ziprecruiter.com/candidate/one-click-unsubscribe/78b9a631/job_alert_candidate_ziprecruiter/5u_1781729378_-8M75RK0MNj6UbdKujLBWN_vA2KJETb4uW2s5yCOhz0/1786913378>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Id: <job_alerts.ziprecruiter.com>
+Feedback-Id: job_alerts:job_alert_candidate_ziprecruiter:mg.ziprecruiter.com:js_ziprecruiter
+X-Mailgun-Variables: {"zr_message_id": "7e6248b8-e2dd-4d15-9381-26b73b583beb"}
+Message-Id: <20260617204938.7458a2874b1825cf@mg.ziprecruiter.com>
+
+--30bb290e2c4110740410f47d21cebe0133ac356987a44525a4118508a921
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset="utf-8"
+
+ <https://www.ziprecruiter.com/km/AAFoPWmBLuZL_x7xxT7ctTQ-JDpBJj1iNzmHwD53B=
+FsTGs5x-wJTbvwnwJIHIIBgyKOhOt6Lb8m6Ufi953vi8x0j_7EmRWYi9quDXAGjCsW1SAx4GTbr=
+8xOOKDfBfS7L3z9MQ7FuWmt1MCpni1gvtvJv5OvMhdrOhpapRBtYbVxTAaJw6vGvVNPSfgh3oHI=
+8TWkJH1MUNQx13KoAvxch7kglbWKfjRBI-sXqoDZzwwQls_S5htnYH4d-u8Q38pGJgAjRCALq3h=
+TgYztqMLayVa2LUmWi7bKZ3tF3myR1PHrVCs8fzjZPpYH70sbcGRzFXzk-4HaePir4O08gx2QHx=
+Kfh5e-81QWlkvN9BEmA7rU5_Yv_wD4L__M?tsid=3D111000153>
+
+Hi Magnus,
+ Here are today's jobs recommended for you:=20
+ Back End Developer - Mid-level - TS/SCI Clearance Required  <https://www.z=
+iprecruiter.com/km/AAHNPG4aWXUL4zakNj7UbZ9cQ2uhA8F9CE9qiKO6Ag7sV7O1gEnyxLr_=
+CuuvZJ1nOsyRJBA2OFKTdsHUkFAWd4KqVxHSbjHgUYQdWQfJqKIzixSpYPCR5N5b8WXkG7E-OWm=
+2zzbPSQ7OB60RvabcxBf_ljsQfIyp1p9C075XS3Hgqzva-65jDJx-mOFpDjrFKeIojevHQCI9bt=
+L4NJJEmkWiKyzTpyenNeIyUiBXdJMe0nrqrn1EdTZy5u7quekax74JewRXQ5--d5ce4bbOv_Pmo=
+8ulDxXVdlr6t4vI5ij8rmzddRt0QIJft9MvMn0nppTLGG7DaSHWag3QO951SeS-Dw5-Ze3PBNsW=
+WjgZ4BMA6zcYNQwwOgkDfyduCw4w2XW7tYlReolv?tsid=3D111000153&auth_token=3D5_17=
+81729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&=
+expires=3D1782074978>
+
+Maximus
+
+$100K - $145K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAHNPG4aWXUL4zakNj7UbZ9cQ2u=
+hA8F9CE9qiKO6Ag7sV7O1gEnyxLr_CuuvZJ1nOsyRJBA2OFKTdsHUkFAWd4KqVxHSbjHgUYQdWQ=
+fJqKIzixSpYPCR5N5b8WXkG7E-OWm2zzbPSQ7OB60RvabcxBf_ljsQfIyp1p9C075XS3Hgqzva-=
+65jDJx-mOFpDjrFKeIojevHQCI9btL4NJJEmkWiKyzTpyenNeIyUiBXdJMe0nrqrn1EdTZy5u7q=
+uekax74JewRXQ5--d5ce4bbOv_Pmo8ulDxXVdlr6t4vI5ij8rmzddRt0QIJft9MvMn0nppTLGG7=
+DaSHWag3QO951SeS-Dw5-Ze3PBNsWWjgZ4BMA6zcYNQwwOgkDfyduCw4w2XW7tYlReolv?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer  <https://www.ziprecruiter.com/km/AAFsV93Qs3PDlA=
+Ntj--AfjvfdMj_OcXGx68K6mYZLyKr85BFOAOQui0v4EmpA2lHI4ppFYOO-t4XW9VUVztaVNXEB=
+u6j4XWxzea2Zf0n-RPk_avOmtd5cBPqWzmO7SXh-To81ukJzlZFcRn1Zn3MBEdWnZUZve_Zsitl=
+ak4OD4eYSCtBipQAsWNu4qFDk7kgnYCfCYJUdqAOJR75jeZlraYaUWTXMJzUOdgMH8ROz3dQSKM=
+NWfoa9Ct4H_d0khQkMHxOq6Ao6x6KSjGrSj3VYHIM1K1lFh57NM8Sb3IKwjGfrEZrEm7ie6WvPC=
+NnLyH5acJiQyHWv5rYO-BxJ0VMbEzn_8KpgYafsV4XrAgSWGKemsRupJHBRRb3vKCr5T1WB6jF7=
+tiNrkVS?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtB=
+AOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+HADRIAN =E2=80=A2 Los Angeles, CA
+
+$160K - $250K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAFsV93Qs3PDlANtj--AfjvfdMj=
+_OcXGx68K6mYZLyKr85BFOAOQui0v4EmpA2lHI4ppFYOO-t4XW9VUVztaVNXEBu6j4XWxzea2Zf=
+0n-RPk_avOmtd5cBPqWzmO7SXh-To81ukJzlZFcRn1Zn3MBEdWnZUZve_Zsitlak4OD4eYSCtBi=
+pQAsWNu4qFDk7kgnYCfCYJUdqAOJR75jeZlraYaUWTXMJzUOdgMH8ROz3dQSKMNWfoa9Ct4H_d0=
+khQkMHxOq6Ao6x6KSjGrSj3VYHIM1K1lFh57NM8Sb3IKwjGfrEZrEm7ie6WvPCNnLyH5acJiQyH=
+Wv5rYO-BxJ0VMbEzn_8KpgYafsV4XrAgSWGKemsRupJHBRRb3vKCr5T1WB6jF7tiNrkVS?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Research Scientist - Communications, Networks, Cybersecurity, AI/ML  <http=
+s://www.ziprecruiter.com/km/AAHRCXDqypUpcOl7iHP3NkHoxhQMEhd6uu0mBGrsAsUlJ5j=
+WzlPUhoqU3SiE5GrubhXtcVlzXJ6icbMFyaKGPnELDo6KhZ-G1Oir-PoidG3mFktr7GjOudvtrN=
+uH4MJblGUrGVzIA22Ungzl8czWBZ9ogGuK34QKkHkxcKg8n8j16V0RXlU0LW9GY8LSt2iqrT_eZ=
+-EafWN2NK2DeHDeOQoAlMvv3dlP_auy2OWWMUk-ZNcYpPuQIpLmEj48DecjO-G3s4i7_PnnZwkR=
+RrvC2hbiaBT87Clxs942-dN2_s28D7ibNXAggvWtcrkZRvUpNFmK1RoslY37Sn4z6_6DSV1xhK3=
+qqekzkaEkUBNHP4vPWSPx0te_tvhFuYYevtWHSq6Z95gs?tsid=3D111000153&auth_token=
+=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78=
+b9a631&expires=3D1782074978>
+
+Nexcepta, Inc =E2=80=A2 Gaithersburg, MD =E2=80=A2 Remote
+
+ View Details  <https://www.ziprecruiter.com/km/AAHRCXDqypUpcOl7iHP3NkHoxhQ=
+MEhd6uu0mBGrsAsUlJ5jWzlPUhoqU3SiE5GrubhXtcVlzXJ6icbMFyaKGPnELDo6KhZ-G1Oir-P=
+oidG3mFktr7GjOudvtrNuH4MJblGUrGVzIA22Ungzl8czWBZ9ogGuK34QKkHkxcKg8n8j16V0RX=
+lU0LW9GY8LSt2iqrT_eZ-EafWN2NK2DeHDeOQoAlMvv3dlP_auy2OWWMUk-ZNcYpPuQIpLmEj48=
+DecjO-G3s4i7_PnnZwkRRrvC2hbiaBT87Clxs942-dN2_s28D7ibNXAggvWtcrkZRvUpNFmK1Ro=
+slY37Sn4z6_6DSV1xhK3qqekzkaEkUBNHP4vPWSPx0te_tvhFuYYevtWHSq6Z95gs?tsid=3D11=
+1000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0=
+ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Platform Lifecycle Engineer - AI Trainer  <https://www.ziprecruiter.com/km=
+/AAHZLuwTtPdMPgdEjb5JCQvnU6GnsXDnMPDrX952k-CPGAaCm2dqeco6w97nqt8bluqwkf2oK_=
+0HTmw1AP3mJCypKuzmqnrS_srODYtrLaKAOlTdM5w6I4kUlNEmZtuKd19YlhhV-CkMVz3lOcNN3=
+hzNoa0fHNeJVQVeN1-PSMBokYXAluCFFBJuZgZ1bFt9SOAYTftBimKtckgxarrS70ejRO1vICMA=
+QBsVdM6mDwSr4IOry1kf46yupGEqp4PixWv1Nv6gveL9Il_kfa4MZAbTxl2KK8lhet_kuIRPZLq=
+lx0kLH-hZJUlHys5TxtsVF2v_LjuJTtEL-lPIjogGFNaKEz833vUkyz09Ya01KEvyMHXwwYpZZV=
+ydY7YWE7Oay2EJHYT-MZj_?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5Ijc=
+bfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D17820749=
+78>
+
+DataAnnotation =E2=80=A2 Saint Petersburg, FL =E2=80=A2 Remote
+
+$50 - $100 / hr
+
+ View Details  <https://www.ziprecruiter.com/km/AAHZLuwTtPdMPgdEjb5JCQvnU6G=
+nsXDnMPDrX952k-CPGAaCm2dqeco6w97nqt8bluqwkf2oK_0HTmw1AP3mJCypKuzmqnrS_srODY=
+trLaKAOlTdM5w6I4kUlNEmZtuKd19YlhhV-CkMVz3lOcNN3hzNoa0fHNeJVQVeN1-PSMBokYXAl=
+uCFFBJuZgZ1bFt9SOAYTftBimKtckgxarrS70ejRO1vICMAQBsVdM6mDwSr4IOry1kf46yupGEq=
+p4PixWv1Nv6gveL9Il_kfa4MZAbTxl2KK8lhet_kuIRPZLqlx0kLH-hZJUlHys5TxtsVF2v_Lju=
+JTtEL-lPIjogGFNaKEz833vUkyz09Ya01KEvyMHXwwYpZZVydY7YWE7Oay2EJHYT-MZj_?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ AI/ML Engineer  <https://www.ziprecruiter.com/km/AAHL4OHJUXWek8TTo0xinnvfN=
+Vea0F3zuByWqzNmNkM3D5-7I0bbC91NLlNV0itw_YpJ_HtvjRJQuooT_zobKjLSj7Uo8K08Q6AX=
+lqt_FKd3JKSYB3eUD0upEZ-q6s_pkYrVW0jbvqSW1rMyur7FnepO2k08mjaC7QyTUO6mAJ64QZj=
+kgdT8Dsu14a7uEyvjoTOc5LXB7vubOY0pd26cRQ3YPxYDhscYfqwklrCAn64tR88rmDspeHV2Ai=
+nua2hv2iY5HxTdJkhvfUZf1H9INVu6f_yqtrLrSQ4R1bUurABByJPlEls4glfm1B3D1VmO2p7j0=
+8TmlhbmHZcMddLPNQj57NMIUAiyvmB6FzHuQ5aM6M920OW_PKmN7UdzQb6fcB3qC2_S?tsid=3D=
+111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3L=
+P0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+VXForward =E2=80=A2 Washington, DC =E2=80=A2 Remote
+
+ View Details  <https://www.ziprecruiter.com/km/AAHL4OHJUXWek8TTo0xinnvfNVe=
+a0F3zuByWqzNmNkM3D5-7I0bbC91NLlNV0itw_YpJ_HtvjRJQuooT_zobKjLSj7Uo8K08Q6AXlq=
+t_FKd3JKSYB3eUD0upEZ-q6s_pkYrVW0jbvqSW1rMyur7FnepO2k08mjaC7QyTUO6mAJ64QZjkg=
+dT8Dsu14a7uEyvjoTOc5LXB7vubOY0pd26cRQ3YPxYDhscYfqwklrCAn64tR88rmDspeHV2Ainu=
+a2hv2iY5HxTdJkhvfUZf1H9INVu6f_yqtrLrSQ4R1bUurABByJPlEls4glfm1B3D1VmO2p7j08T=
+mlhbmHZcMddLPNQj57NMIUAiyvmB6FzHuQ5aM6M920OW_PKmN7UdzQb6fcB3qC2_S?tsid=3D11=
+1000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0=
+ao&contact_id=3D78b9a631&expires=3D1782074978>
+ GeoSCADA/Ignition Developer  <https://www.ziprecruiter.com/km/AAHtwZ0xpucY=
+Kge-x1pdkxexKiQ63qjKpRaf5slCikZOMXNaj2b5VwSFiBJlajoHYdAktvSkZiko-uzFJfsO8Hk=
+BdLQ50oYH5Or7rJcnxYZQcY_MTFwFyGmecfRFKGwP8QQuHtvP67lODGgMToxb5hUdjexICHO8yZ=
+LIcsxkemmadfJXN9VCpZ_gWkx0cyIczT7QKj6-GZy7XpJd2ToMk68ubhzkG7SYYbgxt0Yd_UbNA=
+YO2Fk4VppgegiZnRgZcwybQkdq6VOvPZvI7nz5y0dcVLf1GfvnbAoHI6Nh4QaIw9uYgQVGhH7xe=
+1UfTX6xc3xaOviwB3f8YWZJK0mB6IlRWsLDCw1oq0j98F3J0tdTziScHUKQCqY32S91gmixwK1M=
+4gWxd?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAO=
+c9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+COLEXAS DIGITAL INC =E2=80=A2 Houston, TX =E2=80=A2 Remote
+
+$80K - $140K / yr
+Be Seen First
+ View Details  <https://www.ziprecruiter.com/km/AAHtwZ0xpucYKge-x1pdkxexKiQ=
+63qjKpRaf5slCikZOMXNaj2b5VwSFiBJlajoHYdAktvSkZiko-uzFJfsO8HkBdLQ50oYH5Or7rJ=
+cnxYZQcY_MTFwFyGmecfRFKGwP8QQuHtvP67lODGgMToxb5hUdjexICHO8yZLIcsxkemmadfJXN=
+9VCpZ_gWkx0cyIczT7QKj6-GZy7XpJd2ToMk68ubhzkG7SYYbgxt0Yd_UbNAYO2Fk4VppgegiZn=
+RgZcwybQkdq6VOvPZvI7nz5y0dcVLf1GfvnbAoHI6Nh4QaIw9uYgQVGhH7xe1UfTX6xc3xaOviw=
+B3f8YWZJK0mB6IlRWsLDCw1oq0j98F3J0tdTziScHUKQCqY32S91gmixwK1M4gWxd?tsid=3D11=
+1000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0=
+ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer New Grad 2024-2025 -Remote  <https://www.ziprecr=
+uiter.com/km/AAHbh1o2Rk5aTrC-eUu6HhFJRnW3N3FbeIM1rNz1yplthBMADEDnHFrhYlciBG=
+izKckMCVBItmBzOv-O2IHDWp3QYBahwSlgBvpaKRDLJvyLN6d0ZANcshFtwP4c3rAnH7zYnHG6y=
+hbNx2gKCEAtl_FE6-w_3xQu0pyrEZJPyEkgS7LDhiIWFHoYh41bm0qQxJZ6IDh4W21PTBfyBHY2=
+D_rUqm31QHeYuAgXBOBdOsg94rUapodrVQexXezUrshqmFHuIlNOL5nv0JHmNzDWJMYHNF1jWpR=
+IURJMRrFhh1W7Q_ibftWe-HNFe0feRNA2rUBXKiEA39ayXkpI9NcCTINQSoOpUyK5ZmmVL_cb8j=
+wDvC1fLp2NXdsYc0RHbrNdGAtkuglUS5I?tsid=3D111000153&auth_token=3D5_178172937=
+8_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=
+=3D1782074978>
+
+Quora =E2=80=A2 Moscow, ID =E2=80=A2 Remote
+
+$140K - $168K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAHbh1o2Rk5aTrC-eUu6HhFJRnW=
+3N3FbeIM1rNz1yplthBMADEDnHFrhYlciBGizKckMCVBItmBzOv-O2IHDWp3QYBahwSlgBvpaKR=
+DLJvyLN6d0ZANcshFtwP4c3rAnH7zYnHG6yhbNx2gKCEAtl_FE6-w_3xQu0pyrEZJPyEkgS7LDh=
+iIWFHoYh41bm0qQxJZ6IDh4W21PTBfyBHY2D_rUqm31QHeYuAgXBOBdOsg94rUapodrVQexXezU=
+rshqmFHuIlNOL5nv0JHmNzDWJMYHNF1jWpRIURJMRrFhh1W7Q_ibftWe-HNFe0feRNA2rUBXKiE=
+A39ayXkpI9NcCTINQSoOpUyK5ZmmVL_cb8jwDvC1fLp2NXdsYc0RHbrNdGAtkuglUS5I?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer (PhD Intern)  <https://www.ziprecruiter.com/km/A=
+AFvW7hi7oO8TbFMMXvopmQKr9kV8UhOQ0KBj9NwWEY0Z9SO3F9DWJklzB0k1cSqoqOuUdu8mHZ-=
+WdV_XgfAz73M7WyTghDLombQoXi-sg8lV_4orwoMgXwtkJztgUaEHIqt6BLVRolX3Wd7x6D6mgC=
+6SWXbfqkDHrozFs5ieIloCosXM9rwiWqLejfrPvoPYlk1qNf5BOb5FemsfyhOek1OFZ7NLna3nm=
+gB2MV6hHZToQYcRFd-YSu_QOIE5wopzrL6Tj8-VZ1HVUII48oojmW6a-rM3HgH876uGM6M18Ghw=
+Jzf8uFVKTqJAG0WxeHGIXe4RVeiT5u15IdcKtjHVJESxDHLuA74SEm_dg4AZPqkTHuY0ElAoCGk=
+GXvOD-r-0ghOeleXDt8?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA=
+-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Instacart =E2=80=A2 Coeur D Alene, ID
+
+ View Details  <https://www.ziprecruiter.com/km/AAFvW7hi7oO8TbFMMXvopmQKr9k=
+V8UhOQ0KBj9NwWEY0Z9SO3F9DWJklzB0k1cSqoqOuUdu8mHZ-WdV_XgfAz73M7WyTghDLombQoX=
+i-sg8lV_4orwoMgXwtkJztgUaEHIqt6BLVRolX3Wd7x6D6mgC6SWXbfqkDHrozFs5ieIloCosXM=
+9rwiWqLejfrPvoPYlk1qNf5BOb5FemsfyhOek1OFZ7NLna3nmgB2MV6hHZToQYcRFd-YSu_QOIE=
+5wopzrL6Tj8-VZ1HVUII48oojmW6a-rM3HgH876uGM6M18GhwJzf8uFVKTqJAG0WxeHGIXe4RVe=
+iT5u15IdcKtjHVJESxDHLuA74SEm_dg4AZPqkTHuY0ElAoCGkGXvOD-r-0ghOeleXDt8?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer-Los Angeles,California  <https://www.ziprecruite=
+r.com/km/AAHCOzelMTtWhu_HYUSZPh_MuOsHwTF-WnFjf6DmwY80gAdNIjwG_LGgDLrdhcYSzA=
+FE0GsFuVo423pRKSQFmZaZbnI7o2GBSvk1ANmQuyyJ5zGyYVuNq9J7OmKVPtGttJBzsmEGSWRnc=
+qlJlFjuoyErJSke6WInvf7vDRTVqbuwfwxI-kzWeg1XQLYM-MatZqajQk3wfkP4gbxYrpXPc-WF=
+A-naw7seGrwOiQLN1oJTonX97sB0iISpe5dOBJ3Kvhhws0lY5mYm2qfYk-gYGQYZDUT2wxtIYbg=
+P0KSfAJw73sgNpDE0imUCYyKQ6DI5bNNovcos-cp-2WI5gLYVthCHlGJdOhK4E9a2j8B9c5E_az=
+txDMiBru6fpc9iHJMfAutI-sJD_83J?tsid=3D111000153&auth_token=3D5_1781729378_f=
+GqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D=
+1782074978>
+
+HADRIAN =E2=80=A2 Lawndale, CA
+
+$160K - $250K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAHCOzelMTtWhu_HYUSZPh_MuOs=
+HwTF-WnFjf6DmwY80gAdNIjwG_LGgDLrdhcYSzAFE0GsFuVo423pRKSQFmZaZbnI7o2GBSvk1AN=
+mQuyyJ5zGyYVuNq9J7OmKVPtGttJBzsmEGSWRncqlJlFjuoyErJSke6WInvf7vDRTVqbuwfwxI-=
+kzWeg1XQLYM-MatZqajQk3wfkP4gbxYrpXPc-WFA-naw7seGrwOiQLN1oJTonX97sB0iISpe5dO=
+BJ3Kvhhws0lY5mYm2qfYk-gYGQYZDUT2wxtIYbgP0KSfAJw73sgNpDE0imUCYyKQ6DI5bNNovco=
+s-cp-2WI5gLYVthCHlGJdOhK4E9a2j8B9c5E_aztxDMiBru6fpc9iHJMfAutI-sJD_83J?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer  <https://www.ziprecruiter.com/km/AAFLpiz8uBMiQI=
+JbPyX_qcLOxcQ2O17fVLv0NYUD_tc0Kcm5ROcubCwPrTYKWGoXR5a304ZgLw143YxeBViXELvG_=
+_cOSvOfOS9BWXxyMhfYE6ILl5dj66MfibJp7sfUWmSw2v4H2DJsezYYYp58VUsHigN09nwHrbPV=
+p7ENYfQrBIIxbSRcOcoCfjBnn10aSpC9lpqJEO2YUUbRpJ3_HVc6eUvm3YYnZp5IbmiVWqk89G9=
+MWFfEH53ozOiOGX5-rRT39EOP_1jo_yPe8Ueupb2Mc-Uc-M3cbbJWAJ33BSza5kfNElRAq3zxnL=
+W8-MKjoPitKhHAWrPma51zvL1nN5zvXwmCdECFEL6GMbuaPBW9OZ4tOhWiMe1UsQ9L8PhgqXwB8=
+22kogr_?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtB=
+AOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Acceler8 Talent =E2=80=A2 San Francisco, CA
+
+ View Details  <https://www.ziprecruiter.com/km/AAFLpiz8uBMiQIJbPyX_qcLOxcQ=
+2O17fVLv0NYUD_tc0Kcm5ROcubCwPrTYKWGoXR5a304ZgLw143YxeBViXELvG__cOSvOfOS9BWX=
+xyMhfYE6ILl5dj66MfibJp7sfUWmSw2v4H2DJsezYYYp58VUsHigN09nwHrbPVp7ENYfQrBIIxb=
+SRcOcoCfjBnn10aSpC9lpqJEO2YUUbRpJ3_HVc6eUvm3YYnZp5IbmiVWqk89G9MWFfEH53ozOiO=
+GX5-rRT39EOP_1jo_yPe8Ueupb2Mc-Uc-M3cbbJWAJ33BSza5kfNElRAq3zxnLW8-MKjoPitKhH=
+AWrPma51zvL1nN5zvXwmCdECFEL6GMbuaPBW9OZ4tOhWiMe1UsQ9L8PhgqXwB822kogr_?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer, Monetization Engineering  <https://www.ziprecru=
+iter.com/km/AAEo71X-JykvldDjBmi-gfDUT3gMfOMfTnXrFVFjX1dSaQ35iDU0t97gC553WvN=
+mPAiVcuqm0913eXOtuJD5EwzSqrCHn0yGZKutGLhEwdM5fzmvX1fDiv2qRd4_tZaqI3sy0mbbWt=
+UxUopNjnRhBvJEYbLIey388smkln0NKrqnR_04_W7guZNeNjEP24psqiTKCXpqhYPcXNZk1bFSy=
+m1lOEdicH95ZX9kDVNqrABLCMZHCac6Ca3it_TADW0BQhNy58V1IAlbAvHBtfFGFYcC2HE-cHaN=
+4RXbQQIlfKxhsRhw-gn1YW6UYxRLFsbIM5RfpF3cuncLJoutN8akyD97xDX-nhS1_94dWNIhS_S=
+TJryF570HlVTkwbLCsm9GqMvTkUmRCdSs?tsid=3D111000153&auth_token=3D5_178172937=
+8_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=
+=3D1782074978>
+
+Pinterest
+
+ View Details  <https://www.ziprecruiter.com/km/AAEo71X-JykvldDjBmi-gfDUT3g=
+MfOMfTnXrFVFjX1dSaQ35iDU0t97gC553WvNmPAiVcuqm0913eXOtuJD5EwzSqrCHn0yGZKutGL=
+hEwdM5fzmvX1fDiv2qRd4_tZaqI3sy0mbbWtUxUopNjnRhBvJEYbLIey388smkln0NKrqnR_04_=
+W7guZNeNjEP24psqiTKCXpqhYPcXNZk1bFSym1lOEdicH95ZX9kDVNqrABLCMZHCac6Ca3it_TA=
+DW0BQhNy58V1IAlbAvHBtfFGFYcC2HE-cHaN4RXbQQIlfKxhsRhw-gn1YW6UYxRLFsbIM5RfpF3=
+cuncLJoutN8akyD97xDX-nhS1_94dWNIhS_STJryF570HlVTkwbLCsm9GqMvTkUmRCdSs?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Research Engineer, Machine Learning Systems  <https://www.ziprecruiter.com=
+/km/AAG1nfluNgp5mH-UTztKjqi9PyiSKcw9qNFDYzkHu-A7jlFNRN4Jz982lhFwqNW4r9Cqp3N=
+zRIJJe19mTe6kPbEGQ6SHGPqlwTBWYt5fSOVuG75fwrwTrmPxEpqm_z11J4LEMS5DT9saPVbPUA=
+VOwHO_8TgUk5dKTDhr1mdRTe3lbgpcmn4VKwGkT1m3rRMgv4kHg-vtLD0fj3Zrb2bjHRw2cYbij=
+6JKK01eQ2l1ptXH8mGqVGxtH8YRll9YoVf4rl7KgIOTAa-9gvFEys6waml16CN774sq9t7jUz6c=
+EoVu4RvDeuq_0uEt_lfFr3XpHUuAQaqlcLNrQw-d_jdLuQ50YDYxNKB0lYdTx-NAF0rWpckhaAK=
+tAaG_1yVGvm-Q_OihhIJD_MCV?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5=
+IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D17820=
+74978>
+
+Deepgram
+
+ View Details  <https://www.ziprecruiter.com/km/AAG1nfluNgp5mH-UTztKjqi9Pyi=
+SKcw9qNFDYzkHu-A7jlFNRN4Jz982lhFwqNW4r9Cqp3NzRIJJe19mTe6kPbEGQ6SHGPqlwTBWYt=
+5fSOVuG75fwrwTrmPxEpqm_z11J4LEMS5DT9saPVbPUAVOwHO_8TgUk5dKTDhr1mdRTe3lbgpcm=
+n4VKwGkT1m3rRMgv4kHg-vtLD0fj3Zrb2bjHRw2cYbij6JKK01eQ2l1ptXH8mGqVGxtH8YRll9Y=
+oVf4rl7KgIOTAa-9gvFEys6waml16CN774sq9t7jUz6cEoVu4RvDeuq_0uEt_lfFr3XpHUuAQaq=
+lcLNrQw-d_jdLuQ50YDYxNKB0lYdTx-NAF0rWpckhaAKtAaG_1yVGvm-Q_OihhIJD_MCV?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Perception Engineer  <https://www.ziprecruiter.com/km/AAH-EvII_DQBpTsDMYR7=
+lek1hudFt8Dsm352SVRFxsCESoRYVTwyJhdNGb3lZDnAkWpJeThSsqaGVMH1-23zqrdTPmrScz_=
+6A7S2WtRbvdypdJ1Tl5c6_IPazJ-JGyvRlPY4cf2IOIt-uqJk7ibXJ8Fc4HsFAz99rRzPbYbmCl=
+joVqejkgxZ17WtawvlNcf2KrJQLL4NtvH94PKssj1hr00IgnYQ9G1lhq-wM1JLDOP-RPccpBKwT=
+C11NAqRV0Wlbc80Q0cn0DsIw0TrfcDc0qvbJ0IwLHOJxQRrVTXyikOrrR-j7mcXm4Rlj_LdGEP_=
+T-euY9dNREUTEFxReDzko1E5j32jmN11yEI1D9c8aON-0aQoI8vgG0P_WNecVRBdr0W5PGNQE0u=
+e?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9Vn=
+SPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Aquabyte
+
+ View Details  <https://www.ziprecruiter.com/km/AAH-EvII_DQBpTsDMYR7lek1hud=
+Ft8Dsm352SVRFxsCESoRYVTwyJhdNGb3lZDnAkWpJeThSsqaGVMH1-23zqrdTPmrScz_6A7S2Wt=
+RbvdypdJ1Tl5c6_IPazJ-JGyvRlPY4cf2IOIt-uqJk7ibXJ8Fc4HsFAz99rRzPbYbmCljoVqejk=
+gxZ17WtawvlNcf2KrJQLL4NtvH94PKssj1hr00IgnYQ9G1lhq-wM1JLDOP-RPccpBKwTC11NAqR=
+V0Wlbc80Q0cn0DsIw0TrfcDc0qvbJ0IwLHOJxQRrVTXyikOrrR-j7mcXm4Rlj_LdGEP_T-euY9d=
+NREUTEFxReDzko1E5j32jmN11yEI1D9c8aON-0aQoI8vgG0P_WNecVRBdr0W5PGNQE0ue?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer, Integrity  <https://www.ziprecruiter.com/km/AAF=
+hasCjGJstO13SXpCNnK9qpx1AoDqdIVvi7lveVEaVecgwNv1KOYcihY_rcMMZx1-u4wUU-s5cPF=
+OPaM31OALByrtvTeQBKcvJYH651HSxz5vWyBOvjEC-Wi9z5UpV__HhD5-OqJDkOUkjckxpebDi_=
+8Y9iGoKar0wdYiLE3obgJPweSXiaHsdz3VQJGpf0HAfiXjp0JodD7ftl2hJRurvPKysqgaRzAcQ=
+WcwxEH-yErflHSqcDRPbYj774HesOFPXjE6IrJ8B48dNe_zMlZHVYnGmU73X1ZAQi3-6Nl_dNKK=
+NXHN1PGA9hiwrU-iQ2GUH9MqqbjZ5FI_YMGOKOHo3x_RNNVZKYvP8WFWdMfgo_bPsCKV8fGna47=
+pzqmVtYWwEcEC_UhCG?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-=
+V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+HackerRank
+
+ View Details  <https://www.ziprecruiter.com/km/AAFhasCjGJstO13SXpCNnK9qpx1=
+AoDqdIVvi7lveVEaVecgwNv1KOYcihY_rcMMZx1-u4wUU-s5cPFOPaM31OALByrtvTeQBKcvJYH=
+651HSxz5vWyBOvjEC-Wi9z5UpV__HhD5-OqJDkOUkjckxpebDi_8Y9iGoKar0wdYiLE3obgJPwe=
+SXiaHsdz3VQJGpf0HAfiXjp0JodD7ftl2hJRurvPKysqgaRzAcQWcwxEH-yErflHSqcDRPbYj77=
+4HesOFPXjE6IrJ8B48dNe_zMlZHVYnGmU73X1ZAQi3-6Nl_dNKKNXHN1PGA9hiwrU-iQ2GUH9Mq=
+qbjZ5FI_YMGOKOHo3x_RNNVZKYvP8WFWdMfgo_bPsCKV8fGna47pzqmVtYWwEcEC_UhCG?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Physics Expert - Remote  <https://www.ziprecruiter.com/km/AAEb1gweU_jqql0_=
+HQB-9Ia6n8pDpsGqO9SNsGikePwNI8UbTzDVJ_V6l7miHZ0ZzG_hBka7IfCJbOvCbC3E6sIhDAC=
+RJPCqKLh6lNTiaRcwtV18bpnIlnW0iZf-1Y8rw397xlU71HS8vN2rqFAyQitKjFZdWy9ZbZB87q=
+cIeqRhECoWhEqZkDpxKSHd-GOtd-9Xtsa8qtuwM5XejVZhT23wMUImgTXHtmUCKAWRaq31kDGnf=
+I34oqiY2ON9S6WK-FhpxY1ByVmQvq_CarZcRMgOH6638CCH2dczlDSKdWEUv7RzZUbWUDuNeMh5=
+QygmH9qF0b9XlJHrNleCkMZhwtbcKjUjlPi04fPCV1fk-wvJRh1IYIgaJYyS_esykP3n1LMglDm=
+QbxOG?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAO=
+c9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+YO IT Consulting
+
+ View Details  <https://www.ziprecruiter.com/km/AAEb1gweU_jqql0_HQB-9Ia6n8p=
+DpsGqO9SNsGikePwNI8UbTzDVJ_V6l7miHZ0ZzG_hBka7IfCJbOvCbC3E6sIhDACRJPCqKLh6lN=
+TiaRcwtV18bpnIlnW0iZf-1Y8rw397xlU71HS8vN2rqFAyQitKjFZdWy9ZbZB87qcIeqRhECoWh=
+EqZkDpxKSHd-GOtd-9Xtsa8qtuwM5XejVZhT23wMUImgTXHtmUCKAWRaq31kDGnfI34oqiY2ON9=
+S6WK-FhpxY1ByVmQvq_CarZcRMgOH6638CCH2dczlDSKdWEUv7RzZUbWUDuNeMh5QygmH9qF0b9=
+XlJHrNleCkMZhwtbcKjUjlPi04fPCV1fk-wvJRh1IYIgaJYyS_esykP3n1LMglDmQbxOG?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Senior Machine Learning Engineer (Nova)  <https://www.ziprecruiter.com/km/=
+AAFNcMDFsNvRaxr9xJ3LiVW7vWaAjVKFwNJZnFU9Ayf76si5rhqwvlMYx5UXrHE2up-4jeoXJBl=
+Hj7DcWHWwnbEvoH3g-wIXeWAqZadpLSqNhLbCB2JEygY7W8vXTacMFD2Mu-R8v1Bv_PQ0-DLOHJ=
+kHZ1ITugZ9sVzKZkdTxw7VrmcuEUOsSyAVfRCekRwyyQeVZI-MCEFOhNUzbqwvxYL4eisPiJWsH=
+CgAhJGhpkWq4WNAVhIaVukYaIPPDCf0stHeCGfmlXDhMoAKZaXVIWJN1UDqOTZMVQ4fQ0mSrCYB=
+CfaUcaL9_is_GtBsL-CZPj_8nuQjXfXWE5dd4Ql6o50TcYdXbtjTx5uEBKRXQ-b2YCbUxkBZ9ch=
+lJIKmYP5Vav4kECGfYFlb?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5Ijcb=
+fA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178207497=
+8>
+
+Iterable
+
+$107K - $147K / yr
+Estimated Pay
+ View Details  <https://www.ziprecruiter.com/km/AAFNcMDFsNvRaxr9xJ3LiVW7vWa=
+AjVKFwNJZnFU9Ayf76si5rhqwvlMYx5UXrHE2up-4jeoXJBlHj7DcWHWwnbEvoH3g-wIXeWAqZa=
+dpLSqNhLbCB2JEygY7W8vXTacMFD2Mu-R8v1Bv_PQ0-DLOHJkHZ1ITugZ9sVzKZkdTxw7VrmcuE=
+UOsSyAVfRCekRwyyQeVZI-MCEFOhNUzbqwvxYL4eisPiJWsHCgAhJGhpkWq4WNAVhIaVukYaIPP=
+DCf0stHeCGfmlXDhMoAKZaXVIWJN1UDqOTZMVQ4fQ0mSrCYBCfaUcaL9_is_GtBsL-CZPj_8nuQ=
+jXfXWE5dd4Ql6o50TcYdXbtjTx5uEBKRXQ-b2YCbUxkBZ9chlJIKmYP5Vav4kECGfYFlb?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Lead Flutter Engineer  <https://www.ziprecruiter.com/km/AAHuhizzHET_uVtQp0=
+kQHmvyvRxJDdX8sC6adp3RveHPHtcrzGymPvyd_a2l3mLQxWXMivam6lT1lN7aisD174_jNmynf=
+JxKJVItIFglBbps3qqqDs2LIDSCeTCkKDCUefWjo_fmvxz3mYnvm1P7_oP1AR-XCouxKrYvL-Mo=
+gLR2jDkzzXDatEjULUygwXeo3oc4yJfj1_JsbEEg6toWdts5AIG0N0nUZwWYYC2FichVTp2phLZ=
+1jeD8wVMdvW7bli4WvNy7DQMUqUTSNp7iTz_RoGYrXtZ61k5Tx1vCvyjL7j9eoyznZLKbkUq1AI=
+H8Gm5SsQ-yv_WrelfB_dgiKwtgLDE3kJJ22omizcCnmgvhIhZ14BQBP8A142w4roFRtuLVhYXdP=
+ni7?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9=
+VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+goTenna =E2=80=A2 Phoenix, AZ =E2=80=A2 Remote
+
+$170K - $200K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAHuhizzHET_uVtQp0kQHmvyvRx=
+JDdX8sC6adp3RveHPHtcrzGymPvyd_a2l3mLQxWXMivam6lT1lN7aisD174_jNmynfJxKJVItIF=
+glBbps3qqqDs2LIDSCeTCkKDCUefWjo_fmvxz3mYnvm1P7_oP1AR-XCouxKrYvL-MogLR2jDkzz=
+XDatEjULUygwXeo3oc4yJfj1_JsbEEg6toWdts5AIG0N0nUZwWYYC2FichVTp2phLZ1jeD8wVMd=
+vW7bli4WvNy7DQMUqUTSNp7iTz_RoGYrXtZ61k5Tx1vCvyjL7j9eoyznZLKbkUq1AIH8Gm5SsQ-=
+yv_WrelfB_dgiKwtgLDE3kJJ22omizcCnmgvhIhZ14BQBP8A142w4roFRtuLVhYXdPni7?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Software Engineer Intern  <https://www.ziprecruiter.com/km/AAHUJuaR_j99i0Q=
+wPfPe0ZNj0m3z3l_-6DacyxmxCLAAcXBLDQaHcAffTC5Byzdt8hE-E6hWVNZ4h8fvDkTujeOX8I=
+vwV4ovuxkuPPdChQMLoh5VBlJcWcSWgYmsrAzGwT3hegQOKmHqBY4JbFFJIunWnLmeeCjINpC4D=
+AcNLVC1CJVVTt0a2-lhrJVcdBhOJ7gWTspXC3jER1-h35ETZTkf6cEATFtC1P-MUtQZzByLE9Td=
+zjFzvlh07kN66GqtBoABZpuoUYCSsl0l1gTP1ZohgNxkshutrD42IGX6-IhVbMoi62MItDwXLau=
+M4a6aHpy6FPmOdIaxxFp8khM95pQalklhxO-QuMIcXQsFqrnSNlwFVVwcZQkHgY4-MzF-585rQB=
+Gw1P2T?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBA=
+Oc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+CUBRC Inc. =E2=80=A2 Buffalo, NY =E2=80=A2 Remote
+
+$24 - $35 / hr
+
+ View Details  <https://www.ziprecruiter.com/km/AAHUJuaR_j99i0QwPfPe0ZNj0m3=
+z3l_-6DacyxmxCLAAcXBLDQaHcAffTC5Byzdt8hE-E6hWVNZ4h8fvDkTujeOX8IvwV4ovuxkuPP=
+dChQMLoh5VBlJcWcSWgYmsrAzGwT3hegQOKmHqBY4JbFFJIunWnLmeeCjINpC4DAcNLVC1CJVVT=
+t0a2-lhrJVcdBhOJ7gWTspXC3jER1-h35ETZTkf6cEATFtC1P-MUtQZzByLE9TdzjFzvlh07kN6=
+6GqtBoABZpuoUYCSsl0l1gTP1ZohgNxkshutrD42IGX6-IhVbMoi62MItDwXLauM4a6aHpy6FPm=
+OdIaxxFp8khM95pQalklhxO-QuMIcXQsFqrnSNlwFVVwcZQkHgY4-MzF-585rQBGw1P2T?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Data Scientist/Engineer - Junior (Remote)  <https://www.ziprecruiter.com/k=
+m/AAHj8shwD1VvpfFqhDv5IoSDYzCPTy_tVwo2JKzRL0hjF0yy2KXrTYfD0vDciGiOaWcPAyPNX=
+WX8XjewpGwCdNDeU1wX3-m3QSAslfijN9yYWWtjpoJGgCALxbbUSnH5_FYGTZjiYRwiRS0faoGR=
+Tyym_2BqTdlZr-kh6YS1ssLqHoZNBLbyXVEmkGoyxYhUBkVZM5t-Y2LF0KC570tUwoOQoQWgrW7=
+rtk7B_R2mmQbbApA8CLRMW3fOgk3Axlsm8KXvM8LgsTaXz_R_O-_YqKwNLSgJXLqLPSnr2Mmjfv=
+957s1tcQwdvO00I9DEFD78wdlaK0RhZTYfse-_OPnF_qECHQUi-cfgZqntBshISFxXOCQRZL1MR=
+5fr8BmnF7blAnfT4zaCO2Rl?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5Ij=
+cbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074=
+978>
+
+SynergisticIT =E2=80=A2 Portland, OR =E2=80=A2 In-person
+
+ View Details  <https://www.ziprecruiter.com/km/AAHj8shwD1VvpfFqhDv5IoSDYzC=
+PTy_tVwo2JKzRL0hjF0yy2KXrTYfD0vDciGiOaWcPAyPNXWX8XjewpGwCdNDeU1wX3-m3QSAslf=
+ijN9yYWWtjpoJGgCALxbbUSnH5_FYGTZjiYRwiRS0faoGRTyym_2BqTdlZr-kh6YS1ssLqHoZNB=
+LbyXVEmkGoyxYhUBkVZM5t-Y2LF0KC570tUwoOQoQWgrW7rtk7B_R2mmQbbApA8CLRMW3fOgk3A=
+xlsm8KXvM8LgsTaXz_R_O-_YqKwNLSgJXLqLPSnr2Mmjfv957s1tcQwdvO00I9DEFD78wdlaK0R=
+hZTYfse-_OPnF_qECHQUi-cfgZqntBshISFxXOCQRZL1MR5fr8BmnF7blAnfT4zaCO2Rl?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+ Associate Engineer - Data Platform  <https://www.ziprecruiter.com/km/AAGom=
+3aepc3FE9hO3mz5HmkN6kJmfebIFYixzWdOAURgdUe8VCV8sQd3Ok8GRJ491LzM8nN1Ix-M71px=
+WFAEDgkapMKa2dU80WqRk093h2cLiG2ta7yEBrM6DhBNL1hYuLH1StYQn6xC6xvt1Ts0OXshfrA=
+3cBVpAYiu3LO0rxo3K8k38sp9f9HB9IG82aMlhE4cPQ0R8FXdDqkxvFtfSk_eW0Y057utI4ApFt=
+__byjp8jjgq7GhaWK9TExCUt9D3b1Sdpmczne7Gup6HqHJefruvq0OjJIURpcLzDsmPlVHZo-63=
+EX_2NwLojEzGicuY6TmwlAiMAYQcXHWN0QxCyKPd9BD3fbgiOxgsMEARsFjjniWzb9mcVuOIScW=
+?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnS=
+PTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Defense Unicorns
+
+$102K - $138K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAGom3aepc3FE9hO3mz5HmkN6kJ=
+mfebIFYixzWdOAURgdUe8VCV8sQd3Ok8GRJ491LzM8nN1Ix-M71pxWFAEDgkapMKa2dU80WqRk0=
+93h2cLiG2ta7yEBrM6DhBNL1hYuLH1StYQn6xC6xvt1Ts0OXshfrA3cBVpAYiu3LO0rxo3K8k38=
+sp9f9HB9IG82aMlhE4cPQ0R8FXdDqkxvFtfSk_eW0Y057utI4ApFt__byjp8jjgq7GhaWK9TExC=
+Ut9D3b1Sdpmczne7Gup6HqHJefruvq0OjJIURpcLzDsmPlVHZo-63EX_2NwLojEzGicuY6TmwlA=
+iMAYQcXHWN0QxCyKPd9BD3fbgiOxgsMEARsFjjniWzb9mcVuOIScW?tsid=3D111000153&auth=
+_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_i=
+d=3D78b9a631&expires=3D1782074978>
+ Senior Machine Learning Engineer  <https://www.ziprecruiter.com/km/AAExBu1=
+lc-8rW8Z5OeXrkt0cjRnIVmpEKx79ioNv5v4bIHNMCf5ioaCDc3NE4vjxqWYr4fLlqKlc5kUMbT=
+Xc4KgAYRoObbffuRLcnBJhZi-sawk9I0G8S5v9k6TUDY-JNBA8uVDeoMQm5tUqD4_o7US1VUBoa=
+ynED-qieIc6zT3k6SBfejgme8ntP3c54dbqFWMvBKzc594s_xViehj2gWO-zIT7YuwvMQiMV3CX=
+VZitalH1rTxvcK3NKPHRZJBKLh7qikQaGqVKK5D53tpCiy0JBNvKnZsQ6Ao4NcbTJ7xhwzz6dpg=
+8A8DbS6yEvc-EmAZVhbbWmeFmML3ncCayG0lTHktxPzj3S3cOZzYx9t3woWtA_oRIGpwYZC9L?t=
+sid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPT=
+sKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Anno.ai
+
+$104K - $143K / yr
+Estimated Pay
+ View Details  <https://www.ziprecruiter.com/km/AAExBu1lc-8rW8Z5OeXrkt0cjRn=
+IVmpEKx79ioNv5v4bIHNMCf5ioaCDc3NE4vjxqWYr4fLlqKlc5kUMbTXc4KgAYRoObbffuRLcnB=
+JhZi-sawk9I0G8S5v9k6TUDY-JNBA8uVDeoMQm5tUqD4_o7US1VUBoaynED-qieIc6zT3k6SBfe=
+jgme8ntP3c54dbqFWMvBKzc594s_xViehj2gWO-zIT7YuwvMQiMV3CXVZitalH1rTxvcK3NKPHR=
+ZJBKLh7qikQaGqVKK5D53tpCiy0JBNvKnZsQ6Ao4NcbTJ7xhwzz6dpg8A8DbS6yEvc-EmAZVhbb=
+WmeFmML3ncCayG0lTHktxPzj3S3cOZzYx9t3woWtA_oRIGpwYZC9L?tsid=3D111000153&auth=
+_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_i=
+d=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer: Perception  <https://www.ziprecruiter.com/km/AA=
+GVIIXsTsGluvQ9FTfpW5Ye6Dx114n8_-oWKGYFaTlqOk5lvkIlQVC9XFXANvRqcQdqbNqX-KXPz=
+0EDqp7aECWaEVXMzVzloiOxCK_EvcVp0c_thJ9NbaEkie7eD8zb_dNrqru4JitH4xCgJ10JgiPY=
+ib8Zx7CSGlULtFTOmwCJ7ZQNyltyiZ7fjWwyH8xtDUG3uwPUEHJX_GCT-PsfRpnmUJKQ3AS4hXA=
+dqUanfo7S-1jPpY02j_M-V9qFoqQ5Aznu8Jk2YTY5xa1z6B8TJg0kn9EMqZ4-Su_vLbZAbLqxhR=
+Lft-IHfeS1S360WTICR8grY3VeTyR2JfqTaRQOhDr0PFF_wVeb0F92hi802Y1iWeOXfbROn1Dlv=
+8ef?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9=
+VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Bedrock Robotics =E2=80=A2 San Francisco, CA =E2=80=A2 In-person
+
+ View Details  <https://www.ziprecruiter.com/km/AAGVIIXsTsGluvQ9FTfpW5Ye6Dx=
+114n8_-oWKGYFaTlqOk5lvkIlQVC9XFXANvRqcQdqbNqX-KXPz0EDqp7aECWaEVXMzVzloiOxCK=
+_EvcVp0c_thJ9NbaEkie7eD8zb_dNrqru4JitH4xCgJ10JgiPYib8Zx7CSGlULtFTOmwCJ7ZQNy=
+ltyiZ7fjWwyH8xtDUG3uwPUEHJX_GCT-PsfRpnmUJKQ3AS4hXAdqUanfo7S-1jPpY02j_M-V9qF=
+oqQ5Aznu8Jk2YTY5xa1z6B8TJg0kn9EMqZ4-Su_vLbZAbLqxhRLft-IHfeS1S360WTICR8grY3V=
+eTyR2JfqTaRQOhDr0PFF_wVeb0F92hi802Y1iWeOXfbROn1Dlv8ef?tsid=3D111000153&auth=
+_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_i=
+d=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer  <https://www.ziprecruiter.com/km/AAFWJB5P0_mtQf=
+IYxmby9b69plAlMihfS8eU6vt5uIKHths6JakhSSjQiM5Ig_8v9cGrQJ-NgZww1ATV_rgZyUUyj=
+nQT0-IQq1gMGY46qiUpVZ83E2LTfapE5EHSLOxNAAmvymqPwJO0FiUuwxP2yAeEaCrTLWk_M1gA=
+bwtShcxgJFRbMk6U55Tg3JokAWEPA815UUaXFca4R0ZJ461vbPHPtbRFVBSOm2YV0RN1BAzX2EC=
+Ub0SVBLEOhCuhQ0O-3GH0EibMXA4CCjd-iu6X5PUn8y2c_H93S6iUiWv_b0FueaVGTI8fuRPIwL=
+dH6kpI2HkWfvs6HgWUhlx3sIYB2jrFN3-eh_VytvYfA_7_dsavdRE8QtiO66-f9srt?tsid=3D1=
+11000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP=
+0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Intel =E2=80=A2 Hillsboro, OR
+
+ View Details  <https://www.ziprecruiter.com/km/AAFWJB5P0_mtQfIYxmby9b69plA=
+lMihfS8eU6vt5uIKHths6JakhSSjQiM5Ig_8v9cGrQJ-NgZww1ATV_rgZyUUyjnQT0-IQq1gMGY=
+46qiUpVZ83E2LTfapE5EHSLOxNAAmvymqPwJO0FiUuwxP2yAeEaCrTLWk_M1gAbwtShcxgJFRbM=
+k6U55Tg3JokAWEPA815UUaXFca4R0ZJ461vbPHPtbRFVBSOm2YV0RN1BAzX2ECUb0SVBLEOhCuh=
+Q0O-3GH0EibMXA4CCjd-iu6X5PUn8y2c_H93S6iUiWv_b0FueaVGTI8fuRPIwLdH6kpI2HkWfvs=
+6HgWUhlx3sIYB2jrFN3-eh_VytvYfA_7_dsavdRE8QtiO66-f9srt?tsid=3D111000153&auth=
+_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_i=
+d=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer, Agentic AI  <https://www.ziprecruiter.com/km/AA=
+FyxKoOTHNjvcwZGDEdm8pBvw65P6FCLVW_W2qniAyN9_oKdKfUKoB6j5OGwa5qVN2pUYx5lcU27=
+rKIoZYZ24-XsDTB0_FlOMulG4vabZf8ndGCnWZm2DH8711EAv6iSaUHB_ik737rcx6ZxnXeirEE=
+DD5qVdJ0ybm3opKVdXpcQ4JsujtlkLS8-hdvRaysfOSh70hCeG5hVn2kSCGxquJhAc1s0AI_Ciq=
+o4Iuuy7U7eVs722Y3lvZuugink8-pGt6F3Jy-dgoqlQW3G7CGVmWJGj-2N7EK2CTvUtQR2yTuQi=
+fXM1-h-Qb6XEURuZ0XrMY4t2k1DNIfetnodCtroKYiFaV9sXdS9B30UIwOJPWc0BNwXceGmEzMX=
+HJh?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9=
+VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Zillow
+
+$138K - $221K / yr
+
+ View Details  <https://www.ziprecruiter.com/km/AAFyxKoOTHNjvcwZGDEdm8pBvw6=
+5P6FCLVW_W2qniAyN9_oKdKfUKoB6j5OGwa5qVN2pUYx5lcU27rKIoZYZ24-XsDTB0_FlOMulG4=
+vabZf8ndGCnWZm2DH8711EAv6iSaUHB_ik737rcx6ZxnXeirEEDD5qVdJ0ybm3opKVdXpcQ4Jsu=
+jtlkLS8-hdvRaysfOSh70hCeG5hVn2kSCGxquJhAc1s0AI_Ciqo4Iuuy7U7eVs722Y3lvZuugin=
+k8-pGt6F3Jy-dgoqlQW3G7CGVmWJGj-2N7EK2CTvUtQR2yTuQifXM1-h-Qb6XEURuZ0XrMY4t2k=
+1DNIfetnodCtroKYiFaV9sXdS9B30UIwOJPWc0BNwXceGmEzMXHJh?tsid=3D111000153&auth=
+_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_i=
+d=3D78b9a631&expires=3D1782074978>
+ Machine Learning Engineer  <https://www.ziprecruiter.com/km/AAFBFB7w8Y1ngo=
+vY7OWdbw1mShnmWDtqbX0aauJ0hlNaT5PAIyFrZzGM35sId4ye5kkgVrkIg1wwqw4LafsSJiG0b=
+vkB-H6dsepx1Utw5HzXb8pWT9U_DuzFCPlnpT0z64w8RRfygH1x_E_pIfWwLWwLEZhryiBJPte7=
+edopWhUdRFvsFOs3E_8AotAFCAOluzuEqLn9eN8PMNmmvxV9D_k51NmFm51JQYUSg3EA_1ZpQAL=
+SACVRc3AZEUOpwbXHh0LeLR-C083l9orKsFfzEQx8445WRBXMTqtd0X864xzldr-CAm7fGGcXKj=
+iFsiAWnZX5VNqFwWPok0jXuNoNMu61CC96rq_LCgRJRcVC4QGYNEQ9aIgNwJZcJVA6?tsid=3D1=
+11000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP=
+0ao&contact_id=3D78b9a631&expires=3D1782074978>
+
+Tyto Athene, LLC
+
+ View Details  <https://www.ziprecruiter.com/km/AAFBFB7w8Y1ngovY7OWdbw1mShn=
+mWDtqbX0aauJ0hlNaT5PAIyFrZzGM35sId4ye5kkgVrkIg1wwqw4LafsSJiG0bvkB-H6dsepx1U=
+tw5HzXb8pWT9U_DuzFCPlnpT0z64w8RRfygH1x_E_pIfWwLWwLEZhryiBJPte7edopWhUdRFvsF=
+Os3E_8AotAFCAOluzuEqLn9eN8PMNmmvxV9D_k51NmFm51JQYUSg3EA_1ZpQALSACVRc3AZEUOp=
+wbXHh0LeLR-C083l9orKsFfzEQx8445WRBXMTqtd0X864xzldr-CAm7fGGcXKjiFsiAWnZX5VNq=
+FwWPok0jXuNoNMu61CC96rq_LCgRJRcVC4QGYNEQ9aIgNwJZcJVA6?tsid=3D111000153&auth=
+_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_i=
+d=3D78b9a631&expires=3D1782074978>
+
+ View More Jobs  <https://www.ziprecruiter.com/km/AAFf9KrHiPb5jeH2VvumXHt_e=
+FB1fJEqpBxc2k8OeaTs-T8pqO7rq031n7Jf2syXsR9zgIy-HGNCVD6i99HqxDzX7p-qfqdoKLm_=
+M5_DBywDGIHRgrkylxnWiK8D8vqILaSlIqqNxJat-foISNpFPLSTua3IMbam9BmBtGBOwFPssRB=
+01yP19WeEZrOdEnw6hPiDvntoWx191UAAWA5ehEp-vWCIXIQdFAG42isRpodq_ulbvrdVj_K-G8=
+B54P4gXYTEWNVhgnPmPeokrBPr4590Y6CRGCPBim5SMsEVhoKD6-9UDuqUUuf8R72nJgMCpWeSc=
+EYa2zv1BDHXtQVJR_OmDJRWoy0U3p1xBeZ5wY5zhMqs_ruYJQA?tsid=3D111000153>
+
+Phil
+Your Career Advisor
+
+Get Hired Faster
+Download the free iOS or Android app and search millions of jobs from anywh=
+ere.
+ <https://www.ziprecruiter.com/ekm/AAG1v7pCDnuDxnXOJtPYClVJvESu7RBKexW3-RPt=
+m23Xn7PZbk7OaGDItcjNpBxXH36JCR6Okqu6YBJUnElnOUpCTjEFYQ65wefeDE14TfEjSHnIIlG=
+7ubtcYWfsGHc-YB5jwVrt_fG0jLD-L5Y3_1UkyjbUZT9d-ws_cZsObLqUbqwm5WhGPq23KUt84C=
+hOzWuaoscwMx3KwF-vPHLhfe80g-rKHkpR2ghYhpdC4OkR8WZG6kSDXshh8UYrT-5YnD3N66qa9=
+FIyZnw9gAIVEu2yU97U1gcX1D-tPwil9wSLOxhUsAV5D5mKFA87hnxWJ_BgMFjzFHbCpxKPICf_=
+ZtOiLOYXZ7qJUlYfGcSLn2sX_0dX-GnEa2ugAM13Xg>  <https://www.ziprecruiter.com/=
+ekm/AAFDUJ9Rz-jXdu4gJ0iOEII3Qv_DP-2kxU0R4xe-LRk-ZxmoQlX7BqIWbrumz1kRIYCUOqv=
+HfvJ-WIHNpWfl4qahIyFpOWC5PM52kV2VW5S6D2_cefRcBOW3QnIMPeOi0u-gYqq8iR1Mxkmjql=
+PW_UHmHMHpgDz3w9NX8xFuGGoTD8AxfgR017onDXcYylGbzSqTYjrQL9-CObtLB5lU1nOUIlv6P=
+ksBxwOUUt0zC3dqcLUuaDuF1aWs0f5nh_jrjR0_ArZD8FVxHE970iSHCrVhKuL-gvECDtgQ1klf=
+pDvomIIpBLE7SFtJzzlilKXDv0FqmnkvWXEwwd9S7meKMsG9GI_aLIDBqJ_02IkyYkwL_zfyMDk=
+IDhGGLlbQwg>
+
+ZipRecruiter, Inc. =C2=A9 All Rights Reserved Worldwide
+ 3000 Ocean Park Blvd., Suite 3000, Santa Monica, CA 90405, USA
+ZipRecruiter provides pay estimates when companies do not include pay in th=
+e job post. ZipRecruiter estimates are based on pay from similar jobs (in s=
+imilar areas), may change over time, and may not be indicative of pay for t=
+he position. ZipRecruiter provides estimates for convenience only, and make=
+s no guarantees or promises regarding any expected or actual job payment.
+Apple and the Apple logo are registered trademarks of Apple Inc. Google Pla=
+y is a trademark of Google LLC.
+Logos provided by Clearbit <https://clearbit.com>
+Privacy Policy <https://www.ziprecruiter.com/ekm/AAHQ4Pd8G50NlJvVi3uUFV9uma=
+3akJ7I8-GPcEblIzXt45KECHqX5GjW7F4a2DKFuuSWKMRtA5A9c4cgddAgDMreL28wzAZ83xP65=
+OiT8MN2F_wbaxrzOE0Ir8O0mogQZXTuesxevDxDWBucbPxOLbsgp6QoLwPWTwuVyM3sEnDrXNkY=
+RpULkwani7gPPCby1sWRbBLZH_o1G6CpyCXhkPIQ58jz4b3SrqWjAMEtHOyxbBasBUqKOWgE7iY=
+Y1I9oeQY1PLJzVEunTSIDhc-HYDYSrHX7OEAxn5Jr9hFtP8z9SvF5TX_x4JHECTdY0JuHhQb5N4=
+jsuXis38bOKMxhw9XoOO956AK6yrEmW_IUQTByqw> | Unsubscribe <https://www.ziprec=
+ruiter.com/ekm/AAG7YP1EHqzg4cCzgHtCKeasV_4N9dc2jovtbxjOE6_tPcfw3F2EHzJxG2f-=
+P9LjHyzvT_6ccZFliFKW_4YBSq3m7dZmaBcEDxkR98miNyPu4JRGwQlyatRUjjFA3UlMpITwx39=
+ENL40kjTNjbKGt0DDjhh95u9gVzugGdHDX6P-EV9KCd_5U8Y5oMOroL23nns87vHl6DlWnIl6C2=
+ahIKRebv7zBaZPl5tseUul9cZtqKDwTbscb4uqCgOLe2jEjq3OCj030y6YyHewK1dYt3EzMZO0b=
+74wIkltkoklRZURRcmcDJUx2221zFCij9fzYw9sUjQVo7mzJ2NfQkkAkD3WfTJlPh0mMbbf72E0=
+e2RSGscrH6eVX4BFUR9OlYLH5mXZPNZhW83wCAMiEXDxcH0s0HCspYNSiVf7Jdnd6bSD5IGKWhI=
+eqE0HwFmq1W1oIapF-Lo0LYIazlr9Ki1jxwNbC6kCn4jUREydCKKzg6oIhOoiYxC22WvvnQUbeh=
+-FPKD8nqEiQGAJuKHqiMEcgDxEOvqpyX8aWNgXwesh5E_Zhk9p8jz_25BvNVcxf9D2kULmpMBFt=
+7eG2PmVjG6T9FBqm_sSmEGs8bjZrVE7DU8rzu1RKjc7Y57bicyYmjyZ5E1RhNuN_JApAA>
+
+--30bb290e2c4110740410f47d21cebe0133ac356987a44525a4118508a921
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html lang=3Den xmlns=3Dhttp://www.w3.org/1999/xhtml xmlns:o=
+=3Durn:schemas-microsoft-com:office:office xmlns:v=3Durn:schemas-microsoft-=
+com:vml><head><meta charset=3Dutf-8><meta content=3D"width=3Ddevice-width" =
+name=3Dviewport><meta content=3D"IE=3Dedge" http-equiv=3DX-UA-Compatible><m=
+eta name=3Dx-apple-disable-message-reformatting><meta content=3D"telephone=
+=3Dno,address=3Dno,email=3Dno,date=3Dno,url=3Dno" name=3Dformat-detection><=
+meta content=3D"light dark" name=3Dcolor-scheme><meta content=3D"light dark=
+" name=3Dsupported-color-schemes><title></title><style>:root{color-scheme:l=
+ight dark;supported-color-schemes:light dark;}html,body{margin:0 auto!impor=
+tant;padding:0!important;height:100%!important;width:100%!important;}h1,h2,=
+h3,p,a,ul,li{margin:0;padding:0;border:0;}.no-inline--paragraph-spacing p+p=
+{margin-top:12px;}*{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%=
+;}div[style*=3D"margin:16px 0"]{margin:0!important;}#MessageViewBody,#Messa=
+geWebViewDiv{width:100%!important;}table,td{mso-table-lspace:0pt!important;=
+mso-table-rspace:0pt
+!important;}table{border-spacing:0!important;border-collapse:collapse!impor=
+tant;table-layout:fixed!important;margin:0 auto!important;}img{-ms-interpol=
+ation-mode:bicubic;}a{text-decoration:none;}a[x-apple-data-detectors],.unst=
+yle-auto-detected-links a,.aBn{border-bottom:0!important;cursor:default!imp=
+ortant;color:inherit!important;text-decoration:none!important;font-size:inh=
+erit!important;font-family:inherit!important;font-weight:inherit!important;=
+line-height:inherit!important;}.a6S{display:none
+!important;opacity:0.01!important;}.im{color:inherit!important;}img.g-img+d=
+iv{display:none!important;}@media only screen and (min-device-width:320px) =
+and (max-device-width:374px){u~div .no-inline--email-container{min-width:32=
+0px!important;width:100vw;}.no-inline--two-col-jc{width:calc(100vw - 48px);=
+} }@media only screen and (min-device-width:375px) and (max-device-width:41=
+3px){u~div .no-inline--email-container{min-width:375px!important;width:100v=
+w;}.no-inline--two-col-jc{width:calc(100vw - 48px);} }@media only screen an=
+d (min-device-width:414px){u~div .no-inline--email-container{min-width:414p=
+x!important;width:100vw;}.no-inline--two-col-jc{width:calc(100vw - 48px);} =
+}</style><style>.no-inline--button-td-primary,.no-inline--button-a-primary,=
+=2Eno-inline--button-td-white,.no-inlin=
+e--button-a-white,.no-inline--button-t=
+d-teal,.no-inline--button-a-teal{transition:all 100ms ease-in;}.no-inline--=
+button-a-primary:hover{background:#016560!important;}.no-inline--button-a-w=
+hite:hover{background:#F2F4F4!important;}.no-inline--button-a-teal:hover{ba=
+ckground:#7BCAC2!important;}.no-inline--job-title-link-a{color:#1576c1}.no-=
+inline--job-title-link-a:visited{color:#6e20ec!important;}
+=2Eno-inline--job-title-link-a:hover{te=
+xt-decoration:underline!important;colo=
+r:#166AA8!important;}@media screen and (max-width:480px){.no-inline--stack-=
+col,.no-inline--stack-col-center{display:block!important;width:100%!importa=
+nt;max-width:100%!important;direction:ltr!important;}.no-inline--stack-col-=
+center{text-align:center!important;}.no-inline--center-on-narrow{text-align=
+:center!important;display:block!important;margin-left:auto!important;margin=
+-right:auto!important;float:none!important;}table.no-inline--center-on-narr=
+ow{display:inline-block!important;} }@media (prefers-color-scheme:dark){.no=
+-inline--email-bg{background:#111111!important;}.no-inline--darkmode-bg{bac=
+kground:#222222!important;}h1,h2,h3,p,li,.no-inline--darkmode-text,.no-inli=
+ne--email-container a:not([class]){color:#F7F7F9!important;}td.no-inline--b=
+utton-td-primary,td.no-inline--button-td-primary a{color:#ffffff!important;=
+border-width:1px!important;border-color:#00706C!important;}td.no-inline--bu=
+tton-td-white,td.no-inline--button-td-white a{background:#222222!important;
+border-color:#ffffff!important;border-width:1px!important;color:#ffffff!imp=
+ortant;}td.no-inline--button-td-white:hover,td.no-inline--button-td-white a=
+:hover{background:#333333!important;}td.no-inline--button-td-teal,td.no-inl=
+ine--button-td-teal a{background:#9CDCD6!important;border-radius:8px!import=
+ant;}td.no-inline--button-td-teal:hover,td.no-inline--button-td-teal a:hove=
+r{background:#7BCAC2!important;border-radius:8px!important;}.no-inline--foo=
+ter td{color:#aaaaaa!important;}
+=2Eno-inline--darkmode-surface-secondar=
+y{background-color:#333333!important;c=
+olor:#F7F7F9!important;}.no-inline--darkmode-fullbleed-bg{background-color:=
+#0F3016!important;}.no-inline--pill-box{background-color:#333333!important;=
+}.no-inline--new-badge{background-color:#333333!important;color:#F7F7F9!imp=
+ortant;}.no-inline--zr-logo{content:url('https://ziprecruiter.com/img/email=
+/ziprecruiter-logo-email-darkmode-280px@2x.png')!important;width:140px!impo=
+rtant;height:32px!important;} }.no-inline--bsf-badge{background-color:#F0EC=
+FD;border-radius:4px;vertical-align:top;display:inline-block;padding:4px 8p=
+x 4px 4px;color:#592691;font-size:12px;font-style:normal;font-weight:500;li=
+ne-height:16px;letter-spacing:0.24px;}.no-inline--bsf-badge img{width:16px;=
+height:16px;margin-right:4px;vertical-align:middle;}.bsf-response-card{back=
+ground:linear-gradient(to right,#9658E4,#CCD3D3);border-radius:12px;padding=
+:2px;margin:12px 0;}.no-inline--bsf-card-inner{background-color:#ffffff;
+border-radius:10px;padding:12px 16px;}.no-inline--new-badge{background-colo=
+r:#E5F0FB;border-radius:4px;padding:4px 8px;color:#1A4C74;vertical-align:to=
+p;display:inline-block;font-size:12px;font-style:normal;font-weight:500;lin=
+e-height:16px;letter-spacing:0.24px;}
+@media (prefers-color-scheme:dark){.no-inline--bsf-badge{background-color:#=
+333333!important;color:#F7F7F9!important;}.no-inline--button-a-teal{color:#=
+002325!important;}.bsf-response-card{background:linear-gradient(to right,#7=
+B3FC2,#444444)!important;}.no-inline--bsf-card-inner{background-color:#2222=
+22!important;}.no-inline--bsf-card-name{color:#F7F7F9!important;}.no-inline=
+--bsf-card-text{color:#CCCCCC!important;} }</style><style>.container{width:=
+100%;}.collapse{visibility:collapse;}.fixed{position:fixed;}.relative{posit=
+ion:relative;}.m-0{margin:0;}.mb-2{margin-bottom:8px;}.mb-4{margin-bottom:1=
+6px;}.mt-1{margin-top:4px;}.mt-2{margin-top:8px;}.mt-3{margin-top:12px;}.mt=
+-4{margin-top:16px;}.mt-6{margin-top:24px;}.mt-8{margin-top:32px;}.block{di=
+splay:block;}.inline-block{display:inline-block;}.inline{display:inline;}.f=
+lex{display:-webkit-box;display:-ms-flexbox;display:flex;}.table{display:ta=
+ble;}.hidden{display:none;
+}.h-10{height:40px;}.h-11{height:44px;}.h-12{height:48px;}.max-h-0{max-heig=
+ht:0;}.w-10{width:40px;}.w-11{width:44px;}.w-12{width:48px;}.w-full{width:1=
+00%;}.max-w-0{max-width:0;}.max-w-5\/6{max-width:83.333333%;}.max-w-\[450px=
+\]{max-width:450px;}.max-w-\[550px\]{max-width:550px;}.border-collapse{bord=
+er-collapse:collapse;}.flex-col{-webkit-box-orient:vertical;-webkit-box-dir=
+ection:normal;-ms-flex-direction:column;flex-direction:column;}.overflow-vi=
+sible{overflow:visible;}.truncate{overflow:hidden;
+text-overflow:ellipsis;white-space:nowrap;}.text-wrap{text-wrap:wrap;}.brea=
+k-words{overflow-wrap:break-word;}.rounded{border-radius:4px;}.rounded-full=
+{border-radius:9999px;}.rounded-lg{border-radius:8px;}.rounded-xl{border-ra=
+dius:12px;}.rounded-tl-xl{border-top-left-radius:12px;}.rounded-tr-xl{borde=
+r-top-right-radius:12px;}.border{border-width:1px;}.border-solid{border-sty=
+le:solid;}.border-zr-border-gray{border-color:#CCD3D3;}.bg-black{background=
+-color:#000;}.bg-zr-background-gray{
+background-color:#F2F4F4;}.bg-zr-background-surface-secondary{background-co=
+lor:#F8FAFA;}.bg-zr-email-app-download-gray{background-color:#F2F4F4;}.bg-z=
+r-white{background-color:#FFFFFF;}.object-cover{-o-object-fit:cover;object-=
+fit:cover;}.p-0{padding:0;}.p-1{padding:4px;}.p-2{padding:8px;}.p-3{padding=
+:12px;}.p-4{padding:16px;}.p-6{padding:24px;}.p-px{padding:1px;}.px-3{paddi=
+ng-left:12px;padding-right:12px;}.px-6{padding-left:24px;padding-right:24px=
+;}.px-8{padding-left:32px;padding-right:32px;}
+=2Epy-1{padding-top:4px;padding-bottom:=
+4px;}.py-2{padding-top:8px;padding-bot=
+tom:8px;}.py-6{padding-top:24px;padding-bottom:24px;}.pb-0{padding-bottom:0=
+;}.pb-10{padding-bottom:40px;}.pb-2{padding-bottom:8px;}.pb-3{padding-botto=
+m:12px;}.pb-4{padding-bottom:16px;}.pb-6{padding-bottom:24px;}.pb-7{padding=
+-bottom:28px;}.pb-8{padding-bottom:32px;}.pl-3{padding-left:12px;}.pl-5{pad=
+ding-left:20px;}.pr-2{padding-right:8px;}.pr-3{padding-right:12px;}.pt-1{pa=
+dding-top:4px;}.pt-10{padding-top:40px;}.pt-2{
+padding-top:8px;}.pt-3{padding-top:12px;}.pt-4{padding-top:16px;}.pt-5{padd=
+ing-top:20px;}.pt-6{padding-top:24px;}.pt-9{padding-top:36px;}.text-center{=
+text-align:center;}.align-top{vertical-align:top;}.align-middle{vertical-al=
+ign:middle;}.font-sans{font-family:Arial,sans-serif;}.text-2xl{font-size:24=
+px;}.text-base{font-size:16px;}.text-sm{font-size:14px;}.text-xl{font-size:=
+20px;}.text-xs{font-size:12px;}.text-xxs{font-size:11px;}.font-bold{font-we=
+ight:700;}.font-medium{font-weight:500;}
+=2Efont-normal{font-weight:400;}.capita=
+lize{text-transform:capitalize;}.itali=
+c{font-style:italic;}.leading-10{line-height:40px;}.leading-4{line-height:1=
+6px;}.leading-\[20px\]{line-height:20px;}.leading-snug{line-height:1.375;}.=
+tracking-wide{letter-spacing:0.025em;}.tracking-wider{letter-spacing:0.05em=
+;}.text-white{color:#fff;}.text-zr-background-gray{color:#F2F4F4;}.text-zr-=
+email-app-download-black{color:#002325;}.text-zr-email-hyper-link{color:#20=
+66EC;}.text-zr-text-primary{color:#002325;}
+=2Etext-zr-text-secondary{color:#4D6566=
+;}.text-zr-white{color:#FFFFFF;}.under=
+line{text-decoration-line:underline;}.no-underline{text-decoration-line:non=
+e;}.transition{-webkit-transition-property:color,background-color,border-co=
+lor,text-decoration-color,fill,stroke,opacity,backdrop-filter,-webkit-box-s=
+hadow,-webkit-transform,-webkit-filter;transition-property:color,background=
+-color,border-color,text-decoration-color,fill,stroke,opacity,backdrop-filt=
+er,-webkit-box-shadow,-webkit-transform,
+-webkit-filter;transition-property:color,background-color,border-color,text=
+-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-=
+filter;transition-property:color,background-color,border-color,text-decorat=
+ion-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-=
+webkit-box-shadow,-webkit-transform,-webkit-filter;-webkit-transition-timin=
+g-function:cubic-bezier(0.4,0,0.2,1);transition-timing-function:cubic-bezie=
+r(0.4,0,0.2,1);-webkit-transition-duration:150ms;
+transition-duration:150ms;}.zr-email-table{background-color:#FFFFFF;color:#=
+2F3639;border-collapse:collapse;border:none;display:block;}.zr-email-table =
+td,.zr-email-table th{vertical-align:top;text-align:left;font-family:Arial,=
+sans-serif;font-size:16px;line-height:24px;}.viewed-jobs-table{background-c=
+olor:#FFFFFF;color:#2F3639;border-collapse:collapse;border:none;display:blo=
+ck;}.viewed-jobs-table td,.viewed-jobs-table th{background-color:#FFFFFF;co=
+lor:#2F3639;width:100%;vertical-align:top;
+text-align:left;font-family:Arial,sans-serif;font-size:16px;line-height:24p=
+x;display:block;}.apply-button-green{background-color:#00706C;color:#FFFFFF=
+;width:110px;text-decoration:none;border-radius:8px;padding:12px 24px;text-=
+align:center;font-weight:bold;}.suggested-jobs-button-green{background-colo=
+r:#00706C;color:#FFFFFF;width:110px;text-decoration:none;border-radius:60px=
+;padding:12px 35px;text-align:center;font-weight:bold;}.apply-button-white{=
+color:#00706C;height:10px;width:100px;border:1px
+solid;text-decoration:none;border-radius:60px;padding:10px 35px;text-align:=
+center;font-weight:bold;}.apply-button-square{text-decoration:none;border-r=
+adius:8px;width:110px;padding:12px 24px;text-align:center;font-weight:bold;=
+}.button-responsive{width:100%;display:block;padding:12px 0px;}.attribution=
+-footer-table{color:#6A6F74;border:none;display:block;width:100%;border-col=
+lapse:collapse;}.attribution-footer-table td,.attribution-footer-table th{c=
+olor:#6A6F74;width:100%;text-align:justify;
+font-family:Arial,sans-serif;font-size:12px;line-height:16px;display:block;=
+border:none;padding:0;}.no-inline--button-td-white{background-color:#FFFFFF=
+;}.no-inline--button-a-white{background-color:#FFFFFF;color:#002325;border-=
+width:1px;border-style:solid;}.no-inline--button-td-primary{background-colo=
+r:#00706C;}.no-inline--button-a-primary{background-color:#00706C;color:#FFF=
+FFF;border-color:#00706C;border-width:1px;border-style:solid;}.no-inline--b=
+utton-td-teal{background:#9cdcd6;}
+=2Eno-inline--button-a-teal{color:#0023=
+25;border-style:solid;background:#9cdc=
+d6;}.inline-link{color:#1576c1;}.lightbox{background:rgba(0,0,0,0.8);width:=
+100%;height:100%;position:absolute;display:-webkit-box;display:-ms-flexbox;=
+display:flex;-webkit-box-align:center;-ms-flex-align:center;align-items:cen=
+ter;-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;}.l=
+ightbox-modal{background-color:#fff;border-width:2px;border-color:#9ca3af;b=
+order-radius:8px;padding:24px;-webkit-box-shadow:0
+20px 25px -5px rgba(0,0,0,0.1),0 8px 10px -6px rgba(0,0,0,0.1);box-shadow:0=
+ 20px 25px -5px rgba(0,0,0,0.1),0 8px 10px -6px rgba(0,0,0,0.1);max-width:9=
+0%;max-height:90%;overflow:auto;}</style><body class=3D"no-inline--email-bg=
+ bg-zr-background-gray" style=3Dmargin:0;padding:0!important;mso-line-heigh=
+t-rule:exactly;background-color:#f2f4f4 width=3D100%><center class=3D"no-in=
+line--email-bg bg-zr-background-gray" aria-roledescription=3Demail lang=3De=
+n role=3Darticle style=3Dwidth:100%;background-color:#f2f4f4>  <div style=
+=3D"max-width:550px;margin:0 auto;padding-top:24px;" class=3Dno-inline--ema=
+il-container><table class=3D"bg-zr-white no-inline--darkmode-bg" align=3Dce=
+nter border=3D0 cellpadding=3D0 cellspacing=3D0 role=3Dpresentation style=
+=3Dmargin:auto;background:#ffffff width=3D100%><tr><td aria-hidden=3Dtrue h=
+eight=3D24 style=3Dfont-size:0;line-height:0px;>=C2=A0<tr><td align=3Dcente=
+r><table border=3D0 cellpadding=3D0 cellspacing=3D0 style=3Dborder-collapse=
+:collapse;><tr><td style=3Dtext-align:left;><a href=3D"https://www.ziprecru=
+iter.com/km/AAFoPWmBLuZL_x7xxT7ctTQ-JDpBJj1iNzmHwD53BFsTGs5x-wJTbvwnwJIHIIB=
+gyKOhOt6Lb8m6Ufi953vi8x0j_7EmRWYi9quDXAGjCsW1SAx4GTbr8xOOKDfBfS7L3z9MQ7FuWm=
+t1MCpni1gvtvJv5OvMhdrOhpapRBtYbVxTAaJw6vGvVNPSfgh3oHI8TWkJH1MUNQx13KoAvxch7=
+kglbWKfjRBI-sXqoDZzwwQls_S5htnYH4d-u8Q38pGJgAjRCALq3hTgYztqMLayVa2LUmWi7bKZ=
+3tF3myR1PHrVCs8fzjZPpYH70sbcGRzFXzk-4HaePir4O08gx2QHxKfh5e-81QWlkvN9BEmA7rU=
+5_Yv_wD4L__M?tsid=3D111000153" style=3Ddisplay:inline-block; target=3D_blan=
+k> <img class=3Dno-inline--zr-logo height=3D42 src=3Dhttps://ziprecruiter.c=
+om/img/email/ziprecruiter-greener-logo-email-300px@2x.png width=3D150> </a>=
+</table><tr><td aria-hidden=3Dtrue height=3D16 style=3Dfont-size:0;line-hei=
+ght:0px;>=C2=A0</table><table class=3D"zr-email-table text-zr-text-primary =
+no-inline--darkmode-bg" border=3D0 cellpadding=3D0 cellspacing=3D0 role=3Dp=
+resentation style=3Dfont-size:16px;background:#ffffff><tr><td style=3D"padd=
+ing:36px 24px 24px 24px" class=3Dno-inline--darkmode-text><p style=3Dpaddin=
+g-bottom:12px;font-weight:bold;>Hi Magnus,</p> <span> Here are today's jobs=
+ recommended for you: </span><tr><td><div style=3D"padding:18px 24px;max-wi=
+dth:502px;border-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><d=
+iv style=3Dmargin-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-inl=
+ine--job-title-link-a truncate inline-block max-w-5/6 pr-2" href=3D"https:/=
+/www.ziprecruiter.com/km/AAHNPG4aWXUL4zakNj7UbZ9cQ2uhA8F9CE9qiKO6Ag7sV7O1gE=
+nyxLr_CuuvZJ1nOsyRJBA2OFKTdsHUkFAWd4KqVxHSbjHgUYQdWQfJqKIzixSpYPCR5N5b8WXkG=
+7E-OWm2zzbPSQ7OB60RvabcxBf_ljsQfIyp1p9C075XS3Hgqzva-65jDJx-mOFpDjrFKeIojevH=
+QCI9btL4NJJEmkWiKyzTpyenNeIyUiBXdJMe0nrqrn1EdTZy5u7quekax74JewRXQ5--d5ce4bb=
+Ov_Pmo8ulDxXVdlr6t4vI5ij8rmzddRt0QIJft9MvMn0nppTLGG7DaSHWag3QO951SeS-Dw5-Ze=
+3PBNsWWjgZ4BMA6zcYNQwwOgkDfyduCw4w2XW7tYlReolv?tsid=3D111000153&auth_token=
+=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78=
+b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical-align:top> B=
+ack End Developer - Mid-level - TS/SCI Clearance Required </a></div></div><=
+div class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-block=
+;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td style=
+=3Dvertical-align:middle width=3D15%><img alt=3DMaximus src=3Dhttps://www.z=
+iprecruiter.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/1=
+cb87f7c.png style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0=
+ 8px;vertical-align:middle"><p>Maximus</p> <div style=3Dpadding-top:4px;><p=
+ style=3Dpadding-right:4px;display:inline>$100K - $145K / yr</div></table><=
+/div><div class=3Dno-inline--stack-col style=3Dmax-width:35%;display:inline=
+-block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td =
+class=3Dno-inline--button-td-white><a href=3D"https://www.ziprecruiter.com/=
+km/AAHNPG4aWXUL4zakNj7UbZ9cQ2uhA8F9CE9qiKO6Ag7sV7O1gEnyxLr_CuuvZJ1nOsyRJBA2=
+OFKTdsHUkFAWd4KqVxHSbjHgUYQdWQfJqKIzixSpYPCR5N5b8WXkG7E-OWm2zzbPSQ7OB60Rvab=
+cxBf_ljsQfIyp1p9C075XS3Hgqzva-65jDJx-mOFpDjrFKeIojevHQCI9btL4NJJEmkWiKyzTpy=
+enNeIyUiBXdJMe0nrqrn1EdTZy5u7quekax74JewRXQ5--d5ce4bbOv_Pmo8ulDxXVdlr6t4vI5=
+ij8rmzddRt0QIJft9MvMn0nppTLGG7DaSHWag3QO951SeS-Dw5-Ze3PBNsWWjgZ4BMA6zcYNQww=
+OgkDfyduCw4w2XW7tYlReolv?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5I=
+jcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178207=
+4978" style=3D"color:#002325;font-weight:bold;width:100%;display:block;bord=
+er:1px solid #002325;border-radius:8px;padding:12px 0;text-align:center" cl=
+ass=3Dno-inline--button-a-white> View Details </a></table></div></div><tr><=
+td><div style=3D"padding:18px 24px;max-width:502px;border-bottom:1px solid =
+#d6d6d6" class=3Dno-inline--two-col-jc><div style=3Dmargin-bottom:8px><div =
+style=3Ddisplay:inline><a class=3D"no-inline--job-title-link-a truncate inl=
+ine-block max-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/km/AAFsV93Qs=
+3PDlANtj--AfjvfdMj_OcXGx68K6mYZLyKr85BFOAOQui0v4EmpA2lHI4ppFYOO-t4XW9VUVzta=
+VNXEBu6j4XWxzea2Zf0n-RPk_avOmtd5cBPqWzmO7SXh-To81ukJzlZFcRn1Zn3MBEdWnZUZve_=
+Zsitlak4OD4eYSCtBipQAsWNu4qFDk7kgnYCfCYJUdqAOJR75jeZlraYaUWTXMJzUOdgMH8ROz3=
+dQSKMNWfoa9Ct4H_d0khQkMHxOq6Ao6x6KSjGrSj3VYHIM1K1lFh57NM8Sb3IKwjGfrEZrEm7ie=
+6WvPCNnLyH5acJiQyHWv5rYO-BxJ0VMbEzn_8KpgYafsV4XrAgSWGKemsRupJHBRRb3vKCr5T1W=
+B6jF7tiNrkVS?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEg=
+BjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=
+=3Dfont-weight:bold;vertical-align:top> Machine Learning Engineer </a></div=
+></div><div class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inli=
+ne-block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><t=
+d style=3Dvertical-align:middle width=3D15%><img alt=3DHADRIAN src=3Dhttps:=
+//ziprecruiter.com/img/no_company_logo.png style=3Dwidth:40px;vertical-alig=
+n:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>HADRIAN =E2=
+=80=A2 Los Angeles, CA</p> <div style=3Dpadding-top:4px;><p style=3Dpadding=
+-right:4px;display:inline>$160K - $250K / yr</div></table></div><div class=
+=3Dno-inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-b=
+ottom:8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inli=
+ne--button-td-white><a href=3D"https://www.ziprecruiter.com/km/AAFsV93Qs3PD=
+lANtj--AfjvfdMj_OcXGx68K6mYZLyKr85BFOAOQui0v4EmpA2lHI4ppFYOO-t4XW9VUVztaVNX=
+EBu6j4XWxzea2Zf0n-RPk_avOmtd5cBPqWzmO7SXh-To81ukJzlZFcRn1Zn3MBEdWnZUZve_Zsi=
+tlak4OD4eYSCtBipQAsWNu4qFDk7kgnYCfCYJUdqAOJR75jeZlraYaUWTXMJzUOdgMH8ROz3dQS=
+KMNWfoa9Ct4H_d0khQkMHxOq6Ao6x6KSjGrSj3VYHIM1K1lFh57NM8Sb3IKwjGfrEZrEm7ie6Wv=
+PCNnLyH5acJiQyHWv5rYO-BxJ0VMbEzn_8KpgYafsV4XrAgSWGKemsRupJHBRRb3vKCr5T1WB6j=
+F7tiNrkVS?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjm=
+tBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"=
+color:#002325;font-weight:bold;width:100%;display:block;border:1px solid #0=
+02325;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline=
+--button-a-white> View Details </a></table></div></div><tr><td><div style=
+=3D"padding:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" clas=
+s=3Dno-inline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddispl=
+ay:inline><a class=3D"no-inline--job-title-link-a truncate inline-block max=
+-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/km/AAHRCXDqypUpcOl7iHP3Nk=
+HoxhQMEhd6uu0mBGrsAsUlJ5jWzlPUhoqU3SiE5GrubhXtcVlzXJ6icbMFyaKGPnELDo6KhZ-G1=
+Oir-PoidG3mFktr7GjOudvtrNuH4MJblGUrGVzIA22Ungzl8czWBZ9ogGuK34QKkHkxcKg8n8j1=
+6V0RXlU0LW9GY8LSt2iqrT_eZ-EafWN2NK2DeHDeOQoAlMvv3dlP_auy2OWWMUk-ZNcYpPuQIpL=
+mEj48DecjO-G3s4i7_PnnZwkRRrvC2hbiaBT87Clxs942-dN2_s28D7ibNXAggvWtcrkZRvUpNF=
+mK1RoslY37Sn4z6_6DSV1xhK3qqekzkaEkUBNHP4vPWSPx0te_tvhFuYYevtWHSq6Z95gs?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bol=
+d;vertical-align:top> Research Scientist - Communications, Networks, Cybers=
+ecurity, AI/ML </a></div></div><div class=3Dno-inline--stack-col style=3Dma=
+x-width:64%;display:inline-block;margin-bottom:8px;vertical-align:middle><t=
+able width=3D100%><tr><td style=3Dvertical-align:middle width=3D15%><img al=
+t=3D"Nexcepta, Inc" src=3Dhttps://ziprecruiter.com/img/no_company_logo.png =
+style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px;vertica=
+l-align:middle"><p>Nexcepta, Inc =E2=80=A2 Gaithersburg, MD =E2=80=A2 Remot=
+e</p></table></div><div class=3Dno-inline--stack-col style=3Dmax-width:35%;=
+display:inline-block;margin-bottom:8px;vertical-align:middle><table width=
+=3D100%><tr><td class=3Dno-inline--button-td-white><a href=3D"https://www.z=
+iprecruiter.com/km/AAHRCXDqypUpcOl7iHP3NkHoxhQMEhd6uu0mBGrsAsUlJ5jWzlPUhoqU=
+3SiE5GrubhXtcVlzXJ6icbMFyaKGPnELDo6KhZ-G1Oir-PoidG3mFktr7GjOudvtrNuH4MJblGU=
+rGVzIA22Ungzl8czWBZ9ogGuK34QKkHkxcKg8n8j16V0RXlU0LW9GY8LSt2iqrT_eZ-EafWN2NK=
+2DeHDeOQoAlMvv3dlP_auy2OWWMUk-ZNcYpPuQIpLmEj48DecjO-G3s4i7_PnnZwkRRrvC2hbia=
+BT87Clxs942-dN2_s28D7ibNXAggvWtcrkZRvUpNFmK1RoslY37Sn4z6_6DSV1xhK3qqekzkaEk=
+UBNHP4vPWSPx0te_tvhFuYYevtWHSq6Z95gs?tsid=3D111000153&auth_token=3D5_178172=
+9378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expi=
+res=3D1782074978" style=3D"color:#002325;font-weight:bold;width:100%;displa=
+y:block;border:1px solid #002325;border-radius:8px;padding:12px 0;text-alig=
+n:center" class=3Dno-inline--button-a-white> View Details </a></table></div=
+></div><tr><td><div style=3D"padding:18px 24px;max-width:502px;border-botto=
+m:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><div style=3Dmargin-bott=
+om:8px><div style=3Ddisplay:inline><a class=3D"no-inline--job-title-link-a =
+truncate inline-block max-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/=
+km/AAHZLuwTtPdMPgdEjb5JCQvnU6GnsXDnMPDrX952k-CPGAaCm2dqeco6w97nqt8bluqwkf2o=
+K_0HTmw1AP3mJCypKuzmqnrS_srODYtrLaKAOlTdM5w6I4kUlNEmZtuKd19YlhhV-CkMVz3lOcN=
+N3hzNoa0fHNeJVQVeN1-PSMBokYXAluCFFBJuZgZ1bFt9SOAYTftBimKtckgxarrS70ejRO1vIC=
+MAQBsVdM6mDwSr4IOry1kf46yupGEqp4PixWv1Nv6gveL9Il_kfa4MZAbTxl2KK8lhet_kuIRPZ=
+Lqlx0kLH-hZJUlHys5TxtsVF2v_LjuJTtEL-lPIjogGFNaKEz833vUkyz09Ya01KEvyMHXwwYpZ=
+ZVydY7YWE7Oay2EJHYT-MZj_?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5I=
+jcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178207=
+4978" style=3Dfont-weight:bold;vertical-align:top> Platform Lifecycle Engin=
+eer - AI Trainer </a></div></div><div class=3Dno-inline--stack-col style=3D=
+max-width:64%;display:inline-block;margin-bottom:8px;vertical-align:middle>=
+<table width=3D100%><tr><td style=3Dvertical-align:middle width=3D15%><img =
+alt=3DDataAnnotation src=3Dhttps://www.ziprecruiter.com/svc/fotomat/public-=
+nosensitive-ziprecruiter-logos/company/829fe1ea.jpeg style=3Dwidth:40px;ver=
+tical-align:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>Dat=
+aAnnotation =E2=80=A2 Saint Petersburg, FL =E2=80=A2 Remote</p> <div style=
+=3Dpadding-top:4px;><p style=3Dpadding-right:4px;display:inline>$50 - $100 =
+/ hr</div></table></div><div class=3Dno-inline--stack-col style=3Dmax-width=
+:35%;display:inline-block;margin-bottom:8px;vertical-align:middle><table wi=
+dth=3D100%><tr><td class=3Dno-inline--button-td-white><a href=3D"https://ww=
+w.ziprecruiter.com/km/AAHZLuwTtPdMPgdEjb5JCQvnU6GnsXDnMPDrX952k-CPGAaCm2dqe=
+co6w97nqt8bluqwkf2oK_0HTmw1AP3mJCypKuzmqnrS_srODYtrLaKAOlTdM5w6I4kUlNEmZtuK=
+d19YlhhV-CkMVz3lOcNN3hzNoa0fHNeJVQVeN1-PSMBokYXAluCFFBJuZgZ1bFt9SOAYTftBimK=
+tckgxarrS70ejRO1vICMAQBsVdM6mDwSr4IOry1kf46yupGEqp4PixWv1Nv6gveL9Il_kfa4MZA=
+bTxl2KK8lhet_kuIRPZLqlx0kLH-hZJUlHys5TxtsVF2v_LjuJTtEL-lPIjogGFNaKEz833vUky=
+z09Ya01KEvyMHXwwYpZZVydY7YWE7Oay2EJHYT-MZj_?tsid=3D111000153&auth_token=3D5=
+_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a6=
+31&expires=3D1782074978" style=3D"color:#002325;font-weight:bold;width:100%=
+;display:block;border:1px solid #002325;border-radius:8px;padding:12px 0;te=
+xt-align:center" class=3Dno-inline--button-a-white> View Details </a></tabl=
+e></div></div><tr><td><div style=3D"padding:18px 24px;max-width:502px;borde=
+r-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><div style=3Dmarg=
+in-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-inline--job-title-=
+link-a truncate inline-block max-w-5/6 pr-2" href=3D"https://www.ziprecruit=
+er.com/km/AAHL4OHJUXWek8TTo0xinnvfNVea0F3zuByWqzNmNkM3D5-7I0bbC91NLlNV0itw_=
+YpJ_HtvjRJQuooT_zobKjLSj7Uo8K08Q6AXlqt_FKd3JKSYB3eUD0upEZ-q6s_pkYrVW0jbvqSW=
+1rMyur7FnepO2k08mjaC7QyTUO6mAJ64QZjkgdT8Dsu14a7uEyvjoTOc5LXB7vubOY0pd26cRQ3=
+YPxYDhscYfqwklrCAn64tR88rmDspeHV2Ainua2hv2iY5HxTdJkhvfUZf1H9INVu6f_yqtrLrSQ=
+4R1bUurABByJPlEls4glfm1B3D1VmO2p7j08TmlhbmHZcMddLPNQj57NMIUAiyvmB6FzHuQ5aM6=
+M920OW_PKmN7UdzQb6fcB3qC2_S?tsid=3D111000153&auth_token=3D5_1781729378_fGqT=
+G5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178=
+2074978" style=3Dfont-weight:bold;vertical-align:top> AI/ML Engineer </a></=
+div></div><div class=3Dno-inline--stack-col style=3Dmax-width:64%;display:i=
+nline-block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr=
+><td style=3Dvertical-align:middle width=3D15%><img alt=3DVXForward src=3Dh=
+ttps://ziprecruiter.com/img/no_company_logo.png style=3Dwidth:40px;vertical=
+-align:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>VXForwar=
+d =E2=80=A2 Washington, DC =E2=80=A2 Remote</p></table></div><div class=3Dn=
+o-inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-botto=
+m:8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--=
+button-td-white><a href=3D"https://www.ziprecruiter.com/km/AAHL4OHJUXWek8TT=
+o0xinnvfNVea0F3zuByWqzNmNkM3D5-7I0bbC91NLlNV0itw_YpJ_HtvjRJQuooT_zobKjLSj7U=
+o8K08Q6AXlqt_FKd3JKSYB3eUD0upEZ-q6s_pkYrVW0jbvqSW1rMyur7FnepO2k08mjaC7QyTUO=
+6mAJ64QZjkgdT8Dsu14a7uEyvjoTOc5LXB7vubOY0pd26cRQ3YPxYDhscYfqwklrCAn64tR88rm=
+DspeHV2Ainua2hv2iY5HxTdJkhvfUZf1H9INVu6f_yqtrLrSQ4R1bUurABByJPlEls4glfm1B3D=
+1VmO2p7j08TmlhbmHZcMddLPNQj57NMIUAiyvmB6FzHuQ5aM6M920OW_PKmN7UdzQb6fcB3qC2_=
+S?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9Vn=
+SPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color:#0=
+02325;font-weight:bold;width:100%;display:block;border:1px solid #002325;bo=
+rder-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--button=
+-a-white> View Details </a></table></div></div><tr><td><div style=3D"paddin=
+g:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-inl=
+ine--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inline>=
+<a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 pr-=
+2" href=3D"https://www.ziprecruiter.com/km/AAHtwZ0xpucYKge-x1pdkxexKiQ63qjK=
+pRaf5slCikZOMXNaj2b5VwSFiBJlajoHYdAktvSkZiko-uzFJfsO8HkBdLQ50oYH5Or7rJcnxYZ=
+QcY_MTFwFyGmecfRFKGwP8QQuHtvP67lODGgMToxb5hUdjexICHO8yZLIcsxkemmadfJXN9VCpZ=
+_gWkx0cyIczT7QKj6-GZy7XpJd2ToMk68ubhzkG7SYYbgxt0Yd_UbNAYO2Fk4VppgegiZnRgZcw=
+ybQkdq6VOvPZvI7nz5y0dcVLf1GfvnbAoHI6Nh4QaIw9uYgQVGhH7xe1UfTX6xc3xaOviwB3f8Y=
+WZJK0mB6IlRWsLDCw1oq0j98F3J0tdTziScHUKQCqY32S91gmixwK1M4gWxd?tsid=3D1110001=
+53&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&co=
+ntact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical=
+-align:top> GeoSCADA/Ignition Developer </a></div></div><div class=3Dno-inl=
+ine--stack-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8px=
+;vertical-align:middle><table width=3D100%><tr><td style=3Dvertical-align:m=
+iddle width=3D15%><img alt=3D"COLEXAS DIGITAL INC" src=3Dhttps://www.ziprec=
+ruiter.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/fc085c=
+01.jpeg style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px=
+;vertical-align:middle"><p>COLEXAS DIGITAL INC =E2=80=A2 Houston, TX =E2=80=
+=A2 Remote</p> <div style=3Dpadding-top:4px;><p style=3Dpadding-right:4px;d=
+isplay:inline>$80K - $140K / yr</div> <sup class=3D"no-inline--darkmode-tex=
+t no-inline--bsf-badge"><img src=3Dhttps://ziprecruiter.com/img/email/be-se=
+en-first.png>Be Seen First</sup></table></div><div class=3Dno-inline--stack=
+-col style=3Dmax-width:35%;display:inline-block;margin-bottom:8px;vertical-=
+align:middle><table width=3D100%><tr><td class=3Dno-inline--button-td-white=
+><a href=3D"https://www.ziprecruiter.com/km/AAHtwZ0xpucYKge-x1pdkxexKiQ63qj=
+KpRaf5slCikZOMXNaj2b5VwSFiBJlajoHYdAktvSkZiko-uzFJfsO8HkBdLQ50oYH5Or7rJcnxY=
+ZQcY_MTFwFyGmecfRFKGwP8QQuHtvP67lODGgMToxb5hUdjexICHO8yZLIcsxkemmadfJXN9VCp=
+Z_gWkx0cyIczT7QKj6-GZy7XpJd2ToMk68ubhzkG7SYYbgxt0Yd_UbNAYO2Fk4VppgegiZnRgZc=
+wybQkdq6VOvPZvI7nz5y0dcVLf1GfvnbAoHI6Nh4QaIw9uYgQVGhH7xe1UfTX6xc3xaOviwB3f8=
+YWZJK0mB6IlRWsLDCw1oq0j98F3J0tdTziScHUKQCqY32S91gmixwK1M4gWxd?tsid=3D111000=
+153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&c=
+ontact_id=3D78b9a631&expires=3D1782074978" style=3D"color:#002325;font-weig=
+ht:bold;width:100%;display:block;border:1px solid #002325;border-radius:8px=
+;padding:12px 0;text-align:center" class=3Dno-inline--button-a-white> View =
+Details </a></table></div></div><tr><td><div style=3D"padding:18px 24px;max=
+-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc=
+><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-=
+inline--job-title-link-a truncate inline-block max-w-5/6 pr-2" href=3D"http=
+s://www.ziprecruiter.com/km/AAHbh1o2Rk5aTrC-eUu6HhFJRnW3N3FbeIM1rNz1yplthBM=
+ADEDnHFrhYlciBGizKckMCVBItmBzOv-O2IHDWp3QYBahwSlgBvpaKRDLJvyLN6d0ZANcshFtwP=
+4c3rAnH7zYnHG6yhbNx2gKCEAtl_FE6-w_3xQu0pyrEZJPyEkgS7LDhiIWFHoYh41bm0qQxJZ6I=
+Dh4W21PTBfyBHY2D_rUqm31QHeYuAgXBOBdOsg94rUapodrVQexXezUrshqmFHuIlNOL5nv0JHm=
+NzDWJMYHNF1jWpRIURJMRrFhh1W7Q_ibftWe-HNFe0feRNA2rUBXKiEA39ayXkpI9NcCTINQSoO=
+pUyK5ZmmVL_cb8jwDvC1fLp2NXdsYc0RHbrNdGAtkuglUS5I?tsid=3D111000153&auth_toke=
+n=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D7=
+8b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical-align:top> =
+Machine Learning Engineer New Grad 2024-2025 -Remote </a></div></div><div c=
+lass=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-block;marg=
+in-bottom:8px;vertical-align:middle><table width=3D100%><tr><td style=3Dver=
+tical-align:middle width=3D15%><img alt=3DQuora src=3Dhttps://www.ziprecrui=
+ter.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/4733342e.=
+png style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px;ver=
+tical-align:middle"><p>Quora =E2=80=A2 Moscow, ID =E2=80=A2 Remote</p> <div=
+ style=3Dpadding-top:4px;><p style=3Dpadding-right:4px;display:inline>$140K=
+ - $168K / yr</div></table></div><div class=3Dno-inline--stack-col style=3D=
+max-width:35%;display:inline-block;margin-bottom:8px;vertical-align:middle>=
+<table width=3D100%><tr><td class=3Dno-inline--button-td-white><a href=3D"h=
+ttps://www.ziprecruiter.com/km/AAHbh1o2Rk5aTrC-eUu6HhFJRnW3N3FbeIM1rNz1yplt=
+hBMADEDnHFrhYlciBGizKckMCVBItmBzOv-O2IHDWp3QYBahwSlgBvpaKRDLJvyLN6d0ZANcshF=
+twP4c3rAnH7zYnHG6yhbNx2gKCEAtl_FE6-w_3xQu0pyrEZJPyEkgS7LDhiIWFHoYh41bm0qQxJ=
+Z6IDh4W21PTBfyBHY2D_rUqm31QHeYuAgXBOBdOsg94rUapodrVQexXezUrshqmFHuIlNOL5nv0=
+JHmNzDWJMYHNF1jWpRIURJMRrFhh1W7Q_ibftWe-HNFe0feRNA2rUBXKiEA39ayXkpI9NcCTINQ=
+SoOpUyK5ZmmVL_cb8jwDvC1fLp2NXdsYc0RHbrNdGAtkuglUS5I?tsid=3D111000153&auth_t=
+oken=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=
+=3D78b9a631&expires=3D1782074978" style=3D"color:#002325;font-weight:bold;w=
+idth:100%;display:block;border:1px solid #002325;border-radius:8px;padding:=
+12px 0;text-align:center" class=3Dno-inline--button-a-white> View Details <=
+/a></table></div></div><tr><td><div style=3D"padding:18px 24px;max-width:50=
+2px;border-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><div sty=
+le=3Dmargin-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-inline--j=
+ob-title-link-a truncate inline-block max-w-5/6 pr-2" href=3D"https://www.z=
+iprecruiter.com/km/AAFvW7hi7oO8TbFMMXvopmQKr9kV8UhOQ0KBj9NwWEY0Z9SO3F9DWJkl=
+zB0k1cSqoqOuUdu8mHZ-WdV_XgfAz73M7WyTghDLombQoXi-sg8lV_4orwoMgXwtkJztgUaEHIq=
+t6BLVRolX3Wd7x6D6mgC6SWXbfqkDHrozFs5ieIloCosXM9rwiWqLejfrPvoPYlk1qNf5BOb5Fe=
+msfyhOek1OFZ7NLna3nmgB2MV6hHZToQYcRFd-YSu_QOIE5wopzrL6Tj8-VZ1HVUII48oojmW6a=
+-rM3HgH876uGM6M18GhwJzf8uFVKTqJAG0WxeHGIXe4RVeiT5u15IdcKtjHVJESxDHLuA74SEm_=
+dg4AZPqkTHuY0ElAoCGkGXvOD-r-0ghOeleXDt8?tsid=3D111000153&auth_token=3D5_178=
+1729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&e=
+xpires=3D1782074978" style=3Dfont-weight:bold;vertical-align:top> Machine L=
+earning Engineer (PhD Intern) </a></div></div><div class=3Dno-inline--stack=
+-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8px;vertical-=
+align:middle><table width=3D100%><tr><td style=3Dvertical-align:middle widt=
+h=3D15%><img alt=3DInstacart src=3Dhttps://www.ziprecruiter.com/svc/fotomat=
+/public-nosensitive-ziprecruiter-logos/company/62d976bf.png style=3Dwidth:4=
+0px;vertical-align:middle><td style=3D"padding:0 8px;vertical-align:middle"=
+><p>Instacart =E2=80=A2 Coeur D Alene, ID</p></table></div><div class=3Dno-=
+inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom:=
+8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--bu=
+tton-td-white><a href=3D"https://www.ziprecruiter.com/km/AAFvW7hi7oO8TbFMMX=
+vopmQKr9kV8UhOQ0KBj9NwWEY0Z9SO3F9DWJklzB0k1cSqoqOuUdu8mHZ-WdV_XgfAz73M7WyTg=
+hDLombQoXi-sg8lV_4orwoMgXwtkJztgUaEHIqt6BLVRolX3Wd7x6D6mgC6SWXbfqkDHrozFs5i=
+eIloCosXM9rwiWqLejfrPvoPYlk1qNf5BOb5FemsfyhOek1OFZ7NLna3nmgB2MV6hHZToQYcRFd=
+-YSu_QOIE5wopzrL6Tj8-VZ1HVUII48oojmW6a-rM3HgH876uGM6M18GhwJzf8uFVKTqJAG0Wxe=
+HGIXe4RVeiT5u15IdcKtjHVJESxDHLuA74SEm_dg4AZPqkTHuY0ElAoCGkGXvOD-r-0ghOeleXD=
+t8?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9V=
+nSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color:#=
+002325;font-weight:bold;width:100%;display:block;border:1px solid #002325;b=
+order-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--butto=
+n-a-white> View Details </a></table></div></div><tr><td><div style=3D"paddi=
+ng:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-in=
+line--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inline=
+><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 pr=
+-2" href=3D"https://www.ziprecruiter.com/km/AAHCOzelMTtWhu_HYUSZPh_MuOsHwTF=
+-WnFjf6DmwY80gAdNIjwG_LGgDLrdhcYSzAFE0GsFuVo423pRKSQFmZaZbnI7o2GBSvk1ANmQuy=
+yJ5zGyYVuNq9J7OmKVPtGttJBzsmEGSWRncqlJlFjuoyErJSke6WInvf7vDRTVqbuwfwxI-kzWe=
+g1XQLYM-MatZqajQk3wfkP4gbxYrpXPc-WFA-naw7seGrwOiQLN1oJTonX97sB0iISpe5dOBJ3K=
+vhhws0lY5mYm2qfYk-gYGQYZDUT2wxtIYbgP0KSfAJw73sgNpDE0imUCYyKQ6DI5bNNovcos-cp=
+-2WI5gLYVthCHlGJdOhK4E9a2j8B9c5E_aztxDMiBru6fpc9iHJMfAutI-sJD_83J?tsid=3D11=
+1000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0=
+ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;ver=
+tical-align:top> Machine Learning Engineer-Los Angeles,California </a></div=
+></div><div class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inli=
+ne-block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><t=
+d style=3Dvertical-align:middle width=3D15%><img alt=3DHADRIAN src=3Dhttps:=
+//ziprecruiter.com/img/no_company_logo.png style=3Dwidth:40px;vertical-alig=
+n:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>HADRIAN =E2=
+=80=A2 Lawndale, CA</p> <div style=3Dpadding-top:4px;><p style=3Dpadding-ri=
+ght:4px;display:inline>$160K - $250K / yr</div></table></div><div class=3Dn=
+o-inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-botto=
+m:8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--=
+button-td-white><a href=3D"https://www.ziprecruiter.com/km/AAHCOzelMTtWhu_H=
+YUSZPh_MuOsHwTF-WnFjf6DmwY80gAdNIjwG_LGgDLrdhcYSzAFE0GsFuVo423pRKSQFmZaZbnI=
+7o2GBSvk1ANmQuyyJ5zGyYVuNq9J7OmKVPtGttJBzsmEGSWRncqlJlFjuoyErJSke6WInvf7vDR=
+TVqbuwfwxI-kzWeg1XQLYM-MatZqajQk3wfkP4gbxYrpXPc-WFA-naw7seGrwOiQLN1oJTonX97=
+sB0iISpe5dOBJ3Kvhhws0lY5mYm2qfYk-gYGQYZDUT2wxtIYbgP0KSfAJw73sgNpDE0imUCYyKQ=
+6DI5bNNovcos-cp-2WI5gLYVthCHlGJdOhK4E9a2j8B9c5E_aztxDMiBru6fpc9iHJMfAutI-sJ=
+D_83J?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAO=
+c9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"colo=
+r:#002325;font-weight:bold;width:100%;display:block;border:1px solid #00232=
+5;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--bu=
+tton-a-white> View Details </a></table></div></div><tr><td><div style=3D"pa=
+dding:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno=
+-inline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inl=
+ine><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6=
+ pr-2" href=3D"https://www.ziprecruiter.com/km/AAFLpiz8uBMiQIJbPyX_qcLOxcQ2=
+O17fVLv0NYUD_tc0Kcm5ROcubCwPrTYKWGoXR5a304ZgLw143YxeBViXELvG__cOSvOfOS9BWXx=
+yMhfYE6ILl5dj66MfibJp7sfUWmSw2v4H2DJsezYYYp58VUsHigN09nwHrbPVp7ENYfQrBIIxbS=
+RcOcoCfjBnn10aSpC9lpqJEO2YUUbRpJ3_HVc6eUvm3YYnZp5IbmiVWqk89G9MWFfEH53ozOiOG=
+X5-rRT39EOP_1jo_yPe8Ueupb2Mc-Uc-M3cbbJWAJ33BSza5kfNElRAq3zxnLW8-MKjoPitKhHA=
+WrPma51zvL1nN5zvXwmCdECFEL6GMbuaPBW9OZ4tOhWiMe1UsQ9L8PhgqXwB822kogr_?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bol=
+d;vertical-align:top> Machine Learning Engineer </a></div></div><div class=
+=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-block;margin-b=
+ottom:8px;vertical-align:middle><table width=3D100%><tr><td style=3Dvertica=
+l-align:middle width=3D15%><img alt=3D"Acceler8 Talent" src=3Dhttps://zipre=
+cruiter.com/img/no_company_logo.png style=3Dwidth:40px;vertical-align:middl=
+e><td style=3D"padding:0 8px;vertical-align:middle"><p>Acceler8 Talent =E2=
+=80=A2 San Francisco, CA</p></table></div><div class=3Dno-inline--stack-col=
+ style=3Dmax-width:35%;display:inline-block;margin-bottom:8px;vertical-alig=
+n:middle><table width=3D100%><tr><td class=3Dno-inline--button-td-white><a =
+href=3D"https://www.ziprecruiter.com/km/AAFLpiz8uBMiQIJbPyX_qcLOxcQ2O17fVLv=
+0NYUD_tc0Kcm5ROcubCwPrTYKWGoXR5a304ZgLw143YxeBViXELvG__cOSvOfOS9BWXxyMhfYE6=
+ILl5dj66MfibJp7sfUWmSw2v4H2DJsezYYYp58VUsHigN09nwHrbPVp7ENYfQrBIIxbSRcOcoCf=
+jBnn10aSpC9lpqJEO2YUUbRpJ3_HVc6eUvm3YYnZp5IbmiVWqk89G9MWFfEH53ozOiOGX5-rRT3=
+9EOP_1jo_yPe8Ueupb2Mc-Uc-M3cbbJWAJ33BSza5kfNElRAq3zxnLW8-MKjoPitKhHAWrPma51=
+zvL1nN5zvXwmCdECFEL6GMbuaPBW9OZ4tOhWiMe1UsQ9L8PhgqXwB822kogr_?tsid=3D111000=
+153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&c=
+ontact_id=3D78b9a631&expires=3D1782074978" style=3D"color:#002325;font-weig=
+ht:bold;width:100%;display:block;border:1px solid #002325;border-radius:8px=
+;padding:12px 0;text-align:center" class=3Dno-inline--button-a-white> View =
+Details </a></table></div></div><tr><td><div style=3D"padding:18px 24px;max=
+-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc=
+><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-=
+inline--job-title-link-a truncate inline-block max-w-5/6 pr-2" href=3D"http=
+s://www.ziprecruiter.com/km/AAEo71X-JykvldDjBmi-gfDUT3gMfOMfTnXrFVFjX1dSaQ3=
+5iDU0t97gC553WvNmPAiVcuqm0913eXOtuJD5EwzSqrCHn0yGZKutGLhEwdM5fzmvX1fDiv2qRd=
+4_tZaqI3sy0mbbWtUxUopNjnRhBvJEYbLIey388smkln0NKrqnR_04_W7guZNeNjEP24psqiTKC=
+XpqhYPcXNZk1bFSym1lOEdicH95ZX9kDVNqrABLCMZHCac6Ca3it_TADW0BQhNy58V1IAlbAvHB=
+tfFGFYcC2HE-cHaN4RXbQQIlfKxhsRhw-gn1YW6UYxRLFsbIM5RfpF3cuncLJoutN8akyD97xDX=
+-nhS1_94dWNIhS_STJryF570HlVTkwbLCsm9GqMvTkUmRCdSs?tsid=3D111000153&auth_tok=
+en=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D=
+78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical-align:top>=
+ Machine Learning Engineer, Monetization Engineering </a></div></div><div c=
+lass=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-block;marg=
+in-bottom:8px;vertical-align:middle><table width=3D100%><tr><td style=3Dver=
+tical-align:middle width=3D15%><img alt=3DPinterest src=3Dhttps://www.zipre=
+cruiter.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/6fc0b=
+edf.png style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px=
+;vertical-align:middle"><p>Pinterest</p></table></div><div class=3Dno-inlin=
+e--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom:8px;v=
+ertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--button-=
+td-white><a href=3D"https://www.ziprecruiter.com/km/AAEo71X-JykvldDjBmi-gfD=
+UT3gMfOMfTnXrFVFjX1dSaQ35iDU0t97gC553WvNmPAiVcuqm0913eXOtuJD5EwzSqrCHn0yGZK=
+utGLhEwdM5fzmvX1fDiv2qRd4_tZaqI3sy0mbbWtUxUopNjnRhBvJEYbLIey388smkln0NKrqnR=
+_04_W7guZNeNjEP24psqiTKCXpqhYPcXNZk1bFSym1lOEdicH95ZX9kDVNqrABLCMZHCac6Ca3i=
+t_TADW0BQhNy58V1IAlbAvHBtfFGFYcC2HE-cHaN4RXbQQIlfKxhsRhw-gn1YW6UYxRLFsbIM5R=
+fpF3cuncLJoutN8akyD97xDX-nhS1_94dWNIhS_STJryF570HlVTkwbLCsm9GqMvTkUmRCdSs?t=
+sid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPT=
+sKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color:#0023=
+25;font-weight:bold;width:100%;display:block;border:1px solid #002325;borde=
+r-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--button-a-=
+white> View Details </a></table></div></div><tr><td><div style=3D"padding:1=
+8px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-inline=
+--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inline><a =
+class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 pr-2" =
+href=3D"https://www.ziprecruiter.com/km/AAG1nfluNgp5mH-UTztKjqi9PyiSKcw9qNF=
+DYzkHu-A7jlFNRN4Jz982lhFwqNW4r9Cqp3NzRIJJe19mTe6kPbEGQ6SHGPqlwTBWYt5fSOVuG7=
+5fwrwTrmPxEpqm_z11J4LEMS5DT9saPVbPUAVOwHO_8TgUk5dKTDhr1mdRTe3lbgpcmn4VKwGkT=
+1m3rRMgv4kHg-vtLD0fj3Zrb2bjHRw2cYbij6JKK01eQ2l1ptXH8mGqVGxtH8YRll9YoVf4rl7K=
+gIOTAa-9gvFEys6waml16CN774sq9t7jUz6cEoVu4RvDeuq_0uEt_lfFr3XpHUuAQaqlcLNrQw-=
+d_jdLuQ50YDYxNKB0lYdTx-NAF0rWpckhaAKtAaG_1yVGvm-Q_OihhIJD_MCV?tsid=3D111000=
+153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&c=
+ontact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertica=
+l-align:top> Research Engineer, Machine Learning Systems </a></div></div><d=
+iv class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-block;=
+margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td style=
+=3Dvertical-align:middle width=3D15%><img alt=3DDeepgram src=3Dhttps://www.=
+ziprecruiter.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/=
+31dc7464.png style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:=
+0 8px;vertical-align:middle"><p>Deepgram</p></table></div><div class=3Dno-i=
+nline--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom:8=
+px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--but=
+ton-td-white><a href=3D"https://www.ziprecruiter.com/km/AAG1nfluNgp5mH-UTzt=
+Kjqi9PyiSKcw9qNFDYzkHu-A7jlFNRN4Jz982lhFwqNW4r9Cqp3NzRIJJe19mTe6kPbEGQ6SHGP=
+qlwTBWYt5fSOVuG75fwrwTrmPxEpqm_z11J4LEMS5DT9saPVbPUAVOwHO_8TgUk5dKTDhr1mdRT=
+e3lbgpcmn4VKwGkT1m3rRMgv4kHg-vtLD0fj3Zrb2bjHRw2cYbij6JKK01eQ2l1ptXH8mGqVGxt=
+H8YRll9YoVf4rl7KgIOTAa-9gvFEys6waml16CN774sq9t7jUz6cEoVu4RvDeuq_0uEt_lfFr3X=
+pHUuAQaqlcLNrQw-d_jdLuQ50YDYxNKB0lYdTx-NAF0rWpckhaAKtAaG_1yVGvm-Q_OihhIJD_M=
+CV?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9V=
+nSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color:#=
+002325;font-weight:bold;width:100%;display:block;border:1px solid #002325;b=
+order-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--butto=
+n-a-white> View Details </a></table></div></div><tr><td><div style=3D"paddi=
+ng:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-in=
+line--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inline=
+><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 pr=
+-2" href=3D"https://www.ziprecruiter.com/km/AAH-EvII_DQBpTsDMYR7lek1hudFt8D=
+sm352SVRFxsCESoRYVTwyJhdNGb3lZDnAkWpJeThSsqaGVMH1-23zqrdTPmrScz_6A7S2WtRbvd=
+ypdJ1Tl5c6_IPazJ-JGyvRlPY4cf2IOIt-uqJk7ibXJ8Fc4HsFAz99rRzPbYbmCljoVqejkgxZ1=
+7WtawvlNcf2KrJQLL4NtvH94PKssj1hr00IgnYQ9G1lhq-wM1JLDOP-RPccpBKwTC11NAqRV0Wl=
+bc80Q0cn0DsIw0TrfcDc0qvbJ0IwLHOJxQRrVTXyikOrrR-j7mcXm4Rlj_LdGEP_T-euY9dNREU=
+TEFxReDzko1E5j32jmN11yEI1D9c8aON-0aQoI8vgG0P_WNecVRBdr0W5PGNQE0ue?tsid=3D11=
+1000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0=
+ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;ver=
+tical-align:top> Perception Engineer </a></div></div><div class=3Dno-inline=
+--stack-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8px;ve=
+rtical-align:middle><table width=3D100%><tr><td style=3Dvertical-align:midd=
+le width=3D15%><img alt=3DAquabyte src=3Dhttps://ziprecruiter.com/img/no_co=
+mpany_logo.png style=3Dwidth:40px;vertical-align:middle><td style=3D"paddin=
+g:0 8px;vertical-align:middle"><p>Aquabyte</p></table></div><div class=3Dno=
+-inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom=
+:8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--b=
+utton-td-white><a href=3D"https://www.ziprecruiter.com/km/AAH-EvII_DQBpTsDM=
+YR7lek1hudFt8Dsm352SVRFxsCESoRYVTwyJhdNGb3lZDnAkWpJeThSsqaGVMH1-23zqrdTPmrS=
+cz_6A7S2WtRbvdypdJ1Tl5c6_IPazJ-JGyvRlPY4cf2IOIt-uqJk7ibXJ8Fc4HsFAz99rRzPbYb=
+mCljoVqejkgxZ17WtawvlNcf2KrJQLL4NtvH94PKssj1hr00IgnYQ9G1lhq-wM1JLDOP-RPccpB=
+KwTC11NAqRV0Wlbc80Q0cn0DsIw0TrfcDc0qvbJ0IwLHOJxQRrVTXyikOrrR-j7mcXm4Rlj_LdG=
+EP_T-euY9dNREUTEFxReDzko1E5j32jmN11yEI1D9c8aON-0aQoI8vgG0P_WNecVRBdr0W5PGNQ=
+E0ue?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc=
+9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color=
+:#002325;font-weight:bold;width:100%;display:block;border:1px solid #002325=
+;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--but=
+ton-a-white> View Details </a></table></div></div><tr><td><div style=3D"pad=
+ding:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-=
+inline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inli=
+ne><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 =
+pr-2" href=3D"https://www.ziprecruiter.com/km/AAFhasCjGJstO13SXpCNnK9qpx1Ao=
+DqdIVvi7lveVEaVecgwNv1KOYcihY_rcMMZx1-u4wUU-s5cPFOPaM31OALByrtvTeQBKcvJYH65=
+1HSxz5vWyBOvjEC-Wi9z5UpV__HhD5-OqJDkOUkjckxpebDi_8Y9iGoKar0wdYiLE3obgJPweSX=
+iaHsdz3VQJGpf0HAfiXjp0JodD7ftl2hJRurvPKysqgaRzAcQWcwxEH-yErflHSqcDRPbYj774H=
+esOFPXjE6IrJ8B48dNe_zMlZHVYnGmU73X1ZAQi3-6Nl_dNKKNXHN1PGA9hiwrU-iQ2GUH9Mqqb=
+jZ5FI_YMGOKOHo3x_RNNVZKYvP8WFWdMfgo_bPsCKV8fGna47pzqmVtYWwEcEC_UhCG?tsid=3D=
+111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3L=
+P0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;v=
+ertical-align:top> Machine Learning Engineer, Integrity </a></div></div><di=
+v class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-block;m=
+argin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td style=3D=
+vertical-align:middle width=3D15%><img alt=3DHackerRank src=3Dhttps://www.z=
+iprecruiter.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/3=
+6259721.png style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0=
+ 8px;vertical-align:middle"><p>HackerRank</p></table></div><div class=3Dno-=
+inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom:=
+8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--bu=
+tton-td-white><a href=3D"https://www.ziprecruiter.com/km/AAFhasCjGJstO13SXp=
+CNnK9qpx1AoDqdIVvi7lveVEaVecgwNv1KOYcihY_rcMMZx1-u4wUU-s5cPFOPaM31OALByrtvT=
+eQBKcvJYH651HSxz5vWyBOvjEC-Wi9z5UpV__HhD5-OqJDkOUkjckxpebDi_8Y9iGoKar0wdYiL=
+E3obgJPweSXiaHsdz3VQJGpf0HAfiXjp0JodD7ftl2hJRurvPKysqgaRzAcQWcwxEH-yErflHSq=
+cDRPbYj774HesOFPXjE6IrJ8B48dNe_zMlZHVYnGmU73X1ZAQi3-6Nl_dNKKNXHN1PGA9hiwrU-=
+iQ2GUH9MqqbjZ5FI_YMGOKOHo3x_RNNVZKYvP8WFWdMfgo_bPsCKV8fGna47pzqmVtYWwEcEC_U=
+hCG?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9=
+VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color:=
+#002325;font-weight:bold;width:100%;display:block;border:1px solid #002325;=
+border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--butt=
+on-a-white> View Details </a></table></div></div><tr><td><div style=3D"padd=
+ing:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-i=
+nline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inlin=
+e><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 p=
+r-2" href=3D"https://www.ziprecruiter.com/km/AAEb1gweU_jqql0_HQB-9Ia6n8pDps=
+GqO9SNsGikePwNI8UbTzDVJ_V6l7miHZ0ZzG_hBka7IfCJbOvCbC3E6sIhDACRJPCqKLh6lNTia=
+RcwtV18bpnIlnW0iZf-1Y8rw397xlU71HS8vN2rqFAyQitKjFZdWy9ZbZB87qcIeqRhECoWhEqZ=
+kDpxKSHd-GOtd-9Xtsa8qtuwM5XejVZhT23wMUImgTXHtmUCKAWRaq31kDGnfI34oqiY2ON9S6W=
+K-FhpxY1ByVmQvq_CarZcRMgOH6638CCH2dczlDSKdWEUv7RzZUbWUDuNeMh5QygmH9qF0b9XlJ=
+HrNleCkMZhwtbcKjUjlPi04fPCV1fk-wvJRh1IYIgaJYyS_esykP3n1LMglDmQbxOG?tsid=3D1=
+11000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP=
+0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;ve=
+rtical-align:top> Physics Expert - Remote </a></div></div><div class=3Dno-i=
+nline--stack-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8=
+px;vertical-align:middle><table width=3D100%><tr><td style=3Dvertical-align=
+:middle width=3D15%><img alt=3D"YO IT Consulting" src=3Dhttps://ziprecruite=
+r.com/img/no_company_logo.png style=3Dwidth:40px;vertical-align:middle><td =
+style=3D"padding:0 8px;vertical-align:middle"><p>YO IT Consulting</p></tabl=
+e></div><div class=3Dno-inline--stack-col style=3Dmax-width:35%;display:inl=
+ine-block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><=
+td class=3Dno-inline--button-td-white><a href=3D"https://www.ziprecruiter.c=
+om/km/AAEb1gweU_jqql0_HQB-9Ia6n8pDpsGqO9SNsGikePwNI8UbTzDVJ_V6l7miHZ0ZzG_hB=
+ka7IfCJbOvCbC3E6sIhDACRJPCqKLh6lNTiaRcwtV18bpnIlnW0iZf-1Y8rw397xlU71HS8vN2r=
+qFAyQitKjFZdWy9ZbZB87qcIeqRhECoWhEqZkDpxKSHd-GOtd-9Xtsa8qtuwM5XejVZhT23wMUI=
+mgTXHtmUCKAWRaq31kDGnfI34oqiY2ON9S6WK-FhpxY1ByVmQvq_CarZcRMgOH6638CCH2dczlD=
+SKdWEUv7RzZUbWUDuNeMh5QygmH9qF0b9XlJHrNleCkMZhwtbcKjUjlPi04fPCV1fk-wvJRh1IY=
+IgaJYyS_esykP3n1LMglDmQbxOG?tsid=3D111000153&auth_token=3D5_1781729378_fGqT=
+G5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178=
+2074978" style=3D"color:#002325;font-weight:bold;width:100%;display:block;b=
+order:1px solid #002325;border-radius:8px;padding:12px 0;text-align:center"=
+ class=3Dno-inline--button-a-white> View Details </a></table></div></div><t=
+r><td><div style=3D"padding:18px 24px;max-width:502px;border-bottom:1px sol=
+id #d6d6d6" class=3Dno-inline--two-col-jc><div style=3Dmargin-bottom:8px><d=
+iv style=3Ddisplay:inline><a class=3D"no-inline--job-title-link-a truncate =
+inline-block max-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/km/AAFNcM=
+DFsNvRaxr9xJ3LiVW7vWaAjVKFwNJZnFU9Ayf76si5rhqwvlMYx5UXrHE2up-4jeoXJBlHj7DcW=
+HWwnbEvoH3g-wIXeWAqZadpLSqNhLbCB2JEygY7W8vXTacMFD2Mu-R8v1Bv_PQ0-DLOHJkHZ1IT=
+ugZ9sVzKZkdTxw7VrmcuEUOsSyAVfRCekRwyyQeVZI-MCEFOhNUzbqwvxYL4eisPiJWsHCgAhJG=
+hpkWq4WNAVhIaVukYaIPPDCf0stHeCGfmlXDhMoAKZaXVIWJN1UDqOTZMVQ4fQ0mSrCYBCfaUca=
+L9_is_GtBsL-CZPj_8nuQjXfXWE5dd4Ql6o50TcYdXbtjTx5uEBKRXQ-b2YCbUxkBZ9chlJIKmY=
+P5Vav4kECGfYFlb?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_=
+zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" sty=
+le=3Dfont-weight:bold;vertical-align:top> Senior Machine Learning Engineer =
+(Nova) </a></div></div><div class=3Dno-inline--stack-col style=3Dmax-width:=
+64%;display:inline-block;margin-bottom:8px;vertical-align:middle><table wid=
+th=3D100%><tr><td style=3Dvertical-align:middle width=3D15%><img alt=3DIter=
+able src=3Dhttps://www.ziprecruiter.com/svc/fotomat/public-nosensitive-zipr=
+ecruiter-logos/company/a621db41.png style=3Dwidth:40px;vertical-align:middl=
+e><td style=3D"padding:0 8px;vertical-align:middle"><p>Iterable</p> <div st=
+yle=3Dpadding-top:4px;><p style=3Dpadding-right:4px;display:inline>$107K - =
+$147K / yr</p><sup class=3D"bg-zr-background-gray rounded font-bold no-inli=
+ne--darkmode-text no-inline--pill-box" style=3Dpadding:4px;vertical-align:m=
+iddle;font-size:12px>Estimated Pay</sup></div></table></div><div class=3Dno=
+-inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom=
+:8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--b=
+utton-td-white><a href=3D"https://www.ziprecruiter.com/km/AAFNcMDFsNvRaxr9x=
+J3LiVW7vWaAjVKFwNJZnFU9Ayf76si5rhqwvlMYx5UXrHE2up-4jeoXJBlHj7DcWHWwnbEvoH3g=
+-wIXeWAqZadpLSqNhLbCB2JEygY7W8vXTacMFD2Mu-R8v1Bv_PQ0-DLOHJkHZ1ITugZ9sVzKZkd=
+Txw7VrmcuEUOsSyAVfRCekRwyyQeVZI-MCEFOhNUzbqwvxYL4eisPiJWsHCgAhJGhpkWq4WNAVh=
+IaVukYaIPPDCf0stHeCGfmlXDhMoAKZaXVIWJN1UDqOTZMVQ4fQ0mSrCYBCfaUcaL9_is_GtBsL=
+-CZPj_8nuQjXfXWE5dd4Ql6o50TcYdXbtjTx5uEBKRXQ-b2YCbUxkBZ9chlJIKmYP5Vav4kECGf=
+YFlb?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc=
+9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color=
+:#002325;font-weight:bold;width:100%;display:block;border:1px solid #002325=
+;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--but=
+ton-a-white> View Details </a></table></div></div><tr><td><div style=3D"pad=
+ding:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-=
+inline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inli=
+ne><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 =
+pr-2" href=3D"https://www.ziprecruiter.com/km/AAHuhizzHET_uVtQp0kQHmvyvRxJD=
+dX8sC6adp3RveHPHtcrzGymPvyd_a2l3mLQxWXMivam6lT1lN7aisD174_jNmynfJxKJVItIFgl=
+Bbps3qqqDs2LIDSCeTCkKDCUefWjo_fmvxz3mYnvm1P7_oP1AR-XCouxKrYvL-MogLR2jDkzzXD=
+atEjULUygwXeo3oc4yJfj1_JsbEEg6toWdts5AIG0N0nUZwWYYC2FichVTp2phLZ1jeD8wVMdvW=
+7bli4WvNy7DQMUqUTSNp7iTz_RoGYrXtZ61k5Tx1vCvyjL7j9eoyznZLKbkUq1AIH8Gm5SsQ-yv=
+_WrelfB_dgiKwtgLDE3kJJ22omizcCnmgvhIhZ14BQBP8A142w4roFRtuLVhYXdPni7?tsid=3D=
+111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3L=
+P0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;v=
+ertical-align:top> Lead Flutter Engineer </a></div></div><div class=3Dno-in=
+line--stack-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8p=
+x;vertical-align:middle><table width=3D100%><tr><td style=3Dvertical-align:=
+middle width=3D15%><img alt=3DgoTenna src=3Dhttps://www.ziprecruiter.com/sv=
+c/fotomat/public-nosensitive-ziprecruiter-logos/company/4809d563.jpeg style=
+=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px;vertical-ali=
+gn:middle"><p>goTenna =E2=80=A2 Phoenix, AZ =E2=80=A2 Remote</p> <div style=
+=3Dpadding-top:4px;><p style=3Dpadding-right:4px;display:inline>$170K - $20=
+0K / yr</div></table></div><div class=3Dno-inline--stack-col style=3Dmax-wi=
+dth:35%;display:inline-block;margin-bottom:8px;vertical-align:middle><table=
+ width=3D100%><tr><td class=3Dno-inline--button-td-white><a href=3D"https:/=
+/www.ziprecruiter.com/km/AAHuhizzHET_uVtQp0kQHmvyvRxJDdX8sC6adp3RveHPHtcrzG=
+ymPvyd_a2l3mLQxWXMivam6lT1lN7aisD174_jNmynfJxKJVItIFglBbps3qqqDs2LIDSCeTCkK=
+DCUefWjo_fmvxz3mYnvm1P7_oP1AR-XCouxKrYvL-MogLR2jDkzzXDatEjULUygwXeo3oc4yJfj=
+1_JsbEEg6toWdts5AIG0N0nUZwWYYC2FichVTp2phLZ1jeD8wVMdvW7bli4WvNy7DQMUqUTSNp7=
+iTz_RoGYrXtZ61k5Tx1vCvyjL7j9eoyznZLKbkUq1AIH8Gm5SsQ-yv_WrelfB_dgiKwtgLDE3kJ=
+J22omizcCnmgvhIhZ14BQBP8A142w4roFRtuLVhYXdPni7?tsid=3D111000153&auth_token=
+=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78=
+b9a631&expires=3D1782074978" style=3D"color:#002325;font-weight:bold;width:=
+100%;display:block;border:1px solid #002325;border-radius:8px;padding:12px =
+0;text-align:center" class=3Dno-inline--button-a-white> View Details </a></=
+table></div></div><tr><td><div style=3D"padding:18px 24px;max-width:502px;b=
+order-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><div style=3D=
+margin-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-inline--job-ti=
+tle-link-a truncate inline-block max-w-5/6 pr-2" href=3D"https://www.ziprec=
+ruiter.com/km/AAHUJuaR_j99i0QwPfPe0ZNj0m3z3l_-6DacyxmxCLAAcXBLDQaHcAffTC5By=
+zdt8hE-E6hWVNZ4h8fvDkTujeOX8IvwV4ovuxkuPPdChQMLoh5VBlJcWcSWgYmsrAzGwT3hegQO=
+KmHqBY4JbFFJIunWnLmeeCjINpC4DAcNLVC1CJVVTt0a2-lhrJVcdBhOJ7gWTspXC3jER1-h35E=
+TZTkf6cEATFtC1P-MUtQZzByLE9TdzjFzvlh07kN66GqtBoABZpuoUYCSsl0l1gTP1ZohgNxksh=
+utrD42IGX6-IhVbMoi62MItDwXLauM4a6aHpy6FPmOdIaxxFp8khM95pQalklhxO-QuMIcXQsFq=
+rnSNlwFVVwcZQkHgY4-MzF-585rQBGw1P2T?tsid=3D111000153&auth_token=3D5_1781729=
+378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expir=
+es=3D1782074978" style=3Dfont-weight:bold;vertical-align:top> Software Engi=
+neer Intern </a></div></div><div class=3Dno-inline--stack-col style=3Dmax-w=
+idth:64%;display:inline-block;margin-bottom:8px;vertical-align:middle><tabl=
+e width=3D100%><tr><td style=3Dvertical-align:middle width=3D15%><img alt=
+=3D"CUBRC Inc." src=3Dhttps://www.ziprecruiter.com/svc/fotomat/public-nosen=
+sitive-ziprecruiter-logos/company/0087435f.jpeg style=3Dwidth:40px;vertical=
+-align:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>CUBRC In=
+c. =E2=80=A2 Buffalo, NY =E2=80=A2 Remote</p> <div style=3Dpadding-top:4px;=
+><p style=3Dpadding-right:4px;display:inline>$24 - $35 / hr</div></table></=
+div><div class=3Dno-inline--stack-col style=3Dmax-width:35%;display:inline-=
+block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td c=
+lass=3Dno-inline--button-td-white><a href=3D"https://www.ziprecruiter.com/k=
+m/AAHUJuaR_j99i0QwPfPe0ZNj0m3z3l_-6DacyxmxCLAAcXBLDQaHcAffTC5Byzdt8hE-E6hWV=
+NZ4h8fvDkTujeOX8IvwV4ovuxkuPPdChQMLoh5VBlJcWcSWgYmsrAzGwT3hegQOKmHqBY4JbFFJ=
+IunWnLmeeCjINpC4DAcNLVC1CJVVTt0a2-lhrJVcdBhOJ7gWTspXC3jER1-h35ETZTkf6cEATFt=
+C1P-MUtQZzByLE9TdzjFzvlh07kN66GqtBoABZpuoUYCSsl0l1gTP1ZohgNxkshutrD42IGX6-I=
+hVbMoi62MItDwXLauM4a6aHpy6FPmOdIaxxFp8khM95pQalklhxO-QuMIcXQsFqrnSNlwFVVwcZ=
+QkHgY4-MzF-585rQBGw1P2T?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5Ij=
+cbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074=
+978" style=3D"color:#002325;font-weight:bold;width:100%;display:block;borde=
+r:1px solid #002325;border-radius:8px;padding:12px 0;text-align:center" cla=
+ss=3Dno-inline--button-a-white> View Details </a></table></div></div><tr><t=
+d><div style=3D"padding:18px 24px;max-width:502px;border-bottom:1px solid #=
+d6d6d6" class=3Dno-inline--two-col-jc><div style=3Dmargin-bottom:8px><div s=
+tyle=3Ddisplay:inline><a class=3D"no-inline--job-title-link-a truncate inli=
+ne-block max-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/km/AAHj8shwD1=
+VvpfFqhDv5IoSDYzCPTy_tVwo2JKzRL0hjF0yy2KXrTYfD0vDciGiOaWcPAyPNXWX8XjewpGwCd=
+NDeU1wX3-m3QSAslfijN9yYWWtjpoJGgCALxbbUSnH5_FYGTZjiYRwiRS0faoGRTyym_2BqTdlZ=
+r-kh6YS1ssLqHoZNBLbyXVEmkGoyxYhUBkVZM5t-Y2LF0KC570tUwoOQoQWgrW7rtk7B_R2mmQb=
+bApA8CLRMW3fOgk3Axlsm8KXvM8LgsTaXz_R_O-_YqKwNLSgJXLqLPSnr2Mmjfv957s1tcQwdvO=
+00I9DEFD78wdlaK0RhZTYfse-_OPnF_qECHQUi-cfgZqntBshISFxXOCQRZL1MR5fr8BmnF7blA=
+nfT4zaCO2Rl?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgB=
+jmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=
+=3Dfont-weight:bold;vertical-align:top> Data Scientist/Engineer - Junior (R=
+emote) </a></div></div><div class=3Dno-inline--stack-col style=3Dmax-width:=
+64%;display:inline-block;margin-bottom:8px;vertical-align:middle><table wid=
+th=3D100%><tr><td style=3Dvertical-align:middle width=3D15%><img alt=3DSyne=
+rgisticIT src=3Dhttps://www.ziprecruiter.com/svc/fotomat/public-nosensitive=
+-ziprecruiter-logos/company/c57507ef.png style=3Dwidth:40px;vertical-align:=
+middle><td style=3D"padding:0 8px;vertical-align:middle"><p>SynergisticIT =
+=E2=80=A2 Portland, OR =E2=80=A2 In-person</p></table></div><div class=3Dno=
+-inline--stack-col style=3Dmax-width:35%;display:inline-block;margin-bottom=
+:8px;vertical-align:middle><table width=3D100%><tr><td class=3Dno-inline--b=
+utton-td-white><a href=3D"https://www.ziprecruiter.com/km/AAHj8shwD1VvpfFqh=
+Dv5IoSDYzCPTy_tVwo2JKzRL0hjF0yy2KXrTYfD0vDciGiOaWcPAyPNXWX8XjewpGwCdNDeU1wX=
+3-m3QSAslfijN9yYWWtjpoJGgCALxbbUSnH5_FYGTZjiYRwiRS0faoGRTyym_2BqTdlZr-kh6YS=
+1ssLqHoZNBLbyXVEmkGoyxYhUBkVZM5t-Y2LF0KC570tUwoOQoQWgrW7rtk7B_R2mmQbbApA8CL=
+RMW3fOgk3Axlsm8KXvM8LgsTaXz_R_O-_YqKwNLSgJXLqLPSnr2Mmjfv957s1tcQwdvO00I9DEF=
+D78wdlaK0RhZTYfse-_OPnF_qECHQUi-cfgZqntBshISFxXOCQRZL1MR5fr8BmnF7blAnfT4zaC=
+O2Rl?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc=
+9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color=
+:#002325;font-weight:bold;width:100%;display:block;border:1px solid #002325=
+;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--but=
+ton-a-white> View Details </a></table></div></div><tr><td><div style=3D"pad=
+ding:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-=
+inline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inli=
+ne><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 =
+pr-2" href=3D"https://www.ziprecruiter.com/km/AAGom3aepc3FE9hO3mz5HmkN6kJmf=
+ebIFYixzWdOAURgdUe8VCV8sQd3Ok8GRJ491LzM8nN1Ix-M71pxWFAEDgkapMKa2dU80WqRk093=
+h2cLiG2ta7yEBrM6DhBNL1hYuLH1StYQn6xC6xvt1Ts0OXshfrA3cBVpAYiu3LO0rxo3K8k38sp=
+9f9HB9IG82aMlhE4cPQ0R8FXdDqkxvFtfSk_eW0Y057utI4ApFt__byjp8jjgq7GhaWK9TExCUt=
+9D3b1Sdpmczne7Gup6HqHJefruvq0OjJIURpcLzDsmPlVHZo-63EX_2NwLojEzGicuY6TmwlAiM=
+AYQcXHWN0QxCyKPd9BD3fbgiOxgsMEARsFjjniWzb9mcVuOIScW?tsid=3D111000153&auth_t=
+oken=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=
+=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical-align:t=
+op> Associate Engineer - Data Platform </a></div></div><div class=3Dno-inli=
+ne--stack-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8px;=
+vertical-align:middle><table width=3D100%><tr><td style=3Dvertical-align:mi=
+ddle width=3D15%><img alt=3D"Defense Unicorns" src=3Dhttps://www.ziprecruit=
+er.com/svc/fotomat/public-nosensitive-ziprecruiter-logos/company/97396aeb.p=
+ng style=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px;vert=
+ical-align:middle"><p>Defense Unicorns</p> <div style=3Dpadding-top:4px;><p=
+ style=3Dpadding-right:4px;display:inline>$102K - $138K / yr</div></table><=
+/div><div class=3Dno-inline--stack-col style=3Dmax-width:35%;display:inline=
+-block;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td =
+class=3Dno-inline--button-td-white><a href=3D"https://www.ziprecruiter.com/=
+km/AAGom3aepc3FE9hO3mz5HmkN6kJmfebIFYixzWdOAURgdUe8VCV8sQd3Ok8GRJ491LzM8nN1=
+Ix-M71pxWFAEDgkapMKa2dU80WqRk093h2cLiG2ta7yEBrM6DhBNL1hYuLH1StYQn6xC6xvt1Ts=
+0OXshfrA3cBVpAYiu3LO0rxo3K8k38sp9f9HB9IG82aMlhE4cPQ0R8FXdDqkxvFtfSk_eW0Y057=
+utI4ApFt__byjp8jjgq7GhaWK9TExCUt9D3b1Sdpmczne7Gup6HqHJefruvq0OjJIURpcLzDsmP=
+lVHZo-63EX_2NwLojEzGicuY6TmwlAiMAYQcXHWN0QxCyKPd9BD3fbgiOxgsMEARsFjjniWzb9m=
+cVuOIScW?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmt=
+BAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"c=
+olor:#002325;font-weight:bold;width:100%;display:block;border:1px solid #00=
+2325;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline-=
+-button-a-white> View Details </a></table></div></div><tr><td><div style=3D=
+"padding:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=
+=3Dno-inline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddispla=
+y:inline><a class=3D"no-inline--job-title-link-a truncate inline-block max-=
+w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/km/AAExBu1lc-8rW8Z5OeXrkt0=
+cjRnIVmpEKx79ioNv5v4bIHNMCf5ioaCDc3NE4vjxqWYr4fLlqKlc5kUMbTXc4KgAYRoObbffuR=
+LcnBJhZi-sawk9I0G8S5v9k6TUDY-JNBA8uVDeoMQm5tUqD4_o7US1VUBoaynED-qieIc6zT3k6=
+SBfejgme8ntP3c54dbqFWMvBKzc594s_xViehj2gWO-zIT7YuwvMQiMV3CXVZitalH1rTxvcK3N=
+KPHRZJBKLh7qikQaGqVKK5D53tpCiy0JBNvKnZsQ6Ao4NcbTJ7xhwzz6dpg8A8DbS6yEvc-EmAZ=
+VhbbWmeFmML3ncCayG0lTHktxPzj3S3cOZzYx9t3woWtA_oRIGpwYZC9L?tsid=3D111000153&=
+auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&conta=
+ct_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical-al=
+ign:top> Senior Machine Learning Engineer </a></div></div><div class=3Dno-i=
+nline--stack-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8=
+px;vertical-align:middle><table width=3D100%><tr><td style=3Dvertical-align=
+:middle width=3D15%><img alt=3DAnno.ai src=3Dhttps://www.ziprecruiter.com/s=
+vc/fotomat/public-nosensitive-ziprecruiter-logos/company/046e7b24.png style=
+=3Dwidth:40px;vertical-align:middle><td style=3D"padding:0 8px;vertical-ali=
+gn:middle"><p>Anno.ai</p> <div style=3Dpadding-top:4px;><p style=3Dpadding-=
+right:4px;display:inline>$104K - $143K / yr</p><sup class=3D"bg-zr-backgrou=
+nd-gray rounded font-bold no-inline--darkmode-text no-inline--pill-box" sty=
+le=3Dpadding:4px;vertical-align:middle;font-size:12px>Estimated Pay</sup></=
+div></table></div><div class=3Dno-inline--stack-col style=3Dmax-width:35%;d=
+isplay:inline-block;margin-bottom:8px;vertical-align:middle><table width=3D=
+100%><tr><td class=3Dno-inline--button-td-white><a href=3D"https://www.zipr=
+ecruiter.com/km/AAExBu1lc-8rW8Z5OeXrkt0cjRnIVmpEKx79ioNv5v4bIHNMCf5ioaCDc3N=
+E4vjxqWYr4fLlqKlc5kUMbTXc4KgAYRoObbffuRLcnBJhZi-sawk9I0G8S5v9k6TUDY-JNBA8uV=
+DeoMQm5tUqD4_o7US1VUBoaynED-qieIc6zT3k6SBfejgme8ntP3c54dbqFWMvBKzc594s_xVie=
+hj2gWO-zIT7YuwvMQiMV3CXVZitalH1rTxvcK3NKPHRZJBKLh7qikQaGqVKK5D53tpCiy0JBNvK=
+nZsQ6Ao4NcbTJ7xhwzz6dpg8A8DbS6yEvc-EmAZVhbbWmeFmML3ncCayG0lTHktxPzj3S3cOZzY=
+x9t3woWtA_oRIGpwYZC9L?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5Ijcb=
+fA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178207497=
+8" style=3D"color:#002325;font-weight:bold;width:100%;display:block;border:=
+1px solid #002325;border-radius:8px;padding:12px 0;text-align:center" class=
+=3Dno-inline--button-a-white> View Details </a></table></div></div><tr><td>=
+<div style=3D"padding:18px 24px;max-width:502px;border-bottom:1px solid #d6=
+d6d6" class=3Dno-inline--two-col-jc><div style=3Dmargin-bottom:8px><div sty=
+le=3Ddisplay:inline><a class=3D"no-inline--job-title-link-a truncate inline=
+-block max-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/km/AAGVIIXsTsGl=
+uvQ9FTfpW5Ye6Dx114n8_-oWKGYFaTlqOk5lvkIlQVC9XFXANvRqcQdqbNqX-KXPz0EDqp7aECW=
+aEVXMzVzloiOxCK_EvcVp0c_thJ9NbaEkie7eD8zb_dNrqru4JitH4xCgJ10JgiPYib8Zx7CSGl=
+ULtFTOmwCJ7ZQNyltyiZ7fjWwyH8xtDUG3uwPUEHJX_GCT-PsfRpnmUJKQ3AS4hXAdqUanfo7S-=
+1jPpY02j_M-V9qFoqQ5Aznu8Jk2YTY5xa1z6B8TJg0kn9EMqZ4-Su_vLbZAbLqxhRLft-IHfeS1=
+S360WTICR8grY3VeTyR2JfqTaRQOhDr0PFF_wVeb0F92hi802Y1iWeOXfbROn1Dlv8ef?tsid=
+=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKL=
+E3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bol=
+d;vertical-align:top> Machine Learning Engineer: Perception </a></div></div=
+><div class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-blo=
+ck;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td styl=
+e=3Dvertical-align:middle width=3D15%><img alt=3D"Bedrock Robotics" src=3Dh=
+ttps://ziprecruiter.com/img/no_company_logo.png style=3Dwidth:40px;vertical=
+-align:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>Bedrock =
+Robotics =E2=80=A2 San Francisco, CA =E2=80=A2 In-person</p></table></div><=
+div class=3Dno-inline--stack-col style=3Dmax-width:35%;display:inline-block=
+;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td class=
+=3Dno-inline--button-td-white><a href=3D"https://www.ziprecruiter.com/km/AA=
+GVIIXsTsGluvQ9FTfpW5Ye6Dx114n8_-oWKGYFaTlqOk5lvkIlQVC9XFXANvRqcQdqbNqX-KXPz=
+0EDqp7aECWaEVXMzVzloiOxCK_EvcVp0c_thJ9NbaEkie7eD8zb_dNrqru4JitH4xCgJ10JgiPY=
+ib8Zx7CSGlULtFTOmwCJ7ZQNyltyiZ7fjWwyH8xtDUG3uwPUEHJX_GCT-PsfRpnmUJKQ3AS4hXA=
+dqUanfo7S-1jPpY02j_M-V9qFoqQ5Aznu8Jk2YTY5xa1z6B8TJg0kn9EMqZ4-Su_vLbZAbLqxhR=
+Lft-IHfeS1S360WTICR8grY3VeTyR2JfqTaRQOhDr0PFF_wVeb0F92hi802Y1iWeOXfbROn1Dlv=
+8ef?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9=
+VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"color:=
+#002325;font-weight:bold;width:100%;display:block;border:1px solid #002325;=
+border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--butt=
+on-a-white> View Details </a></table></div></div><tr><td><div style=3D"padd=
+ing:18px 24px;max-width:502px;border-bottom:1px solid #d6d6d6" class=3Dno-i=
+nline--two-col-jc><div style=3Dmargin-bottom:8px><div style=3Ddisplay:inlin=
+e><a class=3D"no-inline--job-title-link-a truncate inline-block max-w-5/6 p=
+r-2" href=3D"https://www.ziprecruiter.com/km/AAFWJB5P0_mtQfIYxmby9b69plAlMi=
+hfS8eU6vt5uIKHths6JakhSSjQiM5Ig_8v9cGrQJ-NgZww1ATV_rgZyUUyjnQT0-IQq1gMGY46q=
+iUpVZ83E2LTfapE5EHSLOxNAAmvymqPwJO0FiUuwxP2yAeEaCrTLWk_M1gAbwtShcxgJFRbMk6U=
+55Tg3JokAWEPA815UUaXFca4R0ZJ461vbPHPtbRFVBSOm2YV0RN1BAzX2ECUb0SVBLEOhCuhQ0O=
+-3GH0EibMXA4CCjd-iu6X5PUn8y2c_H93S6iUiWv_b0FueaVGTI8fuRPIwLdH6kpI2HkWfvs6Hg=
+WUhlx3sIYB2jrFN3-eh_VytvYfA_7_dsavdRE8QtiO66-f9srt?tsid=3D111000153&auth_to=
+ken=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=
+=3D78b9a631&expires=3D1782074978" style=3Dfont-weight:bold;vertical-align:t=
+op> Machine Learning Engineer </a></div></div><div class=3Dno-inline--stack=
+-col style=3Dmax-width:64%;display:inline-block;margin-bottom:8px;vertical-=
+align:middle><table width=3D100%><tr><td style=3Dvertical-align:middle widt=
+h=3D15%><img alt=3DIntel src=3Dhttps://www.ziprecruiter.com/svc/fotomat/pub=
+lic-nosensitive-ziprecruiter-logos/company/6cb8afcf.png style=3Dwidth:40px;=
+vertical-align:middle><td style=3D"padding:0 8px;vertical-align:middle"><p>=
+Intel =E2=80=A2 Hillsboro, OR</p></table></div><div class=3Dno-inline--stac=
+k-col style=3Dmax-width:35%;display:inline-block;margin-bottom:8px;vertical=
+-align:middle><table width=3D100%><tr><td class=3Dno-inline--button-td-whit=
+e><a href=3D"https://www.ziprecruiter.com/km/AAFWJB5P0_mtQfIYxmby9b69plAlMi=
+hfS8eU6vt5uIKHths6JakhSSjQiM5Ig_8v9cGrQJ-NgZww1ATV_rgZyUUyjnQT0-IQq1gMGY46q=
+iUpVZ83E2LTfapE5EHSLOxNAAmvymqPwJO0FiUuwxP2yAeEaCrTLWk_M1gAbwtShcxgJFRbMk6U=
+55Tg3JokAWEPA815UUaXFca4R0ZJ461vbPHPtbRFVBSOm2YV0RN1BAzX2ECUb0SVBLEOhCuhQ0O=
+-3GH0EibMXA4CCjd-iu6X5PUn8y2c_H93S6iUiWv_b0FueaVGTI8fuRPIwLdH6kpI2HkWfvs6Hg=
+WUhlx3sIYB2jrFN3-eh_VytvYfA_7_dsavdRE8QtiO66-f9srt?tsid=3D111000153&auth_to=
+ken=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=
+=3D78b9a631&expires=3D1782074978" style=3D"color:#002325;font-weight:bold;w=
+idth:100%;display:block;border:1px solid #002325;border-radius:8px;padding:=
+12px 0;text-align:center" class=3Dno-inline--button-a-white> View Details <=
+/a></table></div></div><tr><td><div style=3D"padding:18px 24px;max-width:50=
+2px;border-bottom:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><div sty=
+le=3Dmargin-bottom:8px><div style=3Ddisplay:inline><a class=3D"no-inline--j=
+ob-title-link-a truncate inline-block max-w-5/6 pr-2" href=3D"https://www.z=
+iprecruiter.com/km/AAFyxKoOTHNjvcwZGDEdm8pBvw65P6FCLVW_W2qniAyN9_oKdKfUKoB6=
+j5OGwa5qVN2pUYx5lcU27rKIoZYZ24-XsDTB0_FlOMulG4vabZf8ndGCnWZm2DH8711EAv6iSaU=
+HB_ik737rcx6ZxnXeirEEDD5qVdJ0ybm3opKVdXpcQ4JsujtlkLS8-hdvRaysfOSh70hCeG5hVn=
+2kSCGxquJhAc1s0AI_Ciqo4Iuuy7U7eVs722Y3lvZuugink8-pGt6F3Jy-dgoqlQW3G7CGVmWJG=
+j-2N7EK2CTvUtQR2yTuQifXM1-h-Qb6XEURuZ0XrMY4t2k1DNIfetnodCtroKYiFaV9sXdS9B30=
+UIwOJPWc0BNwXceGmEzMXHJh?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5I=
+jcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D178207=
+4978" style=3Dfont-weight:bold;vertical-align:top> Machine Learning Enginee=
+r, Agentic AI </a></div></div><div class=3Dno-inline--stack-col style=3Dmax=
+-width:64%;display:inline-block;margin-bottom:8px;vertical-align:middle><ta=
+ble width=3D100%><tr><td style=3Dvertical-align:middle width=3D15%><img alt=
+=3DZillow src=3Dhttps://www.ziprecruiter.com/svc/fotomat/public-nosensitive=
+-ziprecruiter-logos/company/7b37c41f.png style=3Dwidth:40px;vertical-align:=
+middle><td style=3D"padding:0 8px;vertical-align:middle"><p>Zillow</p> <div=
+ style=3Dpadding-top:4px;><p style=3Dpadding-right:4px;display:inline>$138K=
+ - $221K / yr</div></table></div><div class=3Dno-inline--stack-col style=3D=
+max-width:35%;display:inline-block;margin-bottom:8px;vertical-align:middle>=
+<table width=3D100%><tr><td class=3Dno-inline--button-td-white><a href=3D"h=
+ttps://www.ziprecruiter.com/km/AAFyxKoOTHNjvcwZGDEdm8pBvw65P6FCLVW_W2qniAyN=
+9_oKdKfUKoB6j5OGwa5qVN2pUYx5lcU27rKIoZYZ24-XsDTB0_FlOMulG4vabZf8ndGCnWZm2DH=
+8711EAv6iSaUHB_ik737rcx6ZxnXeirEEDD5qVdJ0ybm3opKVdXpcQ4JsujtlkLS8-hdvRaysfO=
+Sh70hCeG5hVn2kSCGxquJhAc1s0AI_Ciqo4Iuuy7U7eVs722Y3lvZuugink8-pGt6F3Jy-dgoql=
+QW3G7CGVmWJGj-2N7EK2CTvUtQR2yTuQifXM1-h-Qb6XEURuZ0XrMY4t2k1DNIfetnodCtroKYi=
+FaV9sXdS9B30UIwOJPWc0BNwXceGmEzMXHJh?tsid=3D111000153&auth_token=3D5_178172=
+9378_fGqTG5IjcbfA-V2_zEgBjmtBAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expi=
+res=3D1782074978" style=3D"color:#002325;font-weight:bold;width:100%;displa=
+y:block;border:1px solid #002325;border-radius:8px;padding:12px 0;text-alig=
+n:center" class=3Dno-inline--button-a-white> View Details </a></table></div=
+></div><tr><td><div style=3D"padding:18px 24px;max-width:502px;border-botto=
+m:1px solid #d6d6d6" class=3Dno-inline--two-col-jc><div style=3Dmargin-bott=
+om:8px><div style=3Ddisplay:inline><a class=3D"no-inline--job-title-link-a =
+truncate inline-block max-w-5/6 pr-2" href=3D"https://www.ziprecruiter.com/=
+km/AAFBFB7w8Y1ngovY7OWdbw1mShnmWDtqbX0aauJ0hlNaT5PAIyFrZzGM35sId4ye5kkgVrkI=
+g1wwqw4LafsSJiG0bvkB-H6dsepx1Utw5HzXb8pWT9U_DuzFCPlnpT0z64w8RRfygH1x_E_pIfW=
+wLWwLEZhryiBJPte7edopWhUdRFvsFOs3E_8AotAFCAOluzuEqLn9eN8PMNmmvxV9D_k51NmFm5=
+1JQYUSg3EA_1ZpQALSACVRc3AZEUOpwbXHh0LeLR-C083l9orKsFfzEQx8445WRBXMTqtd0X864=
+xzldr-CAm7fGGcXKjiFsiAWnZX5VNqFwWPok0jXuNoNMu61CC96rq_LCgRJRcVC4QGYNEQ9aIgN=
+wJZcJVA6?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmt=
+BAOc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3Dfo=
+nt-weight:bold;vertical-align:top> Machine Learning Engineer </a></div></di=
+v><div class=3Dno-inline--stack-col style=3Dmax-width:64%;display:inline-bl=
+ock;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td sty=
+le=3Dvertical-align:middle width=3D15%><img alt=3D"Tyto Athene, LLC" src=3D=
+https://www.ziprecruiter.com/svc/fotomat/public-nosensitive-ziprecruiter-lo=
+gos/company/b93d0606.png style=3Dwidth:40px;vertical-align:middle><td style=
+=3D"padding:0 8px;vertical-align:middle"><p>Tyto Athene, LLC</p></table></d=
+iv><div class=3Dno-inline--stack-col style=3Dmax-width:35%;display:inline-b=
+lock;margin-bottom:8px;vertical-align:middle><table width=3D100%><tr><td cl=
+ass=3Dno-inline--button-td-white><a href=3D"https://www.ziprecruiter.com/km=
+/AAFBFB7w8Y1ngovY7OWdbw1mShnmWDtqbX0aauJ0hlNaT5PAIyFrZzGM35sId4ye5kkgVrkIg1=
+wwqw4LafsSJiG0bvkB-H6dsepx1Utw5HzXb8pWT9U_DuzFCPlnpT0z64w8RRfygH1x_E_pIfWwL=
+WwLEZhryiBJPte7edopWhUdRFvsFOs3E_8AotAFCAOluzuEqLn9eN8PMNmmvxV9D_k51NmFm51J=
+QYUSg3EA_1ZpQALSACVRc3AZEUOpwbXHh0LeLR-C083l9orKsFfzEQx8445WRBXMTqtd0X864xz=
+ldr-CAm7fGGcXKjiFsiAWnZX5VNqFwWPok0jXuNoNMu61CC96rq_LCgRJRcVC4QGYNEQ9aIgNwJ=
+ZcJVA6?tsid=3D111000153&auth_token=3D5_1781729378_fGqTG5IjcbfA-V2_zEgBjmtBA=
+Oc9VnSPTsKLE3LP0ao&contact_id=3D78b9a631&expires=3D1782074978" style=3D"col=
+or:#002325;font-weight:bold;width:100%;display:block;border:1px solid #0023=
+25;border-radius:8px;padding:12px 0;text-align:center" class=3Dno-inline--b=
+utton-a-white> View Details </a></table></div></div><tr><td aria-hidden=3Dt=
+rue height=3D20 style=3Dfont-size:0;line-height:0px;>=C2=A0<tr><td class=3D=
+"text-zr-text-primary no-inline--darkmode-bg no-inline--darkmode-bg" style=
+=3D"padding:0 24px 8px 24px"><div class=3Dno-inline--stack-col style=3Dmax-=
+width:100%;display:inline-block;margin-bottom:0px;vertical-align:middle><ta=
+ble width=3D100%><tr><td class=3Dno-inline--button-td-white><a class=3D"no-=
+inline--button-a-white apply-button-square" href=3D"https://www.ziprecruite=
+r.com/km/AAFf9KrHiPb5jeH2VvumXHt_eFB1fJEqpBxc2k8OeaTs-T8pqO7rq031n7Jf2syXsR=
+9zgIy-HGNCVD6i99HqxDzX7p-qfqdoKLm_M5_DBywDGIHRgrkylxnWiK8D8vqILaSlIqqNxJat-=
+foISNpFPLSTua3IMbam9BmBtGBOwFPssRB01yP19WeEZrOdEnw6hPiDvntoWx191UAAWA5ehEp-=
+vWCIXIQdFAG42isRpodq_ulbvrdVj_K-G8B54P4gXYTEWNVhgnPmPeokrBPr4590Y6CRGCPBim5=
+SMsEVhoKD6-9UDuqUUuf8R72nJgMCpWeScEYa2zv1BDHXtQVJR_OmDJRWoy0U3p1xBeZ5wY5zhM=
+qs_ruYJQA?tsid=3D111000153" style=3D"color:#002325;font-weight:bold;width:1=
+00%;display:block;border:1px solid #002325;border-radius:8px;padding:12px 0=
+;text-align:center" id=3Dzr-view-jobs target=3D_blank> View More Jobs </a><=
+/table></div></table><table class=3D"bg-zr-white no-inline--darkmode-bg" al=
+ign=3Dcenter border=3D0 cellpadding=3D0 cellspacing=3D0 role=3Dpresentation=
+ style=3Dmargin:auto;background:#ffffff width=3D100%><tr><td style=3D"paddi=
+ng:32px 24px 32px 24px" align=3Dleft valign=3Dtop width=3D100%><table align=
+=3Dleft border=3D0 cellpadding=3D0 cellspacing=3D0 style=3Dborder-collapse:=
+collapse;><tr><td style=3Dpadding-right:8px;><img alt=3D"Phil, your career =
+advisor" style=3D"margin:0 auto;display:block;width:62px;height:62px;" bord=
+er=3D0 height=3D62 src=3Dhttps://ziprecruiter.com/img/email/phil_new.png wi=
+dth=3D62><td><table border=3D0 cellpadding=3D0 cellspacing=3D0 style=3Dbord=
+er-collapse:collapse;><tr><td class=3Dno-inline--darkmode-text style=3Dcolo=
+r:#2F3639;font-family:Arial,sans-serif;font-weight:700;font-size:16px;line-=
+height:21px;>Phil<tr><td class=3Dno-inline--darkmode-text style=3Dcolor:#2F=
+3639;font-family:Arial,sans-serif;font-size:16px;line-height:24px;>Your Car=
+eer Advisor</table></table></table><table align=3Dcenter border=3D0 cellpad=
+ding=3D0 cellspacing=3D0 role=3Dpresentation style=3Dmargin:auto; width=3D1=
+00%><tr><td aria-hidden=3Dtrue height=3D25 style=3Dfont-size:0;line-height:=
+0px;>=C2=A0</table><table class=3D"bg-zr-white no-inline--darkmode-bg" alig=
+n=3Dcenter border=3D0 cellpadding=3D0 cellspacing=3D0 role=3Dpresentation s=
+tyle=3Dmargin:auto;background:#ffffff width=3D100%><tr><td style=3D"padding=
+:0 24px 24px 24px"><table class=3Dtracking-wide id=3Dzr-mobile-app-download=
+-footer><tr><td class=3D"text-zr-email-app-download-black no-inline--darkmo=
+de-text" colspan=3D3 style=3Dfont-family:Arial,sans-serif;padding-top:24px;=
+font-size:1.25rem;font-weight:bold>Get Hired Faster<tr><td colspan=3D3 styl=
+e=3Dfont-family:Arial,sans-serif;padding-top:12px;padding-bottom:12px>Downl=
+oad the free iOS or Android app and search millions of jobs from anywhere.<=
+tr><td style=3Dpadding-right:12px><a href=3Dhttps://www.ziprecruiter.com/ek=
+m/AAG1v7pCDnuDxnXOJtPYClVJvESu7RBKexW3-RPtm23Xn7PZbk7OaGDItcjNpBxXH36JCR6Ok=
+qu6YBJUnElnOUpCTjEFYQ65wefeDE14TfEjSHnIIlG7ubtcYWfsGHc-YB5jwVrt_fG0jLD-L5Y3=
+_1UkyjbUZT9d-ws_cZsObLqUbqwm5WhGPq23KUt84ChOzWuaoscwMx3KwF-vPHLhfe80g-rKHkp=
+R2ghYhpdC4OkR8WZG6kSDXshh8UYrT-5YnD3N66qa9FIyZnw9gAIVEu2yU97U1gcX1D-tPwil9w=
+SLOxhUsAV5D5mKFA87hnxWJ_BgMFjzFHbCpxKPICf_ZtOiLOYXZ7qJUlYfGcSLn2sX_0dX-GnEa=
+2ugAM13Xg target=3D_blank> <img alt=3D"Download on the App Store" src=3Dhtt=
+ps://ziprecruiter.com/img/email/download-from-app-store-badge-239x80.png st=
+yle=3Dheight:40px;width:auto;display:block;></a><td><a href=3Dhttps://www.z=
+iprecruiter.com/ekm/AAFDUJ9Rz-jXdu4gJ0iOEII3Qv_DP-2kxU0R4xe-LRk-ZxmoQlX7BqI=
+Wbrumz1kRIYCUOqvHfvJ-WIHNpWfl4qahIyFpOWC5PM52kV2VW5S6D2_cefRcBOW3QnIMPeOi0u=
+-gYqq8iR1MxkmjqlPW_UHmHMHpgDz3w9NX8xFuGGoTD8AxfgR017onDXcYylGbzSqTYjrQL9-CO=
+btLB5lU1nOUIlv6PksBxwOUUt0zC3dqcLUuaDuF1aWs0f5nh_jrjR0_ArZD8FVxHE970iSHCrVh=
+KuL-gvECDtgQ1klfpDvomIIpBLE7SFtJzzlilKXDv0FqmnkvWXEwwd9S7meKMsG9GI_aLIDBqJ_=
+02IkyYkwL_zfyMDkIDhGGLlbQwg target=3D_blank> <img alt=3D"Download on the Go=
+ogle Play" src=3Dhttps://ziprecruiter.com/img/email/download-from-google-pl=
+ay-badge-270x80.png style=3Dheight:40px;width:auto;display:block;></a><td s=
+tyle=3Dwidth:100%></table></table><table align=3Dcenter border=3D0 cellpadd=
+ing=3D0 cellspacing=3D0 class=3Dno-inline--footer role=3Dpresentation style=
+=3Dmargin:auto;text-align:center;color:#4D6566 width=3D100%><tr><td aria-hi=
+dden=3Dtrue height=3D35 style=3Dfont-size:0;line-height:0px;>=C2=A0<tr><td =
+class=3D"text-zr-text-secondary font-sans text-xs unstyle-auto-detected-lin=
+ks tracking-wide">ZipRecruiter, Inc. =C2=A9 All Rights Reserved Worldwide<b=
+r> 3000 Ocean Park Blvd., Suite 3000, Santa Monica, CA 90405, USA<tr><td cl=
+ass=3D"text-zr-text-secondary font-sans text-xs unstyle-auto-detected-links=
+ tracking-wide" id=3Dzr-estimated-pay-footer style=3Dpadding:8px>ZipRecruit=
+er provides pay estimates when companies do not include pay in the job post=
+=2E ZipRecruiter estimates are based on=
+ pay from similar jobs (in similar are=
+as), may change over time, and may not be indicative of pay for the positio=
+n. ZipRecruiter provides estimates for convenience only, and makes no guara=
+ntees or promises regarding any expected or actual job payment.<tr><td clas=
+s=3D"text-zr-text-secondary font-sans text-xs tracking-wide">Apple and the =
+Apple logo are registered trademarks of Apple Inc. Google Play is a tradema=
+rk of Google LLC.<tr><td style=3Dpadding:8px><a class=3D"no-inline--darkmod=
+e-text text-xs underline font-sans tracking-wide" href=3Dhttps://clearbit.c=
+om style=3Dcolor:#4D6566 target=3D_blank>Logos provided by Clearbit</a><tr>=
+<td class=3D"text-zr-text-primary font-sans" style=3Dfont-weight:bold;paddi=
+ng:8px;font-size:14px;color:#002325><a class=3Dno-inline--darkmode-text hre=
+f=3Dhttps://www.ziprecruiter.com/ekm/AAHQ4Pd8G50NlJvVi3uUFV9uma3akJ7I8-GPcE=
+blIzXt45KECHqX5GjW7F4a2DKFuuSWKMRtA5A9c4cgddAgDMreL28wzAZ83xP65OiT8MN2F_wba=
+xrzOE0Ir8O0mogQZXTuesxevDxDWBucbPxOLbsgp6QoLwPWTwuVyM3sEnDrXNkYRpULkwani7gP=
+PCby1sWRbBLZH_o1G6CpyCXhkPIQ58jz4b3SrqWjAMEtHOyxbBasBUqKOWgE7iYY1I9oeQY1PLJ=
+zVEunTSIDhc-HYDYSrHX7OEAxn5Jr9hFtP8z9SvF5TX_x4JHECTdY0JuHhQb5N4jsuXis38bOKM=
+xhw9XoOO956AK6yrEmW_IUQTByqw style=3Dcolor:#2F3639;text-decoration:underlin=
+e;font-weight:700; target=3D_blank>Privacy Policy</a> =C2=A0|=C2=A0 <a clas=
+s=3Dno-inline--darkmode-text href=3Dhttps://www.ziprecruiter.com/ekm/AAG7YP=
+1EHqzg4cCzgHtCKeasV_4N9dc2jovtbxjOE6_tPcfw3F2EHzJxG2f-P9LjHyzvT_6ccZFliFKW_=
+4YBSq3m7dZmaBcEDxkR98miNyPu4JRGwQlyatRUjjFA3UlMpITwx39ENL40kjTNjbKGt0DDjhh9=
+5u9gVzugGdHDX6P-EV9KCd_5U8Y5oMOroL23nns87vHl6DlWnIl6C2ahIKRebv7zBaZPl5tseUu=
+l9cZtqKDwTbscb4uqCgOLe2jEjq3OCj030y6YyHewK1dYt3EzMZO0b74wIkltkoklRZURRcmcDJ=
+Ux2221zFCij9fzYw9sUjQVo7mzJ2NfQkkAkD3WfTJlPh0mMbbf72E0e2RSGscrH6eVX4BFUR9Ol=
+YLH5mXZPNZhW83wCAMiEXDxcH0s0HCspYNSiVf7Jdnd6bSD5IGKWhIeqE0HwFmq1W1oIapF-Lo0=
+LYIazlr9Ki1jxwNbC6kCn4jUREydCKKzg6oIhOoiYxC22WvvnQUbeh-FPKD8nqEiQGAJuKHqiME=
+cgDxEOvqpyX8aWNgXwesh5E_Zhk9p8jz_25BvNVcxf9D2kULmpMBFt7eG2PmVjG6T9FBqm_sSmE=
+Gs8bjZrVE7DU8rzu1RKjc7Y57bicyYmjyZ5E1RhNuN_JApAA style=3Dcolor:#2F3639;text=
+-decoration:underline;font-weight:700; target=3D_blank>Unsubscribe</a><tr><=
+td aria-hidden=3Dtrue height=3D20 style=3Dfont-size:0;line-height:0px;>=C2=
+=A0</table><img alt height=3D1 src=3Dhttps://www.ziprecruiter.com/ekm/AAEv9=
+6a4KIcCfrDHcRrUXxbXJAxqvg6vPndJ4ENvttx_8z6yTJZIsI_5nFNiBQHNxqC5A2Rk_N7PVmej=
+XOqQALeYmZcKQPhoSShE9Ysx1P6-f5biv6oGDk-mk5In-z1AFr0qZUf8MNyDM6ZsM8BLJcmH08b=
+2XgNZ_wfJ4vD9OLBaWJJXChdSffFAYDHZ52AEugmRu3rhmnTp6t-hlZoRXQ width=3D1></div=
+> </center><img width=3D"1" height=3D"1" alt=3D"" src=3D"https://email.mg.z=
+iprecruiter.com/o/eJxMzEFuwyAQQNHThJ0tGAYYL9j1HtYAY5fKxBEmrZTTV-mq6__1SoTEE=
+JREE8gEWGwg9RmNJ0Z0Towm2LzWG1qTrEXy3gedVY2gwWtvAmhcLM0BHTFQwGQIXN5uqNs-v-qj=
+S-7POqTP-Wyqx5_zLI33-_O6od4b1-MvjDikPQ4ekg--rpv9-DrTyof0sWa-l1p4yPrfUyO-_-3=
+sbZK3o74jqFdfm1wX77LWEoN4QEo0CZQyYTFuWiyZCXwKNjmySdJvAAAA__-78lD2">
+--30bb290e2c4110740410f47d21cebe0133ac356987a44525a4118508a921--
