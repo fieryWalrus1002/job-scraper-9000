@@ -166,14 +166,14 @@ def process_eml_directory(
 
     for eml_file in eml_files:
         # Layer-1 dedup: the filename stem is the Gmail message-id. Skip emails
-        # we've handled before, and record this one now so it's never re-enriched
-        # even if processing below fails partway (user accepts "succeeded or not").
+        # we've handled before. We *record* further down — after the email has
+        # actually been parsed/enriched (succeeded or not) — so a hard crash
+        # mid-email propagates loudly and stays retryable rather than poisoning
+        # the cache.
         message_id = eml_file.stem
         if seen_store is not None and seen_store.has(message_id):
             log.info("Skipping %s: already processed (cache hit)", eml_file.name)
             continue
-        if seen_store is not None:
-            seen_store.add(message_id)
 
         log.info("Processing %s", eml_file.name)
         with eml_file.open("rb") as f:
@@ -211,6 +211,10 @@ def process_eml_directory(
             skip_jobs=skip_jobs,
             scrape_details=scrape_details,
         )
+        # Parse + enrich completed for this email (jobs or not) — record it now
+        # so it isn't re-enriched, while a crash above stays uncached/retryable.
+        if seen_store is not None:
+            seen_store.add(message_id)
         if not parsed_jobs:
             log.warning("No jobs parsed from %s; leaving file in place", eml_file)
             continue

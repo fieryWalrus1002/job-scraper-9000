@@ -385,6 +385,12 @@ def _extract_listing_key(final_url: Optional[str]) -> Optional[str]:
             continue
         if isinstance(data, dict) and data.get("listing_key"):
             return data["listing_key"]
+        # Decoded cleanly but no listing_key — the whole dedup story rides on
+        # this, so surface a shape change loudly rather than silently losing it.
+        log.warning(
+            "Decoded /jobs/v2 payload but found no listing_key (ZR shape change?): %s",
+            final_url,
+        )
         return None
     return None
 

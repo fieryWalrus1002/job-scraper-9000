@@ -602,6 +602,14 @@ def test_extract_listing_key_none_for_garbage_segment():
     )
 
 
+def test_extract_listing_key_none_when_payload_lacks_key():
+    """Decodes cleanly but no listing_key (ZR shape change) → None (and logs)."""
+    payload = base64.urlsafe_b64encode(json.dumps({"match_id": "m"}).encode()).decode()
+    assert (
+        _extract_listing_key(f"https://www.ziprecruiter.com/jobs/v2/{payload}") is None
+    )
+
+
 # ---------------------------------------------------------------------------
 # Persistent-profile (Cloudflare piggyback) path
 # ---------------------------------------------------------------------------
