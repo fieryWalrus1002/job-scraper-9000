@@ -46,7 +46,15 @@ from utils.salary import SalaryResult, extract_salary
             "US: $147000 - $211000 (USD) + 15% bonus target + equity + benefits",
             SalaryResult(147_000, 211_000, "yearly"),
         ),
+        (
+            "Pay Rate : $19.00 an hour + Shift Differential ($0.75/hr)",
+            SalaryResult(39_520, None, "hourly"),
+        ),
     ],
 )
 def test_extract_salary_handles_real_world_missed_formats(text, expected):
     assert extract_salary(text) == expected
+
+
+def test_extract_salary_ignores_tiny_hourly_shift_differential():
+    assert extract_salary("Shift Differential (+ $0.75/hr)") is None

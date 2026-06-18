@@ -14,6 +14,8 @@ _HOURS_PER_YEAR = 2080
 _MONTHS_PER_YEAR = 12
 _WEEKS_PER_YEAR = 52
 _DAYS_PER_YEAR = 260  # 52 × 5
+_HOURLY_MIN = 7.25
+_HOURLY_MAX = 500
 
 
 @dataclass
@@ -39,11 +41,11 @@ def annualise(amount: float, period: str) -> int:
 
 # --- Regex patterns, tried in priority order ---
 
-# 1. Hourly: $X/hr, $X-Y/hr, $X–$Y/hour, $X - $Y per hour.
+# 1. Hourly: $X/hr, $X-Y/hr, $X–$Y/hour, $X - $Y per hour, $X an hour.
 _HOURLY = re.compile(
     r"\$\s*([\d]+(?:\.\d+)?)"
     r"(?:\s*(?:\\?\s*[-–—]|\bto\b)\s*\$?\s*([\d]+(?:\.\d+)?))?"
-    r"\s*(?:/\s*h(?:r|our)\b|\bper\s+h(?:r|our)\b)",
+    r"\s*(?:/\s*h(?:r|our)\b|\b(?:per|an)\s+h(?:r|our)\b)",
     re.IGNORECASE,
 )
 
@@ -87,11 +89,12 @@ def extract_salary(text: str) -> SalaryResult | None:
     if not text:
         return None
 
-    # 1. Hourly — unambiguous
-    m = _HOURLY.search(text)
-    if m:
-        lo = round(float(m.group(1)))
-        hi = round(float(m.group(2))) if m.group(2) else None
+    # 1. Hourly — unambiguous, but skip tiny shift differentials like $0.75/hr.
+    for m in _HOURLY.finditer(text):
+        lo = float(m.group(1))
+        hi = float(m.group(2)) if m.group(2) else None
+        if not _plausible_hourly_range(lo, hi):
+            continue
         return SalaryResult(
             salary_min_usd=annualise(lo, "hourly"),
             salary_max_usd=annualise(hi, "hourly") if hi is not None else None,
@@ -154,6 +157,12 @@ def _money_match_has_currency(m: re.Match[str]) -> bool:
 
 def _plausible_yearly_range(lo: int, hi: int) -> bool:
     return 20_000 <= lo <= hi <= 2_000_000
+
+
+def _plausible_hourly_range(lo: float, hi: float | None) -> bool:
+    if not _HOURLY_MIN <= lo <= _HOURLY_MAX:
+        return False
+    return hi is None or lo <= hi <= _HOURLY_MAX
 
 
 def _has_salary_context(text: str, pos: int, window: int = 80) -> bool:
