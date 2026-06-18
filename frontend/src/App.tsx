@@ -27,6 +27,7 @@ import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { TrashRowActions } from './components/TrashRowActions'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
+import { UnsavedGuardProvider, useUnsavedGuard } from './components/UnsavedGuard'
 import { isEditableTarget } from './lib/keyboard'
 import { cn } from './lib/utils'
 
@@ -73,13 +74,18 @@ export default function App() {
     )
   }
 
-  return <AppShell email={principal!.userDetails} />
+  return (
+    <UnsavedGuardProvider>
+      <AppShell email={principal!.userDetails} />
+    </UnsavedGuardProvider>
+  )
 }
 
 function AppShell({ email }: { email: string }) {
   const [urlParams, setUrlParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const { requestNavigation } = useUnsavedGuard()
   const filters = filtersFromParams(urlParams)
   const sort = sortFromParams(urlParams)
   const [selectedJob, setSelectedJob] = useState<{
@@ -311,7 +317,9 @@ function AppShell({ email }: { email: string }) {
           onClose={() => setAddJobOpen(false)}
           onSuccess={() => {
             setAddJobOpen(false)
-            navigate('/shortlist')
+            // The job is already created; only the route change can strand
+            // unsaved settings edits, so it goes through the guard.
+            requestNavigation(() => navigate('/shortlist'))
           }}
         />
       )}

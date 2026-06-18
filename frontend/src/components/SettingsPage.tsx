@@ -1,14 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettings } from '../hooks/useSettings'
 import type { CandidateProfileInput, SearchConfigInput } from '../types'
 import ProfileForm from './settings/ProfileForm'
 import SearchForm from './settings/SearchForm'
 import { AccountSection } from './settings/sections/AccountSection'
 import { SETTINGS_SECTIONS, type SettingsSection } from './settings/settingsSections'
+import { useUnsavedGuard } from './UnsavedGuard'
 
 export default function SettingsPage() {
   const { data, isLoading, isError, error } = useSettings()
   const [active, setActive] = useState<SettingsSection>('profile')
+
+  // Arm the nav guard while either form holds unsaved edits. Switching the
+  // four sections doesn't count — panels stay mounted, so it's intra-page.
+  const { setBlocked } = useUnsavedGuard()
+  const [profileDirty, setProfileDirty] = useState(false)
+  const [searchDirty, setSearchDirty] = useState(false)
+  const dirty = profileDirty || searchDirty
+  useEffect(() => {
+    setBlocked(dirty)
+    return () => setBlocked(false)
+  }, [dirty, setBlocked])
 
   if (isLoading) return <div className="p-6 text-muted text-sm">Loading…</div>
   if (isError)
@@ -61,6 +73,7 @@ export default function SettingsPage() {
                 key={`profile-${data?.profile_version ?? 'new'}`}
                 initial={(data?.profile as CandidateProfileInput | null) ?? null}
                 version={data?.profile_version ?? null}
+                onDirtyChange={setProfileDirty}
               />
             </div>
 
@@ -69,6 +82,7 @@ export default function SettingsPage() {
               initial={(data?.search as SearchConfigInput | null) ?? null}
               policies={(data?.policies as Record<string, unknown> | null) ?? null}
               active={active}
+              onDirtyChange={setSearchDirty}
             />
 
             <div hidden={active !== 'account'}>

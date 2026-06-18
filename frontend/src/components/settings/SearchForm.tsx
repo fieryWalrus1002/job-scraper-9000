@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSaveSearch } from '../../hooks/useSettings'
 import { ApiValidationError, type FieldErrors } from '../../api'
 import { type SearchConfigInput, type SearchEmploymentType } from '../../types'
@@ -25,6 +25,7 @@ export default function SearchForm({
   initial,
   policies,
   active,
+  onDirtyChange,
 }: {
   initial: SearchConfigInput | null
   policies: Record<string, unknown> | null
@@ -35,6 +36,8 @@ export default function SearchForm({
    * unit tests exercise.
    */
   active?: SettingsSection
+  /** Reports whether the form holds edits not yet saved (for the nav guard). */
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const save = useSaveSearch()
 
@@ -42,6 +45,11 @@ export default function SearchForm({
   const showFilters = active === undefined || active === 'filters-policies'
 
   const [form, setForm] = useState<SearchFormState>(() => (initial ? fromSearch(initial) : EMPTY))
+  // Serialized last-saved snapshot; the form is dirty while it diverges.
+  const [baseline, setBaseline] = useState<string>(() => JSON.stringify(form))
+
+  const dirty = JSON.stringify(form) !== baseline
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -76,6 +84,7 @@ export default function SearchForm({
       const res = await save.mutateAsync(toSearch(form))
       setDerivedPolicies(res.policies)
       setSaved(true)
+      setBaseline(JSON.stringify(form)) // saved snapshot is the new clean state
     } catch (err) {
       if (err instanceof ApiValidationError) {
         setFieldErrors(err.fields)

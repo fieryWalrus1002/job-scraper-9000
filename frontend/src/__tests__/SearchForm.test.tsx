@@ -214,6 +214,23 @@ describe('SearchForm', () => {
     ])
   })
 
+  it('reports dirty on edit and clean again after a successful save', async () => {
+    const save = stubSearchSave()
+    const onDirtyChange = vi.fn()
+    renderForm({ initial: EXISTING, policies: null, onDirtyChange })
+
+    // Seeds clean.
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+
+    fireEvent.change(screen.getByDisplayValue('Dev User'), { target: { value: 'Edited' } })
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+
+    fireEvent.click(screen.getByRole('button', { name: /Save search config/i }))
+    await waitFor(() => expect(save.getSentBody()).not.toBeNull())
+    // The saved snapshot becomes the new clean baseline.
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false))
+  })
+
   it('renders FastAPI 422 field errors inline', async () => {
     stubSearchSave({
       status: 422,

@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
+import { useUnsavedGuard } from './UnsavedGuard'
 
 export type FunnelPath = '/trash' | '/jobs' | '/shortlist' | '/tracking'
 
@@ -33,6 +34,7 @@ interface Props {
 export function AppHeader({ email, counts, onAddJob, onShowShortcuts }: Props) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { requestNavigation } = useUnsavedGuard()
   const onSettings = location.pathname === '/settings'
 
   return (
@@ -48,10 +50,18 @@ export function AppHeader({ email, counts, onAddJob, onShowShortcuts }: Props) {
       <nav className="flex items-center gap-1.5" aria-label="Triage funnel">
         {FUNNEL_TABS.map((tab) => {
           const count = counts[tab.path]
+          const to = { pathname: tab.path, search: tab.path === '/jobs' ? location.search : '' }
           return (
             <NavLink
               key={tab.path}
-              to={{ pathname: tab.path, search: tab.path === '/jobs' ? location.search : '' }}
+              to={to}
+              onClick={(e) => {
+                // Let modifier-clicks open a new tab; intercept plain clicks so
+                // the unsaved-edits guard can confirm before we leave the page.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                e.preventDefault()
+                requestNavigation(() => navigate(to))
+              }}
               className={({ isActive }) =>
                 cn(tabBtn, tab.muted && tabBtnMuted, isActive && tabBtnActive)
               }
