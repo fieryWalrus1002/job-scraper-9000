@@ -19,6 +19,13 @@ class JobPosting:
     salary_min_usd: int | None = None
     salary_max_usd: int | None = None
     salary_period: str | None = None  # 'yearly' | 'hourly' | 'monthly' etc.
+    # Outcome of detail-page enrichment, when a source needs a second fetch to
+    # fill in description/posted_at (currently only the ZR email scraper). None
+    # means enrichment was never attempted. Constrained set — see
+    # email_scraper.zr_scraper.EnrichmentStatus — because downstream agents
+    # branch on it (e.g. skills_fit needs a description and should skip records
+    # that never got one).
+    enrichment_status: str | None = None
 
     def compute_hash(self) -> None:
         # source_job_id distinguishes legitimately distinct postings that share

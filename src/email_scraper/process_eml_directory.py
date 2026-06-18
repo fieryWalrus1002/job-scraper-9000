@@ -13,11 +13,14 @@ import argparse
 import email
 import logging
 import shutil
+from datetime import datetime, timezone
 from email.message import Message
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 import yaml
 
+from email_scraper.seen_store import SeenStore, default_processed_store
 from email_scraper.zr_parser import parse_zr_plaintext
 from job_scraper.models import JobPosting
 
@@ -65,6 +68,25 @@ def _extract_text_plain_payload(msg: Message) -> str | bytes | None:
     return payload if isinstance(payload, (str, bytes)) else None
 
 
+def _email_sent_at(msg: Message) -> datetime | None:
+    """Parse an email's Date header into a tz-aware UTC datetime, or None.
+
+    ZR's /km/ enrichment links expire 96h after the email is *sent*, so the send
+    time — not the file mtime — is what tells us whether an email is still worth
+    the browser. Returns None when the header is missing or unparseable.
+    """
+    raw = msg.get("Date")
+    if not raw:
+        return None
+    try:
+        dt = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _select_eml_files(eml_dir: Path, max_files: int | None) -> list[Path]:
     """Return newest .eml files in the directory, excluding subdirectories."""
     if max_files is not None and max_files <= 0:
@@ -93,6 +115,8 @@ def process_eml_directory(
     skip_jobs: int = 0,
     scrape_details: bool = True,
     archive_processed: bool = False,
+    max_age_hours: float | None = None,
+    seen_store: SeenStore | None = None,
 ) -> list[JobPosting]:
     """Parse newest downloaded .eml files into JobPosting objects.
 
@@ -110,6 +134,12 @@ def process_eml_directory(
             Disable for parser-only smoke tests.
         archive_processed: Move successfully parsed .eml files to archive_dir_path
             after parsing.
+        max_age_hours: Skip emails sent longer ago than this (their ZR /km/
+            enrichment links have expired, so there's nothing to scrape). None
+            processes every selected email regardless of age.
+        seen_store: Layer-1 dedup cache (keyed by Gmail message-id = filename
+            stem). Emails already in it are skipped; each attempted email is
+            recorded regardless of outcome. None disables the cache.
 
     Returns:
         Parsed/enriched JobPosting objects.
@@ -118,6 +148,8 @@ def process_eml_directory(
         raise ValueError("max_jobs must be a positive integer")
     if skip_jobs < 0:
         raise ValueError("skip_jobs must be zero or a positive integer")
+    if max_age_hours is not None and max_age_hours <= 0:
+        raise ValueError("max_age_hours must be a positive number")
 
     eml_dir = Path(directory_path)
     archive_dir = Path(archive_dir_path)
@@ -133,9 +165,34 @@ def process_eml_directory(
     all_new_jobs: list[JobPosting] = []
 
     for eml_file in eml_files:
+        # Layer-1 dedup: the filename stem is the Gmail message-id. Skip emails
+        # we've handled before, and record this one now so it's never re-enriched
+        # even if processing below fails partway (user accepts "succeeded or not").
+        message_id = eml_file.stem
+        if seen_store is not None and seen_store.has(message_id):
+            log.info("Skipping %s: already processed (cache hit)", eml_file.name)
+            continue
+        if seen_store is not None:
+            seen_store.add(message_id)
+
         log.info("Processing %s", eml_file.name)
         with eml_file.open("rb") as f:
             msg = email.message_from_binary_file(f)
+
+        if max_age_hours is not None:
+            sent_at = _email_sent_at(msg)
+            if sent_at is not None:
+                age_hours = (
+                    datetime.now(timezone.utc) - sent_at
+                ).total_seconds() / 3600
+                if age_hours > max_age_hours:
+                    log.info(
+                        "Skipping %s: aged-out (%.0fh old > %.0fh window)",
+                        eml_file.name,
+                        age_hours,
+                        max_age_hours,
+                    )
+                    continue
 
         payload = _extract_text_plain_payload(msg)
         if payload is None:
@@ -227,6 +284,17 @@ if __name__ == "__main__":
         action="store_true",
         help="Move successfully parsed .eml files to archive_dir.",
     )
+    parser.add_argument(
+        "--max-age-hours",
+        type=float,
+        default=None,
+        help="Skip emails older than this many hours (their /km/ links have expired).",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass the Layer-1 processed-email cache (reprocess everything).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -240,6 +308,8 @@ if __name__ == "__main__":
         skip_jobs=skip_jobs,
         scrape_details=not args.no_scrape,
         archive_processed=args.archive_processed,
+        max_age_hours=args.max_age_hours,
+        seen_store=None if args.no_cache else default_processed_store(),
     )
     if args.print_jobs:
         for idx, job in enumerate(jobs, start=skip_jobs):

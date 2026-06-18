@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 from job_scraper.models import JobPosting
-from email_scraper.zr_scraper import fetch_job_details_from_url
+from email_scraper.zr_scraper import enrich_job_url
 
 log = logging.getLogger(__name__)
 
@@ -54,11 +54,15 @@ def parse_zr_plaintext(
 
         url = title_url_match.group(2).strip()
 
-        # 4. Extract the obfuscated ID from the /km/ path
+        # 4. Extract the obfuscated ID from the tracking path. Both ZR-hosted
+        # (/km/) and external-handoff (/ekm/) links carry the id as the last path
+        # segment; without covering /ekm/ too, every external job collapsed to
+        # the same "unknown" id and collided in dedup.
         parsed_url = urlparse(url)
-        job_id = (
-            parsed_url.path.split("/")[-1] if "/km/" in parsed_url.path else "unknown"
-        )
+        if "/km/" in parsed_url.path or "/ekm/" in parsed_url.path:
+            job_id = parsed_url.path.rstrip("/").split("/")[-1] or "unknown"
+        else:
+            job_id = "unknown"
 
         # 5. Extract Company, Location, and Salary from the remaining lines
         content_after_title = block[title_url_match.end() :].strip()
@@ -94,20 +98,33 @@ def parse_zr_plaintext(
                 period_map = {"yr": "yearly", "hr": "hourly", "mo": "monthly"}
                 salary_period = period_map.get(period.lower())
 
-        # 6. Use our scraper tool to fetch the full description and posted_at date from the URL if needed
-        description, posted_at = None, None
+        # 6. Enrich from the detail page if needed. The router classifies the URL
+        # first, so external-ATS and expired links cost no browser launch and
+        # come back with an explicit status instead of a silent (None, None).
+        description, posted_at, enrichment_status = None, None, None
         if scrape_details:
-            log.info("Scraping ZR detail page for %s: %s", title, url)
-            description, posted_at = fetch_job_details_from_url(url)
+            log.info("Enriching ZR job %s: %s", title, url)
+            description, posted_at, enrichment_status, listing_key = enrich_job_url(url)
+            # The email tracking token rotates every send, so the path-id we
+            # extracted in step 4 is per-send, not per-job — the same job in two
+            # emails would get two dedup_hashes (→ duplicate app rows, missed
+            # AnalysisCache). The resolved page's listing_key is stable, so prefer
+            # it as the identity when enrichment surfaced one.
+            if listing_key:
+                job_id = listing_key
             if description or posted_at:
                 log.info(
-                    "Scraped ZR detail page for %s: description=%s posted_at=%s",
+                    "Enriched %s [%s]: description=%s posted_at=%s listing_key=%s",
                     title,
+                    enrichment_status,
                     bool(description),
                     posted_at,
+                    listing_key,
                 )
             else:
-                log.warning("No detail fields scraped for %s: %s", title, url)
+                log.warning(
+                    "No detail fields for %s [%s]: %s", title, enrichment_status, url
+                )
 
         # 7. Instantiate and hash
         posting = JobPosting(
@@ -123,6 +140,7 @@ def parse_zr_plaintext(
             salary_min_usd=salary_min,
             salary_max_usd=salary_max,
             salary_period=salary_period,
+            enrichment_status=enrichment_status,
         )
         posting.compute_hash()
         postings.append(posting)

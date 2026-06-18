@@ -128,12 +128,19 @@ def greeting_merged_payload():
 
 
 def _parse(payload, fetch_returns=("Full description", "2024-01-15T00:00:00Z")):
-    """Parse *payload* with mocked fetch_job_details_from_url and datetime."""
+    """Parse *payload* with mocked enrich_job_url and datetime.
+
+    ``fetch_returns`` stays a (description, posted_at) pair for call-site
+    brevity; we derive the enrichment status the router would report so the
+    parser sees the real 3-tuple shape.
+    """
+    description, posted_at = fetch_returns
+    status = "enriched" if (description or posted_at) else "unenriched"
     fixed_dt = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
     with (
         patch(
-            "email_scraper.zr_parser.fetch_job_details_from_url",
-            return_value=fetch_returns,
+            "email_scraper.zr_parser.enrich_job_url",
+            return_value=(description, posted_at, status, None),
         ),
         patch("email_scraper.zr_parser.datetime") as mock_dt,
     ):
@@ -321,6 +328,44 @@ def test_extracts_job_id_from_km_path(single_job_payload):
     assert jobs[0].source_job_id == "abc123"
 
 
+def test_listing_key_overrides_job_id_and_stabilizes_hash():
+    """Same listing via two rotating tokens → same dedup_hash (the whole point)."""
+    fixed_dt = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _parse_url(km_id):
+        payload = (
+            f" Back End Developer  <https://www.ziprecruiter.com/km/{km_id}>\r\n\r\n"
+            "Maximus • Austin, TX\r\n\r\n"
+            f" View Details  <https://www.ziprecruiter.com/km/{km_id}>"
+        )
+        with (
+            patch(
+                "email_scraper.zr_parser.enrich_job_url",
+                return_value=("desc", "2024-01-01", "enriched", "LISTING-STABLE"),
+            ),
+            patch("email_scraper.zr_parser.datetime") as mock_dt,
+        ):
+            mock_dt.now.return_value = fixed_dt
+            mock_dt.timezone = timezone
+            return parse_zr_plaintext(payload)[0]
+
+    a = _parse_url("AAArotating-token-one")
+    b = _parse_url("AAEdifferent-token-two")
+    assert a.source_job_id == b.source_job_id == "LISTING-STABLE"
+    assert a.dedup_hash == b.dedup_hash
+
+
+def test_extracts_job_id_from_ekm_path():
+    """External-handoff (/ekm/) links also carry the id as the last segment."""
+    payload = (
+        " Ext Job  <https://www.ziprecruiter.com/ekm/extId123>\r\n"
+        "\r\n"
+        " View Details  <https://www.ziprecruiter.com/ekm/extId123>"
+    )
+    jobs = _parse(payload)
+    assert jobs[0].source_job_id == "extId123"
+
+
 def test_job_id_fallback_to_unknown():
     """URL without /km/ path falls back to 'unknown'."""
     payload = (
@@ -353,17 +398,17 @@ def test_sets_scraped_at_timestamp(single_job_payload):
     assert "2024-01-15" in jobs[0].scraped_at
 
 
-def test_calls_fetch_job_details_for_each_job(multi_job_payload):
-    """fetch_job_details_from_url is called once per job block."""
+def test_calls_enrich_for_each_job(multi_job_payload):
+    """enrich_job_url is called once per job block."""
     with (
-        patch("email_scraper.zr_parser.fetch_job_details_from_url") as mock_fetch,
+        patch("email_scraper.zr_parser.enrich_job_url") as mock_enrich,
         patch("email_scraper.zr_parser.datetime") as mock_dt,
     ):
         mock_dt.now.return_value = datetime(2024, 1, 1, tzinfo=timezone.utc)
         mock_dt.timezone = timezone
-        mock_fetch.return_value = ("desc", "2024-01-01")
+        mock_enrich.return_value = ("desc", "2024-01-01", "enriched", None)
         parse_zr_plaintext(multi_job_payload)
-        assert mock_fetch.call_count == 3
+        assert mock_enrich.call_count == 3
 
 
 def test_description_and_posted_at_from_fetch(single_job_payload):
@@ -373,11 +418,26 @@ def test_description_and_posted_at_from_fetch(single_job_payload):
 
 
 def test_fetch_returns_none_gracefully(single_job_payload):
-    """When fetch returns (None, None), posting still created."""
+    """When enrichment yields nothing, posting still created."""
     jobs = _parse(single_job_payload, fetch_returns=(None, None))
     assert len(jobs) == 1
     assert jobs[0].description is None
     assert jobs[0].posted_at is None
+
+
+def test_records_enrichment_status(single_job_payload):
+    """The router's status is recorded on the posting."""
+    jobs = _parse(single_job_payload, fetch_returns=("desc", "2024-06-01"))
+    assert jobs[0].enrichment_status == "enriched"
+
+    jobs = _parse(single_job_payload, fetch_returns=(None, None))
+    assert jobs[0].enrichment_status == "unenriched"
+
+
+def test_enrichment_status_none_when_not_scraping(single_job_payload):
+    """With scrape_details off, enrichment is never attempted (status None)."""
+    jobs = parse_zr_plaintext(single_job_payload, scrape_details=False)
+    assert jobs[0].enrichment_status is None
 
 
 # ---------------------------------------------------------------------------
