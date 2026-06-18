@@ -1,10 +1,19 @@
 # User configs in DB + settings form (Phase 12)
 
-Status: **ratified — implementation not started**
+Status: **ratified; Phase 12 shipped. Phase 18 extends the same settings surface.**
 Date: 2026-06-11 (proposed and ratified same day)
+Last updated: 2026-06-18 (Phase 18 Settings & Account follow-ups)
 Baseline: main @ f5c2e31 (Phase 11 multi-user live; #177 warm-replica fix deployed)
-Milestone: [Phase 12](../../milestones/2) · tracking issue #168
+Milestone: [Phase 12](../../milestones/2) · tracking issue #168. Phase 18 follow-ups live in the GitHub milestone "Phase 18: Settings & Account".
 Follows: `specs/multi_user_design.md` §7 (this phase was sketched there)
+
+## Changelog
+
+- **2026-06-18 — Phase 18 Settings & Account updates.** Marked Phase 12 as
+  shipped; documented `user_search_configs.pipeline_enabled` from migration
+  0011; added the Phase 18 search payload follow-ups (`salary_floor_k`,
+  LinkedIn experience codes, per-user travel tolerance); updated settings API,
+  policy, frontend layout, and deploy notes for the Phase 18 slices.
 
 ## 1. Product decisions (settled in discussion 2026-06-11)
 
@@ -58,12 +67,13 @@ CREATE TABLE app.candidate_profiles (
 );
 
 CREATE TABLE app.user_search_configs (
-    user_id         UUID        PRIMARY KEY
-                                REFERENCES app.users(id) ON DELETE CASCADE,
-    payload         JSONB       NOT NULL,   -- search targeting (human format)
-    policies        JSONB       NOT NULL DEFAULT '{}',  -- §6; empty = permissive
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    user_id          UUID        PRIMARY KEY
+                                 REFERENCES app.users(id) ON DELETE CASCADE,
+    payload          JSONB       NOT NULL,   -- search targeting (human format)
+    policies         JSONB       NOT NULL DEFAULT '{}',  -- §6; empty = permissive
+    pipeline_enabled BOOLEAN     NOT NULL DEFAULT true,  -- Phase 18/account toggle; added in 0011
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
@@ -78,8 +88,11 @@ indexing (none does: these tables have at most one row per user).
 serialization of `payload` (`json.dumps(..., sort_keys=True, separators=(",", ":"))`). Date prefix for humans, hash for machines.
 Computed server-side on every save; never client-supplied.
 
-No backfill migration: tables start empty, seeded by the push script (§4).
-Migration `0009_user_config_tables` is just the two `CREATE TABLE`s.
+No backfill migration for Phase 12: tables started empty, seeded by the push script (§4).
+Migration `0009_user_config_tables` is just the two `CREATE TABLE`s. Migration
+`0011_pipeline_enabled_flag` later added `user_search_configs.pipeline_enabled`
+as a pipeline/account switch: an account can exist and log in while opting out of
+overnight runs without deleting its search settings.
 
 ## 3. The human-facing format
 
@@ -101,6 +114,17 @@ the working tree) is **not restored**: with configs in the DB and the
 template frozen into Pydantic models, committed example YAML is dead
 weight. The intake templates themselves get retired from local use once
 the form ships (they remain the historical seed of the format).
+
+Phase 18 extends the frozen search payload where real usage exposed lossy
+round-trips:
+
+- `scrape_preferences.salary_floor_k` — optional LinkedIn salary-floor filter,
+  emitted to pipeline YAML as `global.salary_floor_k`.
+- `scrape_preferences.linkedin_experience_codes` — LinkedIn experience-code
+  list, emitted to pipeline YAML as `linkedin.experience`.
+- A per-user travel tolerance field (implementation location to be chosen in
+  the Phase 18 slice; expected to be policy-shaped rather than scrape-shaped),
+  derived into `policies.remote.max_travel_days` (§6).
 
 ## 4. Scripts (admin CLI — this is where the value ships first)
 
@@ -126,12 +150,18 @@ All routes scoped to the current user via `CurrentUser`; no admin
 cross-user surface this phase (the admin uses the scripts).
 
 - `GET /api/settings` — both payloads + `profile_version` + `updated_at`s
-  (null payloads if not yet configured → frontend shows onboarding state).
+  (null payloads if not yet configured → frontend shows onboarding state). Phase
+  18 extends this response with `pipeline_enabled` so the Account & Activity tab
+  can show whether overnight runs are enabled for this user's search config.
 - `PUT /api/settings/profile` — validate `CandidateProfileInput`, upsert,
   recompute `profile_version`, return it. 422 with field-level errors on
   invalid payload (the form needs them).
-- `PUT /api/settings/search` — validate `SearchConfigInput` + `UserPolicies`,
-  upsert.
+- `PUT /api/settings/search` — validate `SearchConfigInput`, derive
+  `UserPolicies`, upsert payload + policies.
+- `PUT /api/settings/pipeline-enabled` (Phase 18) — toggle
+  `user_search_configs.pipeline_enabled` for the current user. It should fail
+  loudly if the user has no search config row rather than silently creating a
+  partial settings record.
 
 A changed profile takes effect at the next overnight run that the admin
 executes — the form should say so ("your next batch of jobs will use this
@@ -144,9 +174,10 @@ Stored in `user_search_configs.policies`. Known fields at draft time:
 
 ```yaml
 remote:
-  acceptable_classifications: [...]   # default: all eight classes
+  acceptable_classifications: [...]   # default: all currently produced classes
+  max_travel_days: null               # Phase 18; null = preserve current fallback/default
 prefilter:
-  excluded_title_terms: [...]         # default: []
+  excluded_title_terms: []            # default: []
   # further prefilter knobs surfaced at implementation as they're
   # extracted from the current search.yml-coupled config
 ```
@@ -157,25 +188,38 @@ shared and cached exactly as today (`AnalysisCache`, `dedup_hash | prompt_hash |
 permissive by default, per decision 6. The admin's strict settings are
 just his row's values.
 
-This phase only *stores and edits* policies and has `pull_user_configs`
-emit them into the materialized YAML; the pipeline already applies
-equivalent settings from `search.yml` today. Restructuring *where* the
-pipeline applies them (the fan-in/fan-out reshape) is Phase 13.
+Phase 12 only *stored and edited* policies and had `pull_user_configs` emit
+them into materialized YAML; the pipeline already applied equivalent settings
+from `search.yml` at that time. Phase 13 moved per-user policy gating into the
+multi-user scoring flow. Phase 18 adds `max_travel_days` as a per-user policy
+knob now that remote-filter travel is numeric-only (`estimated_travel_days_per_year`);
+see `specs/remote_filter_simplification.md` §7.
 
 ## 7. Frontend settings form
 
-- New Settings page: profile section + search/policy section, driven by
-  the same field structure as the Pydantic models; server 422 errors
-  rendered inline.
-- Onboarding state when payloads are null ("no profile yet — fill this in
-  and your feed gets real jobs after the next run").
-- Show current `profile_version` (read-only) — users will quote it in bug
-  reports, which is exactly what it's for.
-- The user runs the dev server (:5175); frontend PRs land last.
+Phase 12 shipped the first settings form: profile + search/policy sections,
+driven by the same field structure as the Pydantic models, with server 422
+errors rendered inline.
+
+Phase 18 rebuilds `/settings` into a clearer four-section surface:
+
+1. **Profile** — candidate profile editor and read-only `profile_version`.
+1. **Search Targeting** — identity/search profile, target titles, locations,
+   organizations/domains, keywords, cadence/result limits, salary floor, and
+   LinkedIn experience codes.
+1. **Filters & Policies** — employment types, work arrangements, excluded terms,
+   per-user travel tolerance, and the derived-policy preview.
+1. **Account & Activity** — signed-in account context and the
+   `pipeline_enabled` toggle. Disabling it stops future overnight runs for the
+   user's search config; it does not delete settings or existing jobs.
+
+Onboarding state still applies when payloads are null ("no profile yet — fill
+this in and your feed gets real jobs after the next run").
 
 ## 8. Migration & deploy plan
 
-Low-risk relative to Phase 11 — additive schema, no data movement:
+Historical Phase 12 plan: low-risk relative to Phase 11 — additive schema, no
+data movement:
 
 1. Migration 0009 (two CREATE TABLEs) ships with the scripts PR; applies
    via lifespan as usual.
@@ -191,7 +235,17 @@ Low-risk relative to Phase 11 — additive schema, no data movement:
 Rollback: tables are additive; the hand-maintained YAML keeps working
 until step 4 — the scripts are a parallel path, not a cutover.
 
-## 9. PR slicing
+Phase 18 remains additive: `pipeline_enabled` already exists from migration
+0011; new payload/policy fields are JSONB fields validated by Pydantic and can
+be introduced without data migration. The main deploy risk is preserving current
+default behavior for users whose stored search payloads do not yet include the
+new fields.
+
+## 9. Historical Phase 12 PR slicing
+
+Phase 18 implementation slices are tracked in the GitHub milestone "Phase 18:
+Settings & Account"; this section is the original Phase 12 slice list retained
+for history.
 
 1. `feat(config): user_config models + transform + golden tests`
    (no DB, no API — the frozen format and the codified hand-transform)

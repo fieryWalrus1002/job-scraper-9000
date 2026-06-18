@@ -9,6 +9,14 @@ schema problem. We cannot tune it well until the schema + multi-user pipeline
 land and we revisit the eval baseline on real per-user data — so it stays parked
 behind this work. This spec deliberately does **not** touch that behavior.
 
+## Changelog
+
+- **2026-06-18 — Phase 18 follow-up for per-user travel tolerance.** Updated §7
+  from a pure deferral note to the Phase 18 target shape for #215:
+  `max_travel_days` lives in the per-user settings/policy surface, derives into
+  `policies.remote.max_travel_days`, and gates
+  `_remote_analysis.estimated_travel_days_per_year` before skills-fit scoring.
+
 ## 1. Problem
 
 `remote_filter` is wrong "a lot" on the travel subcategories. The root cause
@@ -111,17 +119,25 @@ Eval-forward order for the core slice:
 SCHEMA_VERSION 3.0.0 structurally flags pre-change eval records, which is
 correct — they were produced under a different output contract.
 
-## 7. Open question: per-user travel tolerance
+## 7. Follow-up: per-user travel tolerance
 
 Today `max_estimated_days_per_year: 15` is **global** in `remote_agent.yml`.
 Once travel is purely numeric and the multi-user pipeline applies policy
 per-user (Phase 13), travel tolerance is naturally a **per-user** preference,
 like the remote/hybrid/onsite acceptances `derive_policies` already produces.
 
-**Resolved: defer (option a).** Travel tolerance stays global
-(`max_estimated_days_per_year`) in this effort. Per-user `max_travel_days` is
-tracked as its own backlog issue against the per-user policy schema — it belongs
-with the per-user policy surface, not bundled into the bucket removal.
+**Resolved for this simplification effort: defer (option a).** Travel tolerance
+stays global (`max_estimated_days_per_year`) in the bucket-removal PR so the eval
+delta stays attributable to the schema/prompt change. Per-user
+`max_travel_days` is tracked separately (#215) against the per-user policy schema
+and is scheduled for Phase 18 Settings & Account.
+
+**Phase 18 target shape:** store the user's max-travel tolerance in the
+human-facing search/settings payload, derive it into
+`policies.remote.max_travel_days`, and apply it in the per-user policy gate over
+`_remote_analysis.estimated_travel_days_per_year` before skills-fit scoring. A
+missing/null user value must preserve current behavior rather than silently
+loosening or tightening existing users' filters.
 
 ## 8. PR slicing
 
@@ -142,8 +158,9 @@ mechanical cleanup that can follow.
 
 ## 9. Resolved decisions
 
-1. **Per-user travel tolerance** — **deferred** (§7). Separate backlog issue for
-   `max_travel_days` on the per-user policy schema.
+1. **Per-user travel tolerance** — **deferred from this simplification** (§7).
+   Separate issue #215 adds `max_travel_days` to the per-user policy schema in
+   Phase 18.
 1. **Prompt rewrite depth** — **minimal** edit: remove the cadence buckets, keep
    the rest, so the eval delta is attributable to the schema change rather than
    prose churn.
