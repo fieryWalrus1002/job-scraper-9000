@@ -27,6 +27,40 @@ _MULTI_LOCATION_RE = re.compile(r"^\d+\s+locations?$", re.IGNORECASE)
 _DAYS_AGO_RE = re.compile(r"posted\s+(\d+)\+?\s+days?\s+ago", re.IGNORECASE)
 
 
+def _workday_detail_search_params(detail: dict) -> dict:
+    """Return remote-filter-relevant Workday detail metadata.
+
+    Workday exposes header fields like ``location=Remote`` and
+    ``timeType=Full time`` outside ``jobDescription``. Preserve them so the
+    remote filter does not have to infer from the description alone.
+    """
+    context: dict[str, object] = {}
+
+    locations = _workday_detail_locations(detail)
+    if locations:
+        context["source_detail_location"] = "; ".join(locations)
+        if any(str(loc).strip().lower() == "remote" for loc in locations):
+            context["workplace"] = "remote"
+
+    time_type = str(detail.get("timeType") or "").strip().lower()
+    if time_type.replace("-", " ") == "full time":
+        context["job_type"] = "fulltime"
+
+    if job_req_id := detail.get("jobReqId"):
+        context["workday_job_req_id"] = job_req_id
+
+    return context
+
+
+def _workday_detail_locations(detail: dict) -> list[str]:
+    locations = []
+    if location := detail.get("location") or detail.get("locationsText"):
+        if not _MULTI_LOCATION_RE.match(str(location)):
+            locations.append(str(location))
+    locations.extend(str(loc) for loc in detail.get("additionalLocations") or [])
+    return [loc for loc in dict.fromkeys(loc.strip() for loc in locations) if loc]
+
+
 def _parse_posted_at(relative: str | None, ref_iso: str) -> str | None:
     """Convert a Workday relative date string to an ISO date string.
 
@@ -61,15 +95,21 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
         return "sel"
 
     def _fetch_detail(self, job_path: str) -> dict:
-        """Hits the Workday detail JSON API. Returns jobPostingInfo dict or empty dict."""
+        """Fetch Workday detail JSON and return the ``jobPostingInfo`` object.
+
+        Detail fields include source-of-truth header metadata such as remote
+        location and time type, so failures must surface at the scrape-job
+        boundary instead of silently degrading downstream classification.
+        """
         api_url = f"{_DETAIL_API}{job_path.replace('/job', '')}"
-        try:
-            resp = self.session.get(api_url, timeout=10)
-            if resp.status_code == 200:
-                return resp.json().get("jobPostingInfo", {})
-        except Exception as e:
-            log.warning("Failed detail fetch for %s: %s", job_path, e)
-        return {}
+        resp = self.session.get(api_url, timeout=10)
+        resp.raise_for_status()
+        info = resp.json().get("jobPostingInfo")
+        if not isinstance(info, dict):
+            raise ValueError(
+                f"Workday detail response missing jobPostingInfo: {api_url}"
+            )
+        return info
 
     def scrape(self) -> list[JobPosting]:
         applied_facets = self.query.to_applied_facets()
@@ -103,11 +143,17 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
             for item in postings:
                 path = item.get("externalPath", "")
 
-                detail: dict = {}
-                if self.query.fetch_descriptions and path:
-                    detail = self._fetch_detail(path)
+                # Workday header metadata (location/time type/job req) is part of
+                # the posting contract, not just the long description. Always fetch
+                # detail JSON when a path exists; ``fetch_descriptions`` only gates
+                # whether we retain the description body.
+                detail: dict = self._fetch_detail(path) if path else {}
 
-                description_html = detail.get("jobDescription", "")
+                description_html = (
+                    detail.get("jobDescription", "")
+                    if self.query.fetch_descriptions
+                    else ""
+                )
                 description_raw = (
                     BeautifulSoup(description_html, "html.parser").get_text(
                         "\n", strip=True
@@ -122,9 +168,20 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
                 )
 
+                item_detail = {
+                    "location": item.get("locationsText"),
+                    "timeType": item.get("timeType"),
+                    "jobReqId": source_job_id,
+                }
+                detail_search_params = _workday_detail_search_params(
+                    {**item_detail, **detail}
+                )
+                detail_location = detail_search_params.get("source_detail_location")
                 raw_location = item.get("locationsText", "")
                 location = (
-                    fallback_location
+                    str(detail_location)
+                    if detail_location
+                    else fallback_location
                     if _MULTI_LOCATION_RE.match(raw_location) and fallback_location
                     else raw_location
                 )
@@ -143,6 +200,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     description=description,
                     scraped_at=scraped_at,
                     scrub_counts=scrub_counts,
+                    search_params=detail_search_params,
                     salary_min_usd=salary.salary_min_usd if salary else None,
                     salary_max_usd=salary.salary_max_usd if salary else None,
                     salary_period=salary.salary_period if salary else None,

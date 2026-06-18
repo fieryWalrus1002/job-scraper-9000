@@ -2,6 +2,7 @@ import pytest
 
 from agents.remote_filter.utils import (
     _get_client,
+    build_search_context,
     context_fingerprint,
     resolve_llm_model,
 )
@@ -41,6 +42,79 @@ def test_get_client_and_resolve_llm_model_agree(cfg, env, expected, monkeypatch)
     helper_model = resolve_llm_model(cfg)
 
     assert client_model == helper_model == expected
+
+
+# ---------------------------------------------------------------------------
+# build_search_context
+# ---------------------------------------------------------------------------
+
+
+def test_build_search_context_canonicalizes_consolidated_search_contexts():
+    contexts = [
+        {"source": "linkedin", "workplace": "remote"},
+        {"workplace": "remote", "source": "linkedin"},
+        {"source": "workday", "source_detail_location": "Remote"},
+    ]
+
+    first = build_search_context({"search_contexts": contexts})
+    second = build_search_context({"search_contexts": list(reversed(contexts))})
+
+    assert first == second
+    assert first["search_contexts"] == [
+        {"source": "linkedin", "workplace": "remote"},
+        {"source": "workday", "source_detail_location": "Remote"},
+    ]
+
+
+def test_build_search_context_drops_non_prompt_provenance_from_search_contexts():
+    context = build_search_context(
+        {
+            "search_contexts": [
+                {
+                    "source": "workday",
+                    "workplace": "remote",
+                    "source_detail_location": "Remote; Washington, DC",
+                    "workday_job_req_id": "JR100168",
+                }
+            ]
+        }
+    )
+
+    assert context["search_contexts"] == [
+        {
+            "source": "workday",
+            "workplace": "remote",
+            "source_detail_location": "Remote; Washington, DC",
+        }
+    ]
+    assert "workday_job_req_id" not in context["search_contexts"][0]
+
+
+def test_build_search_context_merges_consolidated_search_contexts():
+    job = {
+        "search_params": {"keywords": "data engineer"},
+        "search_contexts": [
+            {
+                "source": "workday",
+                "workplace": "remote",
+                "job_type": "fulltime",
+                "source_detail_location": "Remote; Washington, DC",
+            }
+        ],
+    }
+
+    assert build_search_context(job, user_timezone="PST") == {
+        "keywords": "data engineer",
+        "search_contexts": [
+            {
+                "source": "workday",
+                "workplace": "remote",
+                "job_type": "fulltime",
+                "source_detail_location": "Remote; Washington, DC",
+            }
+        ],
+        "user_timezone": "PST",
+    }
 
 
 # ---------------------------------------------------------------------------

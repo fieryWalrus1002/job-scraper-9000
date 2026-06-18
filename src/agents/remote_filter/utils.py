@@ -95,6 +95,45 @@ def _extract_usage(usage_obj: Any) -> dict[str, int]:
     }
 
 
+def build_search_context(job: dict, user_timezone: str | None = None) -> dict:
+    """Build the search/provenance context that remote_filter should read.
+
+    Keeps legacy ``search_params`` behavior while carrying consolidated
+    ``search_contexts`` that preserve filters from duplicate postings. Contexts
+    are canonicalized so semantically identical provenance produces stable
+    prompts and cache keys.
+    """
+    context = dict(job.get("search_params") or {})
+    if search_contexts := _normalize_search_contexts(job.get("search_contexts") or []):
+        context["search_contexts"] = search_contexts
+    if user_timezone:
+        context["user_timezone"] = user_timezone
+    return context
+
+
+_SEARCH_CONTEXT_PROMPT_FIELDS = {
+    "source",
+    "workplace",
+    "job_type",
+    "source_detail_location",
+}
+
+
+def _normalize_search_contexts(search_contexts: list[dict]) -> list[dict]:
+    normalized: dict[str, dict] = {}
+    for context in search_contexts:
+        cleaned = {
+            k: v
+            for k, v in context.items()
+            if k in _SEARCH_CONTEXT_PROMPT_FIELDS and v not in (None, "", [], {})
+        }
+        if not cleaned or set(cleaned) == {"source"}:
+            continue
+        marker = json.dumps(cleaned, sort_keys=True, separators=(",", ":"))
+        normalized[marker] = cleaned
+    return [normalized[marker] for marker in sorted(normalized)]
+
+
 def _build_user_message(
     description: str,
     search_context: dict | None,
@@ -119,9 +158,49 @@ def _build_user_message(
             ctx.append(f"candidate_timezone={tz}")
         if ctx:
             parts.append(f"Search context: {', '.join(ctx)}")
+
+        provenance = _format_search_provenance(
+            _normalize_search_contexts(search_context.get("search_contexts") or [])
+        )
+        if provenance:
+            parts.append(provenance)
     if not parts:
         return description
     return "\n".join(f"[{p}]" for p in parts) + "\n\n---\n\n" + description
+
+
+def _format_search_provenance(search_contexts: list[dict]) -> str | None:
+    notes: list[str] = []
+    for context in search_contexts:
+        source = context.get("source") or "source"
+        workplace = str(context.get("workplace") or "").lower()
+        job_type = str(context.get("job_type") or "").lower()
+        detail_location = context.get("source_detail_location")
+
+        bits = []
+        if workplace == "remote":
+            bits.append(
+                "returned by a remote-only search filter or source detail metadata; "
+                "treat this as weak but relevant evidence of remote eligibility "
+                "unless contradicted by the posting"
+            )
+        elif workplace:
+            bits.append(f"workplace_filter={workplace}")
+
+        if job_type == "fulltime":
+            bits.append("returned by a full-time search filter")
+        elif job_type:
+            bits.append(f"job_type={job_type}")
+
+        if detail_location:
+            bits.append(f"source_detail_location={detail_location}")
+
+        if bits:
+            notes.append(f"{source}: " + "; ".join(bits))
+
+    if not notes:
+        return None
+    return "Search provenance: " + " | ".join(notes)
 
 
 def analyze_remote(
@@ -249,7 +328,13 @@ def resolve_llm_model(llm_config: dict | None = None) -> str:
 # Fields of `search_context` that `_build_user_message` actually reads. Keep
 # this in sync with that function — anything that affects the LLM prompt must
 # affect the cache key, or stale analyses leak across runs.
-_CONTEXT_FIELDS = ("keywords", "workplace", "job_type", "user_timezone")
+_CONTEXT_FIELDS = (
+    "keywords",
+    "workplace",
+    "job_type",
+    "search_contexts",
+    "user_timezone",
+)
 
 
 def context_fingerprint(search_context: dict | None) -> str:
@@ -265,8 +350,9 @@ def context_fingerprint(search_context: dict | None) -> str:
     relevant: dict[str, object] = {}
     for k in _CONTEXT_FIELDS:
         v = search_context.get(k)
-        if v:
-            relevant[k] = v
+        if not v:
+            continue
+        relevant[k] = _normalize_search_contexts(v) if k == "search_contexts" else v
     if not relevant:
         return "none"
     canonical = json.dumps(relevant, sort_keys=True, separators=(",", ":"))

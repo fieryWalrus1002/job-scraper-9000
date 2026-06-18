@@ -13,6 +13,7 @@ from agents.remote_filter.models import SCHEMA_VERSION
 from agents.remote_filter.utils import (
     REMOTE_FILTER_PROMPT_PATH,
     analyze_remote,
+    build_search_context,
     context_fingerprint,
     load_raw_jobs,
     passes_remote_filter,
@@ -170,10 +171,7 @@ def run_remote_filter(
                         skipped += 1
                         continue
 
-                    search_context = {
-                        **(job.get("search_params") or {}),
-                        **({"user_timezone": user_timezone} if user_timezone else {}),
-                    }
+                    search_context = build_search_context(job, user_timezone)
                     dedup_key = job.get("dedup_hash") or job.get("source_job_id") or ""
                     context_fp = context_fingerprint(search_context)
                     analysis = None

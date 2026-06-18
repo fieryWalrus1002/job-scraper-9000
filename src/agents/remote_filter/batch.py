@@ -45,6 +45,7 @@ from .utils import (
     REMOTE_FILTER_PROMPT_PATH,
     _build_user_message,
     _get_client,
+    build_search_context,
     context_fingerprint,
     load_raw_jobs,
     passes_remote_filter,
@@ -70,10 +71,7 @@ def build_request(
     ``custom_id`` is ``job-<idx>``; the caller maps results back by that id, so
     ``idx`` must match the request's position in the submitted file.
     """
-    search_context = {
-        **(job.get("search_params") or {}),
-        **({"user_timezone": user_timezone} if user_timezone else {}),
-    }
+    search_context = build_search_context(job, user_timezone)
     user_message = _build_user_message(
         job.get("description", ""),
         search_context=search_context or None,
@@ -286,10 +284,7 @@ def run_remote_filter_batch(
                     skipped += 1
                     continue
 
-                search_context = {
-                    **(job.get("search_params") or {}),
-                    **({"user_timezone": user_timezone} if user_timezone else {}),
-                }
+                search_context = build_search_context(job, user_timezone)
                 dedup_key = job.get("dedup_hash") or job.get("source_job_id") or ""
                 context_fp = context_fingerprint(search_context)
 
