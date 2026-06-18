@@ -9,6 +9,13 @@ Follows: `specs/multi_user_design.md` §7 (this phase was sketched there)
 
 ## Changelog
 
+- **2026-06-18 — #208 shipped (salary floor + LinkedIn experience codes).**
+  `ScrapePreferences` gained `salary_floor_k` (validated at the API edge as
+  `Literal[40, 60, 80, 100, 120]`, mirroring the scraper's supported f_SB2
+  buckets — a sync test fails loud on drift) and `linkedin_experience_codes`
+  (default `["2","3","4","5"]`). The transform emits `global.salary_floor_k`
+  when set and `linkedin.experience` from the codes; an empty code list omits
+  the key so the scraper applies its own default rather than an empty filter.
 - **2026-06-18 — Phase 18 Settings & Account updates.** Marked Phase 12 as
   shipped; documented `user_search_configs.pipeline_enabled` from migration
   0011; added the Phase 18 search payload follow-ups (`salary_floor_k`,

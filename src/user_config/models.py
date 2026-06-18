@@ -53,6 +53,18 @@ LEGACY_REMOTE_CLASSIFICATIONS: tuple[RemoteClassification, ...] = (
 # which catches any drift loudly.
 EmploymentType = Literal["fulltime", "parttime", "contract"]
 
+# LinkedIn salary-floor buckets (in $k) the scraper's f_SB2 filter supports.
+# Duplicated from job_scraper.config._VALID_SALARY_K (keys of
+# query.SALARY_FLOOR // 1000) to keep user_config decoupled from the scraper
+# package, mirroring EmploymentType above. tests/user_config asserts the two
+# stay in sync, so a new scraper tier fails loudly here.
+SalaryFloorK = Literal[40, 60, 80, 100, 120]
+
+# LinkedIn experience-level codes (f_E param): 1=intern 2=entry 3=assoc
+# 4=mid-senior 5=director 6=exec. The default mirrors the scraper's
+# _LinkedInSection.experience default ("2,3,4,5").
+LinkedInExperienceCode = Literal["1", "2", "3", "4", "5", "6"]
+
 
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -178,6 +190,12 @@ class ScrapePreferences(_Strict):
     max_results_per_task: int = Field(default=50, ge=1, le=200)
     freshness_hours: int = Field(default=48, ge=1, le=24 * 31)
     cadence: Literal["daily", "weekly"] = "daily"
+    # LinkedIn-only scrape filters. salary_floor_k None = no floor; the empty
+    # experience list = fall back to the scraper's default (see transform).
+    salary_floor_k: SalaryFloorK | None = None
+    linkedin_experience_codes: list[LinkedInExperienceCode] = Field(
+        default_factory=lambda: ["2", "3", "4", "5"]
+    )
 
 
 class SearchConfigInput(_Strict):

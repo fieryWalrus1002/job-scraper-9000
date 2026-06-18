@@ -111,6 +111,11 @@ def search_config_to_pipeline_yaml(search: SearchConfigInput) -> dict:
             "linkedin_time": _CADENCE_TO_LINKEDIN_TIME[prefs.cadence],
         }
     }
+    # Salary floor is a LinkedIn f_SB2 filter; emitted as a global default that
+    # the loader inherits onto each linkedin search. Omitted when unset (= no
+    # floor, the scraper's permissive default).
+    if prefs.salary_floor_k is not None:
+        out["global"]["salary_floor_k"] = prefs.salary_floor_k
 
     if prefs.include_company_board_searches and search.organizations.target_companies:
         out["companies"] = _dedup(
@@ -118,11 +123,16 @@ def search_config_to_pipeline_yaml(search: SearchConfigInput) -> dict:
         )
 
     if prefs.include_general_job_boards and titles:
-        out["linkedin"] = {
+        linkedin: dict = {
             "workplace": _workplace(search),
             "job_type": search.work_constraints.employment_types.acceptable[0],
-            "searches": [{"keywords": t} for t in titles],
         }
+        # An empty code list falls back to the scraper's _LinkedInSection
+        # default rather than emitting experience="" (an empty f_E filter).
+        if prefs.linkedin_experience_codes:
+            linkedin["experience"] = ",".join(prefs.linkedin_experience_codes)
+        linkedin["searches"] = [{"keywords": t} for t in titles]
+        out["linkedin"] = linkedin
 
         jobspy_searches: list[dict] = []
         if prefs.include_remote_national_searches and wa.remote.acceptable:

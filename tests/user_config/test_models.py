@@ -84,3 +84,34 @@ def test_omitted_sections_get_permissive_defaults():
     wa = cfg.work_constraints.work_arrangements
     assert wa.remote.acceptable and wa.hybrid.acceptable and wa.onsite.acceptable
     assert cfg.scrape_preferences.include_local_searches is True
+
+
+def test_scrape_preference_linkedin_defaults():
+    """Salary floor defaults to no-floor; experience to the scraper default."""
+    cfg = SearchConfigInput.model_validate(_load("search_engineer.yml"))
+    assert cfg.scrape_preferences.salary_floor_k is None
+    assert cfg.scrape_preferences.linkedin_experience_codes == ["2", "3", "4", "5"]
+
+
+def test_valid_salary_floor_and_experience_codes_accepted():
+    data = _load("search_engineer.yml")
+    data["scrape_preferences"]["salary_floor_k"] = 120
+    data["scrape_preferences"]["linkedin_experience_codes"] = ["3", "4"]
+    cfg = SearchConfigInput.model_validate(data)
+    assert cfg.scrape_preferences.salary_floor_k == 120
+    assert cfg.scrape_preferences.linkedin_experience_codes == ["3", "4"]
+
+
+def test_unsupported_salary_floor_rejected():
+    """A floor the scraper has no f_SB2 bucket for fails at the API edge."""
+    data = _load("search_engineer.yml")
+    data["scrape_preferences"]["salary_floor_k"] = 70
+    with pytest.raises(ValidationError, match="salary_floor_k"):
+        SearchConfigInput.model_validate(data)
+
+
+def test_invalid_experience_code_rejected():
+    data = _load("search_engineer.yml")
+    data["scrape_preferences"]["linkedin_experience_codes"] = ["7"]
+    with pytest.raises(ValidationError, match="linkedin_experience_codes"):
+        SearchConfigInput.model_validate(data)
