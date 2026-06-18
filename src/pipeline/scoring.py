@@ -199,11 +199,13 @@ def _travel_days_of(record: dict[str, Any]) -> int | None:
     ``estimated_travel_days_per_year`` is ``int | None`` on RemoteAnalysis;
     a stored value of any other type is corrupt data and must not be
     silently coerced or skipped — fail loud so the per-user isolation handler
-    records it (CLAUDE.md: fail fast, log well).
+    records it (CLAUDE.md: fail fast, log well). ``bool`` is rejected too:
+    ``isinstance(True, int)`` is True, so a stored ``true`` would otherwise
+    sneak through as 1 day.
     """
     analysis = record.get("_remote_analysis") or {}
     days = analysis.get("estimated_travel_days_per_year")
-    if days is not None and not isinstance(days, int):
+    if days is not None and type(days) is not int:
         raise TypeError(
             f"estimated_travel_days_per_year is {type(days).__name__}, "
             f"expected int|None: {days!r}"
@@ -319,10 +321,12 @@ def score_run(
             if not survivors:
                 log.info(
                     "%s — no postings survived remote policy "
-                    "(%d requested, %d unclassified); skipping skills_fit",
+                    "(%d requested, %d unclassified, %d travel-filtered); "
+                    "skipping skills_fit",
                     email,
                     len(row["dedup_hashes"]),
                     unclassified,
+                    travel_filtered,
                 )
                 summary["users_skipped_no_postings"] += 1
                 summary["per_user"].append(
