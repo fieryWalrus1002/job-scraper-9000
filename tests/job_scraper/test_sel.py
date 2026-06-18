@@ -72,25 +72,33 @@ def test_scrape_does_not_call_get_for_listing():
     scraper.session.get.assert_not_called()
 
 
-def test_scrape_preserves_workday_item_metadata_without_fetching_description():
-    posting = {
-        **_posting(1),
-        "locationsText": "Remote",
-        "timeType": "Full time",
-    }
+def test_scrape_preserves_workday_detail_metadata_without_fetching_description_body():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
-    scraper.session.post.return_value = _api_response([posting])
+    scraper.session.post.return_value = _api_response([_posting(1)])
+    detail_resp = MagicMock()
+    detail_resp.status_code = 200
+    detail_resp.json.return_value = {
+        "jobPostingInfo": {
+            "location": "Remote",
+            "additionalLocations": ["Washington, DC"],
+            "timeType": "Full time",
+            "jobReqId": "JR100168",
+            "jobDescription": "<p>Should not be retained</p>",
+        }
+    }
+    scraper.session.get.return_value = detail_resp
 
     jobs = scraper.scrape()
 
-    scraper.session.get.assert_not_called()
-    assert jobs[0].location == "Remote"
+    scraper.session.get.assert_called_once()
+    assert jobs[0].description == ""
+    assert jobs[0].location == "Remote; Washington, DC"
     assert jobs[0].search_params == {
-        "source_detail_location": "Remote",
+        "source_detail_location": "Remote; Washington, DC",
         "workplace": "remote",
         "job_type": "fulltime",
-        "workday_job_req_id": "2025-00001",
+        "workday_job_req_id": "JR100168",
     }
 
 
@@ -235,14 +243,21 @@ def test_scrape_computes_dedup_hash():
 # ---------------------------------------------------------------------------
 
 
-def test_scrape_does_not_fetch_descriptions_when_disabled():
+def test_scrape_does_not_retain_description_body_when_disabled():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
     scraper.session.post.return_value = _api_response([_posting(1)])
+    detail_resp = MagicMock()
+    detail_resp.status_code = 200
+    detail_resp.json.return_value = {
+        "jobPostingInfo": {"jobDescription": "<p>Should not be retained</p>"}
+    }
+    scraper.session.get.return_value = detail_resp
 
-    scraper.scrape()
+    jobs = scraper.scrape()
 
-    scraper.session.get.assert_not_called()
+    scraper.session.get.assert_called_once()
+    assert jobs[0].description == ""
 
 
 def test_scrape_fetches_description_per_job_when_enabled():

@@ -66,6 +66,30 @@ def test_build_search_context_canonicalizes_consolidated_search_contexts():
     ]
 
 
+def test_build_search_context_drops_non_prompt_provenance_from_search_contexts():
+    context = build_search_context(
+        {
+            "search_contexts": [
+                {
+                    "source": "workday",
+                    "workplace": "remote",
+                    "source_detail_location": "Remote; Washington, DC",
+                    "workday_job_req_id": "JR100168",
+                }
+            ]
+        }
+    )
+
+    assert context["search_contexts"] == [
+        {
+            "source": "workday",
+            "workplace": "remote",
+            "source_detail_location": "Remote; Washington, DC",
+        }
+    ]
+    assert "workday_job_req_id" not in context["search_contexts"][0]
+
+
 def test_build_search_context_merges_consolidated_search_contexts():
     job = {
         "search_params": {"keywords": "data engineer"},

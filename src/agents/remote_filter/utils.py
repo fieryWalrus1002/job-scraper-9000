@@ -111,10 +111,22 @@ def build_search_context(job: dict, user_timezone: str | None = None) -> dict:
     return context
 
 
+_SEARCH_CONTEXT_PROMPT_FIELDS = {
+    "source",
+    "workplace",
+    "job_type",
+    "source_detail_location",
+}
+
+
 def _normalize_search_contexts(search_contexts: list[dict]) -> list[dict]:
     normalized: dict[str, dict] = {}
     for context in search_contexts:
-        cleaned = {k: v for k, v in context.items() if v not in (None, "", [], {})}
+        cleaned = {
+            k: v
+            for k, v in context.items()
+            if k in _SEARCH_CONTEXT_PROMPT_FIELDS and v not in (None, "", [], {})
+        }
         if not cleaned or set(cleaned) == {"source"}:
             continue
         marker = json.dumps(cleaned, sort_keys=True, separators=(",", ":"))

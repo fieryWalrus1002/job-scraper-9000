@@ -137,11 +137,17 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
             for item in postings:
                 path = item.get("externalPath", "")
 
-                detail: dict = {}
-                if self.query.fetch_descriptions and path:
-                    detail = self._fetch_detail(path)
+                # Workday header metadata (location/time type/job req) is part of
+                # the posting contract, not just the long description. Always fetch
+                # detail JSON when a path exists; ``fetch_descriptions`` only gates
+                # whether we retain the description body.
+                detail: dict = self._fetch_detail(path) if path else {}
 
-                description_html = detail.get("jobDescription", "")
+                description_html = (
+                    detail.get("jobDescription", "")
+                    if self.query.fetch_descriptions
+                    else ""
+                )
                 description_raw = (
                     BeautifulSoup(description_html, "html.parser").get_text(
                         "\n", strip=True
