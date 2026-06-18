@@ -58,7 +58,10 @@ export function AccountSection({ pipelineEnabled, hasSearchConfig }: AccountSect
             checked={checked}
             disabled={!hasSearchConfig || isSaving}
             aria-label="Run overnight pipeline"
-            onChange={(event) => savePipelineEnabled.mutate(event.target.checked)}
+            onChange={(event) => {
+              if (!hasSearchConfig) return
+              savePipelineEnabled.mutate(event.target.checked)
+            }}
           />
         </label>
 

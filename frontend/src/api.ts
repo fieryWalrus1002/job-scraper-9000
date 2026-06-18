@@ -183,6 +183,10 @@ export async function savePipelineEnabled(enabled: boolean): Promise<PipelineEna
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
   })
+  if (res.status === 404) {
+    const data = (await res.json()) as { detail?: string }
+    throw new Error(data.detail ?? 'No search config exists for the current user')
+  }
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<PipelineEnabledResponse>
 }
