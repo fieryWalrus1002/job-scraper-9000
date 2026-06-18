@@ -1,5 +1,6 @@
 import type { FieldErrors } from '../../../api'
 import {
+  LINKEDIN_EXPERIENCE_CODES,
   LINKEDIN_EXPERIENCE_LABELS,
   SEARCH_SALARY_FLOORS_K,
   type LinkedInExperienceCode,
@@ -115,12 +116,12 @@ export function ScrapePreferencesSection({
           error={fieldErrors['scrape_preferences.linkedin_experience_codes']}
         >
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-0.5">
-            {Object.entries(LINKEDIN_EXPERIENCE_LABELS).map(([code, label]) => (
+            {LINKEDIN_EXPERIENCE_CODES.map((code) => (
               <Checkbox
                 key={code}
-                label={label}
-                checked={form.linkedin_experience_codes.includes(code as LinkedInExperienceCode)}
-                onChange={(on) => toggleLinkedInExperience(code as LinkedInExperienceCode, on)}
+                label={LINKEDIN_EXPERIENCE_LABELS[code]}
+                checked={form.linkedin_experience_codes.includes(code)}
+                onChange={(on) => toggleLinkedInExperience(code, on)}
               />
             ))}
           </div>

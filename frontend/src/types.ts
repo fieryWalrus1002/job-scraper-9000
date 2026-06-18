@@ -31,6 +31,14 @@ export const SEARCH_SALARY_FLOORS_K = [
 export type LinkedInExperienceCode = NonNullable<
   NonNullable<SearchConfigInput['scrape_preferences']>['linkedin_experience_codes']
 >[number]
+export const LINKEDIN_EXPERIENCE_CODES = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+] as const satisfies readonly LinkedInExperienceCode[]
 export const LINKEDIN_EXPERIENCE_LABELS: Record<LinkedInExperienceCode, string> = {
   '1': 'Internship',
   '2': 'Entry level',

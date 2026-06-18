@@ -3,6 +3,7 @@
 // SearchForm orchestrator owns the state and wires these converters to the API.
 import {
   DEFAULT_LINKEDIN_EXPERIENCE_CODES,
+  LINKEDIN_EXPERIENCE_CODES,
   type LinkedInExperienceCode,
   type SearchConfigInput,
   type SearchEmploymentType,
@@ -58,6 +59,12 @@ export type SetField = <K extends keyof SearchFormState>(key: K, value: SearchFo
 
 const ARR_DEFAULT: Arrangement = { acceptable: true, preferred: false, required: false }
 
+export function normalizeLinkedInExperienceCodes(
+  codes: readonly LinkedInExperienceCode[],
+): LinkedInExperienceCode[] {
+  return LINKEDIN_EXPERIENCE_CODES.filter((code) => codes.includes(code))
+}
+
 export const EMPTY: SearchFormState = {
   display_name: '',
   email: '',
@@ -98,7 +105,7 @@ export const EMPTY: SearchFormState = {
   freshness_hours: 48,
   cadence: 'daily',
   salary_floor_k: null,
-  linkedin_experience_codes: [...DEFAULT_LINKEDIN_EXPERIENCE_CODES],
+  linkedin_experience_codes: normalizeLinkedInExperienceCodes(DEFAULT_LINKEDIN_EXPERIENCE_CODES),
 }
 
 function arr(a: Arrangement | undefined): Arrangement {
@@ -161,9 +168,9 @@ export function fromSearch(s: SearchConfigInput): SearchFormState {
     freshness_hours: s.scrape_preferences?.freshness_hours ?? 48,
     cadence: s.scrape_preferences?.cadence ?? 'daily',
     salary_floor_k: s.scrape_preferences?.salary_floor_k ?? null,
-    linkedin_experience_codes: [
-      ...(s.scrape_preferences?.linkedin_experience_codes ?? DEFAULT_LINKEDIN_EXPERIENCE_CODES),
-    ],
+    linkedin_experience_codes: normalizeLinkedInExperienceCodes(
+      s.scrape_preferences?.linkedin_experience_codes ?? DEFAULT_LINKEDIN_EXPERIENCE_CODES,
+    ),
   }
 }
 

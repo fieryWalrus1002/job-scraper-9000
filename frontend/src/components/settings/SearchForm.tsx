@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useSaveSearch } from '../../hooks/useSettings'
 import { ApiValidationError, type FieldErrors } from '../../api'
 import {
-  LINKEDIN_EXPERIENCE_LABELS,
   type LinkedInExperienceCode,
   type SearchConfigInput,
   type SearchEmploymentType,
@@ -11,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import {
   EMPTY,
   fromSearch,
+  normalizeLinkedInExperienceCodes,
   toSearch,
   type Arrangement,
   type ArrangementKey,
@@ -87,9 +87,7 @@ export default function SearchForm({
         : f.linkedin_experience_codes.filter((x) => x !== code)
       return {
         ...f,
-        linkedin_experience_codes: Object.keys(LINKEDIN_EXPERIENCE_LABELS).filter((c) =>
-          codes.includes(c as LinkedInExperienceCode),
-        ) as LinkedInExperienceCode[],
+        linkedin_experience_codes: normalizeLinkedInExperienceCodes(codes),
       }
     })
   }
