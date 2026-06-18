@@ -24,6 +24,7 @@ export const SEARCH_EMPLOYMENT_TYPES = [
 ] as const satisfies readonly SearchEmploymentType[]
 export type ProfileSaveResponse = components['schemas']['ProfileSaveResponse']
 export type SearchSaveResponse = components['schemas']['SearchSaveResponse']
+export type PipelineEnabledResponse = components['schemas']['PipelineEnabledResponse']
 export interface ManualJobCreate {
   title: string
   fit_score: number

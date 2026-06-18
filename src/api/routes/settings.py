@@ -21,7 +21,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, cast
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from psycopg.types.json import Json
 from pydantic import BaseModel
 
@@ -47,6 +47,7 @@ class SettingsResponse(BaseModel):
     search: dict | None = None
     policies: dict | None = None
     search_updated_at: datetime | None = None
+    pipeline_enabled: bool | None = None
 
 
 class ProfileSaveResponse(BaseModel):
@@ -57,6 +58,17 @@ class ProfileSaveResponse(BaseModel):
 class SearchSaveResponse(BaseModel):
     # Echo the derived policies so the form can show the effective gates.
     policies: dict
+    updated_at: datetime
+
+
+class PipelineEnabledUpdate(BaseModel):
+    enabled: bool
+
+    model_config = {"extra": "forbid"}
+
+
+class PipelineEnabledResponse(BaseModel):
+    pipeline_enabled: bool
     updated_at: datetime
 
 
@@ -72,7 +84,7 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         ).fetchone()
         srch = await (
             await conn.execute(
-                "SELECT payload, policies, updated_at "
+                "SELECT payload, policies, updated_at, pipeline_enabled "
                 "FROM app.user_search_configs WHERE user_id = %(uid)s",
                 {"uid": user.id},
             )
@@ -87,6 +99,7 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         search=srch["payload"] if srch else None,
         policies=srch["policies"] if srch else None,
         search_updated_at=srch["updated_at"] if srch else None,
+        pipeline_enabled=srch["pipeline_enabled"] if srch else None,
     )
 
 
@@ -141,3 +154,34 @@ async def put_search(
         ).fetchone()
     row = cast(dict[str, Any], row)
     return SearchSaveResponse(policies=row["policies"], updated_at=row["updated_at"])
+
+
+@router.put("/pipeline-enabled", response_model=PipelineEnabledResponse)
+async def put_pipeline_enabled(
+    body: PipelineEnabledUpdate, pool: Pool, user: CurrentUser
+) -> PipelineEnabledResponse:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                """
+                UPDATE app.user_search_configs
+                SET pipeline_enabled = %(enabled)s,
+                    updated_at = now()
+                WHERE user_id = %(uid)s
+                RETURNING pipeline_enabled, updated_at
+                """,
+                {"uid": user.id, "enabled": body.enabled},
+            )
+        ).fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No search config exists for the current user; create search "
+                "settings before toggling the overnight pipeline."
+            ),
+        )
+    row = cast(dict[str, Any], row)
+    return PipelineEnabledResponse(
+        pipeline_enabled=row["pipeline_enabled"], updated_at=row["updated_at"]
+    )

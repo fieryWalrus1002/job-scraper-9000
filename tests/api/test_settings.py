@@ -41,6 +41,7 @@ FAKE_SEARCH_ROW: dict[str, Any] = {
     "payload": VALID_SEARCH,
     "policies": {"remote": {"acceptable_classifications": ["fully_remote"]}},
     "updated_at": datetime(2026, 6, 11, 12, 0, 0),
+    "pipeline_enabled": True,
 }
 
 
@@ -63,6 +64,7 @@ async def test_get_settings_onboarding_state(
         "search": None,
         "policies": None,
         "search_updated_at": None,
+        "pipeline_enabled": None,
     }
 
 
@@ -79,6 +81,7 @@ async def test_get_settings_configured(
     assert data["profile_version"] == "2026-06-11.abcdef012345"
     assert data["search"] == VALID_SEARCH
     assert data["policies"]["remote"]["acceptable_classifications"] == ["fully_remote"]
+    assert data["pipeline_enabled"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -161,3 +164,40 @@ async def test_put_search_derives_policies(
     # Permissive search config → all remote classes acceptable, no exclusions.
     assert "unclear" in policies["remote"]["acceptable_classifications"]
     assert policies["prefilter"]["excluded_title_terms"] == []
+
+
+# ---------------------------------------------------------------------------
+# PUT /api/settings/pipeline-enabled
+# ---------------------------------------------------------------------------
+
+
+async def test_put_pipeline_enabled_updates_current_user_only(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _execute(sql: str, params: dict[str, Any]) -> AsyncMock:
+        captured["sql"] = sql
+        captured["params"] = params
+        return _make_cursor(
+            {"pipeline_enabled": params["enabled"], "updated_at": datetime(2026, 6, 11)}
+        )
+
+    fake_conn.execute = AsyncMock(side_effect=_execute)
+
+    resp = await client.put("/api/settings/pipeline-enabled", json={"enabled": False})
+    assert resp.status_code == 200
+    assert resp.json()["pipeline_enabled"] is False
+    assert str(captured["params"]["uid"]) == "00000000-0000-0000-0000-000000000001"
+    assert captured["params"]["enabled"] is False
+    assert "WHERE user_id = %(uid)s" in captured["sql"]
+
+
+async def test_put_pipeline_enabled_fails_without_search_config(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock(return_value=_make_cursor())
+
+    resp = await client.put("/api/settings/pipeline-enabled", json={"enabled": True})
+    assert resp.status_code == 404
+    assert "No search config exists" in resp.json()["detail"]

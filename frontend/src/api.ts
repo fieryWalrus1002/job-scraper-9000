@@ -10,6 +10,7 @@ import type {
   JobDetail,
   JobListResponse,
   ManualJobCreate,
+  PipelineEnabledResponse,
   ProfileSaveResponse,
   SearchConfigInput,
   SearchSaveResponse,
@@ -174,6 +175,16 @@ export async function saveSearch(body: SearchConfigInput): Promise<SearchSaveRes
   }
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<SearchSaveResponse>
+}
+
+export async function savePipelineEnabled(enabled: boolean): Promise<PipelineEnabledResponse> {
+  const res = await fetch(`${API_BASE}/api/settings/pipeline-enabled`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<PipelineEnabledResponse>
 }
 
 // ───── Eval corrections ─────

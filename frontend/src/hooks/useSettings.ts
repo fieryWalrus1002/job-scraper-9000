@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fetchSettings, saveProfile, saveSearch } from '../api'
+import { fetchSettings, savePipelineEnabled, saveProfile, saveSearch } from '../api'
 import type { CandidateProfileInput, SearchConfigInput, SettingsResponse } from '../types'
 
 export function useSettings() {
@@ -21,6 +21,14 @@ export function useSaveSearch() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: SearchConfigInput) => saveSearch(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+}
+
+export function useSavePipelineEnabled() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (enabled: boolean) => savePipelineEnabled(enabled),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 }
