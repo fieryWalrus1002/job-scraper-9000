@@ -239,3 +239,16 @@ def test_everything_acceptable_is_fully_permissive():
     ]
     assert policies.remote.acceptable_classifications == canonical
     assert policies.prefilter.excluded_title_terms == []
+
+
+def test_max_travel_days_defaults_to_no_gate():
+    """An unset travel tolerance derives to None — preserve current behavior."""
+    policies = derive_policies(_search("search_engineer.yml"))
+    assert policies.remote.max_travel_days is None
+
+
+def test_max_travel_days_threads_into_remote_policy():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.work_constraints.max_travel_days = 20
+    policies = derive_policies(cfg)
+    assert policies.remote.max_travel_days == 20

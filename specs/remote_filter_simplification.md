@@ -11,6 +11,15 @@ behind this work. This spec deliberately does **not** touch that behavior.
 
 ## Changelog
 
+- **2026-06-18 — #215 shipped (per-user `max_travel_days`).** The human-facing
+  field lives at `work_constraints.max_travel_days` (`int | None`, `0–365`);
+  `derive_policies` threads it into `policies.remote.max_travel_days`; and the
+  per-user scoring phase (`pipeline.scoring.score_run`) drops postings whose
+  `_remote_analysis.estimated_travel_days_per_year` exceeds it. `None` = no
+  per-user travel gate, which preserves prior behavior (the global
+  classification pass still thresholds travel; the per-user phase did not
+  re-filter on travel before this change). A posting with a null numeric
+  estimate is never dropped by the gate. §7 marked shipped below.
 - **2026-06-18 — Phase 18 follow-up for per-user travel tolerance.** Updated §7
   from a pure deferral note to the Phase 18 target shape for #215:
   `max_travel_days` lives in the per-user settings/policy surface, derives into
@@ -138,6 +147,15 @@ human-facing search/settings payload, derive it into
 `_remote_analysis.estimated_travel_days_per_year` before skills-fit scoring. A
 missing/null user value must preserve current behavior rather than silently
 loosening or tightening existing users' filters.
+
+**Shipped (#215, 2026-06-18).** The field is `work_constraints.max_travel_days`
+(`int | None`, validated `0–365` at the API edge). `derive_policies` copies it
+into `policies.remote.max_travel_days`. `pipeline.scoring.score_run` applies it
+after the `acceptable_classifications` gate: a posting is dropped when the user
+set a ceiling *and* the posting's numeric estimate exceeds it. `None` leaves the
+per-user phase travel-blind (its prior behavior — the global classification pass
+was the only travel gate). Per-user drops are logged, never silent; a corrupt
+(non-int) stored estimate raises rather than being coerced.
 
 ## 8. PR slicing
 
