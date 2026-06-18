@@ -39,11 +39,11 @@ def annualise(amount: float, period: str) -> int:
 
 # --- Regex patterns, tried in priority order ---
 
-# 1. Hourly: $X/hr, $X-Y/hr, $X–$Y/hour  (unambiguous due to /hr suffix)
+# 1. Hourly: $X/hr, $X-Y/hr, $X–$Y/hour, $X - $Y per hour.
 _HOURLY = re.compile(
     r"\$\s*([\d]+(?:\.\d+)?)"
-    r"(?:\s*[-–—]\s*\$?\s*([\d]+(?:\.\d+)?))?"
-    r"\s*/\s*h(?:r|our)\b",
+    r"(?:\s*(?:\\?\s*[-–—]|\bto\b)\s*\$?\s*([\d]+(?:\.\d+)?))?"
+    r"\s*(?:/\s*h(?:r|our)\b|\bper\s+h(?:r|our)\b)",
     re.IGNORECASE,
 )
 
@@ -57,16 +57,23 @@ _K_RANGE_ONE = re.compile(
     r"\$\s*([\d]+(?:\.\d+)?)\s*[-–—]\s*([\d]+(?:\.\d+)?)\s*[kK]\b"
 )
 
-# 4. Comma-notation range: $100,000 – $150,000
-_COMMA_RANGE = re.compile(
-    r"\$\s*([\d]{1,3},[\d]{3})\s*[-–—]\s*\$?\s*([\d]{1,3},[\d]{3})"
+# 4. Full-dollar range: $100,000 - $150,000, $90,000 to $170,000,
+# $115, 290 - 170,349, $120,000 - $150'000, $147000 - $211000.
+# LinkedIn/Indeed descriptions may include markdown escapes (\-, \.00).
+_MONEY_AMOUNT = (
+    r"\$?\s*(?:[\d]{1,3}(?:\s*[,']\s*[\d]{3})+|[\d]{5,7})"
+    r"(?:\\?\.[\d]+)?\s*(?:USD)?"
+)
+_MONEY_RANGE = re.compile(
+    rf"({_MONEY_AMOUNT})\s*(?:\\?\s*[-–—]|\bto\b)\s*({_MONEY_AMOUNT})",
+    re.IGNORECASE,
 )
 
 # 5. Single k with salary context nearby: "base $400k", "salary $120k"
 _K_SINGLE = re.compile(r"\$\s*([\d]+(?:\.\d+)?)\s*[kK]\b")
 
 _SALARY_CONTEXT = re.compile(
-    r"\b(?:base|salary|compensation|pay|compensate|OTE|annual|rate|earn|offer)\b",
+    r"\b(?:base|salary|compensation|pay|payrate|budget|compensate|OTE|annual|rate|earn|offer)\b",
     re.IGNORECASE,
 )
 
@@ -102,14 +109,20 @@ def extract_salary(text: str) -> SalaryResult | None:
             salary_period="yearly",
         )
 
-    # 3. Comma range
-    m = _COMMA_RANGE.search(text)
-    if m:
-        return SalaryResult(
-            salary_min_usd=_dollars(m.group(1)),
-            salary_max_usd=_dollars(m.group(2)),
-            salary_period="yearly",
-        )
+    # 3. Full-dollar range
+    for m in _MONEY_RANGE.finditer(text):
+        if not _money_match_has_currency(m) and not _has_salary_context(
+            text, m.start()
+        ):
+            continue
+        lo = _dollars(m.group(1))
+        hi = _dollars(m.group(2))
+        if _plausible_yearly_range(lo, hi):
+            return SalaryResult(
+                salary_min_usd=lo,
+                salary_max_usd=hi,
+                salary_period="yearly",
+            )
 
     # 4. Single k — require salary context and plausible range
     for m in _K_SINGLE.finditer(text):
@@ -131,7 +144,16 @@ def _k(s: str) -> int:
 
 
 def _dollars(s: str) -> int:
-    return int(s.replace(",", ""))
+    normalized = re.sub(r"(?i)\bUSD\b|[$,\\\s']", "", s)
+    return round(float(normalized))
+
+
+def _money_match_has_currency(m: re.Match[str]) -> bool:
+    return bool(re.search(r"(?i)\$|\bUSD\b", m.group(0)))
+
+
+def _plausible_yearly_range(lo: int, hi: int) -> bool:
+    return 20_000 <= lo <= hi <= 2_000_000
 
 
 def _has_salary_context(text: str, pos: int, window: int = 80) -> bool:
