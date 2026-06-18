@@ -54,8 +54,9 @@ def _workday_detail_search_params(detail: dict) -> dict:
 
 def _workday_detail_locations(detail: dict) -> list[str]:
     locations = []
-    if location := detail.get("location"):
-        locations.append(str(location))
+    if location := detail.get("location") or detail.get("locationsText"):
+        if not _MULTI_LOCATION_RE.match(str(location)):
+            locations.append(str(location))
     locations.extend(str(loc) for loc in detail.get("additionalLocations") or [])
     return [loc for loc in dict.fromkeys(loc.strip() for loc in locations) if loc]
 
@@ -155,7 +156,14 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
                 )
 
-                detail_search_params = _workday_detail_search_params(detail)
+                item_detail = {
+                    "location": item.get("locationsText"),
+                    "timeType": item.get("timeType"),
+                    "jobReqId": source_job_id,
+                }
+                detail_search_params = _workday_detail_search_params(
+                    {**item_detail, **detail}
+                )
                 detail_location = detail_search_params.get("source_detail_location")
                 raw_location = item.get("locationsText", "")
                 location = (

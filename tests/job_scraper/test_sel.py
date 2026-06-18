@@ -72,6 +72,28 @@ def test_scrape_does_not_call_get_for_listing():
     scraper.session.get.assert_not_called()
 
 
+def test_scrape_preserves_workday_item_metadata_without_fetching_description():
+    posting = {
+        **_posting(1),
+        "locationsText": "Remote",
+        "timeType": "Full time",
+    }
+    scraper = _make_scraper(fetch_descriptions=False)
+    scraper.session = MagicMock()
+    scraper.session.post.return_value = _api_response([posting])
+
+    jobs = scraper.scrape()
+
+    scraper.session.get.assert_not_called()
+    assert jobs[0].location == "Remote"
+    assert jobs[0].search_params == {
+        "source_detail_location": "Remote",
+        "workplace": "remote",
+        "job_type": "fulltime",
+        "workday_job_req_id": "2025-00001",
+    }
+
+
 def test_scrape_payload_contains_applied_facets():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()

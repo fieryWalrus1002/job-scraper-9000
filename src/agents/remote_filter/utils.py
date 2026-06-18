@@ -99,14 +99,27 @@ def build_search_context(job: dict, user_timezone: str | None = None) -> dict:
     """Build the search/provenance context that remote_filter should read.
 
     Keeps legacy ``search_params`` behavior while carrying consolidated
-    ``search_contexts`` that preserve filters from duplicate postings.
+    ``search_contexts`` that preserve filters from duplicate postings. Contexts
+    are canonicalized so semantically identical provenance produces stable
+    prompts and cache keys.
     """
     context = dict(job.get("search_params") or {})
-    if search_contexts := job.get("search_contexts"):
+    if search_contexts := _normalize_search_contexts(job.get("search_contexts") or []):
         context["search_contexts"] = search_contexts
     if user_timezone:
         context["user_timezone"] = user_timezone
     return context
+
+
+def _normalize_search_contexts(search_contexts: list[dict]) -> list[dict]:
+    normalized: dict[str, dict] = {}
+    for context in search_contexts:
+        cleaned = {k: v for k, v in context.items() if v not in (None, "", [], {})}
+        if not cleaned or set(cleaned) == {"source"}:
+            continue
+        marker = json.dumps(cleaned, sort_keys=True, separators=(",", ":"))
+        normalized[marker] = cleaned
+    return [normalized[marker] for marker in sorted(normalized)]
 
 
 def _build_user_message(
@@ -135,7 +148,7 @@ def _build_user_message(
             parts.append(f"Search context: {', '.join(ctx)}")
 
         provenance = _format_search_provenance(
-            search_context.get("search_contexts") or []
+            _normalize_search_contexts(search_context.get("search_contexts") or [])
         )
         if provenance:
             parts.append(provenance)
@@ -325,8 +338,9 @@ def context_fingerprint(search_context: dict | None) -> str:
     relevant: dict[str, object] = {}
     for k in _CONTEXT_FIELDS:
         v = search_context.get(k)
-        if v:
-            relevant[k] = v
+        if not v:
+            continue
+        relevant[k] = _normalize_search_contexts(v) if k == "search_contexts" else v
     if not relevant:
         return "none"
     canonical = json.dumps(relevant, sort_keys=True, separators=(",", ":"))

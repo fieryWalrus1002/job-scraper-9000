@@ -72,25 +72,27 @@ def _attach_search_contexts(
     contexts_by_key: dict[str, list[dict[str, Any]]] = {}
     seen_by_key: dict[str, set[str]] = {}
 
-    for job in postings:
+    def add_context(key: str, context: dict[str, Any]) -> None:
+        cleaned = {k: v for k, v in context.items() if v not in (None, "", [], {})}
+        if not cleaned or set(cleaned) == {"source"}:
+            return
+        marker = json.dumps(cleaned, sort_keys=True, separators=(",", ":"))
+        seen = seen_by_key.setdefault(key, set())
+        if marker in seen:
+            return
+        seen.add(marker)
+        contexts_by_key.setdefault(key, []).append(cleaned)
+
+    # Include canonical rows explicitly so pre-existing provenance on the dedup
+    # winner is retained even if callers pass a transformed postings list.
+    for job in [*canonical, *postings]:
         key = _posting_key(job)
         if key is None:
             continue
-        contexts = []
         if search_params := job.get("search_params"):
-            contexts.append({"source": job.get("source"), **search_params})
-        contexts.extend(job.get("search_contexts") or [])
-
-        for context in contexts:
-            cleaned = {k: v for k, v in context.items() if v not in (None, "", [], {})}
-            if not cleaned or set(cleaned) == {"source"}:
-                continue
-            marker = json.dumps(cleaned, sort_keys=True, separators=(",", ":"))
-            seen = seen_by_key.setdefault(key, set())
-            if marker in seen:
-                continue
-            seen.add(marker)
-            contexts_by_key.setdefault(key, []).append(cleaned)
+            add_context(key, {"source": job.get("source"), **search_params})
+        for context in job.get("search_contexts") or []:
+            add_context(key, context)
 
     for job in canonical:
         key = _posting_key(job)

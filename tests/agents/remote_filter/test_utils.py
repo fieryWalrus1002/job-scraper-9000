@@ -49,6 +49,23 @@ def test_get_client_and_resolve_llm_model_agree(cfg, env, expected, monkeypatch)
 # ---------------------------------------------------------------------------
 
 
+def test_build_search_context_canonicalizes_consolidated_search_contexts():
+    contexts = [
+        {"source": "linkedin", "workplace": "remote"},
+        {"workplace": "remote", "source": "linkedin"},
+        {"source": "workday", "source_detail_location": "Remote"},
+    ]
+
+    first = build_search_context({"search_contexts": contexts})
+    second = build_search_context({"search_contexts": list(reversed(contexts))})
+
+    assert first == second
+    assert first["search_contexts"] == [
+        {"source": "linkedin", "workplace": "remote"},
+        {"source": "workday", "source_detail_location": "Remote"},
+    ]
+
+
 def test_build_search_context_merges_consolidated_search_contexts():
     job = {
         "search_params": {"keywords": "data engineer"},
