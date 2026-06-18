@@ -14,62 +14,229 @@ function renderForm(props: React.ComponentProps<typeof SearchForm>) {
 }
 
 const EXISTING: SearchConfigInput = {
-  user: { display_name: 'Dev', email: 'dev@localhost', home_location: null },
-  search_profile: { name: 'default', status: 'active', goal_summary: '', search_mode: 'balanced' },
+  user: {
+    display_name: 'Dev User',
+    email: 'dev@example.com',
+    home_location: { city: 'Denver', region: 'CO', country: 'US' },
+  },
+  search_profile: {
+    name: 'default search',
+    status: 'active',
+    goal_summary: 'Find backend platform roles.',
+    search_mode: 'balanced',
+  },
   roles: {
-    target_titles: { preferred: ['Software Engineer'], exploratory: [] },
+    target_titles: { preferred: ['Software Engineer', 'Backend Engineer'], exploratory: ['SRE'] },
     excluded_titles: ['Sales Engineer'],
+  },
+  work_constraints: {
+    employment_types: { acceptable: ['fulltime', 'contract'] },
+    work_arrangements: {
+      remote: { acceptable: true, preferred: true, required: false },
+      hybrid: { acceptable: true, preferred: false, required: false },
+      onsite: { acceptable: false, preferred: false, required: false },
+    },
+  },
+  locations: {
+    acceptable: [{ city: 'Denver', region: 'CO', country: 'US' }],
+    preferred: [],
+    excluded: [{ city: 'Boston', region: 'MA', country: 'US' }],
+    relocation: { willing: true },
+  },
+  organizations: {
+    target_companies: ['Acme'],
+    similar_to: ['GitHub'],
+    preferred_organization_types: ['product'],
+  },
+  industries_and_domains: { preferred: ['developer tools'], excluded: ['adtech'] },
+  keywords: {
+    required_any: ['python'],
+    required_all: ['postgres'],
+    preferred: ['distributed systems'],
+    excluded: ['wordpress'],
+  },
+  scrape_preferences: {
+    include_remote_national_searches: true,
+    include_local_searches: true,
+    include_company_board_searches: false,
+    include_general_job_boards: true,
+    max_results_per_task: 75,
+    freshness_hours: 24,
+    cadence: 'daily',
   },
 }
 
+function stubSearchSave({
+  status = 200,
+  body = {
+    policies: { prefilter: { excluded_title_terms: ['Sales Engineer'] } },
+    updated_at: '2026-06-11T00:00:00Z',
+  },
+}: {
+  status?: number
+  body?: unknown
+} = {}) {
+  let sentBody: SearchConfigInput | null = null
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, opts?: RequestInit) => {
+      if (url.endsWith('/api/settings/search') && opts?.method === 'PUT') {
+        sentBody = JSON.parse(opts.body as string) as SearchConfigInput
+        return Promise.resolve(new Response(JSON.stringify(body), { status }))
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${opts?.method ?? 'GET'} ${url}`))
+    }),
+  )
+  return { getSentBody: () => sentBody }
+}
+
 describe('SearchForm', () => {
-  beforeEach(() => vi.unstubAllGlobals())
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    // Radix Select asks for pointer-capture APIs that jsdom does not implement.
+    Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
+      configurable: true,
+      value: () => false,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+      configurable: true,
+      value: () => undefined,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', {
+      configurable: true,
+      value: () => undefined,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: () => undefined,
+    })
+  })
+
+  it('renders the current search config sections', () => {
+    renderForm({ initial: EXISTING, policies: { remote: { acceptable_classifications: [] } } })
+
+    for (const name of [
+      'Search targeting',
+      'Roles',
+      'Work constraints',
+      'Locations',
+      'Organizations & domains',
+      'Keywords',
+      'Scrape preferences',
+      'Derived policies (read-only)',
+    ]) {
+      expect(screen.getByRole('heading', { name })).toBeInTheDocument()
+    }
+  })
 
   it('shows onboarding state with no config', () => {
     renderForm({ initial: null, policies: null })
     expect(screen.getByText(/No search config yet/i)).toBeInTheDocument()
   })
 
-  it('seeds from an existing config', () => {
+  it('seeds fields from an existing config', () => {
     renderForm({ initial: EXISTING, policies: null })
-    expect(screen.getByDisplayValue('Software Engineer')).toBeInTheDocument()
+
+    expect(screen.getByDisplayValue('Dev User')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('dev@example.com')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('default search')).toBeInTheDocument()
+    expect(screen.getByDisplayValue(/Software Engineer Backend Engineer/)).toBeInTheDocument()
     expect(screen.getByDisplayValue('Sales Engineer')).toBeInTheDocument()
+    expect(screen.getAllByDisplayValue('Denver')).toHaveLength(2)
+    expect(screen.getByDisplayValue('Boston')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('75')).toBeInTheDocument()
+    expect(screen.getByLabelText('fulltime')).toBeChecked()
+    expect(screen.getByLabelText('contract')).toBeChecked()
+    expect(screen.getByLabelText('parttime')).not.toBeChecked()
+    expect(screen.getByLabelText('Willing to relocate')).toBeChecked()
     expect(screen.queryByText(/No search config yet/i)).not.toBeInTheDocument()
   })
 
-  it('submits a well-formed payload and shows derived policies', async () => {
-    let sentBody: SearchConfigInput | null = null
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string, opts?: RequestInit) => {
-        if (url.endsWith('/api/settings/search') && opts?.method === 'PUT') {
-          sentBody = JSON.parse(opts.body as string) as SearchConfigInput
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                policies: { prefilter: { excluded_title_terms: ['Sales Engineer'] } },
-                updated_at: '2026-06-11T00:00:00Z',
-              }),
-              { status: 200 },
-            ),
-          )
-        }
-        return Promise.reject(new Error(`unexpected fetch: ${url}`))
-      }),
-    )
-
+  it('submits edited select state as the expected payload', async () => {
+    const save = stubSearchSave()
     renderForm({ initial: EXISTING, policies: null })
+
+    const searchModeSelect = screen.getAllByRole('combobox')[0]
+    searchModeSelect.focus()
+    fireEvent.keyDown(searchModeSelect, { key: 'ArrowDown' })
+    fireEvent.click(await screen.findByRole('option', { name: 'focused' }))
     fireEvent.click(screen.getByRole('button', { name: /Save search config/i }))
 
-    await waitFor(() => expect(sentBody).not.toBeNull())
-    // Newline-list fields and nested structure survive the round-trip.
-    expect(sentBody!.roles.target_titles.preferred).toEqual(['Software Engineer'])
-    expect(sentBody!.roles.excluded_titles).toEqual(['Sales Engineer'])
-    expect(sentBody!.work_constraints!.work_arrangements!.remote!.acceptable).toBe(true)
-    expect(sentBody!.scrape_preferences!.cadence).toBe('daily')
+    await waitFor(() => expect(save.getSentBody()).not.toBeNull())
+    expect(save.getSentBody()!.search_profile.search_mode).toBe('focused')
+  })
 
-    // The server-derived policies render read-only.
+  it('submits edited input, checkbox, and location state as the expected payload', async () => {
+    const save = stubSearchSave()
+    renderForm({ initial: EXISTING, policies: null })
+
+    fireEvent.change(screen.getByDisplayValue('Dev User'), { target: { value: 'New Dev' } })
+    fireEvent.change(screen.getByDisplayValue(/Software Engineer Backend Engineer/), {
+      target: { value: 'Platform Engineer\nData Engineer' },
+    })
+    fireEvent.click(screen.getByLabelText('contract'))
+    fireEvent.click(screen.getByLabelText('parttime'))
+    fireEvent.click(screen.getByLabelText('Company board searches'))
+    fireEvent.click(screen.getAllByText('+ Add location')[0])
+    await waitFor(() => expect(screen.getAllByPlaceholderText('City')).toHaveLength(3))
+    const cityInputs = screen.getAllByPlaceholderText('City')
+    const regionInputs = screen.getAllByPlaceholderText('Region')
+    fireEvent.change(cityInputs[1], { target: { value: 'Portland' } })
+    fireEvent.change(regionInputs[1], { target: { value: 'OR' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /Save search config/i }))
+
+    await waitFor(() => expect(save.getSentBody()).not.toBeNull())
+    const sentBody = save.getSentBody()!
+    expect(sentBody.user.display_name).toBe('New Dev')
+    expect(sentBody.roles.target_titles.preferred).toEqual(['Platform Engineer', 'Data Engineer'])
+    expect(sentBody.work_constraints!.employment_types.acceptable).toEqual(['fulltime', 'parttime'])
+    expect(sentBody.locations!.acceptable).toEqual([
+      { city: 'Denver', region: 'CO', country: 'US' },
+      { city: 'Portland', region: 'OR', country: 'US' },
+    ])
+    expect(sentBody.scrape_preferences!.include_company_board_searches).toBe(true)
     expect(await screen.findByText(/Derived policies/i)).toBeInTheDocument()
     expect(screen.getByText(/excluded_title_terms/)).toBeInTheDocument()
+  })
+
+  it('removes location rows before submitting', async () => {
+    const save = stubSearchSave()
+    renderForm({ initial: EXISTING, policies: null })
+
+    fireEvent.click(screen.getAllByLabelText('Remove location')[0])
+    fireEvent.click(screen.getByRole('button', { name: /Save search config/i }))
+
+    await waitFor(() => expect(save.getSentBody()).not.toBeNull())
+    expect(save.getSentBody()!.locations!.acceptable).toEqual([])
+    expect(save.getSentBody()!.locations!.excluded).toEqual([
+      { city: 'Boston', region: 'MA', country: 'US' },
+    ])
+  })
+
+  it('renders FastAPI 422 field errors inline', async () => {
+    stubSearchSave({
+      status: 422,
+      body: {
+        detail: [
+          {
+            loc: ['body', 'roles', 'target_titles', 'preferred'],
+            msg: 'List should have at least 1 item',
+            type: 'too_short',
+          },
+          {
+            loc: ['body', 'scrape_preferences', 'max_results_per_task'],
+            msg: 'Input should be less than or equal to 200',
+            type: 'less_than_equal',
+          },
+        ],
+      },
+    })
+    renderForm({ initial: EXISTING, policies: null })
+
+    fireEvent.click(screen.getByRole('button', { name: /Save search config/i }))
+
+    expect(await screen.findByText(/List should have at least 1 item/i)).toBeInTheDocument()
+    expect(screen.getByText(/less than or equal to 200/i)).toBeInTheDocument()
   })
 })
