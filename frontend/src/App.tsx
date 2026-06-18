@@ -27,6 +27,7 @@ import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { TrashRowActions } from './components/TrashRowActions'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
+import { UnsavedGuardProvider } from './components/UnsavedGuard'
 import { isEditableTarget } from './lib/keyboard'
 import { cn } from './lib/utils'
 
@@ -73,7 +74,11 @@ export default function App() {
     )
   }
 
-  return <AppShell email={principal!.userDetails} />
+  return (
+    <UnsavedGuardProvider>
+      <AppShell email={principal!.userDetails} />
+    </UnsavedGuardProvider>
+  )
 }
 
 function AppShell({ email }: { email: string }) {

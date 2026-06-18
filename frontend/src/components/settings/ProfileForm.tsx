@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSaveProfile } from '../../hooks/useSettings'
 import { ApiValidationError, type FieldErrors } from '../../api'
 import type { CandidateProfileInput } from '../../types'
@@ -69,19 +69,27 @@ function toProfile(f: FormState): CandidateProfileInput {
 export default function ProfileForm({
   initial,
   version,
+  onDirtyChange,
 }: {
   initial: CandidateProfileInput | null
   version: string | null
+  /** Reports whether the form holds edits not yet saved (for the nav guard). */
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const save = useSaveProfile()
 
   const [form, setForm] = useState<FormState>(() => (initial ? fromProfile(initial) : EMPTY))
+  // Serialized last-saved snapshot; the form is dirty while it diverges.
+  const [baseline, setBaseline] = useState<string>(() => JSON.stringify(form))
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedVersion, setSavedVersion] = useState<string | null>(null)
 
   const isOnboarding = !initial
   const currentVersion = savedVersion ?? version
+
+  const dirty = JSON.stringify(form) !== baseline
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange])
 
   function set<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -95,6 +103,7 @@ export default function ProfileForm({
     try {
       const res = await save.mutateAsync(toProfile(form))
       setSavedVersion(res.profile_version)
+      setBaseline(JSON.stringify(form)) // saved snapshot is the new clean state
     } catch (err) {
       if (err instanceof ApiValidationError) {
         setFieldErrors(err.fields)
