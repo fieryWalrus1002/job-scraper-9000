@@ -9,6 +9,12 @@ Follows: `specs/multi_user_design.md` §7 (this phase was sketched there)
 
 ## Changelog
 
+- **2026-06-18 — #215 shipped (per-user `max_travel_days`).** Added
+  `work_constraints.max_travel_days` (`int | None`, `0–365`) to the human-facing
+  config; `derive_policies` threads it into `policies.remote.max_travel_days`
+  (§6). The per-user scoring phase now gates `estimated_travel_days_per_year`
+  against it; `null` preserves prior behavior (no per-user travel re-filter).
+  See `specs/remote_filter_simplification.md` §7.
 - **2026-06-18 — #208 shipped (salary floor + LinkedIn experience codes).**
   `ScrapePreferences` gained `salary_floor_k` (validated at the API edge as
   `Literal[40, 60, 80, 100, 120]`, mirroring the scraper's supported f_SB2
@@ -182,7 +188,7 @@ Stored in `user_search_configs.policies`. Known fields at draft time:
 ```yaml
 remote:
   acceptable_classifications: [...]   # default: all currently produced classes
-  max_travel_days: null               # Phase 18; null = preserve current fallback/default
+  max_travel_days: null               # from work_constraints.max_travel_days; null = no per-user travel gate
 prefilter:
   excluded_title_terms: []            # default: []
   # further prefilter knobs surfaced at implementation as they're

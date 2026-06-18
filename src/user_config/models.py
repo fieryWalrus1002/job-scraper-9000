@@ -145,6 +145,13 @@ class EmploymentTypes(_Strict):
 class WorkConstraints(_Strict):
     employment_types: EmploymentTypes = Field(default_factory=EmploymentTypes)
     work_arrangements: WorkArrangements = Field(default_factory=WorkArrangements)
+    # Per-user travel tolerance. None = no per-user travel gate (preserve
+    # current behavior — the global remote-filter classification pass still
+    # runs). When set, derive_policies threads it into
+    # policies.remote.max_travel_days and the scoring phase drops postings
+    # whose estimated_travel_days_per_year exceeds it (spec
+    # remote_filter_simplification.md §7).
+    max_travel_days: int | None = Field(default=None, ge=0, le=365)
 
 
 class Location(_Strict):
@@ -287,6 +294,10 @@ class RemotePolicy(_Strict):
     acceptable_classifications: list[RemoteClassification] = Field(
         default_factory=lambda: list(REMOTE_CLASSIFICATIONS)
     )
+    # Per-user travel ceiling, derived from work_constraints.max_travel_days.
+    # None = no per-user travel gate (the global classification pass still
+    # thresholds travel, but the per-user scoring phase does not re-filter).
+    max_travel_days: int | None = Field(default=None, ge=0, le=365)
 
 
 class PrefilterPolicy(_Strict):

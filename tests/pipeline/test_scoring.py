@@ -74,19 +74,33 @@ def _materialize_profile(runs_dir: Path, email: str) -> None:
     profile.write_text("profile_version: test\n")
 
 
-def _classified(dedup_hash: str, classification: str) -> dict:
+def _classified(
+    dedup_hash: str, classification: str, *, travel_days: int | None = None
+) -> dict:
     return {
         "dedup_hash": dedup_hash,
         "title": "Eng",
         "description": "d",
-        "_remote_analysis": {"remote_classification": classification},
+        "_remote_analysis": {
+            "remote_classification": classification,
+            "estimated_travel_days_per_year": travel_days,
+        },
     }
 
 
-def _set_policy(conn: psycopg.Connection, user_id: str, acceptable: list[str]) -> None:
+def _set_policy(
+    conn: psycopg.Connection,
+    user_id: str,
+    acceptable: list[str],
+    *,
+    max_travel_days: int | None = None,
+) -> None:
+    remote: dict = {"acceptable_classifications": acceptable}
+    if max_travel_days is not None:
+        remote["max_travel_days"] = max_travel_days
     conn.execute(
         "UPDATE app.user_search_configs SET policies = %s WHERE user_id = %s::uuid",
-        (Json({"remote": {"acceptable_classifications": acceptable}}), user_id),
+        (Json({"remote": remote}), user_id),
     )
 
 
@@ -199,6 +213,70 @@ def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
 
     assert summary["postings_scored"] == 1
     assert score_calls[0]["hashes"] == ["h-ok"]
+
+
+@skip_if_no_docker
+def test_gates_postings_by_each_users_max_travel_days(migrated_pg, tmp_path):
+    """A fully_remote posting whose estimated travel exceeds the user's
+    max_travel_days is dropped before skills_fit; one at/under it survives."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "lowtravel@example.com")
+        _set_policy(conn, u1, ["fully_remote"], max_travel_days=15)
+        _seed_consolidated(conn, dedup_hash="h-near", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-far", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-unknown", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "lowtravel@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-near", "fully_remote", travel_days=15),
+            _classified("h-far", "fully_remote", travel_days=40),
+            # No numeric estimate → not dropped by the travel gate.
+            _classified("h-unknown", "fully_remote", travel_days=None),
+        ],
+    )
+
+    score_calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(score_calls),
+        )
+
+    assert summary["postings_scored"] == 2
+    assert score_calls[0]["hashes"] == ["h-near", "h-unknown"]
+
+
+@skip_if_no_docker
+def test_no_max_travel_days_does_not_filter_on_travel(migrated_pg, tmp_path):
+    """Unset max_travel_days preserves current behavior: a high-travel posting
+    whose classification is acceptable is still scored."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "anytravel@example.com")
+        _set_policy(conn, u1, ["fully_remote"])  # no max_travel_days
+        _seed_consolidated(conn, dedup_hash="h-far", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "anytravel@example.com")
+    _write_classified(
+        tmp_path, passed=[_classified("h-far", "fully_remote", travel_days=200)]
+    )
+
+    score_calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(score_calls),
+        )
+
+    assert summary["postings_scored"] == 1
+    assert score_calls[0]["hashes"] == ["h-far"]
 
 
 @skip_if_no_docker

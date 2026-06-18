@@ -115,3 +115,22 @@ def test_invalid_experience_code_rejected():
     data["scrape_preferences"]["linkedin_experience_codes"] = ["7"]
     with pytest.raises(ValidationError, match="linkedin_experience_codes"):
         SearchConfigInput.model_validate(data)
+
+
+def test_max_travel_days_defaults_to_none():
+    cfg = SearchConfigInput.model_validate(_load("search_engineer.yml"))
+    assert cfg.work_constraints.max_travel_days is None
+
+
+def test_valid_max_travel_days_accepted():
+    data = _load("search_engineer.yml")
+    data["work_constraints"]["max_travel_days"] = 20
+    cfg = SearchConfigInput.model_validate(data)
+    assert cfg.work_constraints.max_travel_days == 20
+
+
+def test_negative_max_travel_days_rejected():
+    data = _load("search_engineer.yml")
+    data["work_constraints"]["max_travel_days"] = -1
+    with pytest.raises(ValidationError, match="max_travel_days"):
+        SearchConfigInput.model_validate(data)

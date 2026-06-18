@@ -7,7 +7,10 @@ consolidated union (profile-free), this phase splits back out per user:
 1. :func:`score_run` — for each user that requested at least one posting,
    gate the union by *that user's*
    ``policies.remote.acceptable_classifications`` (the per-user remote
-   policy, applied post-classification per spec §3), then run skills_fit
+   policy, applied post-classification per spec §3) and their
+   ``policies.remote.max_travel_days`` travel ceiling (numeric gate on
+   ``_remote_analysis.estimated_travel_days_per_year``; None = no gate),
+   then run skills_fit
    over the survivors as **one batch per user** (prompt-cache warmth is per
    ``(user, profile_version)`` — a cross-user batch would carry the wrong
    candidate profile in its system prompt), writing the scored JSONL to
@@ -190,6 +193,26 @@ def _classification_of(record: dict[str, Any]) -> str | None:
     return analysis.get("remote_classification")
 
 
+def _travel_days_of(record: dict[str, Any]) -> int | None:
+    """Numeric travel estimate from the stored remote analysis.
+
+    ``estimated_travel_days_per_year`` is ``int | None`` on RemoteAnalysis;
+    a stored value of any other type is corrupt data and must not be
+    silently coerced or skipped — fail loud so the per-user isolation handler
+    records it (CLAUDE.md: fail fast, log well). ``bool`` is rejected too:
+    ``isinstance(True, int)`` is True, so a stored ``true`` would otherwise
+    sneak through as 1 day.
+    """
+    analysis = record.get("_remote_analysis") or {}
+    days = analysis.get("estimated_travel_days_per_year")
+    if days is not None and type(days) is not int:
+        raise TypeError(
+            f"estimated_travel_days_per_year is {type(days).__name__}, "
+            f"expected int|None: {days!r}"
+        )
+    return days
+
+
 def default_score_fn(
     *,
     input_path: Path,
@@ -259,30 +282,51 @@ def score_run(
     for row in user_rows:
         email = row["email"]
         try:
-            acceptable = set(
-                UserPolicies.model_validate(
-                    row["policies"] or {}
-                ).remote.acceptable_classifications
-            )
+            remote_policy = UserPolicies.model_validate(row["policies"] or {}).remote
+            acceptable = set(remote_policy.acceptable_classifications)
+            max_travel_days = remote_policy.max_travel_days
 
             survivors: list[dict[str, Any]] = []
             unclassified = 0
+            travel_filtered = 0
             for dedup_hash in row["dedup_hashes"]:
                 rec = classified.get(dedup_hash)
                 if rec is None:
                     unclassified += 1
                     continue
-                if _classification_of(rec) in acceptable:
-                    survivors.append(rec)
+                if _classification_of(rec) not in acceptable:
+                    continue
+                # Per-user travel gate (spec remote_filter_simplification.md
+                # §7). None = no gate; a posting with no numeric estimate is
+                # never dropped here (the classification gate above already
+                # decided remote-ness).
+                days = _travel_days_of(rec)
+                if (
+                    max_travel_days is not None
+                    and days is not None
+                    and days > max_travel_days
+                ):
+                    travel_filtered += 1
+                    continue
+                survivors.append(rec)
             summary["postings_unclassified"] += unclassified
+            if travel_filtered:
+                log.info(
+                    "%s — %d posting(s) dropped: travel exceeds max_travel_days=%d",
+                    email,
+                    travel_filtered,
+                    max_travel_days,
+                )
 
             if not survivors:
                 log.info(
                     "%s — no postings survived remote policy "
-                    "(%d requested, %d unclassified); skipping skills_fit",
+                    "(%d requested, %d unclassified, %d travel-filtered); "
+                    "skipping skills_fit",
                     email,
                     len(row["dedup_hashes"]),
                     unclassified,
+                    travel_filtered,
                 )
                 summary["users_skipped_no_postings"] += 1
                 summary["per_user"].append(
