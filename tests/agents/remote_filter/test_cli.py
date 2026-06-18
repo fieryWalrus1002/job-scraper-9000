@@ -438,6 +438,30 @@ def test_build_user_message_none_title_and_location_with_context():
     assert "Location field" not in msg
 
 
+def test_build_user_message_explains_remote_search_provenance_for_ddc_case():
+    ctx = {
+        "search_contexts": [
+            {
+                "source": "workday",
+                "workplace": "remote",
+                "job_type": "fulltime",
+                "source_detail_location": "Remote; Washington, DC",
+            }
+        ]
+    }
+    msg = _build_user_message(
+        "Ambiguous body text with no remote wording.",
+        ctx,
+        title="Data Engineer",
+        location="Remote; Washington, DC",
+    )
+
+    assert "returned by a remote-only search filter" in msg
+    assert "weak but relevant evidence of remote eligibility" in msg
+    assert "full-time search filter" in msg
+    assert "Remote; Washington, DC" in msg
+
+
 # ---------------------------------------------------------------------------
 # analyze_remote — title and location threaded through
 # ---------------------------------------------------------------------------

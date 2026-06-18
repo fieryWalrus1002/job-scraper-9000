@@ -27,6 +27,39 @@ _MULTI_LOCATION_RE = re.compile(r"^\d+\s+locations?$", re.IGNORECASE)
 _DAYS_AGO_RE = re.compile(r"posted\s+(\d+)\+?\s+days?\s+ago", re.IGNORECASE)
 
 
+def _workday_detail_search_params(detail: dict) -> dict:
+    """Return remote-filter-relevant Workday detail metadata.
+
+    Workday exposes header fields like ``location=Remote`` and
+    ``timeType=Full time`` outside ``jobDescription``. Preserve them so the
+    remote filter does not have to infer from the description alone.
+    """
+    context: dict[str, object] = {}
+
+    locations = _workday_detail_locations(detail)
+    if locations:
+        context["source_detail_location"] = "; ".join(locations)
+        if any(str(loc).strip().lower() == "remote" for loc in locations):
+            context["workplace"] = "remote"
+
+    time_type = str(detail.get("timeType") or "").strip().lower()
+    if time_type.replace("-", " ") == "full time":
+        context["job_type"] = "fulltime"
+
+    if job_req_id := detail.get("jobReqId"):
+        context["workday_job_req_id"] = job_req_id
+
+    return context
+
+
+def _workday_detail_locations(detail: dict) -> list[str]:
+    locations = []
+    if location := detail.get("location"):
+        locations.append(str(location))
+    locations.extend(str(loc) for loc in detail.get("additionalLocations") or [])
+    return [loc for loc in dict.fromkeys(loc.strip() for loc in locations) if loc]
+
+
 def _parse_posted_at(relative: str | None, ref_iso: str) -> str | None:
     """Convert a Workday relative date string to an ISO date string.
 
@@ -122,9 +155,13 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     bullet_fields[0] if bullet_fields else path.rsplit("_", 1)[-1]
                 )
 
+                detail_search_params = _workday_detail_search_params(detail)
+                detail_location = detail_search_params.get("source_detail_location")
                 raw_location = item.get("locationsText", "")
                 location = (
-                    fallback_location
+                    str(detail_location)
+                    if detail_location
+                    else fallback_location
                     if _MULTI_LOCATION_RE.match(raw_location) and fallback_location
                     else raw_location
                 )
@@ -143,6 +180,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     description=description,
                     scraped_at=scraped_at,
                     scrub_counts=scrub_counts,
+                    search_params=detail_search_params,
                     salary_min_usd=salary.salary_min_usd if salary else None,
                     salary_max_usd=salary.salary_max_usd if salary else None,
                     salary_period=salary.salary_period if salary else None,

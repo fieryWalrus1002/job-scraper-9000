@@ -8,6 +8,7 @@ from job_scraper.scrapers.sel import (
     _JOBS_API,
     _PAGE_SIZE,
     _parse_posted_at,
+    _workday_detail_search_params,
 )
 
 
@@ -242,6 +243,22 @@ def test_scrape_fetches_description_per_job_when_enabled():
     assert scraper.session.get.call_count == 2
     assert "Great job" in jobs[0].description
     assert jobs[0].posted_at == "2026-05-01"
+
+
+def test_workday_detail_search_params_preserve_remote_header_metadata():
+    detail = {
+        "location": "Remote",
+        "additionalLocations": ["Washington, DC"],
+        "timeType": "Full time",
+        "jobReqId": "JR100168",
+    }
+
+    assert _workday_detail_search_params(detail) == {
+        "workplace": "remote",
+        "job_type": "fulltime",
+        "source_detail_location": "Remote; Washington, DC",
+        "workday_job_req_id": "JR100168",
+    }
 
 
 # ---------------------------------------------------------------------------

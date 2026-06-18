@@ -2,6 +2,7 @@ import pytest
 
 from agents.remote_filter.utils import (
     _get_client,
+    build_search_context,
     context_fingerprint,
     resolve_llm_model,
 )
@@ -41,6 +42,38 @@ def test_get_client_and_resolve_llm_model_agree(cfg, env, expected, monkeypatch)
     helper_model = resolve_llm_model(cfg)
 
     assert client_model == helper_model == expected
+
+
+# ---------------------------------------------------------------------------
+# build_search_context
+# ---------------------------------------------------------------------------
+
+
+def test_build_search_context_merges_consolidated_search_contexts():
+    job = {
+        "search_params": {"keywords": "data engineer"},
+        "search_contexts": [
+            {
+                "source": "workday",
+                "workplace": "remote",
+                "job_type": "fulltime",
+                "source_detail_location": "Remote; Washington, DC",
+            }
+        ],
+    }
+
+    assert build_search_context(job, user_timezone="PST") == {
+        "keywords": "data engineer",
+        "search_contexts": [
+            {
+                "source": "workday",
+                "workplace": "remote",
+                "job_type": "fulltime",
+                "source_detail_location": "Remote; Washington, DC",
+            }
+        ],
+        "user_timezone": "PST",
+    }
 
 
 # ---------------------------------------------------------------------------
