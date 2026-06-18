@@ -14,8 +14,10 @@ _HOURS_PER_YEAR = 2080
 _MONTHS_PER_YEAR = 12
 _WEEKS_PER_YEAR = 52
 _DAYS_PER_YEAR = 260  # 52 × 5
+_YEARLY_MIN = 20_000
+_YEARLY_MAX = 999_999
 _HOURLY_MIN = 7.25
-_HOURLY_MAX = 500
+_HOURLY_MAX = _YEARLY_MAX / _HOURS_PER_YEAR
 
 
 @dataclass
@@ -79,9 +81,14 @@ _SALARY_CONTEXT = re.compile(
     re.IGNORECASE,
 )
 
+_NON_COMPENSATION_BUDGET_CONTEXT = re.compile(
+    r"\b(?:project|team|department|equipment|infrastructure|marketing|operating|operations|program|travel|training|cloud|tooling|tools)\s+budget\b",
+    re.IGNORECASE,
+)
+
 # Sanity bounds for k-notation singles (reject "$3k signing bonus", "$1000k valuation")
-_K_SINGLE_MIN = 40
-_K_SINGLE_MAX = 700
+_K_SINGLE_MIN = _YEARLY_MIN / 1000
+_K_SINGLE_MAX = _YEARLY_MAX / 1000
 
 
 def extract_salary(text: str) -> SalaryResult | None:
@@ -102,18 +109,25 @@ def extract_salary(text: str) -> SalaryResult | None:
         )
 
     # 2. k-range (range signal is strong enough; no context guard needed)
-    m = _K_RANGE_BOTH.search(text)
-    if not m:
-        m = _K_RANGE_ONE.search(text)
-    if m:
-        return SalaryResult(
-            salary_min_usd=_k(m.group(1)),
-            salary_max_usd=_k(m.group(2)),
-            salary_period="yearly",
-        )
+    k_range_spans: list[tuple[int, int]] = []
+    for pattern in (_K_RANGE_BOTH, _K_RANGE_ONE):
+        for m in pattern.finditer(text):
+            k_range_spans.append(m.span())
+            if _has_non_compensation_budget_context(text, m.start()):
+                continue
+            lo = _k(m.group(1))
+            hi = _k(m.group(2))
+            if _plausible_yearly_range(lo, hi):
+                return SalaryResult(
+                    salary_min_usd=lo,
+                    salary_max_usd=hi,
+                    salary_period="yearly",
+                )
 
     # 3. Full-dollar range
     for m in _MONEY_RANGE.finditer(text):
+        if _has_non_compensation_budget_context(text, m.start()):
+            continue
         if not _money_match_has_currency(m) and not _has_salary_context(
             text, m.start()
         ):
@@ -129,6 +143,10 @@ def extract_salary(text: str) -> SalaryResult | None:
 
     # 4. Single k — require salary context and plausible range
     for m in _K_SINGLE.finditer(text):
+        if _is_inside_span(m.start(), k_range_spans):
+            continue
+        if _has_non_compensation_budget_context(text, m.start()):
+            continue
         val = float(m.group(1))
         if _K_SINGLE_MIN <= val <= _K_SINGLE_MAX and _has_salary_context(
             text, m.start()
@@ -156,7 +174,7 @@ def _money_match_has_currency(m: re.Match[str]) -> bool:
 
 
 def _plausible_yearly_range(lo: int, hi: int) -> bool:
-    return 20_000 <= lo <= hi <= 2_000_000
+    return _YEARLY_MIN <= lo <= hi <= _YEARLY_MAX
 
 
 def _plausible_hourly_range(lo: float, hi: float | None) -> bool:
@@ -165,7 +183,17 @@ def _plausible_hourly_range(lo: float, hi: float | None) -> bool:
     return hi is None or lo <= hi <= _HOURLY_MAX
 
 
+def _is_inside_span(pos: int, spans: list[tuple[int, int]]) -> bool:
+    return any(start <= pos < end for start, end in spans)
+
+
 def _has_salary_context(text: str, pos: int, window: int = 80) -> bool:
     lo = max(0, pos - window)
     hi = min(len(text), pos + window)
     return bool(_SALARY_CONTEXT.search(text[lo:hi]))
+
+
+def _has_non_compensation_budget_context(text: str, pos: int, window: int = 80) -> bool:
+    lo = max(0, pos - window)
+    hi = min(len(text), pos + window)
+    return bool(_NON_COMPENSATION_BUDGET_CONTEXT.search(text[lo:hi]))

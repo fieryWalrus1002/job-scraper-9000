@@ -58,3 +58,37 @@ def test_extract_salary_handles_real_world_missed_formats(text, expected):
 
 def test_extract_salary_ignores_tiny_hourly_shift_differential():
     assert extract_salary("Shift Differential (+ $0.75/hr)") is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Project budget: $120k for infrastructure modernization.",
+        "Manage annual project budget: $120,000 - $150,000.",
+        "Team budget is $500,000 - $700,000 and salary is competitive.",
+        "Equipment budget: $120-160k.",
+    ],
+)
+def test_extract_salary_ignores_non_compensation_budgets(text):
+    assert extract_salary(text) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Salary Range: $950,000 - $1,200,000.",
+        "Base salary $1000k plus equity.",
+        "Salary Range: $950k-$1200k.",
+        "Payment: Current payrate will be $500 per hour.",
+    ],
+)
+def test_extract_salary_ignores_values_above_yearly_cap(text):
+    assert extract_salary(text) is None
+
+
+def test_extract_salary_accepts_yearly_cap_boundary():
+    assert extract_salary("Salary Range: $500,000 - $999,999.00") == SalaryResult(
+        500_000,
+        999_999,
+        "yearly",
+    )
