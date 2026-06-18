@@ -1,4 +1,10 @@
 import type { FieldErrors } from '../../../api'
+import {
+  LINKEDIN_EXPERIENCE_CODES,
+  LINKEDIN_EXPERIENCE_LABELS,
+  SEARCH_SALARY_FLOORS_K,
+  type LinkedInExperienceCode,
+} from '../../../types'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -13,10 +19,12 @@ import type { SearchFormState, SetField } from '../searchFormState'
 export function ScrapePreferencesSection({
   form,
   set,
+  toggleLinkedInExperience,
   fieldErrors,
 }: {
   form: SearchFormState
   set: SetField
+  toggleLinkedInExperience: (code: LinkedInExperienceCode, on: boolean) => void
   fieldErrors: FieldErrors
 }) {
   return (
@@ -74,6 +82,49 @@ export function ScrapePreferencesSection({
               <SelectItem value="weekly">weekly</SelectItem>
             </SelectContent>
           </Select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+        <Field label="Salary floor" error={fieldErrors['scrape_preferences.salary_floor_k']}>
+          <Select
+            value={form.salary_floor_k === null ? 'any' : String(form.salary_floor_k)}
+            onValueChange={(v) =>
+              set(
+                'salary_floor_k',
+                v === 'any' ? null : (Number(v) as SearchFormState['salary_floor_k']),
+              )
+            }
+          >
+            <SelectTrigger className="w-full h-8 text-[13px] bg-bg-elevated border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any</SelectItem>
+              {SEARCH_SALARY_FLOORS_K.map((floor) => (
+                <SelectItem key={floor} value={String(floor)}>
+                  ${floor}k+
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field
+          label="LinkedIn experience levels"
+          hint="Defaults to entry through director"
+          error={fieldErrors['scrape_preferences.linkedin_experience_codes']}
+        >
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-0.5">
+            {LINKEDIN_EXPERIENCE_CODES.map((code) => (
+              <Checkbox
+                key={code}
+                label={LINKEDIN_EXPERIENCE_LABELS[code]}
+                checked={form.linkedin_experience_codes.includes(code)}
+                onChange={(on) => toggleLinkedInExperience(code, on)}
+              />
+            ))}
+          </div>
         </Field>
       </div>
     </Section>

@@ -22,6 +22,37 @@ export const SEARCH_EMPLOYMENT_TYPES = [
   'parttime',
   'contract',
 ] as const satisfies readonly SearchEmploymentType[]
+export type SearchSalaryFloorK = NonNullable<
+  NonNullable<SearchConfigInput['scrape_preferences']>['salary_floor_k']
+>
+export const SEARCH_SALARY_FLOORS_K = [
+  40, 60, 80, 100, 120,
+] as const satisfies readonly SearchSalaryFloorK[]
+export type LinkedInExperienceCode = NonNullable<
+  NonNullable<SearchConfigInput['scrape_preferences']>['linkedin_experience_codes']
+>[number]
+export const LINKEDIN_EXPERIENCE_CODES = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+] as const satisfies readonly LinkedInExperienceCode[]
+export const LINKEDIN_EXPERIENCE_LABELS: Record<LinkedInExperienceCode, string> = {
+  '1': 'Internship',
+  '2': 'Entry level',
+  '3': 'Associate',
+  '4': 'Mid-Senior level',
+  '5': 'Director',
+  '6': 'Executive',
+}
+export const DEFAULT_LINKEDIN_EXPERIENCE_CODES = [
+  '2',
+  '3',
+  '4',
+  '5',
+] as const satisfies readonly LinkedInExperienceCode[]
 export type ProfileSaveResponse = components['schemas']['ProfileSaveResponse']
 export type SearchSaveResponse = components['schemas']['SearchSaveResponse']
 export type PipelineEnabledResponse = components['schemas']['PipelineEnabledResponse']

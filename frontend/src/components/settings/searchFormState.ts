@@ -1,7 +1,14 @@
 // Shared state model + converters for the search settings form. The section
 // components under settings/sections/ render slices of SearchFormState; the
 // SearchForm orchestrator owns the state and wires these converters to the API.
-import type { SearchConfigInput, SearchEmploymentType } from '../../types'
+import {
+  DEFAULT_LINKEDIN_EXPERIENCE_CODES,
+  LINKEDIN_EXPERIENCE_CODES,
+  type LinkedInExperienceCode,
+  type SearchConfigInput,
+  type SearchEmploymentType,
+  type SearchSalaryFloorK,
+} from '../../types'
 import { linesToList, listToLines } from './formKit'
 
 export type Arrangement = { acceptable: boolean; preferred: boolean; required: boolean }
@@ -23,6 +30,7 @@ export interface SearchFormState {
   excluded_titles: string
   employment_types: SearchEmploymentType[]
   arrangements: Record<ArrangementKey, Arrangement>
+  max_travel_days: number | null
   acceptable_locations: LocRow[]
   excluded_locations: LocRow[]
   relocation_willing: boolean
@@ -42,12 +50,20 @@ export interface SearchFormState {
   max_results: number
   freshness_hours: number
   cadence: 'daily' | 'weekly'
+  salary_floor_k: SearchSalaryFloorK | null
+  linkedin_experience_codes: LinkedInExperienceCode[]
 }
 
 /** Generic single-field setter shared by every section component. */
 export type SetField = <K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) => void
 
 const ARR_DEFAULT: Arrangement = { acceptable: true, preferred: false, required: false }
+
+export function normalizeLinkedInExperienceCodes(
+  codes: readonly LinkedInExperienceCode[],
+): LinkedInExperienceCode[] {
+  return LINKEDIN_EXPERIENCE_CODES.filter((code) => codes.includes(code))
+}
 
 export const EMPTY: SearchFormState = {
   display_name: '',
@@ -68,6 +84,7 @@ export const EMPTY: SearchFormState = {
     hybrid: { ...ARR_DEFAULT },
     onsite: { ...ARR_DEFAULT },
   },
+  max_travel_days: null,
   acceptable_locations: [],
   excluded_locations: [],
   relocation_willing: false,
@@ -87,6 +104,8 @@ export const EMPTY: SearchFormState = {
   max_results: 50,
   freshness_hours: 48,
   cadence: 'daily',
+  salary_floor_k: null,
+  linkedin_experience_codes: normalizeLinkedInExperienceCodes(DEFAULT_LINKEDIN_EXPERIENCE_CODES),
 }
 
 function arr(a: Arrangement | undefined): Arrangement {
@@ -128,6 +147,7 @@ export function fromSearch(s: SearchConfigInput): SearchFormState {
     employment_types: (s.work_constraints?.employment_types
       ?.acceptable as SearchEmploymentType[]) ?? ['fulltime'],
     arrangements: { remote: arr(wa.remote), hybrid: arr(wa.hybrid), onsite: arr(wa.onsite) },
+    max_travel_days: s.work_constraints?.max_travel_days ?? null,
     acceptable_locations: (locs.acceptable ?? []).map(toRow),
     excluded_locations: (locs.excluded ?? []).map(toRow),
     relocation_willing: locs.relocation?.willing ?? false,
@@ -147,6 +167,10 @@ export function fromSearch(s: SearchConfigInput): SearchFormState {
     max_results: s.scrape_preferences?.max_results_per_task ?? 50,
     freshness_hours: s.scrape_preferences?.freshness_hours ?? 48,
     cadence: s.scrape_preferences?.cadence ?? 'daily',
+    salary_floor_k: s.scrape_preferences?.salary_floor_k ?? null,
+    linkedin_experience_codes: normalizeLinkedInExperienceCodes(
+      s.scrape_preferences?.linkedin_experience_codes ?? DEFAULT_LINKEDIN_EXPERIENCE_CODES,
+    ),
   }
 }
 
@@ -177,6 +201,10 @@ export function toSearch(f: SearchFormState): SearchConfigInput {
     work_constraints: {
       employment_types: { acceptable: f.employment_types },
       work_arrangements: f.arrangements,
+      max_travel_days:
+        f.max_travel_days === null || !Number.isFinite(f.max_travel_days)
+          ? null
+          : f.max_travel_days,
     },
     locations: {
       acceptable: cleanLocs(f.acceptable_locations),
@@ -206,6 +234,8 @@ export function toSearch(f: SearchFormState): SearchConfigInput {
       max_results_per_task: f.max_results,
       freshness_hours: f.freshness_hours,
       cadence: f.cadence,
+      salary_floor_k: f.salary_floor_k,
+      linkedin_experience_codes: normalizeLinkedInExperienceCodes(f.linkedin_experience_codes),
     },
   }
 }

@@ -714,6 +714,10 @@ export interface components {
              * @enum {string}
              */
             cadence: "daily" | "weekly";
+            /** Salary Floor K */
+            salary_floor_k?: (40 | 60 | 80 | 100 | 120) | null;
+            /** Linkedin Experience Codes */
+            linkedin_experience_codes?: ("1" | "2" | "3" | "4" | "5" | "6")[];
         };
         /**
          * SearchConfigInput
@@ -864,6 +868,8 @@ export interface components {
         WorkConstraints: {
             employment_types?: components["schemas"]["EmploymentTypes"];
             work_arrangements?: components["schemas"]["WorkArrangements"];
+            /** Max Travel Days */
+            max_travel_days?: number | null;
         };
     };
     responses: never;

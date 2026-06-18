@@ -1,15 +1,18 @@
 import type { FieldErrors } from '../../../api'
+import { Input } from '@/components/ui/input'
 import { SEARCH_EMPLOYMENT_TYPES, type SearchEmploymentType } from '../../../types'
 import { Checkbox, Field, Section } from '../fields'
-import type { Arrangement, ArrangementKey, SearchFormState } from '../searchFormState'
+import type { Arrangement, ArrangementKey, SearchFormState, SetField } from '../searchFormState'
 
 export function WorkConstraintsSection({
   form,
+  set,
   setArrangement,
   toggleEmployment,
   fieldErrors,
 }: {
   form: SearchFormState
+  set: SetField
   setArrangement: (key: ArrangementKey, patch: Partial<Arrangement>) => void
   toggleEmployment: (t: SearchEmploymentType, on: boolean) => void
   fieldErrors: FieldErrors
@@ -30,6 +33,26 @@ export function WorkConstraintsSection({
             />
           ))}
         </div>
+      </Field>
+
+      <Field
+        label="Max travel days per year"
+        hint="Blank means no per-user travel ceiling"
+        error={fieldErrors['work_constraints.max_travel_days']}
+      >
+        <Input
+          type="number"
+          min={0}
+          max={365}
+          value={form.max_travel_days ?? ''}
+          onChange={(e) => {
+            const value = Number(e.target.value)
+            set('max_travel_days', e.target.value === '' || !Number.isFinite(value) ? null : value)
+          }}
+        />
+        <p className="text-[11px] text-muted">
+          Postings estimated above this travel load are filtered before scoring.
+        </p>
       </Field>
 
       <Field label="Work arrangements" hint="At least one must be acceptable" error={waError}>
