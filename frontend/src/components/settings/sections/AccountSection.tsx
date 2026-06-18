@@ -4,17 +4,17 @@ import { Section } from '../fields'
 
 interface AccountSectionProps {
   pipelineEnabled: boolean | null
+  hasSearchConfig: boolean
 }
 
 /**
  * Account & Activity panel: signed-in context plus the self-service overnight
  * pipeline gate backed by app.user_search_configs.pipeline_enabled.
  */
-export function AccountSection({ pipelineEnabled }: AccountSectionProps) {
+export function AccountSection({ pipelineEnabled, hasSearchConfig }: AccountSectionProps) {
   const { principal, isLoading } = useAuth()
   const savePipelineEnabled = useSavePipelineEnabled()
   const email = principal?.userDetails ?? null
-  const hasSearchConfig = pipelineEnabled !== null
   const checked = pipelineEnabled === true
   const isSaving = savePipelineEnabled.isPending
 

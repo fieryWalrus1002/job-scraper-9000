@@ -86,7 +86,10 @@ export default function SettingsPage() {
             />
 
             <div hidden={active !== 'account'}>
-              <AccountSection pipelineEnabled={data?.pipeline_enabled ?? null} />
+              <AccountSection
+                pipelineEnabled={data?.pipeline_enabled ?? null}
+                hasSearchConfig={data?.search !== null}
+              />
             </div>
           </div>
         </div>

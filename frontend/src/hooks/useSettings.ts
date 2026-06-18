@@ -29,6 +29,6 @@ export function useSavePipelineEnabled() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (enabled: boolean) => savePipelineEnabled(enabled),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 }
