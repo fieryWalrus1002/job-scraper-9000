@@ -95,15 +95,21 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
         return "sel"
 
     def _fetch_detail(self, job_path: str) -> dict:
-        """Hits the Workday detail JSON API. Returns jobPostingInfo dict or empty dict."""
+        """Fetch Workday detail JSON and return the ``jobPostingInfo`` object.
+
+        Detail fields include source-of-truth header metadata such as remote
+        location and time type, so failures must surface at the scrape-job
+        boundary instead of silently degrading downstream classification.
+        """
         api_url = f"{_DETAIL_API}{job_path.replace('/job', '')}"
-        try:
-            resp = self.session.get(api_url, timeout=10)
-            if resp.status_code == 200:
-                return resp.json().get("jobPostingInfo", {})
-        except Exception as e:
-            log.warning("Failed detail fetch for %s: %s", job_path, e)
-        return {}
+        resp = self.session.get(api_url, timeout=10)
+        resp.raise_for_status()
+        info = resp.json().get("jobPostingInfo")
+        if not isinstance(info, dict):
+            raise ValueError(
+                f"Workday detail response missing jobPostingInfo: {api_url}"
+            )
+        return info
 
     def scrape(self) -> list[JobPosting]:
         applied_facets = self.query.to_applied_facets()

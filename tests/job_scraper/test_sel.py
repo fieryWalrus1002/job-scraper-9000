@@ -28,6 +28,20 @@ def _api_response(postings: list[dict], total: int | None = None) -> MagicMock:
     return mock_resp
 
 
+def _detail_response(**overrides) -> MagicMock:
+    """Build a mock GET response from the Workday CXS detail API."""
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = {
+        "jobPostingInfo": {
+            "jobDescription": "",
+            "postedOn": "2026-05-01",
+            **overrides,
+        }
+    }
+    return mock_resp
+
+
 def _posting(n: int = 1) -> dict:
     return {
         "title": f"Engineer {n}",
@@ -54,6 +68,7 @@ def test_source_name():
 def test_scrape_posts_to_cxs_api():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([])
 
     scraper.scrape()
@@ -65,6 +80,7 @@ def test_scrape_posts_to_cxs_api():
 def test_scrape_does_not_call_get_for_listing():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([])
 
     scraper.scrape()
@@ -75,6 +91,7 @@ def test_scrape_does_not_call_get_for_listing():
 def test_scrape_preserves_workday_detail_metadata_without_fetching_description_body():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
     detail_resp = MagicMock()
     detail_resp.status_code = 200
@@ -105,6 +122,7 @@ def test_scrape_preserves_workday_detail_metadata_without_fetching_description_b
 def test_scrape_payload_contains_applied_facets():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([])
 
     scraper.scrape()
@@ -117,6 +135,7 @@ def test_scrape_payload_contains_applied_facets():
 def test_scrape_payload_includes_limit_and_offset():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([])
 
     scraper.scrape()
@@ -139,6 +158,7 @@ def test_scrape_paginates_until_total_reached():
 
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.side_effect = [
         _api_response(page1, total=total),
         _api_response(page2, total=0),  # Workday: total=0 on pages 2+
@@ -156,6 +176,7 @@ def test_scrape_second_page_uses_correct_offset():
 
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.side_effect = [
         _api_response(page1, total=_PAGE_SIZE + 1),
         _api_response(page2, total=0),  # Workday: total=0 on pages 2+
@@ -170,6 +191,7 @@ def test_scrape_second_page_uses_correct_offset():
 def test_scrape_stops_when_postings_empty():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([], total=0)
 
     jobs = scraper.scrape()
@@ -186,6 +208,7 @@ def test_scrape_stops_when_postings_empty():
 def test_scrape_maps_title_and_location():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
 
     jobs = scraper.scrape()
@@ -197,6 +220,7 @@ def test_scrape_maps_title_and_location():
 def test_scrape_source_job_id_from_bullet_fields():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
 
     jobs = scraper.scrape()
@@ -207,6 +231,7 @@ def test_scrape_source_job_id_from_bullet_fields():
 def test_scrape_source_url_uses_domain_and_external_path():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
 
     jobs = scraper.scrape()
@@ -220,6 +245,7 @@ def test_scrape_source_url_uses_domain_and_external_path():
 def test_scrape_company_is_sel():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
 
     jobs = scraper.scrape()
@@ -231,6 +257,7 @@ def test_scrape_company_is_sel():
 def test_scrape_computes_dedup_hash():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
 
     jobs = scraper.scrape()
@@ -246,6 +273,7 @@ def test_scrape_computes_dedup_hash():
 def test_scrape_does_not_retain_description_body_when_disabled():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
     detail_resp = MagicMock()
     detail_resp.status_code = 200
@@ -260,9 +288,27 @@ def test_scrape_does_not_retain_description_body_when_disabled():
     assert jobs[0].description == ""
 
 
+def test_scrape_detail_fetch_failure_bubbles():
+    scraper = _make_scraper(fetch_descriptions=False)
+    scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
+    scraper.session.post.return_value = _api_response([_posting(1)])
+    detail_resp = MagicMock()
+    detail_resp.raise_for_status.side_effect = RuntimeError("detail boom")
+    scraper.session.get.return_value = detail_resp
+
+    try:
+        scraper.scrape()
+    except RuntimeError as exc:
+        assert str(exc) == "detail boom"
+    else:  # pragma: no cover - makes the assertion message clearer
+        raise AssertionError("expected detail fetch failure to bubble")
+
+
 def test_scrape_fetches_description_per_job_when_enabled():
     scraper = _make_scraper(fetch_descriptions=True)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1), _posting(2)])
     detail_resp = MagicMock()
     detail_resp.status_code = 200
@@ -389,6 +435,7 @@ def _multi_location_posting(n: int = 1) -> dict:
 def test_scrape_replaces_multi_location_with_query_location():
     scraper = _make_scraper(fetch_descriptions=False, location_key="pullman_wa")
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_multi_location_posting(1)])
 
     jobs = scraper.scrape()
@@ -399,6 +446,7 @@ def test_scrape_replaces_multi_location_with_query_location():
 def test_scrape_preserves_single_location():
     scraper = _make_scraper(fetch_descriptions=False, location_key="pullman_wa")
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
 
     jobs = scraper.scrape()
@@ -409,6 +457,7 @@ def test_scrape_preserves_single_location():
 def test_scrape_strips_title_whitespace():
     scraper = _make_scraper(fetch_descriptions=False)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     posting = _posting(1)
     posting["title"] = "Engineer 1 "
     scraper.session.post.return_value = _api_response([posting])
@@ -421,6 +470,7 @@ def test_scrape_strips_title_whitespace():
 def test_scrape_posted_at_parsed_from_relative_string():
     scraper = _make_scraper(fetch_descriptions=True)
     scraper.session = MagicMock()
+    scraper.session.get.return_value = _detail_response()
     scraper.session.post.return_value = _api_response([_posting(1)])
     detail_resp = MagicMock()
     detail_resp.status_code = 200
