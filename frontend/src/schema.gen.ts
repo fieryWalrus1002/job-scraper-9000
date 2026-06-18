@@ -207,6 +207,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/pipeline-enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Pipeline Enabled */
+        put: operations["put_pipeline_enabled_api_settings_pipeline_enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -620,6 +637,21 @@ export interface components {
             /** Preferred Organization Types */
             preferred_organization_types?: string[];
         };
+        /** PipelineEnabledResponse */
+        PipelineEnabledResponse: {
+            /** Pipeline Enabled */
+            pipeline_enabled: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PipelineEnabledUpdate */
+        PipelineEnabledUpdate: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** ProfileSaveResponse */
         ProfileSaveResponse: {
             /** Profile Version */
@@ -756,6 +788,8 @@ export interface components {
             } | null;
             /** Search Updated At */
             search_updated_at?: string | null;
+            /** Pipeline Enabled */
+            pipeline_enabled?: boolean | null;
         };
         /** TargetTitles */
         TargetTitles: {
@@ -871,6 +905,8 @@ export interface operations {
                 min_salary_usd?: number | null;
                 search?: string | null;
                 company?: string | null;
+                sort?: "fit_score" | "posted_at" | "company" | "title" | "salary_min_usd";
+                order?: "asc" | "desc";
                 limit?: number;
                 offset?: number;
             };
@@ -1310,6 +1346,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchSaveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_pipeline_enabled_api_settings_pipeline_enabled_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PipelineEnabledUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineEnabledResponse"];
                 };
             };
             /** @description Validation Error */
