@@ -10,16 +10,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import get_args
 
 import pytest
 import yaml
 
 import job_scraper.config as scraper_config
 from agents.skills_fit.utils import _format_profile_block, load_candidate_profile
+from job_scraper.scrapers.linkedin import LinkedInJobScraper
 from user_config import (
     LEGACY_REMOTE_CLASSIFICATIONS,
     REMOTE_CLASSIFICATIONS,
     CandidateProfileInput,
+    SalaryFloorK,
     SearchConfigInput,
     candidate_profile_to_pipeline_yaml,
     derive_policies,
@@ -133,6 +136,57 @@ def test_no_general_boards_emits_no_linkedin_or_jobspy():
     out = search_config_to_pipeline_yaml(cfg)
     assert "linkedin" not in out and "jobspy" not in out
     assert "companies" in out  # company boards are gated independently
+
+
+def test_salary_floor_emits_into_global():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.scrape_preferences.salary_floor_k = 120
+    out = search_config_to_pipeline_yaml(cfg)
+    assert out["global"]["salary_floor_k"] == 120
+
+
+def test_no_salary_floor_omits_the_key():
+    out = search_config_to_pipeline_yaml(_search("search_engineer.yml"))
+    assert "salary_floor_k" not in out["global"]
+
+
+def test_experience_codes_emit_into_linkedin():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.scrape_preferences.linkedin_experience_codes = ["3", "4"]
+    out = search_config_to_pipeline_yaml(cfg)
+    assert out["linkedin"]["experience"] == "3,4"
+
+
+def test_empty_experience_codes_fall_back_to_scraper_default():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.scrape_preferences.linkedin_experience_codes = []
+    out = search_config_to_pipeline_yaml(cfg)
+    # Omitted, not experience="" — the loader applies its own default.
+    assert "experience" not in out["linkedin"]
+
+
+def test_salary_floor_literal_matches_scraper_buckets():
+    """SalaryFloorK is duplicated for decoupling; fail loud if the scraper's
+    supported f_SB2 tiers drift away from our Literal."""
+    assert set(get_args(SalaryFloorK)) == scraper_config._VALID_SALARY_K
+
+
+def test_salary_floor_loads_through_real_parser(tmp_path, monkeypatch):
+    boards = tmp_path / "boards.json"
+    boards.write_text(json.dumps({}))
+    monkeypatch.setattr(scraper_config, "BOARDS_DB_PATH", boards)
+
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.scrape_preferences.salary_floor_k = 120
+    cfg.scrape_preferences.linkedin_experience_codes = ["3", "4"]
+    out = search_config_to_pipeline_yaml(cfg)
+    cfg_file = tmp_path / "search.yml"
+    cfg_file.write_text(dump_yaml(out))
+
+    scrapers = scraper_config.load_config(cfg_file)
+    linkedin = [s.query for s in scrapers if isinstance(s, LinkedInJobScraper)]
+    assert linkedin and all(q.salary_floor == 120_000 for q in linkedin)
+    assert all(q.experience == "3,4" for q in linkedin)
 
 
 def test_hybrid_only_user_gets_hybrid_workplace_and_no_remote():

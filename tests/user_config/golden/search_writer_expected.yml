@@ -11,6 +11,7 @@ companies:
 linkedin:
   workplace: remote
   job_type: fulltime
+  experience: "2,3,4,5"
   searches:
     - keywords: Science Writer
     - keywords: Technical Writer

@@ -9,6 +9,8 @@ from .models import (
     LEGACY_REMOTE_CLASSIFICATIONS,
     REMOTE_CLASSIFICATIONS,
     CandidateProfileInput,
+    LinkedInExperienceCode,
+    SalaryFloorK,
     SearchConfigInput,
     UserPolicies,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "LEGACY_REMOTE_CLASSIFICATIONS",
     "REMOTE_CLASSIFICATIONS",
     "CandidateProfileInput",
+    "LinkedInExperienceCode",
+    "SalaryFloorK",
     "SearchConfigInput",
     "UserPolicies",
     "canonical_json",
