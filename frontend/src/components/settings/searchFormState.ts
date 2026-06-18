@@ -201,7 +201,10 @@ export function toSearch(f: SearchFormState): SearchConfigInput {
     work_constraints: {
       employment_types: { acceptable: f.employment_types },
       work_arrangements: f.arrangements,
-      max_travel_days: f.max_travel_days,
+      max_travel_days:
+        f.max_travel_days === null || !Number.isFinite(f.max_travel_days)
+          ? null
+          : f.max_travel_days,
     },
     locations: {
       acceptable: cleanLocs(f.acceptable_locations),
@@ -232,7 +235,7 @@ export function toSearch(f: SearchFormState): SearchConfigInput {
       freshness_hours: f.freshness_hours,
       cadence: f.cadence,
       salary_floor_k: f.salary_floor_k,
-      linkedin_experience_codes: f.linkedin_experience_codes,
+      linkedin_experience_codes: normalizeLinkedInExperienceCodes(f.linkedin_experience_codes),
     },
   }
 }

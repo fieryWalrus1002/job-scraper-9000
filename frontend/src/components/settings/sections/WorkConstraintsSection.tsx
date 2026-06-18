@@ -45,9 +45,10 @@ export function WorkConstraintsSection({
           min={0}
           max={365}
           value={form.max_travel_days ?? ''}
-          onChange={(e) =>
-            set('max_travel_days', e.target.value === '' ? null : Number(e.target.value))
-          }
+          onChange={(e) => {
+            const value = Number(e.target.value)
+            set('max_travel_days', e.target.value === '' || !Number.isFinite(value) ? null : value)
+          }}
         />
         <p className="text-[11px] text-muted">
           Postings estimated above this travel load are filtered before scoring.
