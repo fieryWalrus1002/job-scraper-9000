@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useSaveSearch } from '../../hooks/useSettings'
 import { ApiValidationError, type FieldErrors } from '../../api'
-import { type SearchConfigInput, type SearchEmploymentType } from '../../types'
+import {
+  LINKEDIN_EXPERIENCE_LABELS,
+  type LinkedInExperienceCode,
+  type SearchConfigInput,
+  type SearchEmploymentType,
+} from '../../types'
 import { Button } from '@/components/ui/button'
 import {
   EMPTY,
@@ -75,6 +80,20 @@ export default function SearchForm({
     }))
   }
 
+  function toggleLinkedInExperience(code: LinkedInExperienceCode, on: boolean) {
+    setForm((f) => {
+      const codes = on
+        ? [...f.linkedin_experience_codes, code]
+        : f.linkedin_experience_codes.filter((x) => x !== code)
+      return {
+        ...f,
+        linkedin_experience_codes: Object.keys(LINKEDIN_EXPERIENCE_LABELS).filter((c) =>
+          codes.includes(c as LinkedInExperienceCode),
+        ) as LinkedInExperienceCode[],
+      }
+    })
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setFieldErrors({})
@@ -108,13 +127,19 @@ export default function SearchForm({
         <LocationsSection form={form} set={set} />
         <OrganizationsAndDomainsSection form={form} set={set} />
         <KeywordsSection form={form} set={set} />
-        <ScrapePreferencesSection form={form} set={set} fieldErrors={fieldErrors} />
+        <ScrapePreferencesSection
+          form={form}
+          set={set}
+          toggleLinkedInExperience={toggleLinkedInExperience}
+          fieldErrors={fieldErrors}
+        />
       </div>
 
       {/* Filters & Policies: constraints applied before scoring. */}
       <div hidden={!showFilters} className="flex flex-col gap-6">
         <WorkConstraintsSection
           form={form}
+          set={set}
           setArrangement={setArrangement}
           toggleEmployment={toggleEmployment}
           fieldErrors={fieldErrors}

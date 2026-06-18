@@ -36,6 +36,7 @@ const EXISTING: SearchConfigInput = {
       hybrid: { acceptable: true, preferred: false, required: false },
       onsite: { acceptable: false, preferred: false, required: false },
     },
+    max_travel_days: 20,
   },
   locations: {
     acceptable: [{ city: 'Denver', region: 'CO', country: 'US' }],
@@ -63,13 +64,18 @@ const EXISTING: SearchConfigInput = {
     max_results_per_task: 75,
     freshness_hours: 24,
     cadence: 'daily',
+    salary_floor_k: 80,
+    linkedin_experience_codes: ['2', '3', '4', '5'],
   },
 }
 
 function stubSearchSave({
   status = 200,
   body = {
-    policies: { prefilter: { excluded_title_terms: ['Sales Engineer'] } },
+    policies: {
+      remote: { acceptable_classifications: ['fully_remote'], max_travel_days: 10 },
+      prefilter: { excluded_title_terms: ['Sales Engineer'] },
+    },
     updated_at: '2026-06-11T00:00:00Z',
   },
 }: {
@@ -145,9 +151,16 @@ describe('SearchForm', () => {
     expect(screen.getAllByDisplayValue('Denver')).toHaveLength(2)
     expect(screen.getByDisplayValue('Boston')).toBeInTheDocument()
     expect(screen.getByDisplayValue('75')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('20')).toBeInTheDocument()
     expect(screen.getByLabelText('fulltime')).toBeChecked()
     expect(screen.getByLabelText('contract')).toBeChecked()
     expect(screen.getByLabelText('parttime')).not.toBeChecked()
+    expect(screen.getByLabelText('Entry level')).toBeChecked()
+    expect(screen.getByLabelText('Associate')).toBeChecked()
+    expect(screen.getByLabelText('Mid-Senior level')).toBeChecked()
+    expect(screen.getByLabelText('Director')).toBeChecked()
+    expect(screen.getByLabelText('Internship')).not.toBeChecked()
+    expect(screen.getByLabelText('Executive')).not.toBeChecked()
     expect(screen.getByLabelText('Willing to relocate')).toBeChecked()
     expect(screen.queryByText(/No search config yet/i)).not.toBeInTheDocument()
   })
@@ -177,6 +190,13 @@ describe('SearchForm', () => {
     fireEvent.click(screen.getByLabelText('contract'))
     fireEvent.click(screen.getByLabelText('parttime'))
     fireEvent.click(screen.getByLabelText('Company board searches'))
+    fireEvent.change(screen.getByDisplayValue('20'), { target: { value: '10' } })
+    fireEvent.click(screen.getByLabelText('Internship'))
+    fireEvent.click(screen.getByLabelText('Director'))
+    const salaryFloorSelect = screen.getAllByRole('combobox')[2]
+    salaryFloorSelect.focus()
+    fireEvent.keyDown(salaryFloorSelect, { key: 'ArrowDown' })
+    fireEvent.click(await screen.findByRole('option', { name: '$120k+' }))
     fireEvent.click(screen.getAllByText('+ Add location')[0])
     await waitFor(() => expect(screen.getAllByPlaceholderText('City')).toHaveLength(3))
     const cityInputs = screen.getAllByPlaceholderText('City')
@@ -191,13 +211,17 @@ describe('SearchForm', () => {
     expect(sentBody.user.display_name).toBe('New Dev')
     expect(sentBody.roles.target_titles.preferred).toEqual(['Platform Engineer', 'Data Engineer'])
     expect(sentBody.work_constraints!.employment_types.acceptable).toEqual(['fulltime', 'parttime'])
+    expect(sentBody.work_constraints!.max_travel_days).toBe(10)
     expect(sentBody.locations!.acceptable).toEqual([
       { city: 'Denver', region: 'CO', country: 'US' },
       { city: 'Portland', region: 'OR', country: 'US' },
     ])
     expect(sentBody.scrape_preferences!.include_company_board_searches).toBe(true)
+    expect(sentBody.scrape_preferences!.salary_floor_k).toBe(120)
+    expect(sentBody.scrape_preferences!.linkedin_experience_codes).toEqual(['1', '2', '3', '4'])
     expect(await screen.findByText(/Derived policies/i)).toBeInTheDocument()
     expect(screen.getByText(/excluded_title_terms/)).toBeInTheDocument()
+    expect(screen.getByText(/max_travel_days/)).toBeInTheDocument()
   })
 
   it('removes location rows before submitting', async () => {
@@ -246,6 +270,16 @@ describe('SearchForm', () => {
             msg: 'Input should be less than or equal to 200',
             type: 'less_than_equal',
           },
+          {
+            loc: ['body', 'work_constraints', 'max_travel_days'],
+            msg: 'Input should be less than or equal to 365',
+            type: 'less_than_equal',
+          },
+          {
+            loc: ['body', 'scrape_preferences', 'linkedin_experience_codes'],
+            msg: 'Input should be a valid LinkedIn experience code',
+            type: 'literal_error',
+          },
         ],
       },
     })
@@ -255,5 +289,7 @@ describe('SearchForm', () => {
 
     expect(await screen.findByText(/List should have at least 1 item/i)).toBeInTheDocument()
     expect(screen.getByText(/less than or equal to 200/i)).toBeInTheDocument()
+    expect(screen.getByText(/less than or equal to 365/i)).toBeInTheDocument()
+    expect(screen.getByText(/valid LinkedIn experience code/i)).toBeInTheDocument()
   })
 })
