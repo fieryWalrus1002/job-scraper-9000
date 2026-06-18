@@ -1,0 +1,8 @@
+# Configuration for the Gmail/Email Scraping Pipeline
+
+credentials_path: "config/email_scraper/secrets/credentials.json"
+token_path: "config/email_scraper/secrets/token.json"
+label_query: "label:to-scrape/zr"
+output_dir: "data/emails/scraped"
+archive_dir: "data/emails/archived"
+max_emails: 10
