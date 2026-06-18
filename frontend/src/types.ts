@@ -14,6 +14,14 @@ export type EvalCorrectionOut = components['schemas']['EvalCorrectionOut']
 export type SettingsResponse = components['schemas']['SettingsResponse']
 export type CandidateProfileInput = components['schemas']['CandidateProfileInput']
 export type SearchConfigInput = components['schemas']['SearchConfigInput']
+export type SearchEmploymentType = NonNullable<
+  NonNullable<NonNullable<SearchConfigInput['work_constraints']>['employment_types']>['acceptable']
+>[number]
+export const SEARCH_EMPLOYMENT_TYPES = [
+  'fulltime',
+  'parttime',
+  'contract',
+] as const satisfies readonly SearchEmploymentType[]
 export type ProfileSaveResponse = components['schemas']['ProfileSaveResponse']
 export type SearchSaveResponse = components['schemas']['SearchSaveResponse']
 export interface ManualJobCreate {
