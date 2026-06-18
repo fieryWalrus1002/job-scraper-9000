@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SettingsPage from '../components/SettingsPage'
+import * as auth from '../lib/auth'
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -106,5 +107,57 @@ describe('SettingsPage profile section', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save profile/i }))
     await waitFor(() => expect(screen.getByText('2026-06-11.newnewnewnew')).toBeInTheDocument())
     expect(screen.getByText(/Saved/i)).toBeInTheDocument()
+  })
+})
+
+describe('SettingsPage four-section nav', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('defaults to Profile; search sections are hidden until selected', async () => {
+    stubFetch({ getSettings: ONBOARDING_SETTINGS })
+    renderPage()
+    await screen.findByText(/No profile yet/i)
+    // role queries skip `hidden` panels — the search/filter headings exist in
+    // the DOM but are not exposed while Profile is active.
+    expect(screen.queryByRole('heading', { name: 'Search targeting' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Work constraints' })).not.toBeInTheDocument()
+  })
+
+  it('reveals targeting sections on Search Targeting', async () => {
+    stubFetch({ getSettings: ONBOARDING_SETTINGS })
+    renderPage()
+    await screen.findByText(/No profile yet/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Search Targeting' }))
+    expect(screen.getByRole('heading', { name: 'Search targeting' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Keywords' })).toBeInTheDocument()
+    // Filters live under a different tab.
+    expect(screen.queryByRole('heading', { name: 'Work constraints' })).not.toBeInTheDocument()
+  })
+
+  it('reveals filters + policy preview on Filters & Policies', async () => {
+    stubFetch({ getSettings: ONBOARDING_SETTINGS })
+    renderPage()
+    await screen.findByText(/No profile yet/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Filters & Policies' }))
+    expect(screen.getByRole('heading', { name: 'Work constraints' })).toBeInTheDocument()
+    // One Save persists the whole search config from either search tab.
+    expect(screen.getByRole('button', { name: /Save search config/i })).toBeInTheDocument()
+  })
+
+  it('shows signed-in account context on Account & Activity', async () => {
+    vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
+      userId: 'u1',
+      userDetails: 'me@example.com',
+      userRoles: ['authenticated'],
+    })
+    stubFetch({ getSettings: ONBOARDING_SETTINGS })
+    renderPage()
+    await screen.findByText(/No profile yet/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(await screen.findByText('me@example.com')).toBeInTheDocument()
+    expect(screen.getByText(/stops future overnight runs/i)).toBeInTheDocument()
   })
 })

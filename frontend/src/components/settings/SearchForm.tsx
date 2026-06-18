@@ -19,15 +19,27 @@ import { OrganizationsAndDomainsSection } from './sections/OrganizationsAndDomai
 import { KeywordsSection } from './sections/KeywordsSection'
 import { ScrapePreferencesSection } from './sections/ScrapePreferencesSection'
 import { DerivedPoliciesSection } from './sections/DerivedPoliciesSection'
+import type { SettingsSection } from './settingsSections'
 
 export default function SearchForm({
   initial,
   policies,
+  active,
 }: {
   initial: SearchConfigInput | null
   policies: Record<string, unknown> | null
+  /**
+   * Which settings section is showing. The one search config spans two nav
+   * sections, so the form stays mounted (preserving edits) and shows the
+   * relevant group. `undefined` renders every group — the standalone mode the
+   * unit tests exercise.
+   */
+  active?: SettingsSection
 }) {
   const save = useSaveSearch()
+
+  const showTargeting = active === undefined || active === 'search-targeting'
+  const showFilters = active === undefined || active === 'filters-policies'
 
   const [form, setForm] = useState<SearchFormState>(() => (initial ? fromSearch(initial) : EMPTY))
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -75,36 +87,46 @@ export default function SearchForm({
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-      <SearchTargetingSection
-        form={form}
-        set={set}
-        fieldErrors={fieldErrors}
-        isOnboarding={isOnboarding}
-      />
-      <RolesSection form={form} set={set} fieldErrors={fieldErrors} />
-      <WorkConstraintsSection
-        form={form}
-        setArrangement={setArrangement}
-        toggleEmployment={toggleEmployment}
-        fieldErrors={fieldErrors}
-      />
-      <LocationsSection form={form} set={set} />
-      <OrganizationsAndDomainsSection form={form} set={set} />
-      <KeywordsSection form={form} set={set} />
-      <ScrapePreferencesSection form={form} set={set} fieldErrors={fieldErrors} />
-      <DerivedPoliciesSection policies={derivedPolicies} />
+      {/* Search Targeting: what gets scraped. */}
+      <div hidden={!showTargeting} className="flex flex-col gap-6">
+        <SearchTargetingSection
+          form={form}
+          set={set}
+          fieldErrors={fieldErrors}
+          isOnboarding={isOnboarding}
+        />
+        <RolesSection form={form} set={set} fieldErrors={fieldErrors} />
+        <LocationsSection form={form} set={set} />
+        <OrganizationsAndDomainsSection form={form} set={set} />
+        <KeywordsSection form={form} set={set} />
+        <ScrapePreferencesSection form={form} set={set} fieldErrors={fieldErrors} />
+      </div>
 
-      {saveError && (
-        <div className="text-[12px] text-score-low bg-score-low/10 border border-score-low/20 rounded-md px-3 py-2">
-          {saveError}
+      {/* Filters & Policies: constraints applied before scoring. */}
+      <div hidden={!showFilters} className="flex flex-col gap-6">
+        <WorkConstraintsSection
+          form={form}
+          setArrangement={setArrangement}
+          toggleEmployment={toggleEmployment}
+          fieldErrors={fieldErrors}
+        />
+        <DerivedPoliciesSection policies={derivedPolicies} />
+      </div>
+
+      {/* One save persists the whole search config from either search tab. */}
+      <div hidden={!showTargeting && !showFilters} className="flex flex-col gap-6">
+        {saveError && (
+          <div className="text-[12px] text-score-low bg-score-low/10 border border-score-low/20 rounded-md px-3 py-2">
+            {saveError}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-3">
+          {saved && <span className="text-[11px] text-score-high">✓ Saved</span>}
+          <Button type="submit" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save search config'}
+          </Button>
         </div>
-      )}
-
-      <div className="flex items-center justify-end gap-3">
-        {saved && <span className="text-[11px] text-score-high">✓ Saved</span>}
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save search config'}
-        </Button>
       </div>
     </form>
   )
