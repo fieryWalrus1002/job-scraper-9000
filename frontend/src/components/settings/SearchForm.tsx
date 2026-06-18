@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useSaveSearch } from '../../hooks/useSettings'
 import { ApiValidationError, type FieldErrors } from '../../api'
-import type { SearchConfigInput } from '../../types'
+import {
+  SEARCH_EMPLOYMENT_TYPES,
+  type SearchConfigInput,
+  type SearchEmploymentType,
+} from '../../types'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,8 +18,6 @@ import {
 import { Checkbox, Field, ListField, Section } from './fields'
 import { labelCls, linesToList, listToLines } from './formKit'
 
-type EmploymentType = 'fulltime' | 'parttime' | 'contract'
-const EMPLOYMENT_TYPES: EmploymentType[] = ['fulltime', 'parttime', 'contract']
 type Arrangement = { acceptable: boolean; preferred: boolean; required: boolean }
 type ArrangementKey = 'remote' | 'hybrid' | 'onsite'
 type LocRow = { city: string; region: string; country: string }
@@ -33,7 +35,7 @@ interface SearchFormState {
   preferred_titles: string
   exploratory_titles: string
   excluded_titles: string
-  employment_types: EmploymentType[]
+  employment_types: SearchEmploymentType[]
   arrangements: Record<ArrangementKey, Arrangement>
   acceptable_locations: LocRow[]
   excluded_locations: LocRow[]
@@ -118,9 +120,8 @@ function fromSearch(s: SearchConfigInput): SearchFormState {
     preferred_titles: listToLines(s.roles.target_titles.preferred),
     exploratory_titles: listToLines(s.roles.target_titles.exploratory),
     excluded_titles: listToLines(s.roles.excluded_titles),
-    employment_types: (s.work_constraints?.employment_types?.acceptable as EmploymentType[]) ?? [
-      'fulltime',
-    ],
+    employment_types: (s.work_constraints?.employment_types
+      ?.acceptable as SearchEmploymentType[]) ?? ['fulltime'],
     arrangements: { remote: arr(wa.remote), hybrid: arr(wa.hybrid), onsite: arr(wa.onsite) },
     acceptable_locations: (locs.acceptable ?? []).map(toRow),
     excluded_locations: (locs.excluded ?? []).map(toRow),
@@ -248,7 +249,7 @@ export default function SearchForm({
     }))
   }
 
-  function toggleEmployment(t: EmploymentType, on: boolean) {
+  function toggleEmployment(t: SearchEmploymentType, on: boolean) {
     setForm((f) => ({
       ...f,
       employment_types: on ? [...f.employment_types, t] : f.employment_types.filter((x) => x !== t),
@@ -362,7 +363,7 @@ export default function SearchForm({
       <Section title="Work constraints">
         <Field label="Employment types" required error={empError}>
           <div className="flex gap-4 pt-0.5">
-            {EMPLOYMENT_TYPES.map((t) => (
+            {SEARCH_EMPLOYMENT_TYPES.map((t) => (
               <Checkbox
                 key={t}
                 label={t}
