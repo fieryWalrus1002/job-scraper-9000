@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from utils.salary import extract_salary
 
+from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
 from ..query import LinkedInSearchQuery
@@ -86,7 +87,7 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
             return ""
         soup = BeautifulSoup(resp.text, "html.parser")
         desc = soup.find("div", class_="show-more-less-html__markup")
-        return desc.get_text("\n", strip=True) if desc else ""
+        return html_to_markdown(desc) if desc else ""
 
     def scrape(self) -> list[JobPosting]:
         all_jobs: list[JobPosting] = []

@@ -3,10 +3,10 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import requests
-from bs4 import BeautifulSoup
 
 from utils.salary import extract_salary
 
+from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
 from ..query import SELSearchQuery
@@ -154,13 +154,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     if self.query.fetch_descriptions
                     else ""
                 )
-                description_raw = (
-                    BeautifulSoup(description_html, "html.parser").get_text(
-                        "\n", strip=True
-                    )
-                    if description_html
-                    else ""
-                )
+                description_raw = html_to_markdown(description_html)
                 description, scrub_counts = scrub(description_raw)
 
                 bullet_fields = item.get("bulletFields") or []

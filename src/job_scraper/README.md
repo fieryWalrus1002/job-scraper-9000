@@ -50,7 +50,7 @@ Every scraper returns a list of `JobPosting` dataclasses (defined in `models.py`
   "company": "Stripe",
   "location": "US-Remote (35 miles+ outside an office)",
   "posted_at": "2026-05-10T00:00:00",
-  "description": "<html>...",
+  "description": "**About the role**\n\n- Build data pipelines\n- Work with product teams",
   "scraped_at": "2026-05-13T09:12:00",
   "scrub_counts": {"email": 0, "phone": 0},
   "search_params": {"keywords": "data engineer", "workplace": "remote"},
@@ -64,7 +64,7 @@ ______________________________________________________________________
 
 ## PII scrubbing
 
-Every description is passed through `pii.scrub()` before being written to disk. It redacts email addresses (`[EMAIL_REDACTED]`) and phone numbers (`[PHONE_REDACTED]`). The `scrub_counts` field records how many of each were removed — useful for spotting boards that leak contact info.
+Every HTML description fragment is normalised to Markdown before storage so bullets, paragraph breaks, and emphasis survive without storing raw markup. Every description is then passed through `pii.scrub()` before being written to disk. It redacts email addresses (`[EMAIL_REDACTED]`) and phone numbers (`[PHONE_REDACTED]`). The `scrub_counts` field records how many of each were removed — useful for spotting boards that leak contact info.
 
 ______________________________________________________________________
 

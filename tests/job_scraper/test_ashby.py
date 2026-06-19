@@ -89,12 +89,15 @@ def test_scrape_prefers_description_plain_over_html():
 def test_scrape_falls_back_to_html_description():
     item = _sample_api_response(1)["jobs"][0]
     del item["descriptionPlain"]
+    item["descriptionHtml"] = "<p><strong>HTML</strong></p><ul><li>Build APIs</li></ul>"
     scraper = AshbyScraper(AshbyQuery(company="acme"))
     with patch.object(
         scraper.session, "get", return_value=_mock_response({"jobs": [item]})
     ):
         jobs = scraper.scrape()
-    assert "<p>" in jobs[0].description
+    assert "**HTML**" in jobs[0].description
+    assert "- Build APIs" in jobs[0].description
+    assert "<p>" not in jobs[0].description
 
 
 def test_scrape_no_descriptions():

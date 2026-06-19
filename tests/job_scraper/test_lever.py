@@ -90,10 +90,13 @@ def test_scrape_prefers_description_plain_over_html():
 def test_scrape_falls_back_to_html_description():
     item = _sample_api_response(1)[0]
     del item["descriptionPlain"]
+    item["description"] = "<p><strong>HTML</strong></p><ul><li>Build APIs</li></ul>"
     scraper = LeverScraper(LeverQuery(company="acme"))
     with patch.object(scraper.session, "get", return_value=_mock_response([item])):
         jobs = scraper.scrape()
-    assert "<p>" in jobs[0].description
+    assert "**HTML**" in jobs[0].description
+    assert "- Build APIs" in jobs[0].description
+    assert "<p>" not in jobs[0].description
 
 
 def test_scrape_created_at_converted_to_iso():
