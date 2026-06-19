@@ -78,6 +78,19 @@ def test_scrape_converts_html_content_to_markdown():
     assert "<li>" not in jobs[0].description
 
 
+def test_scrape_no_descriptions_keeps_description_empty_even_if_content_present():
+    scraper = GreenhouseScraper(
+        GreenhouseQuery(board_token="acme", fetch_descriptions=False)
+    )
+
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
+    ):
+        jobs = scraper.scrape()
+
+    assert jobs[0].description == ""
+
+
 def test_scrape_empty_board():
     scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
 

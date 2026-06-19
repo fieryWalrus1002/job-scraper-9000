@@ -49,7 +49,11 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
 
         jobs: list[JobPosting] = []
         for item in data.get("jobs", []):
-            raw_desc = html_to_markdown(item.get("content") or "")
+            raw_desc = (
+                html_to_markdown(item.get("content") or "")
+                if self.query.fetch_descriptions
+                else ""
+            )
             description, scrub_counts = scrub(raw_desc)
 
             location = ""
