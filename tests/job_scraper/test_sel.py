@@ -328,6 +328,32 @@ def test_scrape_fetches_description_per_job_when_enabled():
     assert jobs[0].posted_at == "2026-05-01"
 
 
+def test_scrape_fetches_workday_description_as_markdown():
+    scraper = _make_scraper(fetch_descriptions=True)
+    scraper.session = MagicMock()
+    scraper.session.post.return_value = _api_response([_posting(1)])
+    detail_resp = MagicMock()
+    detail_resp.status_code = 200
+    detail_resp.raise_for_status = MagicMock()
+    detail_resp.json.return_value = {
+        "jobPostingInfo": {
+            "jobDescription": """
+            <p><strong>Responsibilities</strong></p>
+            <ul><li>Build relays</li><li>Write software</li></ul>
+            """,
+            "postedOn": "2026-05-01",
+        }
+    }
+    scraper.session.get.return_value = detail_resp
+
+    jobs = scraper.scrape()
+
+    assert "**Responsibilities**" in jobs[0].description
+    assert "- Build relays" in jobs[0].description
+    assert "- Write software" in jobs[0].description
+    assert "<li>" not in jobs[0].description
+
+
 def test_workday_detail_search_params_preserve_remote_header_metadata():
     detail = {
         "location": "Remote",

@@ -59,6 +59,25 @@ def test_scrape_maps_fields_correctly():
     assert job.description == "Job description for role 0."
 
 
+def test_scrape_converts_html_content_to_markdown():
+    item = _sample_api_response(1)["jobs"][0]
+    item["content"] = """
+    <p><strong>About the team</strong></p>
+    <ul><li>Build APIs</li><li>Own operations</li></ul>
+    """
+    scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
+
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response({"jobs": [item]})
+    ):
+        jobs = scraper.scrape()
+
+    assert "**About the team**" in jobs[0].description
+    assert "- Build APIs" in jobs[0].description
+    assert "- Own operations" in jobs[0].description
+    assert "<li>" not in jobs[0].description
+
+
 def test_scrape_empty_board():
     scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
 

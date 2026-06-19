@@ -6,6 +6,7 @@ import requests
 
 from utils.salary import extract_salary
 
+from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
 from .base import BaseScraper
@@ -48,7 +49,7 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
 
         jobs: list[JobPosting] = []
         for item in data.get("jobs", []):
-            raw_desc = item.get("content") or ""
+            raw_desc = html_to_markdown(item.get("content") or "")
             description, scrub_counts = scrub(raw_desc)
 
             location = ""

@@ -139,6 +139,29 @@ def test_fetch_description_returns_text():
     assert "Great role with Python." in desc
 
 
+def test_fetch_description_returns_markdown_for_structured_html():
+    scraper = LinkedInJobScraper(_make_query())
+    html = """
+    <div class="show-more-less-html__markup">
+      <p><strong>Key Responsibilities</strong></p>
+      <ul>
+        <li>Build Python services</li>
+        <li>Support production systems</li>
+      </ul>
+      <p>Contact hiring@example.com or 555-867-5309.</p>
+    </div>
+    """
+
+    with patch.object(scraper.session, "get", return_value=_mock_response(html)):
+        desc = scraper.fetch_description("999")
+
+    assert "**Key Responsibilities**" in desc
+    assert "- Build Python services" in desc
+    assert "- Support production systems" in desc
+    assert "555-867-5309" in desc
+    assert "<li>" not in desc
+
+
 def test_fetch_description_bad_status_returns_empty():
     scraper = LinkedInJobScraper(_make_query())
 

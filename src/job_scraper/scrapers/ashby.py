@@ -6,6 +6,7 @@ import requests
 
 from utils.salary import extract_salary
 
+from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
 from .base import BaseScraper
@@ -47,8 +48,8 @@ class AshbyScraper(BaseScraper["AshbyQuery"]):
         for item in data.get("jobs", []):
             raw_desc = ""
             if self.query.fetch_descriptions:
-                raw_desc = (
-                    item.get("descriptionPlain") or item.get("descriptionHtml") or ""
+                raw_desc = item.get("descriptionPlain") or html_to_markdown(
+                    item.get("descriptionHtml") or ""
                 )
             description, scrub_counts = scrub(raw_desc)
 

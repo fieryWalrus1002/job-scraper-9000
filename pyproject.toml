@@ -23,6 +23,7 @@ dependencies = [
     "google-api-python-client>=2.197.0",
     "google-auth-httplib2>=0.4.0",
     "google-auth-oauthlib>=1.4.0",
+    "markdownify>=0.13.1",
     "curl-cffi>=0.15.0",
     "playwright>=1.60.0",
     "playwright-stealth>=2.0.3",
