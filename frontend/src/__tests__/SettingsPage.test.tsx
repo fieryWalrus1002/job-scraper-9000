@@ -21,6 +21,9 @@ const ONBOARDING_SETTINGS = {
   policies: null,
   search_updated_at: null,
   pipeline_enabled: null,
+  stale_to_apply_days: null,
+  post_interview_nudge_days: null,
+  inactivity_days: null,
 }
 
 const CONFIGURED_SETTINGS = {
@@ -37,6 +40,9 @@ const CONFIGURED_SETTINGS = {
     roles: { target_titles: { preferred: ['Software Engineer'] } },
   },
   pipeline_enabled: true,
+  stale_to_apply_days: 3,
+  post_interview_nudge_days: 7,
+  inactivity_days: 14,
 }
 
 /** Route the global fetch mock by URL + method. */
@@ -44,6 +50,7 @@ function stubFetch(handlers: {
   getSettings: unknown
   putProfile?: { status: number; body: unknown }
   putPipelineEnabled?: { status: number; body: unknown }
+  putAlertThresholds?: { status: number; body: unknown }
 }) {
   vi.stubGlobal(
     'fetch',
@@ -62,6 +69,18 @@ function stubFetch(handlers: {
         const h = handlers.putPipelineEnabled ?? {
           status: 200,
           body: { pipeline_enabled: false, updated_at: '2026-06-11T00:00:00Z' },
+        }
+        return Promise.resolve(new Response(JSON.stringify(h.body), { status: h.status }))
+      }
+      if (url.endsWith('/api/settings/alert-thresholds') && opts?.method === 'PUT') {
+        const h = handlers.putAlertThresholds ?? {
+          status: 200,
+          body: {
+            stale_to_apply_days: 3,
+            post_interview_nudge_days: 7,
+            inactivity_days: 14,
+            updated_at: '2026-06-11T00:00:00Z',
+          },
         }
         return Promise.resolve(new Response(JSON.stringify(h.body), { status: h.status }))
       }
@@ -213,5 +232,39 @@ describe('SettingsPage four-section nav', () => {
       .mocked(fetch)
       .mock.calls.find(([url]) => String(url).endsWith('/api/settings/pipeline-enabled'))
     expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({ enabled: false })
+  })
+
+  it('renders alert threshold fields in Account section', async () => {
+    stubFetch({ getSettings: CONFIGURED_SETTINGS })
+    renderPage()
+    await screen.findByDisplayValue(/Backend engineer with a decade/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(screen.getByRole('heading', { name: 'Alert thresholds' })).toBeInTheDocument()
+    expect(screen.getByText(/upcoming step reminders/i)).toBeInTheDocument()
+  })
+
+  it('sends the alert thresholds mutation on save', async () => {
+    stubFetch({ getSettings: CONFIGURED_SETTINGS })
+    renderPage()
+    await screen.findByDisplayValue(/Backend engineer with a decade/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(screen.getByRole('heading', { name: 'Alert thresholds' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Save thresholds/i }))
+
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls
+      expect(calls.some(([url]) => String(url).endsWith('/api/settings/alert-thresholds'))).toBe(
+        true,
+      )
+    })
+    const putCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).endsWith('/api/settings/alert-thresholds'))
+    expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({
+      stale_to_apply_days: 3,
+      post_interview_nudge_days: 7,
+      inactivity_days: 14,
+    })
   })
 })

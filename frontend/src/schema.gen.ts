@@ -92,6 +92,49 @@ export interface paths {
         patch: operations["update_application_api_applications__dedup_hash__patch"];
         trace?: never;
     };
+    "/api/applications/{dedup_hash}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Events */
+        get: operations["list_events_api_applications__dedup_hash__events_get"];
+        put?: never;
+        /**
+         * Create Event
+         * @description Create an application event. Accepts the discriminated union
+         *     (StatusChangeEvent | GenericEvent) and persists it row-by-row.
+         */
+        post: operations["create_event_api_applications__dedup_hash__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{dedup_hash}/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Event */
+        delete: operations["delete_event_api_applications__dedup_hash__events__event_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Event
+         * @description Patch an application event. Allowed fields: occurred_at, body, tags, metadata.
+         */
+        patch: operations["update_event_api_applications__dedup_hash__events__event_id__patch"];
+        trace?: never;
+    };
     "/api/eval/corrections": {
         parameters: {
             query?: never;
@@ -224,6 +267,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/alert-thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Alert Thresholds */
+        put: operations["put_alert_thresholds_api_settings_alert_thresholds_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -258,6 +318,32 @@ export interface components {
             core_job_duties: string[];
         } & {
             [key: string]: unknown;
+        };
+        /** AlertThresholdsResponse */
+        AlertThresholdsResponse: {
+            /** Stale To Apply Days */
+            stale_to_apply_days: number;
+            /** Post Interview Nudge Days */
+            post_interview_nudge_days: number;
+            /** Inactivity Days */
+            inactivity_days: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * AlertThresholdsUpdate
+         * @description Per-user alert threshold settings (days). Load-bearing for rules engine.
+         */
+        AlertThresholdsUpdate: {
+            /** Stale To Apply Days */
+            stale_to_apply_days: number;
+            /** Post Interview Nudge Days */
+            post_interview_nudge_days: number;
+            /** Inactivity Days */
+            inactivity_days: number;
         };
         /** Application */
         Application: {
@@ -305,6 +391,59 @@ export interface components {
             applied_at?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /**
+         * ApplicationEvent
+         * @description Full output model returned by the API (all stored columns).
+         */
+        ApplicationEvent: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Dedup Hash */
+            dedup_hash: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "status_change" | "event";
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Body */
+            body: string | null;
+            /** Tags */
+            tags: string[];
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * ApplicationEventUpdate
+         * @description PATCH payload — all fields optional; only those set are written
+         *     (``model_dump(exclude_unset=True)``). Typed so bad shapes fail at the edge.
+         */
+        ApplicationEventUpdate: {
+            /** Occurred At */
+            occurred_at?: string | null;
+            /** Body */
+            body?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ApplicationUpdate */
         ApplicationUpdate: {
@@ -432,6 +571,33 @@ export interface components {
             evidence_of?: string[];
         } & {
             [key: string]: unknown;
+        };
+        /**
+         * GenericEvent
+         * @description Free-form event — meaning carried by tags[] (ECS-style).
+         */
+        GenericEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "event";
+            /** Body */
+            body?: string | null;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
+            /**
+             * Metadata
+             * @default {}
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Occurred At */
+            occurred_at?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -794,6 +960,33 @@ export interface components {
             search_updated_at?: string | null;
             /** Pipeline Enabled */
             pipeline_enabled?: boolean | null;
+            /** Stale To Apply Days */
+            stale_to_apply_days?: number | null;
+            /** Post Interview Nudge Days */
+            post_interview_nudge_days?: number | null;
+            /** Inactivity Days */
+            inactivity_days?: number | null;
+        };
+        /**
+         * StatusChangeEvent
+         * @description Auto-emitted on every status transition. {from, to} is load-bearing
+         *     for Phase 21 alerts (derive timing from it).
+         */
+        StatusChangeEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "status_change";
+            /** From */
+            from?: ("maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed") | null;
+            /**
+             * To
+             * @enum {string}
+             */
+            to: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
+            /** Occurred At */
+            occurred_at?: string | null;
         };
         /** TargetTitles */
         TargetTitles: {
@@ -1134,6 +1327,138 @@ export interface operations {
             };
         };
     };
+    list_events_api_applications__dedup_hash__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationEvent"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_applications__dedup_hash__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusChangeEvent"] | components["schemas"]["GenericEvent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_applications__dedup_hash__events__event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_api_applications__dedup_hash__events__event_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dedup_hash: string;
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationEventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_eval_corrections_api_eval_corrections_get: {
         parameters: {
             query?: {
@@ -1385,6 +1710,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineEnabledResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_alert_thresholds_api_settings_alert_thresholds_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertThresholdsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertThresholdsResponse"];
                 };
             };
             /** @description Validation Error */

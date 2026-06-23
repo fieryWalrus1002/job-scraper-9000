@@ -42,6 +42,9 @@ FAKE_SEARCH_ROW: dict[str, Any] = {
     "policies": {"remote": {"acceptable_classifications": ["fully_remote"]}},
     "updated_at": datetime(2026, 6, 11, 12, 0, 0),
     "pipeline_enabled": True,
+    "stale_to_apply_days": 3,
+    "post_interview_nudge_days": 7,
+    "inactivity_days": 14,
 }
 
 
@@ -65,6 +68,9 @@ async def test_get_settings_onboarding_state(
         "policies": None,
         "search_updated_at": None,
         "pipeline_enabled": None,
+        "stale_to_apply_days": None,
+        "post_interview_nudge_days": None,
+        "inactivity_days": None,
     }
 
 
@@ -82,6 +88,9 @@ async def test_get_settings_configured(
     assert data["search"] == VALID_SEARCH
     assert data["policies"]["remote"]["acceptable_classifications"] == ["fully_remote"]
     assert data["pipeline_enabled"] is True
+    assert data["stale_to_apply_days"] == 3
+    assert data["post_interview_nudge_days"] == 7
+    assert data["inactivity_days"] == 14
 
 
 # ---------------------------------------------------------------------------
@@ -199,5 +208,99 @@ async def test_put_pipeline_enabled_fails_without_search_config(
     fake_conn.execute = AsyncMock(return_value=_make_cursor())
 
     resp = await client.put("/api/settings/pipeline-enabled", json={"enabled": True})
+    assert resp.status_code == 404
+    assert "No search config exists" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# PUT /api/settings/alert-thresholds
+# ---------------------------------------------------------------------------
+
+
+async def test_put_alert_thresholds_updates_successfully(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _execute(sql: str, params: dict[str, Any]) -> AsyncMock:
+        captured["sql"] = sql
+        captured["params"] = params
+        return _make_cursor(
+            {
+                "stale_to_apply_days": params["stale_to_apply_days"],
+                "post_interview_nudge_days": params["post_interview_nudge_days"],
+                "inactivity_days": params["inactivity_days"],
+                "updated_at": datetime(2026, 6, 11),
+            }
+        )
+
+    fake_conn.execute = AsyncMock(side_effect=_execute)
+
+    resp = await client.put(
+        "/api/settings/alert-thresholds",
+        json={
+            "stale_to_apply_days": 5,
+            "post_interview_nudge_days": 10,
+            "inactivity_days": 21,
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["stale_to_apply_days"] == 5
+    assert data["post_interview_nudge_days"] == 10
+    assert data["inactivity_days"] == 21
+    assert "updated_at" in data
+    assert str(captured["params"]["uid"]) == "00000000-0000-0000-0000-000000000001"
+    assert "WHERE user_id = %(uid)s" in captured["sql"]
+
+
+async def test_put_alert_thresholds_rejects_bad_input(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock()  # must never be reached
+
+    # Zero value (ge=1 validation)
+    resp = await client.put(
+        "/api/settings/alert-thresholds",
+        json={
+            "stale_to_apply_days": 0,
+            "post_interview_nudge_days": 7,
+            "inactivity_days": 14,
+        },
+    )
+    assert resp.status_code == 422
+    fake_conn.execute.assert_not_called()
+
+
+async def test_put_alert_thresholds_rejects_extra_field(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock()
+    resp = await client.put(
+        "/api/settings/alert-thresholds",
+        json={
+            "stale_to_apply_days": 3,
+            "post_interview_nudge_days": 7,
+            "inactivity_days": 14,
+            "bogus_field": 99,
+        },
+    )
+    assert resp.status_code == 422
+    fake_conn.execute.assert_not_called()
+
+
+async def test_put_alert_thresholds_fails_without_search_config(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock(return_value=_make_cursor())
+
+    resp = await client.put(
+        "/api/settings/alert-thresholds",
+        json={
+            "stale_to_apply_days": 3,
+            "post_interview_nudge_days": 7,
+            "inactivity_days": 14,
+        },
+    )
     assert resp.status_code == 404
     assert "No search config exists" in resp.json()["detail"]

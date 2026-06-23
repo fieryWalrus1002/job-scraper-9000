@@ -89,6 +89,9 @@ export default function SettingsPage() {
               <AccountSection
                 pipelineEnabled={data?.pipeline_enabled ?? null}
                 hasSearchConfig={data?.search !== null}
+                staleToApplyDays={data?.stale_to_apply_days ?? null}
+                postInterviewNudgeDays={data?.post_interview_nudge_days ?? null}
+                inactivityDays={data?.inactivity_days ?? null}
               />
             </div>
           </div>
