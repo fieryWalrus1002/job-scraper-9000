@@ -1,12 +1,17 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from psycopg.types.json import Json
 
 from ..schemas import (
     Application,
     ApplicationCreate,
+    ApplicationEvent,
+    ApplicationEventPayload,
+    ApplicationEventUpdate,
     ApplicationStatus,
     ApplicationUpdate,
+    StatusChangeEvent,
 )
 from ..dependencies import Pool, CurrentUser
 
@@ -111,3 +116,150 @@ async def update_application(
     if row is None:
         raise HTTPException(status_code=404, detail="Application not found")
     return Application.model_validate(row)
+
+
+# ---------------------------------------------------------------------------
+# Application events sub-resource
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{dedup_hash}/events",
+    response_model=list[ApplicationEvent],
+)
+async def list_events(
+    dedup_hash: str,
+    pool: Pool,
+    user: CurrentUser,
+):
+    sql = """
+        SELECT id, dedup_hash, kind, occurred_at, body, tags, metadata, created_at
+        FROM app.application_events
+        WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
+        ORDER BY occurred_at DESC
+    """
+    async with pool.connection() as conn:
+        cur = await conn.execute(sql, {"user_id": user.id, "dedup_hash": dedup_hash})
+        rows = await cur.fetchall()
+    return [ApplicationEvent.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{dedup_hash}/events",
+    response_model=ApplicationEvent,
+    status_code=201,
+)
+async def create_event(
+    dedup_hash: str,
+    body: ApplicationEventPayload,
+    pool: Pool,
+    user: CurrentUser,
+):
+    """Create an application event. Accepts the discriminated union
+    (StatusChangeEvent | GenericEvent) and persists it row-by-row."""
+    if isinstance(body, StatusChangeEvent):
+        # status_change: {from, to} goes into metadata; body/tags stay empty
+        metadata: dict[str, object] = {
+            "from_status": body.from_status,
+            "to_status": body.to_status,
+        }
+        kind: str = "status_change"
+        event_body: str | None = None
+        tags: list[str] = []
+    else:
+        # GenericEvent
+        kind = "event"
+        event_body = body.body
+        tags = body.tags
+        metadata = body.metadata
+
+    # occurred_at: only set the column when the caller provides one (backdating).
+    # Omitting it from the INSERT lets the column DEFAULT now() apply — passing an
+    # explicit NULL would violate the NOT NULL constraint instead.
+    cols = ["user_id", "dedup_hash", "kind", "body", "tags", "metadata"]
+    params: dict[str, object] = {
+        "user_id": user.id,
+        "dedup_hash": dedup_hash,
+        "kind": kind,
+        "body": event_body,
+        "tags": tags,
+        # jsonb needs the Json() adapter — a bare dict can't be adapted by psycopg.
+        "metadata": Json(metadata),
+    }
+    if body.occurred_at is not None:
+        cols.append("occurred_at")
+        params["occurred_at"] = body.occurred_at
+
+    placeholders = ", ".join(
+        f"%({c})s::jsonb" if c == "metadata" else f"%({c})s" for c in cols
+    )
+    sql = f"""
+        INSERT INTO app.application_events ({", ".join(cols)})
+        VALUES ({placeholders})
+        RETURNING id, dedup_hash, kind, occurred_at, body, tags, metadata, created_at
+    """
+    async with pool.connection() as conn:
+        cur = await conn.execute(sql, params)  # type: ignore[arg-type]
+        row = await cur.fetchone()
+    return ApplicationEvent.model_validate(row)
+
+
+@router.patch("/{dedup_hash}/events/{event_id}", response_model=ApplicationEvent)
+async def update_event(
+    dedup_hash: str,
+    event_id: str,
+    body: ApplicationEventUpdate,
+    pool: Pool,
+    user: CurrentUser,
+):
+    """Patch an application event. Allowed fields: occurred_at, body, tags, metadata."""
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="No fields to update")
+
+    # jsonb needs the Json() adapter; everything else passes through as-is.
+    if "metadata" in updates:
+        updates["metadata"] = Json(updates["metadata"])
+
+    set_clause = ", ".join(
+        f"{k} = %({k})s::jsonb" if k == "metadata" else f"{k} = %({k})s"
+        for k in updates
+    )
+    params = {
+        "event_id": event_id,
+        "user_id": user.id,
+        "dedup_hash": dedup_hash,
+        **updates,
+    }
+    sql = f"""
+        UPDATE app.application_events
+        SET {set_clause}
+        WHERE id = %(event_id)s AND user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
+        RETURNING id, dedup_hash, kind, occurred_at, body, tags, metadata, created_at
+    """
+    async with pool.connection() as conn:
+        cur = await conn.execute(sql, params)  # type: ignore[arg-type]
+        row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return ApplicationEvent.model_validate(row)
+
+
+@router.delete(
+    "/{dedup_hash}/events/{event_id}", status_code=204, response_class=Response
+)
+async def delete_event(
+    dedup_hash: str,
+    event_id: str,
+    pool: Pool,
+    user: CurrentUser,
+):
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "DELETE FROM app.application_events "
+            "WHERE id = %(event_id)s AND user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s",
+            {"event_id": event_id, "user_id": user.id, "dedup_hash": dedup_hash},
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Event not found")
+    return Response(status_code=204)
