@@ -50,7 +50,11 @@ export function useMarkApplication() {
       status: ApplicationStatus
       notes?: string
     }) => createApplication({ dedup_hash: dedupHash, status, notes }),
-    onSuccess: () => invalidateApplications(qc),
+    onSuccess: (_, variables) => {
+      invalidateApplications(qc)
+      // A status change auto-emits a status_change event (#381) — refresh the timeline.
+      invalidateEvents(qc, variables.dedupHash)
+    },
     onError: logMutationError('mark application'),
   })
 }
@@ -60,7 +64,11 @@ export function useUpdateApplication() {
   return useMutation({
     mutationFn: ({ dedupHash, update }: { dedupHash: string; update: ApplicationUpdate }) =>
       updateApplication(dedupHash, update),
-    onSuccess: () => invalidateApplications(qc),
+    onSuccess: (_, variables) => {
+      invalidateApplications(qc)
+      // A status change auto-emits a status_change event (#381) — refresh the timeline.
+      invalidateEvents(qc, variables.dedupHash)
+    },
     onError: logMutationError('update application'),
   })
 }

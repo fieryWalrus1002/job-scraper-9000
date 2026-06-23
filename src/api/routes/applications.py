@@ -1,6 +1,8 @@
 from typing import Annotated, Any, cast
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from psycopg import AsyncConnection
 from psycopg.types.json import Json
 
 from ..schemas import (
@@ -27,9 +29,9 @@ _JOINS = """
 
 
 async def _emit_status_change(
-    conn: Any,
+    conn: AsyncConnection[Any],
     *,
-    user_id: object,
+    user_id: UUID,
     dedup_hash: str,
     from_status: ApplicationStatus | None,
     to_status: ApplicationStatus,
