@@ -95,7 +95,8 @@ function formatDate(iso: string): string {
 function StatusChangeRow({ event }: { event: ApplicationEvent }) {
   const { from, to } = readStatusTransition(event)
   const toLabel = STATUS_LABELS[to as keyof typeof STATUS_LABELS] ?? to
-  const label = from ? `Moved from ${from} → ${toLabel}` : `Entered ${toLabel}`
+  const fromLabel = from ? (STATUS_LABELS[from as keyof typeof STATUS_LABELS] ?? from) : null
+  const label = fromLabel ? `Moved from ${fromLabel} → ${toLabel}` : `Entered ${toLabel}`
 
   return (
     <div className="flex items-start gap-3 text-[12px]">

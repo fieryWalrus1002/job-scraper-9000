@@ -117,9 +117,10 @@ describe('ActivityTimelinePanel', () => {
       expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
     })
 
-    // "Entered Applied" (from_status: null) and "Moved from applied → Screening"
+    // "Entered Applied" (from_status: null) and "Moved from Applied → Screening"
+    // (both statuses run through STATUS_LABELS, so they render title-cased)
     expect(screen.getByText(/Entered Applied/)).toBeInTheDocument()
-    expect(screen.getByText(/Moved from applied/)).toBeInTheDocument()
+    expect(screen.getByText(/Moved from Applied/)).toBeInTheDocument()
 
     // Verify the status_change rows use italic styling
     const enteredEl = screen.getByText(/Entered Applied/)
