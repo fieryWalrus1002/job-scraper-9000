@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import uuid
 
@@ -112,7 +112,14 @@ def _make_cursor(*rows: Any) -> AsyncMock:
 
 @pytest.fixture
 def fake_conn() -> AsyncMock:
-    return AsyncMock()
+    conn = AsyncMock()
+    # Default: conn.transaction() returns an async-context-manager mock.
+    # Tests that need specific transaction behavior can override this.
+    txn_ctx = MagicMock()
+    txn_ctx.__aenter__ = AsyncMock(return_value=True)
+    txn_ctx.__aexit__ = AsyncMock(return_value=False)
+    conn.transaction = MagicMock(return_value=txn_ctx)
+    return conn
 
 
 @pytest.fixture

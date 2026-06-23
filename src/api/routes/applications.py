@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from psycopg.types.json import Json
@@ -24,6 +24,34 @@ _JOINS = """
     LEFT JOIN raw.job_scores s
         ON s.dedup_hash = a.dedup_hash AND s.user_id = a.user_id
 """
+
+
+async def _emit_status_change(
+    conn: Any,
+    *,
+    user_id: object,
+    dedup_hash: str,
+    from_status: ApplicationStatus | None,
+    to_status: ApplicationStatus,
+) -> None:
+    """Insert an auto-emitted status_change event. Call inside the same
+    transaction as the status write so the two commit atomically.
+
+    occurred_at is omitted so the column DEFAULT now() applies (auto-events are
+    not backdatable, §3.2.3). metadata is wrapped in Json() — psycopg cannot
+    adapt a bare dict to jsonb.
+    """
+    await conn.execute(
+        """
+        INSERT INTO app.application_events (user_id, dedup_hash, kind, metadata)
+        VALUES (%(user_id)s, %(dedup_hash)s, 'status_change', %(metadata)s::jsonb)
+        """,
+        {
+            "user_id": user_id,
+            "dedup_hash": dedup_hash,
+            "metadata": Json({"from_status": from_status, "to_status": to_status}),
+        },
+    )
 
 
 @router.get("", response_model=list[Application])
@@ -56,7 +84,16 @@ async def list_applications(
 
 @router.post("", response_model=Application, status_code=201)
 async def create_application(body: ApplicationCreate, pool: Pool, user: CurrentUser):
-    sql = """
+    insert_params = {**body.model_dump(), "user_id": user.id}
+    new_status = insert_params["status"]
+
+    # Read prior status to distinguish insert vs update and detect status change.
+    # A NULL result means this is a brand-new row.
+    select_sql = """
+        SELECT status FROM app.user_applications
+        WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
+    """
+    upsert_sql = """
         INSERT INTO app.user_applications (user_id, dedup_hash, status, applied_at, notes)
         VALUES (%(user_id)s, %(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
         ON CONFLICT (user_id, dedup_hash) DO UPDATE
@@ -66,9 +103,31 @@ async def create_application(body: ApplicationCreate, pool: Pool, user: CurrentU
                 updated_at = now()
         RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
     """
+
     async with pool.connection() as conn:
-        cur = await conn.execute(sql, {**body.model_dump(), "user_id": user.id})
-        row = await cur.fetchone()
+        async with conn.transaction():
+            # Read old status (None = new row)
+            cur = await conn.execute(select_sql, insert_params)  # type: ignore[arg-type]
+            old_row = cast(dict[str, Any] | None, await cur.fetchone())
+            old_status: ApplicationStatus | None = (
+                old_row["status"] if old_row else None
+            )
+
+            # Upsert the application
+            cur = await conn.execute(upsert_sql, insert_params)  # type: ignore[arg-type]
+            row = await cur.fetchone()
+
+            # Emit a status_change event atomically: new row enters the funnel
+            # (from = null); an existing row only when status actually changes.
+            if old_status != new_status:
+                await _emit_status_change(
+                    conn,
+                    user_id=user.id,
+                    dedup_hash=body.dedup_hash,
+                    from_status=old_status,
+                    to_status=new_status,
+                )
+
     return Application.model_validate(row)
 
 
@@ -98,7 +157,15 @@ async def update_application(
     set_clause = ", ".join(f"{k} = %({k})s" for k in updates)
     updates["dedup_hash"] = dedup_hash
     updates["user_id"] = user.id
-    sql = f"""
+
+    # "status" in updates means the caller sent a status value
+    # (model_dump(exclude_unset=True) omits fields not in the request body).
+
+    select_old_sql = """
+        SELECT status FROM app.user_applications
+        WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
+    """
+    update_sql = f"""
         WITH updated AS (
             UPDATE app.user_applications
             SET {set_clause}, updated_at = now()
@@ -110,9 +177,30 @@ async def update_application(
         FROM updated a
         {_JOINS}
     """
+
     async with pool.connection() as conn:
-        cur = await conn.execute(sql, updates)  # type: ignore[arg-type]
-        row = await cur.fetchone()
+        async with conn.transaction():
+            # Read old status before the update
+            cur = await conn.execute(select_old_sql, updates)  # type: ignore[arg-type]
+            old_row = cast(dict[str, Any] | None, await cur.fetchone())
+            if old_row is None:
+                raise HTTPException(status_code=404, detail="Application not found")
+            old_status = old_row["status"]
+
+            # Apply the update
+            cur = await conn.execute(update_sql, updates)  # type: ignore[arg-type]
+            row = await cur.fetchone()
+
+            # Emit status_change event only if status actually changed
+            if "status" in updates and old_status != updates["status"]:
+                await _emit_status_change(
+                    conn,
+                    user_id=user.id,
+                    dedup_hash=dedup_hash,
+                    from_status=old_status,
+                    to_status=updates["status"],
+                )
+
     if row is None:
         raise HTTPException(status_code=404, detail="Application not found")
     return Application.model_validate(row)
