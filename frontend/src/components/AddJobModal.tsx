@@ -32,7 +32,7 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
   const [url, setUrl] = useState('')
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
-  const [postedAt, setPostedAt] = useState('')
+  const [postedAt, setPostedAt] = useState(todayLocalISO())
   const [fitScore, setFitScore] = useState<number | ''>('')
   const [status, setStatus] = useState<ApplicationStatus>('maybe')
   const [apiError, setApiError] = useState<string | null>(null)
@@ -225,6 +225,13 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
       </DialogContent>
     </Dialog>
   )
+}
+
+function todayLocalISO(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 function scoreHint(n: number): string {
