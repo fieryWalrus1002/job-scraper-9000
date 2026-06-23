@@ -13,6 +13,14 @@ function makeWrapper() {
   )
 }
 
+// Mirror the component's local-date helper so the default-date assertion is tz-safe.
+function todayLocalISO(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
 vi.mock('../hooks/useApplications')
 
 beforeEach(() => {
@@ -27,7 +35,20 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('AddJobModal', () => {
-  it('submits successfully and fires onSuccess', async () => {
+  it('defaults the posted date to today', async () => {
+    const { useCreateManualJob } = await import('../hooks/useApplications')
+    vi.mocked(useCreateManualJob).mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never)
+
+    render(<AddJobModal onClose={vi.fn()} onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    const posted = screen.getByLabelText(/Posted date/) as HTMLInputElement
+    expect(posted.value).toBe(todayLocalISO())
+  })
+
+  it('submits successfully with today as the posted date and fires onSuccess', async () => {
     const { useCreateManualJob } = await import('../hooks/useApplications')
     const mutateAsync = vi.fn().mockResolvedValue({ dedup_hash: 'manual-1' })
     vi.mocked(useCreateManualJob).mockReturnValue({
@@ -42,17 +63,15 @@ describe('AddJobModal', () => {
       wrapper: makeWrapper(),
     })
 
-    // Fill required fields — getByPlaceholderText since #322 (htmlFor/id) not yet merged
-    fireEvent.change(screen.getByPlaceholderText('e.g. Senior Software Engineer'), {
+    // getByLabelText exercises #322's label/control associations.
+    fireEvent.change(screen.getByLabelText(/Title/), {
       target: { value: '  Staff Engineer  ' },
     })
 
-    // Open fit score select (first combobox) and pick 4
-    const [scoreTrigger] = screen.getAllByRole('combobox')
-    fireEvent.click(scoreTrigger)
+    // Open the fit score select and pick 4.
+    fireEvent.click(screen.getByLabelText(/Your fit score/))
     fireEvent.click(screen.getByText('4'))
 
-    // Submit
     fireEvent.click(screen.getByRole('button', { name: 'Add job' }))
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1))
@@ -61,6 +80,7 @@ describe('AddJobModal', () => {
       expect.objectContaining({
         title: 'Staff Engineer',
         fit_score: 4,
+        posted_at: todayLocalISO(),
       }),
     )
   })
@@ -78,12 +98,11 @@ describe('AddJobModal', () => {
       wrapper: makeWrapper(),
     })
 
-    fireEvent.change(screen.getByPlaceholderText('e.g. Senior Software Engineer'), {
+    fireEvent.change(screen.getByLabelText(/Title/), {
       target: { value: 'Engineer' },
     })
 
-    const [scoreTrigger] = screen.getAllByRole('combobox')
-    fireEvent.click(scoreTrigger)
+    fireEvent.click(screen.getByLabelText(/Your fit score/))
     fireEvent.click(screen.getByText('4'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Add job' }))
@@ -106,7 +125,7 @@ describe('AddJobModal', () => {
       wrapper: makeWrapper(),
     })
 
-    fireEvent.change(screen.getByPlaceholderText('e.g. Senior Software Engineer'), {
+    fireEvent.change(screen.getByLabelText(/Title/), {
       target: { value: 'Engineer' },
     })
 
