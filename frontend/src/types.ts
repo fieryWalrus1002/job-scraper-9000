@@ -111,6 +111,23 @@ export interface ApplicationEvent {
   created_at: string
 }
 
+/** Payload for POST /api/applications/{dedup_hash}/events (GenericEvent side of the discriminated union). */
+export interface ApplicationEventCreate {
+  kind: 'event'
+  occurred_at?: string
+  body?: string | null
+  tags?: string[]
+  metadata?: Record<string, unknown>
+}
+
+/** Payload for PATCH /api/applications/{dedup_hash}/events/{id}. All fields optional. */
+export interface ApplicationEventUpdate {
+  occurred_at?: string | null
+  body?: string | null
+  tags?: string[] | null
+  metadata?: Record<string, unknown> | null
+}
+
 /** Read `{from, to}` from a status_change event's metadata. */
 export function readStatusTransition(event: ApplicationEvent): { from: string | null; to: string } {
   if (event.kind !== 'status_change') {

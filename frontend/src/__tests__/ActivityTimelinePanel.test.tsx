@@ -177,4 +177,112 @@ describe('ActivityTimelinePanel', () => {
       expect(screen.getByText(/Could not load activity/)).toBeInTheDocument()
     })
   })
+
+  it('offers edit and delete buttons on user-created (event kind) rows', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_EVENTS), { status: 200 })),
+    )
+
+    render(<ActivityTimelinePanel jobData={JOB_DATA} />, { wrapper: makeWrapper() })
+    fireEvent.click(screen.getByRole('button', { name: 'Activity Timeline' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    // The user event (evt-3) should have edit and del buttons
+    expect(screen.getByText('edit')).toBeInTheDocument()
+    expect(screen.getByText('del')).toBeInTheDocument()
+  })
+
+  it('does NOT offer edit/delete on status_change events', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(MOCK_EVENTS), { status: 200 })),
+    )
+
+    render(<ActivityTimelinePanel jobData={JOB_DATA} />, { wrapper: makeWrapper() })
+    fireEvent.click(screen.getByRole('button', { name: 'Activity Timeline' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    // status_change rows should have the system icon but no edit/del buttons
+    expect(screen.getByText(/Entered Applied/)).toBeInTheDocument()
+    expect(screen.getByText(/Moved from Applied/)).toBeInTheDocument()
+
+    // There should be exactly one "edit" and one "del" (for the single user event)
+    // We verify this by counting: only 1 of each
+    const editButtons = screen.getAllByText('edit')
+    expect(editButtons).toHaveLength(1)
+    const delButtons = screen.getAllByText('del')
+    expect(delButtons).toHaveLength(1)
+  })
+
+  it('"Add note" button reveals the form, and submitting POSTs with date/body/tags', async () => {
+    const newEvent = {
+      id: 'evt-new',
+      dedup_hash: 'hash-timeline',
+      kind: 'event' as const,
+      occurred_at: '2026-06-23T00:00:00Z',
+      body: 'Test note',
+      tags: ['contact'],
+      metadata: {},
+      created_at: '2026-06-23T12:00:00Z',
+    }
+    // Track whether POST has been called; after that, GET returns the new event
+    let postCalled = false
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      const method = init?.method ?? 'GET'
+      if (method === 'POST' && url.includes('/events')) {
+        postCalled = true
+        return new Response(JSON.stringify(newEvent), { status: 201 })
+      }
+      // GET events — empty until POST succeeds, then returns the new event
+      const events = postCalled ? [newEvent] : []
+      return new Response(JSON.stringify(events), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ActivityTimelinePanel jobData={JOB_DATA} />, { wrapper: makeWrapper() })
+    fireEvent.click(screen.getByRole('button', { name: 'Activity Timeline' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+    })
+
+    // Click "+ Add note" to reveal the form
+    fireEvent.click(screen.getByText('+ Add note'))
+
+    // Form fields should be visible
+    expect(screen.getByLabelText(/Date/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Note/i)).toBeInTheDocument()
+
+    // Fill in the note body
+    fireEvent.change(screen.getByLabelText(/Note/i), {
+      target: { value: 'Test note' },
+    })
+
+    // Submit the form
+    fireEvent.click(screen.getByText('Add note'))
+
+    // Verify POST was called with the correct payload
+    await waitFor(() => {
+      const postCall = fetchMock.mock.calls.find((call) => call[1]?.method === 'POST')
+      expect(postCall).toBeDefined()
+      expect(postCall![0]).toContain('/api/applications/hash-timeline/events')
+      const body = JSON.parse(postCall![1]?.body as string)
+      expect(body.kind).toBe('event')
+      expect(body.body).toBe('Test note')
+    })
+
+    // After mutation, the query is invalidated and refetches — the mock now
+    // returns the new event, so the timeline should show it.
+    await waitFor(() => {
+      expect(screen.getByText('Test note')).toBeInTheDocument()
+    })
+  })
 })
