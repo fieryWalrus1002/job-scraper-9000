@@ -118,6 +118,30 @@ class TestStaleToApply:
         with pytest.raises(ValueError, match="null metadata"):
             check_stale_to_apply([bad_event], datetime.now(timezone.utc))
 
+    def test_to_apply_then_passed_no_alert(self) -> None:
+        """to_apply (old) → later passed ⇒ current status is 'passed', no alert."""
+        events = [
+            _event("job-1", "to_apply", 10),
+            _event("job-1", "passed", 2),
+        ]
+        assert check_stale_to_apply(events, datetime.now(timezone.utc), 3) is None
+
+    def test_to_apply_then_rejected_no_alert(self) -> None:
+        """to_apply (old) → later rejected ⇒ current status is 'rejected', no alert."""
+        events = [
+            _event("job-1", "to_apply", 10),
+            _event("job-1", "rejected", 2),
+        ]
+        assert check_stale_to_apply(events, datetime.now(timezone.utc), 3) is None
+
+    def test_to_apply_then_maybe_no_alert(self) -> None:
+        """to_apply (old) → later maybe ⇒ current status is 'maybe', no alert."""
+        events = [
+            _event("job-1", "to_apply", 10),
+            _event("job-1", "maybe", 2),
+        ]
+        assert check_stale_to_apply(events, datetime.now(timezone.utc), 3) is None
+
 
 # ---------------------------------------------------------------------------
 # check_post_interview
@@ -153,6 +177,30 @@ class TestPostInterview:
         assert alert.count == 2
         assert set(alert.dedup_hashes) == {"job-1", "job-2"}
         assert alert.days >= 14
+
+    def test_interview_then_rejected_no_alert(self) -> None:
+        """interview (old) → later rejected ⇒ current status is 'rejected', no alert."""
+        events = [
+            _event("job-1", "interview", 10),
+            _event("job-1", "rejected", 2),
+        ]
+        assert check_post_interview(events, datetime.now(timezone.utc), 7) is None
+
+    def test_interview_then_offer_no_alert(self) -> None:
+        """interview (old) → later offer ⇒ current status is 'offer', no alert."""
+        events = [
+            _event("job-1", "interview", 10),
+            _event("job-1", "offer", 2),
+        ]
+        assert check_post_interview(events, datetime.now(timezone.utc), 7) is None
+
+    def test_interview_then_hired_no_alert(self) -> None:
+        """interview (old) → later hired ⇒ current status is 'hired', no alert."""
+        events = [
+            _event("job-1", "interview", 10),
+            _event("job-1", "hired", 2),
+        ]
+        assert check_post_interview(events, datetime.now(timezone.utc), 7) is None
 
     def test_missing_to_status_raises(self) -> None:
         bad_event = {

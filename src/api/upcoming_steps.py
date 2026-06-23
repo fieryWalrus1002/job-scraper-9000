@@ -89,12 +89,13 @@ def check_stale_to_apply(
     now: datetime,
     threshold_days: int = _DEFAULT_STALE_DAYS,
 ) -> StaleToApplyAlert | None:
-    """Return an alert for jobs stuck in *to_apply* beyond the threshold.
+    """Return an alert for jobs whose current status is still *to_apply* beyond
+    the threshold.
 
     A job is stale if:
-    1. Its latest ``to_status == "to_apply"`` event has no later
-       ``to_status == "applied"`` event.
-    2. ``now - occurred_at > threshold_days``.
+    1. Its current status (``to_status`` of the chronologically last
+       status_change event) equals ``"to_apply"``.
+    2. ``now - occurred_at > threshold_days`` for that last event.
 
     Returns ``None`` when no stale jobs are found.
     """
@@ -113,32 +114,16 @@ def check_stale_to_apply(
         # Sort chronologically so "latest" = last element
         rows.sort(key=lambda r: r["occurred_at"])
 
-        # Find the latest to_apply event
-        latest_to_apply: datetime | None = None
-        for r in rows:
-            to_status = _parse_status_change_metadata(r)
-            if to_status == "to_apply":
-                latest_to_apply = r["occurred_at"]
-
-        if latest_to_apply is None:
+        # Current status = to_status of the last event
+        current_to_status = _parse_status_change_metadata(rows[-1])
+        if current_to_status != "to_apply":
             continue
 
-        # Check if there's a later "applied" event (cancels the alert)
-        has_later_applied = False
-        for r in rows:
-            if r["occurred_at"] > latest_to_apply:
-                to_status = _parse_status_change_metadata(r)
-                if to_status == "applied":
-                    has_later_applied = True
-                    break
-
-        if has_later_applied:
-            continue
-
-        # Check if past threshold
-        if latest_to_apply < deadline:
+        # Current status is to_apply; check if past threshold
+        occurred_at = rows[-1]["occurred_at"]
+        if occurred_at < deadline:
             stale_hashes.append(dh)
-            days_stale = (now - latest_to_apply).days
+            days_stale = (now - occurred_at).days
             if days_stale > max_days:
                 max_days = days_stale
 
@@ -157,10 +142,13 @@ def check_post_interview(
     now: datetime,
     threshold_days: int = _DEFAULT_INTERVIEW_DAYS,
 ) -> PostInterviewAlert | None:
-    """Return an alert for jobs that entered *interview* and stalled.
+    """Return an alert for jobs whose current status is still *interview* beyond
+    the threshold.
 
-    Per job, find the latest ``to_status == "interview"`` event. If
-    ``now - occurred_at > threshold_days``, include it.
+    A job gets a nudge if:
+    1. Its current status (``to_status`` of the chronologically last
+       status_change event) equals ``"interview"``.
+    2. ``now - occurred_at > threshold_days`` for that last event.
 
     Returns ``None`` when no interview-nudge jobs are found.
     """
@@ -177,18 +165,15 @@ def check_post_interview(
     for dh, rows in by_job.items():
         rows.sort(key=lambda r: r["occurred_at"])
 
-        latest_interview: datetime | None = None
-        for r in rows:
-            to_status = _parse_status_change_metadata(r)
-            if to_status == "interview":
-                latest_interview = r["occurred_at"]
-
-        if latest_interview is None:
+        # Current status = to_status of the last event
+        current_to_status = _parse_status_change_metadata(rows[-1])
+        if current_to_status != "interview":
             continue
 
-        if latest_interview < deadline:
+        occurred_at = rows[-1]["occurred_at"]
+        if occurred_at < deadline:
             nudge_hashes.append(dh)
-            days_since = (now - latest_interview).days
+            days_since = (now - occurred_at).days
             if days_since > max_days:
                 max_days = days_since
 
