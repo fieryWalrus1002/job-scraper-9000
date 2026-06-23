@@ -7,7 +7,15 @@ from datetime import date, datetime
 import pytest
 from pydantic import ValidationError
 
-from api.schemas import JobDetail, JobListResponse, JobSummary
+from api.schemas import (
+    ApplicationEvent,
+    ApplicationEventPayload,
+    GenericEvent,
+    JobDetail,
+    JobListResponse,
+    JobSummary,
+    StatusChangeEvent,
+)
 from tests.api.conftest import FAKE_DETAIL_ROW, FAKE_JOB_ROW
 
 
@@ -111,3 +119,86 @@ def test_job_list_response_validates() -> None:
 def test_job_list_response_empty_items() -> None:
     resp = JobListResponse(total=0, limit=50, offset=0, items=[])
     assert resp.items == []
+
+
+# ---------------------------------------------------------------------------
+# Application events — discriminated union + alias round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_status_change_event_from_to_aliases() -> None:
+    """from/to JSON keys round-trip via from_status/to_status field aliases."""
+    data = {"kind": "status_change", "from": "maybe", "to": "to_apply"}
+    evt = StatusChangeEvent.model_validate(data)
+    assert evt.from_status == "maybe"
+    assert evt.to_status == "to_apply"
+
+    # model_dump(by_alias=True) → keys are "from" / "to"
+    dumped = evt.model_dump(by_alias=True)
+    assert dumped["from"] == "maybe"
+    assert dumped["to"] == "to_apply"
+
+
+def test_status_change_event_from_can_be_none() -> None:
+    """Initial transitions (e.g. job first tracked) have no prior status."""
+    evt = StatusChangeEvent.model_validate({"to": "maybe"})
+    assert evt.from_status is None
+    assert evt.to_status == "maybe"
+
+
+def test_status_change_event_invalid_status_rejected() -> None:
+    with pytest.raises(ValidationError):
+        StatusChangeEvent.model_validate({"to": "invalid_status"})
+
+
+def test_generic_event_defaults() -> None:
+    evt = GenericEvent.model_validate({"kind": "event"})
+    assert evt.body is None
+    assert evt.tags == []
+    assert evt.metadata == {}
+
+
+def test_generic_event_full() -> None:
+    evt = GenericEvent.model_validate(
+        {
+            "kind": "event",
+            "body": "Had a call with recruiter",
+            "tags": ["contact", "phone"],
+            "metadata": {"contact_email": "recruiter@example.com"},
+        }
+    )
+    assert evt.body == "Had a call with recruiter"
+    assert evt.tags == ["contact", "phone"]
+
+
+def test_application_event_payload_discriminated_union() -> None:
+    """The discriminated union routes on the kind field."""
+    sc: ApplicationEventPayload = StatusChangeEvent.model_validate(
+        {"from": "to_apply", "to": "applied"}
+    )
+    assert sc.kind == "status_change"
+    assert sc.to_status == "applied"
+
+    ge: ApplicationEventPayload = GenericEvent.model_validate(
+        {"kind": "event", "tags": ["note"]}
+    )
+    assert ge.kind == "event"
+
+
+def test_application_event_output_model() -> None:
+    from uuid import uuid4
+
+    uid = uuid4()
+    now = datetime(2026, 6, 23, 12, 0, 0)
+    evt = ApplicationEvent(
+        id=uid,
+        dedup_hash="abc123",
+        kind="status_change",
+        occurred_at=now,
+        body=None,
+        tags=[],
+        metadata={"from": "maybe", "to": "to_apply"},
+        created_at=now,
+    )
+    assert evt.id == uid
+    assert evt.kind == "status_change"
