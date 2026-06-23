@@ -3,6 +3,7 @@ import { JobSummaryHeader } from '../shared/JobSummaryHeader'
 import type { DetailSurfaceProps } from '../types'
 import { useApplicationDetailActions } from './actionHelpers'
 import {
+  ActivityTimelinePanel,
   ApplicationTrackingPanel,
   DescriptionPanel,
   DevMetadataPanel,
@@ -37,6 +38,7 @@ export function TrackingDetailSurface({
       />
       <JobDetailBody>
         <ApplicationTrackingPanel jobData={jobData} application={application} defaultOpen />
+        <ActivityTimelinePanel jobData={jobData} />
         <DescriptionPanel jobData={jobData} />
         <SkillsFitPanel jobData={jobData} />
         <EvalCorrectionPanel jobData={jobData} correction={correction} />

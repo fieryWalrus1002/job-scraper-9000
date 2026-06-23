@@ -1,6 +1,7 @@
 import type {
   Application,
   ApplicationCreate,
+  ApplicationEvent,
   ApplicationStatus,
   ApplicationUpdate,
   CandidateProfileInput,
@@ -139,6 +140,17 @@ export async function updateApplication(
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<Application>
+}
+
+export async function fetchApplicationEvents(
+  dedupHash: string,
+  signal?: AbortSignal,
+): Promise<ApplicationEvent[]> {
+  const res = await fetch(`${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}/events`, {
+    signal,
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<ApplicationEvent[]>
 }
 
 // ───── Settings ─────

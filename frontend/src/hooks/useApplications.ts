@@ -3,11 +3,18 @@ import {
   createApplication,
   createManualJob,
   deleteApplication,
+  fetchApplicationEvents,
   fetchApplications,
   normalizeApplicationStatuses,
   updateApplication,
 } from '../api'
-import type { Application, ApplicationStatus, ApplicationUpdate, ManualJobCreate } from '../types'
+import type {
+  Application,
+  ApplicationEvent,
+  ApplicationStatus,
+  ApplicationUpdate,
+  ManualJobCreate,
+} from '../types'
 import { logMutationError } from '../lib/mutations'
 
 export function useApplications(statuses?: ApplicationStatus[]) {
@@ -16,6 +23,13 @@ export function useApplications(statuses?: ApplicationStatus[]) {
     queryKey: ['applications', normalizedStatuses.length > 0 ? normalizedStatuses : 'all'],
     queryFn: ({ signal }) => fetchApplications(normalizedStatuses, signal),
     select: (data: Application[]) => new Map(data.map((a) => [a.dedup_hash, a])),
+  })
+}
+
+export function useApplicationEvents(dedupHash: string) {
+  return useQuery<ApplicationEvent[], Error>({
+    queryKey: ['application-events', dedupHash],
+    queryFn: ({ signal }) => fetchApplicationEvents(dedupHash, signal),
   })
 }
 

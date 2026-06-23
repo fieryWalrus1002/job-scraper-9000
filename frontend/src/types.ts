@@ -98,6 +98,32 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   passed: 'Trashed',
 }
 
+// Application event — returned by GET /api/applications/{dedup_hash}/events.
+// Mirrors the backend ApplicationEvent Pydantic model.
+export interface ApplicationEvent {
+  id: string
+  dedup_hash: string
+  kind: 'status_change' | 'event'
+  occurred_at: string
+  body: string | null
+  tags: string[]
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+/** Read `{from, to}` from a status_change event's metadata. */
+export function readStatusTransition(event: ApplicationEvent): { from: string | null; to: string } {
+  if (event.kind !== 'status_change') {
+    throw new Error(`readStatusTransition called on non-status_change event (kind=${event.kind})`)
+  }
+  const from = event.metadata.from_status as string | null | undefined
+  const to = event.metadata.to_status as string | undefined
+  if (!to) {
+    throw new Error(`status_change event missing metadata.to_status (id=${event.id})`)
+  }
+  return { from, to }
+}
+
 // Frontend-only — not part of the API schema.
 export interface Filters {
   search: string
