@@ -1,16 +1,21 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import {
   createApplication,
+  createEvent,
   createManualJob,
   deleteApplication,
+  deleteEvent,
   fetchApplicationEvents,
   fetchApplications,
   normalizeApplicationStatuses,
   updateApplication,
+  updateEvent,
 } from '../api'
 import type {
   Application,
   ApplicationEvent,
+  ApplicationEventCreate,
+  ApplicationEventUpdate,
   ApplicationStatus,
   ApplicationUpdate,
   ManualJobCreate,
@@ -78,6 +83,43 @@ export function useCreateManualJob() {
   })
 }
 
+export function useCreateEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dedupHash, body }: { dedupHash: string; body: ApplicationEventCreate }) =>
+      createEvent(dedupHash, body),
+    onSuccess: (_, variables) => invalidateEvents(qc, variables.dedupHash),
+    onError: logMutationError('create event'),
+  })
+}
+
+export function useUpdateEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      dedupHash,
+      eventId,
+      update,
+    }: {
+      dedupHash: string
+      eventId: string
+      update: ApplicationEventUpdate
+    }) => updateEvent(dedupHash, eventId, update),
+    onSuccess: (_, variables) => invalidateEvents(qc, variables.dedupHash),
+    onError: logMutationError('update event'),
+  })
+}
+
+export function useDeleteEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dedupHash, eventId }: { dedupHash: string; eventId: string }) =>
+      deleteEvent(dedupHash, eventId),
+    onSuccess: (_, variables) => invalidateEvents(qc, variables.dedupHash),
+    onError: logMutationError('delete event'),
+  })
+}
+
 // Status mark/update/delete only change application state, not the job list, so
 // invalidating ['jobs'] would trigger a pointless refetch (and a loading flash)
 // of the current page on every triage action.
@@ -89,4 +131,8 @@ function invalidateApplications(qc: QueryClient) {
 function invalidateApplicationsAndJobs(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['applications'], exact: false })
   void qc.invalidateQueries({ queryKey: ['jobs'], exact: false })
+}
+
+function invalidateEvents(qc: QueryClient, dedupHash: string) {
+  void qc.invalidateQueries({ queryKey: ['application-events', dedupHash] })
 }

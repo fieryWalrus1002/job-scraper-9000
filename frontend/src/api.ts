@@ -2,6 +2,8 @@ import type {
   Application,
   ApplicationCreate,
   ApplicationEvent,
+  ApplicationEventCreate,
+  ApplicationEventUpdate,
   ApplicationStatus,
   ApplicationUpdate,
   CandidateProfileInput,
@@ -151,6 +153,44 @@ export async function fetchApplicationEvents(
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<ApplicationEvent[]>
+}
+
+export async function createEvent(
+  dedupHash: string,
+  body: ApplicationEventCreate,
+): Promise<ApplicationEvent> {
+  const res = await fetch(`${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<ApplicationEvent>
+}
+
+export async function updateEvent(
+  dedupHash: string,
+  eventId: string,
+  body: ApplicationEventUpdate,
+): Promise<ApplicationEvent> {
+  const res = await fetch(
+    `${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<ApplicationEvent>
+}
+
+export async function deleteEvent(dedupHash: string, eventId: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/applications/${encodeURIComponent(dedupHash)}/events/${encodeURIComponent(eventId)}`,
+    { method: 'DELETE' },
+  )
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
 }
 
 // ───── Settings ─────
