@@ -87,10 +87,11 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
 
         <form className="grid grid-cols-2 gap-x-4 gap-y-3.5 px-6 py-5" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-1.5 col-span-2">
-            <label className={labelCls}>
+            <label className={labelCls} htmlFor="job-title">
               Title <span className="text-score-low normal-case">*</span>
             </label>
             <Input
+              id="job-title"
               required
               placeholder="e.g. Senior Software Engineer"
               value={title}
@@ -99,8 +100,11 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>Company</label>
+            <label className={labelCls} htmlFor="job-company">
+              Company
+            </label>
             <Input
+              id="job-company"
               placeholder="e.g. Acme Corp"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
@@ -108,8 +112,11 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>Location</label>
+            <label className={labelCls} htmlFor="job-location">
+              Location
+            </label>
             <Input
+              id="job-location"
               placeholder="e.g. Remote, Seattle WA"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -117,8 +124,11 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5 col-span-2">
-            <label className={labelCls}>Job URL</label>
+            <label className={labelCls} htmlFor="job-url">
+              Job URL
+            </label>
             <Input
+              id="job-url"
               type="text"
               placeholder="https://…"
               value={url}
@@ -127,8 +137,11 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5 col-span-2">
-            <label className={labelCls}>Job description</label>
+            <label className={labelCls} htmlFor="job-description">
+              Job description
+            </label>
             <textarea
+              id="job-description"
               className={textareaCls}
               placeholder="Copy-paste the job description here."
               value={description}
@@ -137,19 +150,29 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>Posted date</label>
-            <Input type="date" value={postedAt} onChange={(e) => setPostedAt(e.target.value)} />
+            <label className={labelCls} htmlFor="job-posted-at">
+              Posted date
+            </label>
+            <Input
+              id="job-posted-at"
+              type="date"
+              value={postedAt}
+              onChange={(e) => setPostedAt(e.target.value)}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className={labelCls}>
+            <label className={labelCls} htmlFor="job-fit-score">
               Your fit score <span className="text-score-low normal-case">*</span>
             </label>
             <Select
               value={fitScore === '' ? undefined : String(fitScore)}
               onValueChange={(v) => setFitScore(Number(v))}
             >
-              <SelectTrigger className="w-full h-8 text-[13px] bg-bg-elevated border-border hover:border-border-strong">
+              <SelectTrigger
+                id="job-fit-score"
+                className="w-full h-8 text-[13px] bg-bg-elevated border-border hover:border-border-strong"
+              >
                 <SelectValue placeholder="— pick one —" />
               </SelectTrigger>
               <SelectContent>
@@ -164,9 +187,14 @@ export default function AddJobModal({ onClose, onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5 col-span-2">
-            <label className={labelCls}>Initial status</label>
+            <label className={labelCls} htmlFor="job-status">
+              Initial status
+            </label>
             <Select value={status} onValueChange={(v) => setStatus(v as ApplicationStatus)}>
-              <SelectTrigger className="w-full h-8 text-[13px] bg-bg-elevated border-border hover:border-border-strong">
+              <SelectTrigger
+                id="job-status"
+                className="w-full h-8 text-[13px] bg-bg-elevated border-border hover:border-border-strong"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
