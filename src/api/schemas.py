@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -162,3 +162,48 @@ class User(BaseModel):
     email: str
     display_name: str | None = None
     role: Literal["admin", "member"]
+
+
+# ---------------------------------------------------------------------------
+# Application events — activity log (app.application_events)
+# ---------------------------------------------------------------------------
+
+
+class StatusChangeEvent(BaseModel):
+    """Auto-emitted on every status transition. {from, to} is load-bearing
+    for Phase 21 alerts (derive timing from it)."""
+
+    kind: Literal["status_change"] = "status_change"
+    from_status: ApplicationStatus | None = Field(default=None, alias="from")
+    to_status: ApplicationStatus = Field(alias="to")
+
+    model_config = {"populate_by_name": True}
+
+
+class GenericEvent(BaseModel):
+    """Free-form event — meaning carried by tags[] (ECS-style)."""
+
+    kind: Literal["event"] = "event"
+    body: str | None = None
+    tags: list[str] = []
+    metadata: dict[str, object] = {}
+
+
+# Discriminated union — importable by #380 (endpoints) directly
+ApplicationEventPayload = Annotated[
+    StatusChangeEvent | GenericEvent,
+    Field(discriminator="kind"),
+]
+
+
+class ApplicationEvent(BaseModel):
+    """Full output model returned by the API (all stored columns)."""
+
+    id: UUID
+    dedup_hash: str
+    kind: Literal["status_change", "event"]
+    occurred_at: datetime
+    body: str | None
+    tags: list[str]
+    metadata: dict[str, object]
+    created_at: datetime
