@@ -8,6 +8,7 @@ import {
   TRACKING_STATUSES,
 } from '../lib/trackingGroups'
 import { ApplicationTable } from './TriageApplicationTable'
+import { UpcomingStepsPane } from './UpcomingStepsPane'
 import { cn } from '../lib/utils'
 
 interface Props {
@@ -47,6 +48,7 @@ export function TrackingBoard({ onSelect }: Props) {
 
   return (
     <div className="flex-1 overflow-auto">
+      <UpcomingStepsPane />
       <TrackingGroup
         title="To Apply"
         applications={inGroup(TO_APPLY_STATUSES)}

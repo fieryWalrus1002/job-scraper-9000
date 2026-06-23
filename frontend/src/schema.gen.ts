@@ -284,6 +284,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/upcoming-steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Upcoming Steps */
+        get: operations["get_upcoming_steps_api_upcoming_steps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -616,6 +633,21 @@ export interface components {
              */
             country: string;
         };
+        /**
+         * InactivityAlertOut
+         * @description No *applied* event across the pipeline for > threshold days.
+         */
+        InactivityAlertOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "inactivity";
+            /** Message */
+            message: string;
+            /** Days */
+            days: number;
+        };
         /** IndustriesAndDomains */
         IndustriesAndDomains: {
             /** Preferred */
@@ -818,6 +850,25 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /**
+         * PostInterviewAlertOut
+         * @description Jobs that entered *interview* and haven't progressed past threshold.
+         */
+        PostInterviewAlertOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "post_interview";
+            /** Message */
+            message: string;
+            /** Count */
+            count: number;
+            /** Dedup Hashes */
+            dedup_hashes: string[];
+            /** Days */
+            days: number;
+        };
         /** ProfileSaveResponse */
         ProfileSaveResponse: {
             /** Profile Version */
@@ -968,6 +1019,25 @@ export interface components {
             inactivity_days?: number | null;
         };
         /**
+         * StaleToApplyAlertOut
+         * @description Jobs sitting in *to_apply* longer than threshold without moving to *applied*.
+         */
+        StaleToApplyAlertOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "stale_to_apply";
+            /** Message */
+            message: string;
+            /** Count */
+            count: number;
+            /** Dedup Hashes */
+            dedup_hashes: string[];
+            /** Days */
+            days: number;
+        };
+        /**
          * StatusChangeEvent
          * @description Auto-emitted on every status transition. {from, to} is load-bearing
          *     for Phase 21 alerts (derive timing from it).
@@ -994,6 +1064,14 @@ export interface components {
             preferred: string[];
             /** Exploratory */
             exploratory?: string[];
+        };
+        /**
+         * UpcomingStepsResponse
+         * @description List of time-based alerts derived from the user's application events.
+         */
+        UpcomingStepsResponse: {
+            /** Alerts */
+            alerts: (components["schemas"]["StaleToApplyAlertOut"] | components["schemas"]["PostInterviewAlertOut"] | components["schemas"]["InactivityAlertOut"])[];
         };
         /** User */
         User: {
@@ -1752,6 +1830,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_upcoming_steps_api_upcoming_steps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpcomingStepsResponse"];
                 };
             };
         };

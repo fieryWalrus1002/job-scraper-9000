@@ -58,6 +58,10 @@ export type SearchSaveResponse = components['schemas']['SearchSaveResponse']
 export type PipelineEnabledResponse = components['schemas']['PipelineEnabledResponse']
 export type AlertThresholdsResponse = components['schemas']['AlertThresholdsResponse']
 export type AlertThresholdsUpdate = components['schemas']['AlertThresholdsUpdate']
+export type UpcomingStepsResponse = components['schemas']['UpcomingStepsResponse']
+export type StaleToApplyAlertOut = components['schemas']['StaleToApplyAlertOut']
+export type PostInterviewAlertOut = components['schemas']['PostInterviewAlertOut']
+export type InactivityAlertOut = components['schemas']['InactivityAlertOut']
 export interface ManualJobCreate {
   title: string
   fit_score: number
