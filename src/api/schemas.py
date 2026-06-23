@@ -176,6 +176,8 @@ class StatusChangeEvent(BaseModel):
     kind: Literal["status_change"] = "status_change"
     from_status: ApplicationStatus | None = Field(default=None, alias="from")
     to_status: ApplicationStatus = Field(alias="to")
+    # Omitted → DB default now() (auto-events are not backdatable, set by the caller).
+    occurred_at: datetime | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -187,6 +189,8 @@ class GenericEvent(BaseModel):
     body: str | None = None
     tags: list[str] = []
     metadata: dict[str, object] = {}
+    # Omitted → DB default now(); set explicitly to backdate a manual note (§3.2.3).
+    occurred_at: datetime | None = None
 
 
 # Discriminated union — importable by #380 (endpoints) directly
@@ -194,6 +198,16 @@ ApplicationEventPayload = Annotated[
     StatusChangeEvent | GenericEvent,
     Field(discriminator="kind"),
 ]
+
+
+class ApplicationEventUpdate(BaseModel):
+    """PATCH payload — all fields optional; only those set are written
+    (``model_dump(exclude_unset=True)``). Typed so bad shapes fail at the edge."""
+
+    occurred_at: datetime | None = None
+    body: str | None = None
+    tags: list[str] | None = None
+    metadata: dict[str, object] | None = None
 
 
 class ApplicationEvent(BaseModel):

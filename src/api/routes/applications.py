@@ -1,12 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from psycopg.types.json import Json
 
 from ..schemas import (
     Application,
     ApplicationCreate,
     ApplicationEvent,
     ApplicationEventPayload,
+    ApplicationEventUpdate,
     ApplicationStatus,
     ApplicationUpdate,
     StatusChangeEvent,
@@ -171,24 +173,33 @@ async def create_event(
         tags = body.tags
         metadata = body.metadata
 
-    sql = """
-        INSERT INTO app.application_events
-            (user_id, dedup_hash, kind, occurred_at, body, tags, metadata)
-        VALUES
-            (%(user_id)s, %(dedup_hash)s, %(kind)s, %(occurred_at)s, %(body)s, %(tags)s, %(metadata)s::jsonb)
-        RETURNING id, dedup_hash, kind, occurred_at, body, tags, metadata, created_at
-    """
+    # occurred_at: only set the column when the caller provides one (backdating).
+    # Omitting it from the INSERT lets the column DEFAULT now() apply — passing an
+    # explicit NULL would violate the NOT NULL constraint instead.
+    cols = ["user_id", "dedup_hash", "kind", "body", "tags", "metadata"]
     params: dict[str, object] = {
         "user_id": user.id,
         "dedup_hash": dedup_hash,
         "kind": kind,
-        "occurred_at": None,  # DB default: now()
         "body": event_body,
         "tags": tags,
-        "metadata": metadata,
+        # jsonb needs the Json() adapter — a bare dict can't be adapted by psycopg.
+        "metadata": Json(metadata),
     }
+    if body.occurred_at is not None:
+        cols.append("occurred_at")
+        params["occurred_at"] = body.occurred_at
+
+    placeholders = ", ".join(
+        f"%({c})s::jsonb" if c == "metadata" else f"%({c})s" for c in cols
+    )
+    sql = f"""
+        INSERT INTO app.application_events ({", ".join(cols)})
+        VALUES ({placeholders})
+        RETURNING id, dedup_hash, kind, occurred_at, body, tags, metadata, created_at
+    """
     async with pool.connection() as conn:
-        cur = await conn.execute(sql, params)
+        cur = await conn.execute(sql, params)  # type: ignore[arg-type]
         row = await cur.fetchone()
     return ApplicationEvent.model_validate(row)
 
@@ -197,17 +208,23 @@ async def create_event(
 async def update_event(
     dedup_hash: str,
     event_id: str,
-    body: dict[str, object],
+    body: ApplicationEventUpdate,
     pool: Pool,
     user: CurrentUser,
 ):
     """Patch an application event. Allowed fields: occurred_at, body, tags, metadata."""
-    allowed = {"occurred_at", "body", "tags", "metadata"}
-    updates = {k: v for k, v in body.items() if k in allowed}
+    updates = body.model_dump(exclude_unset=True)
     if not updates:
-        raise HTTPException(status_code=422, detail="No valid fields to update")
+        raise HTTPException(status_code=422, detail="No fields to update")
 
-    set_clause = ", ".join(f"{k} = %({k})s" for k in updates)
+    # jsonb needs the Json() adapter; everything else passes through as-is.
+    if "metadata" in updates:
+        updates["metadata"] = Json(updates["metadata"])
+
+    set_clause = ", ".join(
+        f"{k} = %({k})s::jsonb" if k == "metadata" else f"{k} = %({k})s"
+        for k in updates
+    )
     params = {
         "event_id": event_id,
         "user_id": user.id,
