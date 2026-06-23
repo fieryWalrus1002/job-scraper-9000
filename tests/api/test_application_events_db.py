@@ -41,7 +41,11 @@ SEED_USER = User(
 async def db_client(fresh_pg, monkeypatch):  # type: ignore[no-untyped-def]
     """Migrate a fresh DB, seed a user + application (the events FK target),
     and yield an AsyncClient wired to a real pool against the container."""
-    _run_alembic("head", fresh_pg)
+    # 0006 refuses to seed without a bootstrap admin; supply one so the fixture
+    # doesn't depend on a local (untracked) config/auth.yml being present.
+    _run_alembic(
+        "head", fresh_pg, extra_env={"BOOTSTRAP_ADMIN_EMAIL": "admin@example.com"}
+    )
 
     async with AsyncConnectionPool(
         fresh_pg, kwargs={"row_factory": dict_row}, open=False
@@ -142,3 +146,34 @@ async def test_list_then_delete(db_client: AsyncClient) -> None:
 
     again = await db_client.get(f"/api/applications/{DEDUP}/events")
     assert all(e["id"] != event_id for e in again.json())
+
+
+# ---------------------------------------------------------------------------
+# #381 — auto-emit status_change on triage mutations (real DB)
+# ---------------------------------------------------------------------------
+
+
+async def test_patch_status_auto_emits_status_change(db_client: AsyncClient) -> None:
+    """PATCHing the application status writes a status_change event with the
+    correct {from,to} — proves the auto-emit INSERT's Json(metadata) adapts and
+    the row commits in the same transaction. The seeded app starts at 'to_apply'."""
+    resp = await db_client.patch(
+        f"/api/applications/{DEDUP}", json={"status": "applied"}
+    )
+    assert resp.status_code == 200, resp.text
+
+    events = (await db_client.get(f"/api/applications/{DEDUP}/events")).json()
+    changes = [e for e in events if e["kind"] == "status_change"]
+    assert len(changes) == 1
+    assert changes[0]["metadata"] == {"from_status": "to_apply", "to_status": "applied"}
+
+
+async def test_patch_notes_only_emits_no_event(db_client: AsyncClient) -> None:
+    """A notes-only PATCH must not emit a status_change event."""
+    resp = await db_client.patch(
+        f"/api/applications/{DEDUP}", json={"notes": "called recruiter"}
+    )
+    assert resp.status_code == 200, resp.text
+
+    events = (await db_client.get(f"/api/applications/{DEDUP}/events")).json()
+    assert [e for e in events if e["kind"] == "status_change"] == []
