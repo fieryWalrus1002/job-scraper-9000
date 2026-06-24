@@ -8,6 +8,7 @@ import { Section } from '../fields'
 interface AlertThresholdsSectionProps {
   staleToApplyDays: number | null
   postInterviewNudgeDays: number | null
+  postApplicationNudgeDays: number | null
   inactivityDays: number | null
   hasSearchConfig: boolean
 }
@@ -17,12 +18,14 @@ interface AlertThresholdsSectionProps {
 const DEFAULTS = {
   stale_to_apply_days: 3,
   post_interview_nudge_days: 7,
+  post_application_nudge_days: 10,
   inactivity_days: 14,
 } as const
 
 const LABELS: Record<keyof typeof DEFAULTS, string> = {
   stale_to_apply_days: 'Stale → To Apply (days)',
   post_interview_nudge_days: 'Post-Interview Nudge (days)',
+  post_application_nudge_days: 'Post-Application Follow-up (days)',
   inactivity_days: 'Inactivity Alert (days)',
 }
 
@@ -34,6 +37,7 @@ const LABELS: Record<keyof typeof DEFAULTS, string> = {
 export function AlertThresholdsSection({
   staleToApplyDays,
   postInterviewNudgeDays,
+  postApplicationNudgeDays,
   inactivityDays,
   hasSearchConfig,
 }: AlertThresholdsSectionProps) {
@@ -41,6 +45,7 @@ export function AlertThresholdsSection({
   const [values, setValues] = useState({
     stale_to_apply_days: staleToApplyDays ?? DEFAULTS.stale_to_apply_days,
     post_interview_nudge_days: postInterviewNudgeDays ?? DEFAULTS.post_interview_nudge_days,
+    post_application_nudge_days: postApplicationNudgeDays ?? DEFAULTS.post_application_nudge_days,
     inactivity_days: inactivityDays ?? DEFAULTS.inactivity_days,
   })
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})

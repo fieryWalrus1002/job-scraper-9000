@@ -95,6 +95,7 @@ export default function SettingsPage() {
                 hasSearchConfig={data?.search !== null}
                 staleToApplyDays={data?.stale_to_apply_days ?? null}
                 postInterviewNudgeDays={data?.post_interview_nudge_days ?? null}
+                postApplicationNudgeDays={data?.post_application_nudge_days ?? null}
                 inactivityDays={data?.inactivity_days ?? null}
               />
             </div>
