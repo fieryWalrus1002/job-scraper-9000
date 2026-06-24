@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import { useApplications } from '../hooks/useApplications'
 import { STATUS_LABELS, type Application, type ApplicationStatus } from '../types'
+import type { components } from '../schema.gen'
 import { Badge } from './ui/badge'
+
+type LatestEvent = components['schemas']['LatestEvent']
 
 type ApplicationSortCol = 'status' | 'title' | 'score' | 'updated'
 type SortDir = 'asc' | 'desc'
@@ -116,7 +119,7 @@ export function ApplicationTable({
           <th className="col-sortable" onClick={() => handleSort('updated')}>
             Updated{sortIndicator('updated')}
           </th>
-          <th>Notes</th>
+          <th>Latest activity</th>
           {renderRowActions && <th className="text-right pr-3">Actions</th>}
         </tr>
       </thead>
@@ -175,7 +178,7 @@ export function ApplicationTable({
             </td>
             <td>
               <span className="truncate block text-muted text-[12px]">
-                {app.notes ?? <span className="text-faint">—</span>}
+                {renderLatestActivity(app.latest_event)}
               </span>
             </td>
             {renderRowActions && (
@@ -187,6 +190,47 @@ export function ApplicationTable({
         ))}
       </tbody>
     </table>
+  )
+}
+
+const MINUTE = 60
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+const WEEK = 7 * DAY
+
+function relativeTime(iso: string): string {
+  const diff = (Date.now() - Date.parse(iso)) / 1000
+  if (diff < 0) return 'just now'
+  if (diff < 60) return 'just now'
+  if (diff < 5 * MINUTE) return `${Math.floor(diff / MINUTE)}m ago`
+  if (diff < 45 * MINUTE) return `${Math.floor(diff / MINUTE)}m ago`
+  if (diff < 2 * HOUR) return '1h ago'
+  if (diff < 24 * HOUR) return `${Math.floor(diff / HOUR)}h ago`
+  if (diff < 30 * DAY) return `${Math.floor(diff / DAY)}d ago`
+  return `${Math.floor(diff / WEEK)}w ago`
+}
+
+function renderLatestActivity(ev: LatestEvent | null | undefined): ReactNode {
+  if (!ev) return <span className="text-faint">—</span>
+
+  const time = relativeTime(ev.occurred_at)
+
+  if (ev.kind === 'status_change') {
+    const label = STATUS_LABELS[ev.to_status as ApplicationStatus] ?? ev.to_status ?? 'Unknown'
+    return (
+      <>
+        Entered {label} <span className="text-faint">· {time}</span>
+      </>
+    )
+  }
+
+  // kind === 'event'
+  const body = ev.body?.trim() ?? ''
+  return (
+    <>
+      {body ? <span className="truncate">{body}</span> : <span className="text-faint">—</span>}{' '}
+      <span className="text-faint">· {time}</span>
+    </>
   )
 }
 
