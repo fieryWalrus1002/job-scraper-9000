@@ -219,10 +219,8 @@ class TestPostInterview:
 
 class TestInactivity:
     def test_no_events_at_all(self) -> None:
-        """No events → inactivity alert (days = threshold_days)."""
-        alert = check_inactivity([], datetime.now(timezone.utc), 14)
-        assert alert is not None
-        assert alert.days == 14
+        """No events → never applied → no alert (inactivity ≠ never-applied)."""
+        assert check_inactivity([], datetime.now(timezone.utc), 14) is None
 
     def test_recent_applied_no_alert(self) -> None:
         """Applied event 3 days ago, threshold=14 → no alert."""
@@ -237,14 +235,12 @@ class TestInactivity:
         assert alert.days >= 20
 
     def test_no_applied_events_other_statuses(self) -> None:
-        """Events exist but none are 'applied' → treated as no applications."""
+        """Events exist but none are 'applied' → never applied → no alert."""
         events = [
             _event("job-1", "to_apply", 5),
             _event("job-2", "interview", 3),
         ]
-        alert = check_inactivity(events, datetime.now(timezone.utc), 14)
-        assert alert is not None
-        assert alert.days == 14
+        assert check_inactivity(events, datetime.now(timezone.utc), 14) is None
 
     def test_multiple_applied_uses_latest(self) -> None:
         """Two applied events — only the latest matters."""

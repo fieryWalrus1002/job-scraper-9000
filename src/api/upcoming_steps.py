@@ -192,13 +192,18 @@ def check_inactivity(
     now: datetime,
     threshold_days: int = _DEFAULT_INACTIVITY_DAYS,
 ) -> InactivityAlert | None:
-    """Return an alert if no *applied* event has occurred in the window.
+    """Return an alert if applications have gone quiet beyond the window.
 
     Looks at ``max(occurred_at)`` across all ``to_status == "applied"`` events.
-    If that max is older than ``threshold_days``, or if there are no applied
-    events at all, emit an alert.
+    If that max is older than ``threshold_days``, emit an alert.
 
-    Returns ``None`` when activity is within threshold.
+    *Inactivity* means you applied before and went quiet — so when there are no
+    applied events at all (e.g. a brand-new user, or one with only to_apply
+    jobs) this returns ``None`` rather than firing a day-one false nudge. The
+    "go apply to these" case is already covered by ``check_stale_to_apply``.
+
+    Returns ``None`` when activity is within threshold or there's been no
+    applied event at all.
     """
     deadline = now - timedelta(days=threshold_days)
 
@@ -211,8 +216,8 @@ def check_inactivity(
                 latest_applied = occurred
 
     if latest_applied is None:
-        # No applications at all — report as very stale
-        return InactivityAlert(days=threshold_days)
+        # Never applied — not "inactivity" (handled by stale_to_apply instead).
+        return None
 
     if latest_applied < deadline:
         return InactivityAlert(days=(now - latest_applied).days)

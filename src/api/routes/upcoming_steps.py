@@ -73,6 +73,10 @@ def _build_messages(alerts):
                     days=alert.days,
                 )
             )
+        else:
+            # FAIL FAST: an alert kind the engine produced but this builder
+            # doesn't handle would otherwise vanish silently from the response.
+            raise ValueError(f"unhandled upcoming-steps alert kind: {alert.kind!r}")
     return out
 
 

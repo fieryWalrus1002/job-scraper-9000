@@ -36,7 +36,10 @@ def _event(dh: str, to_status: str, days_ago: int) -> dict[str, Any]:
 async def test_upcoming_steps_empty_no_events(
     client: AsyncClient, fake_conn: AsyncMock
 ) -> None:
-    """No events, no config row → empty alerts list."""
+    """No events, no config row → empty alerts list.
+
+    A user with no events has never applied, so inactivity does NOT fire
+    (inactivity = applied-then-quiet, not never-applied)."""
     fake_conn.execute = AsyncMock(
         side_effect=[
             _make_cursor(),  # events query → empty
@@ -46,12 +49,7 @@ async def test_upcoming_steps_empty_no_events(
     resp = await client.get("/api/upcoming-steps")
     assert resp.status_code == 200
     data = resp.json()
-    assert "alerts" in data
-    # Inactivity alert is expected even with no events (no applications = inactive)
-    assert len(data["alerts"]) >= 1
-    inactivity = [a for a in data["alerts"] if a["kind"] == "inactivity"]
-    assert len(inactivity) == 1
-    assert "No applications submitted" in inactivity[0]["message"]
+    assert data["alerts"] == []
 
 
 async def test_upcoming_steps_empty_no_alerts_due(
