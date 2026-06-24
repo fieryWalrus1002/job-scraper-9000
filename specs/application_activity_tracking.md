@@ -292,8 +292,58 @@ All resolved as of this revision (ready to ratify):
   (§3.2.6).
 - **Timeline on non-Tracking surfaces?** → **No, Tracking-only** (§5).
 
+## 11. Phase 23 — Notes deprecation & latest-activity column
+
+The activity timeline (§3–5) has fully superseded the legacy free-text
+`app.user_applications.notes` field. Phase 23 retires `notes` and reclaims its
+Tracking-table column to show each job's most recent activity at a glance.
+
+**This reverses two earlier decisions:** §10 ("`notes` kept as a freeform
+scratchpad") and §9 ("one-time parse/import of existing `notes` into events" —
+out of scope). Both are now superseded — `notes` is migrated into events and
+dropped.
+
+### 11.1 Latest activity on the list
+
+- `GET /applications` gains an optional `latest_event` field on the `Application`
+  out-model: the single most recent `application_events` row for that job by
+  `occurred_at` (lateral join, `LIMIT 1`). Shape carries enough to render
+  compactly — `kind`, `occurred_at`, and either the resolved status label
+  (`status_change`) or the note `body` (`event`). `None` when a job has no events.
+- Backfilled note events (§11.3) are picked up by this join automatically, so a
+  migrated note shows as the latest activity if it's the most recent row.
+
+### 11.2 Tracking-table column
+
+- The **Notes** column becomes **Latest activity**, rendering `latest_event`:
+  a `status_change` shows the compact label ("Entered Applied"), an `event` shows
+  its truncated body, both with a relative timestamp ("· 3d ago"). No events → em-dash.
+- The table stops reading `app.notes` (removed in 11.3).
+
+### 11.3 Notes migration & removal
+
+- Migration `0015`: for each `user_applications` row with non-empty `notes`,
+  insert a `note` event (`kind='event'`, `body = notes`, no tags) carrying that
+  text, then `DROP COLUMN notes`. No data loss; existing notes become first-class
+  timeline events.
+- `notes` is removed from the API model, create/update bodies, and the list query.
+- The notes textarea is removed from `ApplicationTrackingSection` (the timeline +
+  add-note form is now the only way to record narrative).
+
+### 11.4 Slicing
+
+1. `fix(timeline)` — status-change row overlap + sibling rendering sweep (standalone).
+1. `feat(api)` — `latest_event` on the applications list (additive; no notes code).
+1. `feat(tracking)` — "Latest activity" column; stop reading `app.notes` (needs #2).
+1. `refactor(notes)` — migration `0015` (backfill + drop) + remove `notes` from
+   API/UI (needs #3, drops the column last after nothing reads it).
+
 ## Changelog
 
+- **2026-06-24** — §11: Phase 23 — deprecate legacy `notes` (migrate to `note`
+  events via migration `0015`, drop the column) and repurpose the Tracking
+  **Notes** column as **Latest activity** (new `latest_event` on the applications
+  list). Reverses the §10 "notes kept" and §9 "notes import out of scope" decisions.
 - **2026-06-24** — §6: Added 4th alert rule `post_application` (touchpoint-aware
   post-application follow-up nudge). Consumes `event`-kind rows with `follow_up`/
   `contact` tags as snooze signals. Threshold `post_application_nudge_days` from
