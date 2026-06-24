@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useUpcomingSteps } from '../hooks/useApplications'
 import type { InactivityAlertOut, PostInterviewAlertOut, StaleToApplyAlertOut } from '../types'
 import { Badge } from './ui/badge'
@@ -17,10 +18,18 @@ type AlertKind = StaleToApplyAlertOut | PostInterviewAlertOut | InactivityAlertO
  * Upcoming Steps pane — renders at the top of the Tracking page.
  *
  * Degrades quietly: hidden while loading or on error, hidden when there are
- * no alerts. Never blocks the board from rendering.
+ * no alerts. Never blocks the board from rendering. The error is hidden from
+ * the user but still logged loudly (per the repo's log-well rule) since the
+ * pane swallows it visually.
  */
 export function UpcomingStepsPane() {
-  const { data, isLoading, isError } = useUpcomingSteps()
+  const { data, isLoading, isError, error } = useUpcomingSteps()
+
+  // The pane hides its own failures from the UI, so log them — otherwise a
+  // failing /api/upcoming-steps would vanish with no diagnostic trace.
+  useEffect(() => {
+    if (isError) console.error('Upcoming Steps query failed:', error)
+  }, [isError, error])
 
   // Degrade quietly — never block the board.
   if (isLoading || isError) return null
