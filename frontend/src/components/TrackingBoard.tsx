@@ -23,6 +23,31 @@ interface Props {
 export function TrackingBoard({ onSelect }: Props) {
   const { data, isLoading, isError, error } = useApplications(TRACKING_STATUSES)
 
+  // The Upcoming Steps pane is page-level: it has its own query and degrades
+  // quietly, so it renders above the board regardless of the board's own
+  // loading / error / empty state (otherwise an inactivity nudge would be
+  // hidden whenever the application list is slow, failing, or empty).
+  return (
+    <div className="flex-1 overflow-auto">
+      <UpcomingStepsPane />
+      {renderBoard({ data, isLoading, isError, error, onSelect })}
+    </div>
+  )
+}
+
+function renderBoard({
+  data,
+  isLoading,
+  isError,
+  error,
+  onSelect,
+}: {
+  data: Map<string, Application> | undefined
+  isLoading: boolean
+  isError: boolean
+  error: Error | null
+  onSelect: (application: Application) => void
+}) {
   if (isLoading) return <div className="py-12 text-center text-muted text-sm">Loading…</div>
   if (isError) {
     return (
@@ -47,8 +72,7 @@ export function TrackingBoard({ onSelect }: Props) {
   const inGroup = (statuses: ApplicationStatus[]) => all.filter((a) => statuses.includes(a.status))
 
   return (
-    <div className="flex-1 overflow-auto">
-      <UpcomingStepsPane />
+    <>
       <TrackingGroup
         title="To Apply"
         applications={inGroup(TO_APPLY_STATUSES)}
@@ -67,7 +91,7 @@ export function TrackingBoard({ onSelect }: Props) {
         defaultOpen={false}
         onSelect={onSelect}
       />
-    </div>
+    </>
   )
 }
 

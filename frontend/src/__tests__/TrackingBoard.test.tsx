@@ -33,12 +33,25 @@ const APPS = [
   app('h-closed', 'rejected', 'Closed Role'),
 ]
 
-beforeEach(() => {
-  vi.restoreAllMocks()
+// The board now always mounts <UpcomingStepsPane />, so two queries hit fetch:
+// the applications list and GET /api/upcoming-steps. Route by URL and return a
+// fresh Response per call (a Response body can only be read once).
+function stubFetch(apps: Application[]) {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(new Response(JSON.stringify(APPS), { status: 200 })),
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/upcoming-steps')) {
+        return new Response(JSON.stringify({ alerts: [] }), { status: 200 })
+      }
+      return new Response(JSON.stringify(apps), { status: 200 })
+    }),
   )
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  stubFetch(APPS)
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -64,10 +77,7 @@ describe('TrackingBoard', () => {
   })
 
   it('shows an empty-state message when there are no tracking jobs', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })),
-    )
+    stubFetch([])
 
     render(<TrackingBoard onSelect={vi.fn()} />, { wrapper: makeWrapper() })
 
