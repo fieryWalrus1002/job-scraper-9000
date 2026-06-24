@@ -24,6 +24,7 @@ from .routes import (
     jobs_router,
     me_router,
     settings_router,
+    upcoming_steps_router,
 )
 from .users import sync_users
 
@@ -139,3 +140,4 @@ app.include_router(applications_router, prefix="/api")
 app.include_router(eval_router, prefix="/api")
 app.include_router(me_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(upcoming_steps_router, prefix="/api")

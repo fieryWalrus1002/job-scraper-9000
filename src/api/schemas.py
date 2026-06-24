@@ -221,3 +221,48 @@ class ApplicationEvent(BaseModel):
     tags: list[str]
     metadata: dict[str, object]
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Upcoming steps — alert output models
+# ---------------------------------------------------------------------------
+
+
+class StaleToApplyAlertOut(BaseModel):
+    """Jobs sitting in *to_apply* longer than threshold without moving to *applied*."""
+
+    kind: Literal["stale_to_apply"] = "stale_to_apply"
+    message: str
+    count: int
+    dedup_hashes: list[str]
+    days: int
+
+
+class PostInterviewAlertOut(BaseModel):
+    """Jobs that entered *interview* and haven't progressed past threshold."""
+
+    kind: Literal["post_interview"] = "post_interview"
+    message: str
+    count: int
+    dedup_hashes: list[str]
+    days: int
+
+
+class InactivityAlertOut(BaseModel):
+    """No *applied* event across the pipeline for > threshold days."""
+
+    kind: Literal["inactivity"] = "inactivity"
+    message: str
+    days: int
+
+
+UpcomingStepAlert = Annotated[
+    StaleToApplyAlertOut | PostInterviewAlertOut | InactivityAlertOut,
+    Field(discriminator="kind"),
+]
+
+
+class UpcomingStepsResponse(BaseModel):
+    """List of time-based alerts derived from the user's application events."""
+
+    alerts: list[UpcomingStepAlert]
