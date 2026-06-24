@@ -187,6 +187,14 @@ Tracking page:
   `status_change` with `to = interview` vs. now.
 - *"You haven't applied for any jobs in the last X days."* ← max `status_change`
   (`to = applied`) `occurred_at` across all the user's applications.
+- *"N application(s) have gone D+ days without a follow-up."* ← jobs whose
+  current status is `applied` or `screening` AND whose **last meaningful
+  touchpoint** is older than `post_application_nudge_days`. A touchpoint is
+  either the status-change event that moved the job into `applied`/`screening`,
+  or an `event`-kind row tagged `follow_up` or `contact`. Logging a
+  `follow_up`/`contact` event **snoozes** the nudge for that job. This is the
+  first rule to consume `event`-kind rows + tags (§3.2.6, "tags as semantic
+  carrier").
 
 **Thresholds are config, not hardcoded** — they belong in user settings
 (**Phase 18 — Settings & Account**), consistent with the `.env`-secrets /
@@ -283,3 +291,10 @@ All resolved as of this revision (ready to ratify):
   on freeform `tags[]`; `kind` is just a `status_change` vs. `event` discriminator
   (§3.2.6).
 - **Timeline on non-Tracking surfaces?** → **No, Tracking-only** (§5).
+
+## Changelog
+
+- **2026-06-24** — §6: Added 4th alert rule `post_application` (touchpoint-aware
+  post-application follow-up nudge). Consumes `event`-kind rows with `follow_up`/
+  `contact` tags as snooze signals. Threshold `post_application_nudge_days` from
+  user settings (default 10 days).

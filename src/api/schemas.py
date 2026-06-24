@@ -256,8 +256,21 @@ class InactivityAlertOut(BaseModel):
     days: int
 
 
+class PostApplicationAlertOut(BaseModel):
+    """Jobs in *applied*/*screening* with no follow-up for > threshold days."""
+
+    kind: Literal["post_application"] = "post_application"
+    message: str
+    count: int
+    dedup_hashes: list[str]
+    days: int
+
+
 UpcomingStepAlert = Annotated[
-    StaleToApplyAlertOut | PostInterviewAlertOut | InactivityAlertOut,
+    StaleToApplyAlertOut
+    | PostInterviewAlertOut
+    | InactivityAlertOut
+    | PostApplicationAlertOut,
     Field(discriminator="kind"),
 ]
 

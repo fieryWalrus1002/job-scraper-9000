@@ -1,7 +1,8 @@
 """Endpoint tests for GET /api/upcoming-steps.
 
 Mock pool fixture — no live Postgres. Verifies the endpoint wires together:
-fetches events + thresholds, calls rule functions, and returns the response.
+fetches events + thresholds + touchpoints, calls rule functions, and returns
+the response.
 """
 
 from __future__ import annotations
@@ -42,8 +43,9 @@ async def test_upcoming_steps_empty_no_events(
     (inactivity = applied-then-quiet, not never-applied)."""
     fake_conn.execute = AsyncMock(
         side_effect=[
-            _make_cursor(),  # events query → empty
+            _make_cursor(),  # status_change events query → empty
             _make_cursor(),  # thresholds query → no row (defaults used)
+            _make_cursor(),  # touchpoints query → empty
         ]
     )
     resp = await client.get("/api/upcoming-steps")
@@ -61,6 +63,7 @@ async def test_upcoming_steps_empty_no_alerts_due(
         side_effect=[
             _make_cursor(*events),  # events
             _make_cursor(),  # thresholds → defaults
+            _make_cursor(),  # touchpoints → empty
         ]
     )
     resp = await client.get("/api/upcoming-steps")
@@ -83,12 +86,14 @@ async def test_upcoming_steps_stale_to_apply(
     config_row = {
         "stale_to_apply_days": 3,
         "post_interview_nudge_days": 7,
+        "post_application_nudge_days": 10,
         "inactivity_days": 14,
     }
     fake_conn.execute = AsyncMock(
         side_effect=[
             _make_cursor(*events),
             _make_cursor(config_row),
+            _make_cursor(),  # touchpoints → empty
         ]
     )
     resp = await client.get("/api/upcoming-steps")
@@ -115,12 +120,14 @@ async def test_upcoming_steps_post_interview(
     config_row = {
         "stale_to_apply_days": 3,
         "post_interview_nudge_days": 7,
+        "post_application_nudge_days": 10,
         "inactivity_days": 14,
     }
     fake_conn.execute = AsyncMock(
         side_effect=[
             _make_cursor(*events),
             _make_cursor(config_row),
+            _make_cursor(),  # touchpoints → empty
         ]
     )
     resp = await client.get("/api/upcoming-steps")
@@ -148,12 +155,14 @@ async def test_upcoming_steps_thresholds_passthrough(
     config_row = {
         "stale_to_apply_days": 10,  # 5 < 10 → no alert
         "post_interview_nudge_days": 7,
+        "post_application_nudge_days": 10,
         "inactivity_days": 14,
     }
     fake_conn.execute = AsyncMock(
         side_effect=[
             _make_cursor(*events),
             _make_cursor(config_row),
+            _make_cursor(),  # touchpoints → empty
         ]
     )
     resp = await client.get("/api/upcoming-steps")
@@ -161,3 +170,66 @@ async def test_upcoming_steps_thresholds_passthrough(
     data = resp.json()
     stale = [a for a in data["alerts"] if a["kind"] == "stale_to_apply"]
     assert len(stale) == 0  # 5 days < 10 day threshold
+
+
+# ---------------------------------------------------------------------------
+# GET /api/upcoming-steps — post_application alert
+# ---------------------------------------------------------------------------
+
+
+async def test_upcoming_steps_post_application(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """applied event 12 days ago, threshold=10 → post_application alert."""
+    events = [_event("job-post-app", "applied", 12)]
+    config_row = {
+        "stale_to_apply_days": 3,
+        "post_interview_nudge_days": 7,
+        "post_application_nudge_days": 10,
+        "inactivity_days": 14,
+    }
+    fake_conn.execute = AsyncMock(
+        side_effect=[
+            _make_cursor(*events),
+            _make_cursor(config_row),
+            _make_cursor(),  # touchpoints → empty (no follow_up/contact)
+        ]
+    )
+    resp = await client.get("/api/upcoming-steps")
+    assert resp.status_code == 200
+    data = resp.json()
+    post_app = [a for a in data["alerts"] if a["kind"] == "post_application"]
+    assert len(post_app) == 1
+    assert post_app[0]["count"] == 1
+    assert "job-post-app" in post_app[0]["dedup_hashes"]
+    assert post_app[0]["days"] >= 12
+    assert "follow-up" in post_app[0]["message"].lower()
+
+
+async def test_upcoming_steps_post_application_snoozed(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """applied 15 days ago but follow_up 3 days ago → no post_application alert."""
+    events = [_event("job-post-app", "applied", 15)]
+    config_row = {
+        "stale_to_apply_days": 3,
+        "post_interview_nudge_days": 7,
+        "post_application_nudge_days": 10,
+        "inactivity_days": 14,
+    }
+    touchpoint = {
+        "dedup_hash": "job-post-app",
+        "occurred_at": datetime.now(timezone.utc) - timedelta(days=3),
+    }
+    fake_conn.execute = AsyncMock(
+        side_effect=[
+            _make_cursor(*events),
+            _make_cursor(config_row),
+            _make_cursor(touchpoint),  # touchpoints → recent follow_up snoozes
+        ]
+    )
+    resp = await client.get("/api/upcoming-steps")
+    assert resp.status_code == 200
+    data = resp.json()
+    post_app = [a for a in data["alerts"] if a["kind"] == "post_application"]
+    assert len(post_app) == 0

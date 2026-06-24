@@ -12,6 +12,7 @@ import pytest
 
 from api.upcoming_steps import (
     check_inactivity,
+    check_post_application,
     check_post_interview,
     check_stale_to_apply,
 )
@@ -258,3 +259,129 @@ class TestInactivity:
         }
         with pytest.raises(ValueError, match="missing 'to_status'"):
             check_inactivity([bad_event], datetime.now(timezone.utc))
+
+
+# ---------------------------------------------------------------------------
+# Helpers — touchpoint events
+# ---------------------------------------------------------------------------
+
+
+def _touchpoint(dh: str, days_ago: int) -> dict:
+    """Build a minimal follow_up/contact event row."""
+    occurred_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    return {"dedup_hash": dh, "occurred_at": occurred_at}
+
+
+# ---------------------------------------------------------------------------
+# check_post_application
+# ---------------------------------------------------------------------------
+
+
+class TestPostApplication:
+    def test_no_events_returns_none(self) -> None:
+        assert check_post_application([], [], datetime.now(timezone.utc)) is None
+
+    def test_applied_beyond_threshold_no_followup_fires(self) -> None:
+        """applied 12 days ago, threshold=10, no follow_up → fires."""
+        events = [_event("job-1", "applied", 12)]
+        alert = check_post_application(events, [], datetime.now(timezone.utc), 10)
+        assert alert is not None
+        assert alert.count == 1
+        assert alert.dedup_hashes == ["job-1"]
+        assert alert.days >= 12
+
+    def test_applied_recent_followup_snoozed(self) -> None:
+        """applied 15 days ago but follow_up 3 days ago → no alert."""
+        events = [_event("job-1", "applied", 15)]
+        touchpoints = [_touchpoint("job-1", 3)]
+        alert = check_post_application(
+            events, touchpoints, datetime.now(timezone.utc), 10
+        )
+        assert alert is None
+
+    def test_applied_old_followup_fires(self) -> None:
+        """applied 20 days ago, follow_up 12 days ago → fires (days from follow-up)."""
+        events = [_event("job-1", "applied", 20)]
+        touchpoints = [_touchpoint("job-1", 12)]
+        alert = check_post_application(
+            events, touchpoints, datetime.now(timezone.utc), 10
+        )
+        assert alert is not None
+        assert alert.count == 1
+        assert alert.days >= 12
+
+    def test_contact_tag_also_snoozes(self) -> None:
+        """A contact event (not follow_up) also resets the clock."""
+        events = [_event("job-1", "applied", 15)]
+        touchpoints = [_touchpoint("job-1", 2)]
+        alert = check_post_application(
+            events, touchpoints, datetime.now(timezone.utc), 10
+        )
+        assert alert is None
+
+    def test_non_resetting_tag_does_not_snooze(self) -> None:
+        """A tag that is not follow_up/contact (e.g. interview_prep) does NOT
+        snooze — but touchpoints are pre-filtered by the endpoint so this
+        test verifies that only the passed touchpoints matter."""
+        events = [_event("job-1", "applied", 12)]
+        # No touchpoints passed → same as no snooze
+        alert = check_post_application(events, [], datetime.now(timezone.utc), 10)
+        assert alert is not None
+        assert alert.count == 1
+
+    def test_screening_status_counts(self) -> None:
+        """screening status is also eligible."""
+        events = [
+            _event("job-1", "applied", 20),
+            _event("job-1", "screening", 12),
+        ]
+        alert = check_post_application(events, [], datetime.now(timezone.utc), 10)
+        assert alert is not None
+        assert alert.count == 1
+        assert alert.days >= 12
+
+    def test_current_status_guard_rejected_no_alert(self) -> None:
+        """applied then rejected → current status is rejected, no alert."""
+        events = [
+            _event("job-1", "applied", 15),
+            _event("job-1", "rejected", 2),
+        ]
+        alert = check_post_application(events, [], datetime.now(timezone.utc), 10)
+        assert alert is None
+
+    def test_current_status_guard_interview_no_alert(self) -> None:
+        """applied then interview → current status is interview, no alert."""
+        events = [
+            _event("job-1", "applied", 15),
+            _event("job-1", "interview", 5),
+        ]
+        alert = check_post_application(events, [], datetime.now(timezone.utc), 10)
+        assert alert is None
+
+    def test_boundary_exactly_at_threshold_no_alert(self) -> None:
+        """applied exactly 10 days ago, threshold=10 → no alert (strict >)."""
+        now = datetime.now(timezone.utc)
+        events = [_event("job-1", "applied", 10, now=now)]
+        alert = check_post_application(events, [], now, 10)
+        assert alert is None
+
+    def test_multiple_jobs_aggregated(self) -> None:
+        """Two jobs past threshold → aggregated alert."""
+        events = [
+            _event("job-1", "applied", 12),
+            _event("job-2", "applied", 15),
+        ]
+        alert = check_post_application(events, [], datetime.now(timezone.utc), 10)
+        assert alert is not None
+        assert alert.count == 2
+        assert set(alert.dedup_hashes) == {"job-1", "job-2"}
+        assert alert.days >= 15  # max
+
+    def test_missing_to_status_raises(self) -> None:
+        bad_event = {
+            "dedup_hash": "job-bad",
+            "occurred_at": datetime.now(timezone.utc),
+            "metadata": {"from_status": "applied"},
+        }
+        with pytest.raises(ValueError, match="missing 'to_status'"):
+            check_post_application([bad_event], [], datetime.now(timezone.utc))

@@ -1,6 +1,11 @@
 import { useEffect } from 'react'
 import { useUpcomingSteps } from '../hooks/useApplications'
-import type { InactivityAlertOut, PostInterviewAlertOut, StaleToApplyAlertOut } from '../types'
+import type {
+  InactivityAlertOut,
+  PostApplicationAlertOut,
+  PostInterviewAlertOut,
+  StaleToApplyAlertOut,
+} from '../types'
 import { Badge } from './ui/badge'
 
 const KIND_CONFIG: Record<
@@ -10,9 +15,14 @@ const KIND_CONFIG: Record<
   stale_to_apply: { label: 'Stale to-apply', badgeVariant: 'score_mid' },
   post_interview: { label: 'Post-interview', badgeVariant: 'score_low' },
   inactivity: { label: 'Inactivity', badgeVariant: 'score_low' },
+  post_application: { label: 'Follow-up', badgeVariant: 'score_mid' },
 }
 
-type AlertKind = StaleToApplyAlertOut | PostInterviewAlertOut | InactivityAlertOut
+type AlertKind =
+  | StaleToApplyAlertOut
+  | PostInterviewAlertOut
+  | InactivityAlertOut
+  | PostApplicationAlertOut
 
 /**
  * Upcoming Steps pane — renders at the top of the Tracking page.
