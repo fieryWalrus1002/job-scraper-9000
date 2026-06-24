@@ -12,6 +12,8 @@ interface AlertThresholdsSectionProps {
   hasSearchConfig: boolean
 }
 
+// These mirror the backend defaults in src/api/upcoming_steps.py.
+// Kept separate across the language boundary — not worth an API round-trip for 3 ints.
 const DEFAULTS = {
   stale_to_apply_days: 3,
   post_interview_nudge_days: 7,

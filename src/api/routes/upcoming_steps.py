@@ -5,7 +5,7 @@ returns a structured alert list. Plain request/response — no async, no
 background jobs, no stored alerts.
 
 Thresholds are read from ``app.user_search_configs`` (set via #386). Falls
-back to defaults (3 / 7 / 14 days) when no config row exists.
+back to defaults when no config row exists.
 """
 
 from __future__ import annotations
@@ -23,16 +23,15 @@ from ..schemas import (
     UpcomingStepsResponse,
 )
 from ..upcoming_steps import (
+    _DEFAULT_INACTIVITY_DAYS,
+    _DEFAULT_INTERVIEW_DAYS,
+    _DEFAULT_STALE_DAYS,
     check_inactivity,
     check_post_interview,
     check_stale_to_apply,
 )
 
 router = APIRouter(prefix="/upcoming-steps", tags=["Upcoming Steps"])
-
-_DEFAULT_STALE_DAYS = 3
-_DEFAULT_INTERVIEW_DAYS = 7
-_DEFAULT_INACTIVITY_DAYS = 14
 
 
 def _build_messages(alerts):
