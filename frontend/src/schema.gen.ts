@@ -342,6 +342,8 @@ export interface components {
             stale_to_apply_days: number;
             /** Post Interview Nudge Days */
             post_interview_nudge_days: number;
+            /** Post Application Nudge Days */
+            post_application_nudge_days: number;
             /** Inactivity Days */
             inactivity_days: number;
             /**
@@ -359,6 +361,8 @@ export interface components {
             stale_to_apply_days: number;
             /** Post Interview Nudge Days */
             post_interview_nudge_days: number;
+            /** Post Application Nudge Days */
+            post_application_nudge_days: number;
             /** Inactivity Days */
             inactivity_days: number;
         };
@@ -1015,6 +1019,8 @@ export interface components {
             stale_to_apply_days?: number | null;
             /** Post Interview Nudge Days */
             post_interview_nudge_days?: number | null;
+            /** Post Application Nudge Days */
+            post_application_nudge_days?: number | null;
             /** Inactivity Days */
             inactivity_days?: number | null;
         };

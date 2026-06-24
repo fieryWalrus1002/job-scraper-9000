@@ -8,6 +8,7 @@ interface AccountSectionProps {
   hasSearchConfig: boolean
   staleToApplyDays: number | null
   postInterviewNudgeDays: number | null
+  postApplicationNudgeDays: number | null
   inactivityDays: number | null
 }
 
@@ -20,6 +21,7 @@ export function AccountSection({
   hasSearchConfig,
   staleToApplyDays,
   postInterviewNudgeDays,
+  postApplicationNudgeDays,
   inactivityDays,
 }: AccountSectionProps) {
   const { principal, isLoading } = useAuth()
@@ -91,6 +93,7 @@ export function AccountSection({
       <AlertThresholdsSection
         staleToApplyDays={staleToApplyDays}
         postInterviewNudgeDays={postInterviewNudgeDays}
+        postApplicationNudgeDays={postApplicationNudgeDays}
         inactivityDays={inactivityDays}
         hasSearchConfig={hasSearchConfig}
       />

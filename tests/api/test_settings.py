@@ -44,6 +44,7 @@ FAKE_SEARCH_ROW: dict[str, Any] = {
     "pipeline_enabled": True,
     "stale_to_apply_days": 3,
     "post_interview_nudge_days": 7,
+    "post_application_nudge_days": 10,
     "inactivity_days": 14,
 }
 
@@ -70,6 +71,7 @@ async def test_get_settings_onboarding_state(
         "pipeline_enabled": None,
         "stale_to_apply_days": None,
         "post_interview_nudge_days": None,
+        "post_application_nudge_days": None,
         "inactivity_days": None,
     }
 
@@ -90,6 +92,7 @@ async def test_get_settings_configured(
     assert data["pipeline_enabled"] is True
     assert data["stale_to_apply_days"] == 3
     assert data["post_interview_nudge_days"] == 7
+    assert data["post_application_nudge_days"] == 10
     assert data["inactivity_days"] == 14
 
 
@@ -229,6 +232,7 @@ async def test_put_alert_thresholds_updates_successfully(
             {
                 "stale_to_apply_days": params["stale_to_apply_days"],
                 "post_interview_nudge_days": params["post_interview_nudge_days"],
+                "post_application_nudge_days": params["post_application_nudge_days"],
                 "inactivity_days": params["inactivity_days"],
                 "updated_at": datetime(2026, 6, 11),
             }
@@ -241,6 +245,7 @@ async def test_put_alert_thresholds_updates_successfully(
         json={
             "stale_to_apply_days": 5,
             "post_interview_nudge_days": 10,
+            "post_application_nudge_days": 12,
             "inactivity_days": 21,
         },
     )
@@ -248,6 +253,7 @@ async def test_put_alert_thresholds_updates_successfully(
     data = resp.json()
     assert data["stale_to_apply_days"] == 5
     assert data["post_interview_nudge_days"] == 10
+    assert data["post_application_nudge_days"] == 12
     assert data["inactivity_days"] == 21
     assert "updated_at" in data
     assert str(captured["params"]["uid"]) == "00000000-0000-0000-0000-000000000001"
@@ -265,6 +271,7 @@ async def test_put_alert_thresholds_rejects_bad_input(
         json={
             "stale_to_apply_days": 0,
             "post_interview_nudge_days": 7,
+            "post_application_nudge_days": 10,
             "inactivity_days": 14,
         },
     )
@@ -281,6 +288,7 @@ async def test_put_alert_thresholds_rejects_extra_field(
         json={
             "stale_to_apply_days": 3,
             "post_interview_nudge_days": 7,
+            "post_application_nudge_days": 10,
             "inactivity_days": 14,
             "bogus_field": 99,
         },
@@ -299,6 +307,7 @@ async def test_put_alert_thresholds_fails_without_search_config(
         json={
             "stale_to_apply_days": 3,
             "post_interview_nudge_days": 7,
+            "post_application_nudge_days": 10,
             "inactivity_days": 14,
         },
     )

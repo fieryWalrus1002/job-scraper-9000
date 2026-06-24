@@ -50,6 +50,7 @@ class SettingsResponse(BaseModel):
     pipeline_enabled: bool | None = None
     stale_to_apply_days: int | None = None
     post_interview_nudge_days: int | None = None
+    post_application_nudge_days: int | None = None
     inactivity_days: int | None = None
 
 
@@ -80,6 +81,7 @@ class AlertThresholdsUpdate(BaseModel):
 
     stale_to_apply_days: int = Field(ge=1)
     post_interview_nudge_days: int = Field(ge=1)
+    post_application_nudge_days: int = Field(ge=1)
     inactivity_days: int = Field(ge=1)
 
     model_config = {"extra": "forbid"}
@@ -88,6 +90,7 @@ class AlertThresholdsUpdate(BaseModel):
 class AlertThresholdsResponse(BaseModel):
     stale_to_apply_days: int
     post_interview_nudge_days: int
+    post_application_nudge_days: int
     inactivity_days: int
     updated_at: datetime
 
@@ -105,7 +108,8 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         srch = await (
             await conn.execute(
                 "SELECT payload, policies, updated_at, pipeline_enabled, "
-                "stale_to_apply_days, post_interview_nudge_days, inactivity_days "
+                "stale_to_apply_days, post_interview_nudge_days, "
+                "post_application_nudge_days, inactivity_days "
                 "FROM app.user_search_configs WHERE user_id = %(uid)s",
                 {"uid": user.id},
             )
@@ -123,6 +127,9 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         pipeline_enabled=srch["pipeline_enabled"] if srch else None,
         stale_to_apply_days=srch["stale_to_apply_days"] if srch else None,
         post_interview_nudge_days=srch["post_interview_nudge_days"] if srch else None,
+        post_application_nudge_days=srch["post_application_nudge_days"]
+        if srch
+        else None,
         inactivity_days=srch["inactivity_days"] if srch else None,
     )
 
@@ -222,15 +229,17 @@ async def put_alert_thresholds(
                 UPDATE app.user_search_configs
                 SET stale_to_apply_days = %(stale_to_apply_days)s,
                     post_interview_nudge_days = %(post_interview_nudge_days)s,
+                    post_application_nudge_days = %(post_application_nudge_days)s,
                     inactivity_days = %(inactivity_days)s,
                     updated_at = now()
                 WHERE user_id = %(uid)s
-                RETURNING stale_to_apply_days, post_interview_nudge_days, inactivity_days, updated_at
+                RETURNING stale_to_apply_days, post_interview_nudge_days, post_application_nudge_days, inactivity_days, updated_at
                 """,
                 {
                     "uid": user.id,
                     "stale_to_apply_days": body.stale_to_apply_days,
                     "post_interview_nudge_days": body.post_interview_nudge_days,
+                    "post_application_nudge_days": body.post_application_nudge_days,
                     "inactivity_days": body.inactivity_days,
                 },
             )
@@ -247,6 +256,7 @@ async def put_alert_thresholds(
     return AlertThresholdsResponse(
         stale_to_apply_days=row["stale_to_apply_days"],
         post_interview_nudge_days=row["post_interview_nudge_days"],
+        post_application_nudge_days=row["post_application_nudge_days"],
         inactivity_days=row["inactivity_days"],
         updated_at=row["updated_at"],
     )

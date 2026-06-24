@@ -23,6 +23,7 @@ const ONBOARDING_SETTINGS = {
   pipeline_enabled: null,
   stale_to_apply_days: null,
   post_interview_nudge_days: null,
+  post_application_nudge_days: null,
   inactivity_days: null,
 }
 
@@ -42,6 +43,7 @@ const CONFIGURED_SETTINGS = {
   pipeline_enabled: true,
   stale_to_apply_days: 3,
   post_interview_nudge_days: 7,
+  post_application_nudge_days: 10,
   inactivity_days: 14,
 }
 
@@ -78,6 +80,7 @@ function stubFetch(handlers: {
           body: {
             stale_to_apply_days: 3,
             post_interview_nudge_days: 7,
+            post_application_nudge_days: 10,
             inactivity_days: 14,
             updated_at: '2026-06-11T00:00:00Z',
           },
@@ -264,6 +267,7 @@ describe('SettingsPage four-section nav', () => {
     expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({
       stale_to_apply_days: 3,
       post_interview_nudge_days: 7,
+      post_application_nudge_days: 10,
       inactivity_days: 14,
     })
   })
