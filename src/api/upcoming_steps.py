@@ -53,6 +53,16 @@ class InactivityAlert:
 # Helpers
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Alert-threshold defaults — single Python source of truth
+#
+# These are the one runtime source for threshold defaults. The migration
+# `0013` column DEFAULT literals are deliberately separate (migrations are
+# immutable historical records and must not import a moving constant). The
+# frontend keeps its own copy across the language boundary (see
+# AlertThresholdsSection.tsx) — not worth an API round-trip for a few ints.
+# ---------------------------------------------------------------------------
+
 _DEFAULT_STALE_DAYS = 3
 _DEFAULT_INTERVIEW_DAYS = 7
 _DEFAULT_INACTIVITY_DAYS = 14
