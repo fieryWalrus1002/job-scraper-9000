@@ -20,7 +20,7 @@ export function useApplicationDetailActions(
   }
 
   function removeTracking() {
-    triage({ dedupHash, from: currentStatus, to: 'remove', restoreNotes: application?.notes })
+    triage({ dedupHash, from: currentStatus, to: 'remove' })
     onTriaged?.()
   }
 

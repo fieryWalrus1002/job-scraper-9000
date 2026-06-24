@@ -2,7 +2,7 @@
 
 Verifies that PATCH and POST on /api/applications insert status_change events
 atomically (same transaction) when status actually changes, and emit nothing
-when status is unchanged or when only notes/applied_at are updated.
+when status is unchanged or when only applied_at is updated.
 
 All tests use the mock pool fixture — no live Postgres required.
 """
@@ -24,7 +24,6 @@ FAKE_APP_ROW: dict[str, Any] = {
     "dedup_hash": DEDUP,
     "status": "maybe",
     "applied_at": None,
-    "notes": None,
     "created_at": datetime(2026, 6, 1, 12, 0, 0),
     "updated_at": datetime(2026, 6, 1, 12, 0, 0),
     "title": FAKE_JOB_ROW["title"],
@@ -122,33 +121,6 @@ async def test_patch_same_status_no_event(
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "maybe"
-
-    # Only 2 queries: SELECT old + UPDATE (no event INSERT)
-    assert fake_conn.execute.call_count == 2
-    fake_conn.transaction.assert_called_once()
-
-
-async def test_patch_notes_only_no_event(
-    client: AsyncClient, fake_conn: AsyncMock
-) -> None:
-    """A notes-only update inserts no event."""
-    fake_conn.transaction = MagicMock(return_value=_make_txn_ctx(fake_conn))
-
-    old_status_row = {"status": "maybe"}
-    updated_row = {**FAKE_APP_ROW, "notes": "Added a note"}
-    fake_conn.execute = AsyncMock(
-        side_effect=[
-            _make_cursor(old_status_row),
-            _make_cursor(updated_row),
-        ]
-    )
-
-    resp = await client.patch(
-        f"/api/applications/{DEDUP}",
-        json={"notes": "Added a note"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["notes"] == "Added a note"
 
     # Only 2 queries: SELECT old + UPDATE (no event INSERT)
     assert fake_conn.execute.call_count == 2

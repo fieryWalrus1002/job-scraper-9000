@@ -17,7 +17,6 @@ FAKE_APP_ROW: dict[str, Any] = {
     "dedup_hash": FAKE_JOB_ROW["dedup_hash"],
     "status": "maybe",
     "applied_at": None,
-    "notes": None,
     "created_at": datetime(2026, 6, 1, 12, 0, 0),
     "updated_at": datetime(2026, 6, 1, 12, 0, 0),
     "title": FAKE_JOB_ROW["title"],
@@ -164,23 +163,6 @@ async def test_create_application_invalid_status(
     assert resp.status_code == 422
 
 
-async def test_create_application_with_notes(
-    client: AsyncClient, fake_conn: AsyncMock
-) -> None:
-    row = {**FAKE_APP_ROW, "notes": "Great role"}
-    fake_conn.execute = AsyncMock(return_value=_make_cursor(row))
-    resp = await client.post(
-        "/api/applications",
-        json={
-            "dedup_hash": FAKE_JOB_ROW["dedup_hash"],
-            "status": "maybe",
-            "notes": "Great role",
-        },
-    )
-    assert resp.status_code == 201
-    assert resp.json()["notes"] == "Great role"
-
-
 # ---------------------------------------------------------------------------
 # PATCH /api/applications/{dedup_hash}
 # ---------------------------------------------------------------------------
@@ -228,19 +210,6 @@ async def test_update_application_not_found(
         json={"status": "applied"},
     )
     assert resp.status_code == 404
-
-
-async def test_update_application_clears_notes(
-    client: AsyncClient, fake_conn: AsyncMock
-) -> None:
-    cleared = {**FAKE_APP_ROW, "notes": None}
-    fake_conn.execute = AsyncMock(return_value=_make_cursor(cleared))
-    resp = await client.patch(
-        f"/api/applications/{FAKE_JOB_ROW['dedup_hash']}",
-        json={"notes": None},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["notes"] is None
 
 
 # ---------------------------------------------------------------------------

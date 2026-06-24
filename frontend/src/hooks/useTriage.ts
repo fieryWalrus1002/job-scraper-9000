@@ -13,8 +13,6 @@ export interface TriageMove {
   to: TriageTarget
   /** Snackbar message override; defaults to the outcome for `to` (see triageMessage). */
   label?: string
-  /** Notes to restore if undo has to recreate a deleted row (e.g. un-trash). */
-  restoreNotes?: string | null
 }
 
 /** Default snackbar message for a triage move, phrased as the resulting funnel position. */
@@ -41,7 +39,7 @@ export function triageMessage(to: TriageTarget): string {
  *
  * Undo is just the inverse move, derived mechanically from `from`/`to`:
  *   - created a row (from === null)        → delete it
- *   - deleted a row (to === 'remove')      → recreate it with the prior status/notes
+ *   - deleted a row (to === 'remove')      → recreate it with the prior status
  *   - patched the status                   → patch back to the prior status
  */
 export function useTriageAction() {
@@ -52,13 +50,13 @@ export function useTriageAction() {
 
   const apply = useCallback(
     (move: TriageMove) => {
-      const { dedupHash, to, restoreNotes } = move
+      const { dedupHash, to } = move
 
       const undo = () => {
         if (move.from === null) {
           del.mutate(dedupHash)
         } else if (to === 'remove') {
-          mark.mutate({ dedupHash, status: move.from, notes: restoreNotes ?? undefined })
+          mark.mutate({ dedupHash, status: move.from })
         } else {
           update.mutate({ dedupHash, update: { status: move.from } })
         }

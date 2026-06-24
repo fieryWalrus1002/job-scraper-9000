@@ -5,7 +5,7 @@ import type { Application } from '../types'
 /**
  * Row-level action for the Trash tab: Un-trash deletes the `user_applications`
  * row so the job falls back into the untriaged Jobs feed. Undo recreates the row
- * as `passed`, restoring its notes.
+ * as `passed` with the prior status.
  */
 export function TrashRowActions({ application }: { application: Application }) {
   const { triage, isPending } = useTriageAction()
@@ -25,7 +25,6 @@ export function TrashRowActions({ application }: { application: Application }) {
               dedupHash: application.dedup_hash,
               from: application.status,
               to: 'remove',
-              restoreNotes: application.notes,
             }),
         },
       ]}

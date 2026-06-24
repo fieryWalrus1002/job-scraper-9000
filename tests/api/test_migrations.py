@@ -413,3 +413,88 @@ def test_0010_downgrade_drops_pipe(fresh_pg):
             "SELECT 1 FROM information_schema.schemata WHERE schema_name = 'pipe'"
         ).fetchone()
         assert schema is None
+
+
+# ---------------------------------------------------------------------------
+# 0015: backfill notes → events, then drop the notes column
+# ---------------------------------------------------------------------------
+
+
+@skip_if_no_docker
+def test_0015_backfills_notes_into_events_and_drops_column(fresh_pg):
+    """Migration 0015 must INSERT each non-empty notes value as a kind='event'
+    row (occurred_at = updated_at), then DROP the notes column."""
+    _run_alembic("0014", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        uid = conn.execute("SELECT id FROM app.users WHERE role = 'admin'").fetchone()[
+            0
+        ]
+
+        # Seed applications with notes
+        conn.execute(
+            """
+            INSERT INTO app.user_applications (user_id, dedup_hash, status, notes, updated_at)
+            VALUES
+                (%s, 'hash-with-notes',   'maybe',   'Important note here', '2026-01-15T10:00:00'::timestamptz),
+                (%s, 'hash-empty-notes',  'applied', '',                    '2026-02-20T14:00:00'::timestamptz),
+                (%s, 'hash-null-notes',   'screening', NULL,               '2026-03-10T09:00:00'::timestamptz),
+                (%s, 'hash-whitespace',   'maybe',   '   ',               '2026-04-01T12:00:00'::timestamptz)
+        """,
+            (uid, uid, uid, uid),
+        )
+
+    _run_alembic("0015", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        # Only the non-empty, non-whitespace notes row should have been backfilled
+        events = conn.execute("""
+            SELECT dedup_hash, kind, body, occurred_at
+            FROM app.application_events
+            WHERE kind = 'event'
+            ORDER BY dedup_hash
+        """).fetchall()
+        assert len(events) == 1
+        assert events[0][0] == "hash-with-notes"
+        assert events[0][1] == "event"
+        assert events[0][2] == "Important note here"
+        assert events[0][3].isoformat().startswith("2026-01-15")
+
+        # The notes column must be gone
+        col_exists = conn.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'app'
+              AND table_name = 'user_applications'
+              AND column_name = 'notes'
+        """).fetchone()
+        assert col_exists is None, "notes column still exists"
+
+
+@skip_if_no_docker
+def test_0015_downgrade_recreates_notes_column(fresh_pg):
+    """Downgrade from 0015 back to 0014 must re-add the notes column."""
+    _run_alembic("0014", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        uid = conn.execute("SELECT id FROM app.users WHERE role = 'admin'").fetchone()[
+            0
+        ]
+        conn.execute(
+            """
+            INSERT INTO app.user_applications (user_id, dedup_hash, status, notes)
+            VALUES (%s, 'hash-a', 'maybe', 'some note')
+        """,
+            (uid,),
+        )
+
+    _run_alembic("0015", fresh_pg, extra_env=_BOOTSTRAP)
+    _run_alembic("0014", fresh_pg, command="downgrade", extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        col_exists = conn.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'app'
+              AND table_name = 'user_applications'
+              AND column_name = 'notes'
+        """).fetchone()
+        assert col_exists is not None, "notes column not restored by downgrade"

@@ -106,7 +106,6 @@ class Application(BaseModel):
     dedup_hash: str
     status: ApplicationStatus
     applied_at: date | None
-    notes: str | None
     created_at: datetime
     updated_at: datetime
     # joined from raw.job_postings + the user's own raw.job_scores row
@@ -121,7 +120,6 @@ class ApplicationCreate(BaseModel):
     dedup_hash: str
     status: ApplicationStatus = "maybe"
     applied_at: date | None = None
-    notes: str | None = None
 
 
 class ManualJobCreate(BaseModel):
@@ -138,7 +136,6 @@ class ManualJobCreate(BaseModel):
 class ApplicationUpdate(BaseModel):
     status: ApplicationStatus | None = None
     applied_at: date | None = None
-    notes: str | None = None
 
 
 # ---------------------------------------------------------------------------

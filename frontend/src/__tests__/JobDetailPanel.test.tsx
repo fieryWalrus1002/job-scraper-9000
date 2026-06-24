@@ -98,7 +98,7 @@ const APPLICATION: Application = {
   dedup_hash: 'hash-a',
   status: 'maybe',
   applied_at: null,
-  notes: null,
+
   created_at: '2026-01-16T00:00:00Z',
   updated_at: '2026-01-16T00:00:00Z',
   title: 'Example Role',
