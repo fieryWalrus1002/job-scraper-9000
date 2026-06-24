@@ -397,6 +397,7 @@ export interface components {
             fit_score?: number | null;
             /** Source Url */
             source_url?: string | null;
+            latest_event?: components["schemas"]["LatestEvent"] | null;
         };
         /** ApplicationCreate */
         ApplicationCreate: {
@@ -784,6 +785,27 @@ export interface components {
             preferred?: string[];
             /** Excluded */
             excluded?: string[];
+        };
+        /**
+         * LatestEvent
+         * @description Most-recent activity for a job — display-only summary for the
+         *     Tracking list. Inert: rendered, never queried.
+         */
+        LatestEvent: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "status_change" | "event";
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Body */
+            body?: string | null;
+            /** To Status */
+            to_status?: ("maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed") | null;
         };
         /** Location */
         Location: {

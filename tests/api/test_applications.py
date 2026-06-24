@@ -77,6 +77,65 @@ async def test_list_applications_invalid_status_rejected(
     fake_conn.execute.assert_not_called()
 
 
+async def test_list_applications_latest_event_status_change(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """A status_change latest_event round-trips with to_status and null body."""
+    row = {
+        **FAKE_APP_ROW,
+        "latest_event": {
+            "kind": "status_change",
+            "occurred_at": "2026-06-15T10:00:00",
+            "body": None,
+            "to_status": "applied",
+        },
+    }
+    fake_conn.execute = AsyncMock(return_value=_make_cursor(row))
+    resp = await client.get("/api/applications")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["latest_event"]["kind"] == "status_change"
+    assert data[0]["latest_event"]["to_status"] == "applied"
+    assert data[0]["latest_event"]["body"] is None
+
+
+async def test_list_applications_latest_event_null(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """When the row has no events, latest_event is null."""
+    row = {**FAKE_APP_ROW, "latest_event": None}
+    fake_conn.execute = AsyncMock(return_value=_make_cursor(row))
+    resp = await client.get("/api/applications")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["latest_event"] is None
+
+
+async def test_list_applications_latest_event_generic(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """A generic event latest_event round-trips with body and null to_status."""
+    row = {
+        **FAKE_APP_ROW,
+        "latest_event": {
+            "kind": "event",
+            "occurred_at": "2026-06-20T14:30:00",
+            "body": "Reached out to recruiter",
+            "to_status": None,
+        },
+    }
+    fake_conn.execute = AsyncMock(return_value=_make_cursor(row))
+    resp = await client.get("/api/applications")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["latest_event"]["kind"] == "event"
+    assert data[0]["latest_event"]["body"] == "Reached out to recruiter"
+    assert data[0]["latest_event"]["to_status"] is None
+
+
 # ---------------------------------------------------------------------------
 # POST /api/applications
 # ---------------------------------------------------------------------------
