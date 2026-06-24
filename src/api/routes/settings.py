@@ -23,7 +23,7 @@ from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException
 from psycopg.types.json import Json
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from user_config import (
     CandidateProfileInput,
@@ -48,6 +48,9 @@ class SettingsResponse(BaseModel):
     policies: dict | None = None
     search_updated_at: datetime | None = None
     pipeline_enabled: bool | None = None
+    stale_to_apply_days: int | None = None
+    post_interview_nudge_days: int | None = None
+    inactivity_days: int | None = None
 
 
 class ProfileSaveResponse(BaseModel):
@@ -72,6 +75,23 @@ class PipelineEnabledResponse(BaseModel):
     updated_at: datetime
 
 
+class AlertThresholdsUpdate(BaseModel):
+    """Per-user alert threshold settings (days). Load-bearing for rules engine."""
+
+    stale_to_apply_days: int = Field(ge=1)
+    post_interview_nudge_days: int = Field(ge=1)
+    inactivity_days: int = Field(ge=1)
+
+    model_config = {"extra": "forbid"}
+
+
+class AlertThresholdsResponse(BaseModel):
+    stale_to_apply_days: int
+    post_interview_nudge_days: int
+    inactivity_days: int
+    updated_at: datetime
+
+
 @router.get("", response_model=SettingsResponse)
 async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
     async with pool.connection() as conn:
@@ -84,7 +104,8 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         ).fetchone()
         srch = await (
             await conn.execute(
-                "SELECT payload, policies, updated_at, pipeline_enabled "
+                "SELECT payload, policies, updated_at, pipeline_enabled, "
+                "stale_to_apply_days, post_interview_nudge_days, inactivity_days "
                 "FROM app.user_search_configs WHERE user_id = %(uid)s",
                 {"uid": user.id},
             )
@@ -100,6 +121,9 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         policies=srch["policies"] if srch else None,
         search_updated_at=srch["updated_at"] if srch else None,
         pipeline_enabled=srch["pipeline_enabled"] if srch else None,
+        stale_to_apply_days=srch["stale_to_apply_days"] if srch else None,
+        post_interview_nudge_days=srch["post_interview_nudge_days"] if srch else None,
+        inactivity_days=srch["inactivity_days"] if srch else None,
     )
 
 
@@ -184,4 +208,45 @@ async def put_pipeline_enabled(
     row = cast(dict[str, Any], row)
     return PipelineEnabledResponse(
         pipeline_enabled=row["pipeline_enabled"], updated_at=row["updated_at"]
+    )
+
+
+@router.put("/alert-thresholds", response_model=AlertThresholdsResponse)
+async def put_alert_thresholds(
+    body: AlertThresholdsUpdate, pool: Pool, user: CurrentUser
+) -> AlertThresholdsResponse:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                """
+                UPDATE app.user_search_configs
+                SET stale_to_apply_days = %(stale_to_apply_days)s,
+                    post_interview_nudge_days = %(post_interview_nudge_days)s,
+                    inactivity_days = %(inactivity_days)s,
+                    updated_at = now()
+                WHERE user_id = %(uid)s
+                RETURNING stale_to_apply_days, post_interview_nudge_days, inactivity_days, updated_at
+                """,
+                {
+                    "uid": user.id,
+                    "stale_to_apply_days": body.stale_to_apply_days,
+                    "post_interview_nudge_days": body.post_interview_nudge_days,
+                    "inactivity_days": body.inactivity_days,
+                },
+            )
+        ).fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No search config exists for the current user; create search "
+                "settings before configuring alert thresholds."
+            ),
+        )
+    row = cast(dict[str, Any], row)
+    return AlertThresholdsResponse(
+        stale_to_apply_days=row["stale_to_apply_days"],
+        post_interview_nudge_days=row["post_interview_nudge_days"],
+        inactivity_days=row["inactivity_days"],
+        updated_at=row["updated_at"],
     )

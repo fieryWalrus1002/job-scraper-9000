@@ -1,17 +1,27 @@
 import { useSavePipelineEnabled } from '../../../hooks/useSettings'
 import { useAuth } from '../../../hooks/useAuth'
 import { Section } from '../fields'
+import { AlertThresholdsSection } from './AlertThresholdsSection'
 
 interface AccountSectionProps {
   pipelineEnabled: boolean | null
   hasSearchConfig: boolean
+  staleToApplyDays: number | null
+  postInterviewNudgeDays: number | null
+  inactivityDays: number | null
 }
 
 /**
  * Account & Activity panel: signed-in context plus the self-service overnight
  * pipeline gate backed by app.user_search_configs.pipeline_enabled.
  */
-export function AccountSection({ pipelineEnabled, hasSearchConfig }: AccountSectionProps) {
+export function AccountSection({
+  pipelineEnabled,
+  hasSearchConfig,
+  staleToApplyDays,
+  postInterviewNudgeDays,
+  inactivityDays,
+}: AccountSectionProps) {
   const { principal, isLoading } = useAuth()
   const savePipelineEnabled = useSavePipelineEnabled()
   const email = principal?.userDetails ?? null
@@ -77,6 +87,13 @@ export function AccountSection({ pipelineEnabled, hasSearchConfig }: AccountSect
           </p>
         )}
       </Section>
+
+      <AlertThresholdsSection
+        staleToApplyDays={staleToApplyDays}
+        postInterviewNudgeDays={postInterviewNudgeDays}
+        inactivityDays={inactivityDays}
+        hasSearchConfig={hasSearchConfig}
+      />
     </div>
   )
 }

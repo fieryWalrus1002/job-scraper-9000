@@ -56,6 +56,8 @@ export const DEFAULT_LINKEDIN_EXPERIENCE_CODES = [
 export type ProfileSaveResponse = components['schemas']['ProfileSaveResponse']
 export type SearchSaveResponse = components['schemas']['SearchSaveResponse']
 export type PipelineEnabledResponse = components['schemas']['PipelineEnabledResponse']
+export type AlertThresholdsResponse = components['schemas']['AlertThresholdsResponse']
+export type AlertThresholdsUpdate = components['schemas']['AlertThresholdsUpdate']
 export interface ManualJobCreate {
   title: string
   fit_score: number

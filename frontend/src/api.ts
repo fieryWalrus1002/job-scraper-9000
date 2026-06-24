@@ -1,4 +1,6 @@
 import type {
+  AlertThresholdsResponse,
+  AlertThresholdsUpdate,
   Application,
   ApplicationCreate,
   ApplicationEvent,
@@ -241,6 +243,26 @@ export async function savePipelineEnabled(enabled: boolean): Promise<PipelineEna
   }
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<PipelineEnabledResponse>
+}
+
+export async function saveAlertThresholds(
+  body: AlertThresholdsUpdate,
+): Promise<AlertThresholdsResponse> {
+  const res = await fetch(`${API_BASE}/api/settings/alert-thresholds`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 422) {
+    const data = (await res.json()) as { detail?: FastApiDetailItem[] }
+    throw new ApiValidationError(parseValidationErrors(data.detail ?? []))
+  }
+  if (res.status === 404) {
+    const data = (await res.json()) as { detail?: string }
+    throw new Error(data.detail ?? 'No search config exists for the current user')
+  }
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<AlertThresholdsResponse>
 }
 
 // ───── Eval corrections ─────
