@@ -71,7 +71,7 @@ async def list_applications(
     where = "WHERE " + " AND ".join(filters)
     sql = f"""
         SELECT
-            a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
+            a.dedup_hash, a.status, a.applied_at, a.created_at, a.updated_at,
             p.title, p.company, s.fit_score, p.source_url,
             le.latest_event
         FROM app.user_applications a
@@ -109,14 +109,13 @@ async def create_application(body: ApplicationCreate, pool: Pool, user: CurrentU
         WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
     """
     upsert_sql = """
-        INSERT INTO app.user_applications (user_id, dedup_hash, status, applied_at, notes)
-        VALUES (%(user_id)s, %(dedup_hash)s, %(status)s, %(applied_at)s, %(notes)s)
+        INSERT INTO app.user_applications (user_id, dedup_hash, status, applied_at)
+        VALUES (%(user_id)s, %(dedup_hash)s, %(status)s, %(applied_at)s)
         ON CONFLICT (user_id, dedup_hash) DO UPDATE
             SET status     = EXCLUDED.status,
                 applied_at = EXCLUDED.applied_at,
-                notes      = EXCLUDED.notes,
                 updated_at = now()
-        RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+        RETURNING dedup_hash, status, applied_at, created_at, updated_at
     """
 
     async with pool.connection() as conn:
@@ -185,9 +184,9 @@ async def update_application(
             UPDATE app.user_applications
             SET {set_clause}, updated_at = now()
             WHERE user_id = %(user_id)s AND dedup_hash = %(dedup_hash)s
-            RETURNING user_id, dedup_hash, status, applied_at, notes, created_at, updated_at
+            RETURNING user_id, dedup_hash, status, applied_at, created_at, updated_at
         )
-        SELECT a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
+        SELECT a.dedup_hash, a.status, a.applied_at, a.created_at, a.updated_at,
                p.title, p.company, s.fit_score, p.source_url
         FROM updated a
         {_JOINS}

@@ -15,7 +15,7 @@ const MOCK_APPLICATIONS: Application[] = [
     dedup_hash: 'hash-a',
     status: 'maybe',
     applied_at: null,
-    notes: null,
+
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     title: 'Software Engineer',
@@ -25,7 +25,7 @@ const MOCK_APPLICATIONS: Application[] = [
     dedup_hash: 'hash-b',
     status: 'applied',
     applied_at: '2024-02-01T00:00:00Z',
-    notes: 'Strong fit',
+
     created_at: '2024-02-01T00:00:00Z',
     updated_at: '2024-02-01T00:00:00Z',
     title: 'Backend Engineer',

@@ -103,19 +103,18 @@ describe('useTriageAction undo', () => {
     )
   })
 
-  it('Un-trash (passed → remove): deletes the row, undo recreates it with prior notes', async () => {
+  it('Un-trash (passed → remove): deletes the row, undo recreates it with prior status', async () => {
     const { forward, inverse } = await runMoveThenUndo({
       dedupHash: 'hash-a',
       from: 'passed',
       to: 'remove',
-      restoreNotes: 'kept these notes',
     })
 
     expect(forward).toContainEqual(expect.objectContaining({ method: 'DELETE' }))
     expect(inverse).toContainEqual(
       expect.objectContaining({
         method: 'POST',
-        body: expect.objectContaining({ status: 'passed', notes: 'kept these notes' }),
+        body: expect.objectContaining({ status: 'passed' }),
       }),
     )
   })

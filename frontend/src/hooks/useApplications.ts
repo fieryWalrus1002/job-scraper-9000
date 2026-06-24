@@ -51,15 +51,8 @@ export function useUpcomingSteps() {
 export function useMarkApplication() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      dedupHash,
-      status,
-      notes,
-    }: {
-      dedupHash: string
-      status: ApplicationStatus
-      notes?: string
-    }) => createApplication({ dedup_hash: dedupHash, status, notes }),
+    mutationFn: ({ dedupHash, status }: { dedupHash: string; status: ApplicationStatus }) =>
+      createApplication({ dedup_hash: dedupHash, status }),
     onSuccess: (_, variables) => {
       invalidateApplications(qc)
       // A status change auto-emits a status_change event (#381) — refresh the timeline.

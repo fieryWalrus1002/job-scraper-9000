@@ -377,8 +377,6 @@ export interface components {
             status: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
             /** Applied At */
             applied_at: string | null;
-            /** Notes */
-            notes: string | null;
             /**
              * Created At
              * Format: date-time
@@ -411,8 +409,6 @@ export interface components {
             status: "maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed";
             /** Applied At */
             applied_at?: string | null;
-            /** Notes */
-            notes?: string | null;
         };
         /**
          * ApplicationEvent
@@ -473,8 +469,6 @@ export interface components {
             status?: ("maybe" | "to_apply" | "applied" | "screening" | "interview" | "offer" | "rejected" | "candidate_withdrew" | "hired" | "ghosted" | "passed") | null;
             /** Applied At */
             applied_at?: string | null;
-            /** Notes */
-            notes?: string | null;
         };
         /**
          * CandidateProfileInput

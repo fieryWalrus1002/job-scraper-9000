@@ -42,7 +42,6 @@ const MOCK_APPLICATION: Application = {
   dedup_hash: 'hash-a',
   status: 'maybe',
   applied_at: null,
-  notes: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
   title: 'Software Engineer',
@@ -103,7 +102,7 @@ describe('useMarkApplication', () => {
 
 describe('useUpdateApplication', () => {
   it('patches the application and resolves on success', async () => {
-    const updated = { ...MOCK_APPLICATION, status: 'applied' as const, notes: 'Sent resume' }
+    const updated = { ...MOCK_APPLICATION, status: 'applied' as const }
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(updated), { status: 200 })),
@@ -114,7 +113,7 @@ describe('useUpdateApplication', () => {
     await act(async () => {
       await result.current.mutateAsync({
         dedupHash: 'hash-a',
-        update: { status: 'applied', notes: 'Sent resume' },
+        update: { status: 'applied' },
       })
     })
 

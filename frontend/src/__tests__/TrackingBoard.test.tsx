@@ -19,7 +19,7 @@ function app(dedup_hash: string, status: ApplicationStatus, title: string): Appl
     dedup_hash,
     status,
     applied_at: null,
-    notes: null,
+
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     title,

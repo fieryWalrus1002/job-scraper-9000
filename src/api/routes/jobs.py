@@ -236,7 +236,7 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, user: CurrentUser
             VALUES (%(user_id)s, %(dedup_hash)s, %(status)s)
             ON CONFLICT (user_id, dedup_hash) DO UPDATE
                 SET status = EXCLUDED.status, updated_at = now()
-            RETURNING dedup_hash, status, applied_at, notes, created_at, updated_at
+            RETURNING dedup_hash, status, applied_at, created_at, updated_at
             """,
             {"user_id": user.id, "dedup_hash": dedup_hash, "status": body.status},
         )
