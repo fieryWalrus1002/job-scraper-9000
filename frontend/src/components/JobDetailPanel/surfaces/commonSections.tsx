@@ -103,10 +103,10 @@ function StatusChangeRow({ event }: { event: ApplicationEvent }) {
 
   return (
     <div className="flex items-start gap-3 text-[12px]">
-      <span className="text-faint font-mono whitespace-nowrap shrink-0 w-36">
+      <span className="text-faint font-mono whitespace-nowrap shrink-0">
         {formatDate(event.occurred_at)}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <span className="text-faint">⚙</span>
         <span className="text-muted italic">{label}</span>
       </div>
