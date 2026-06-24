@@ -144,12 +144,73 @@ state*, never a blank screen.
 
 ### Track A — swipe parity
 
-- Wire `useRowSwipe` into the card surfaces. Map commit-direction → the correct
-  triage action **per surface** (Jobs: right→shortlist, left→trash; Shortlist /
-  Tracking / Trash each have their own forward/back semantics — enumerate
-  explicitly, don't assume symmetry).
-- Reuse the existing affordance ramp (tint/progress) and click-suppression
-  (`consumeClickSuppression`) so a swipe doesn't also open the detail panel.
+Today the gesture lives in `useRowSwipe.ts` with four hardcoded module-level
+constants (`COMMIT_PX=72`, `AXIS_SLOP=8`, `OVERSHOOT_PX=28`,
+`OVERSHOOT_RESISTANCE=0.35`) and a `SWIPE_POINTER_TYPES` set. Fine for one table;
+the moment it drives four surfaces it needs a central tuning point and an
+extension seam for feedback effects. So Track A is **generalize the hook, then
+wire it onto cards** — not just wiring.
+
+**1. Central tuning config.** Extract the constants into one typed config with
+defaults (`frontend/src/lib/swipe/config.ts`); the hook takes an optional
+override merged over defaults:
+
+```ts
+export interface SwipeTuning {
+  commitPx: number            // travel before release commits ("trigger line")
+  axisSlopPx: number          // dead zone: below this a press is a tap, not a swipe
+  overshootPx: number         // rubber-band tail past commit
+  overshootResistance: number
+  pointerTypes: ReadonlySet<PointerType>
+}
+export const DEFAULT_SWIPE_TUNING: SwipeTuning = { /* current values */ }
+
+useSwipe({ onCommit, tuning })   // tuning?: Partial<SwipeTuning>
+```
+
+One file tunes the whole app's feel, with per-surface overrides possible (e.g. a
+touchier threshold on grab-bag cards) without forking the hook.
+
+**Two thresholds, named precisely** (they're easy to conflate):
+
+- `axisSlopPx` — the true dead zone; under it nothing moves and a release is a
+  plain click (accidental micro-drag stays "un-swiped").
+- `commitPx` — the trigger line. The band `[axisSlopPx, commitPx)` is the
+  **back-off zone**: the card follows the finger but a release there snaps home
+  un-triaged. This recovery already exists (release < commit → snap back);
+  centralizing just makes both edges tunable. No separate hysteresis value yet.
+
+**2. Lifecycle edge-callbacks (extension seam).** The hook stays **pure gesture
+math + state**; it emits one-shot edge events an effects layer subscribes to —
+so animation/haptics/sound drop in later with zero gesture-engine changes:
+
+```ts
+useSwipe({ onCommit, onArm, onDisarm, onStart, onSnapBack })
+```
+
+The hook already exposes `progress`/`armed`/`settling`/`direction` for
+*continuous* visuals (the existing tint ramp; animation stays CSS-driven off
+`offset`/`settling`). The new callbacks cover *one-shot* feedback — e.g. a haptic
+tick must fire once on `onArm`, not every frame while armed. Effects are
+composable add-on hooks that never touch gesture logic and are individually
+tree-shakeable / testable:
+
+```ts
+useSwipeHaptics(swipe)   // navigator.vibrate on arm/commit — LATER, enabled by this
+useSwipeSound(swipe)     // LATER
+```
+
+Haptics/sound are **not built in Phase 24** — Phase 24 only lands the callback
+API that makes them droppable later.
+
+**3. Rename + relocate.** `useRowSwipe` → `useSwipe`, moved to `lib/swipe/`,
+since it's no longer row-specific.
+
+**4. Wire onto the card surfaces.** Map commit-direction → the correct triage
+action **per surface** (Jobs: right→shortlist, left→trash; Shortlist / Tracking /
+Trash each have their own forward/back semantics — enumerate explicitly, don't
+assume symmetry). Reuse the affordance ramp (tint/progress) and click-suppression
+(`consumeClickSuppression`) so a swipe doesn't also open the detail panel.
 
 ### Track B — grab-bag surface
 
@@ -176,9 +237,12 @@ de-risks the larger phase and never blocks on gesture plumbing.
 
 ### Phase 24 — Swipe parity (Track A, first)
 
-1. **Swipe on cards** — `useRowSwipe` parity across the card surfaces
-   (Shortlist / Tracking / Trash), with per-surface commit-direction mapping
-   enumerated explicitly (don't assume symmetry). Backend-free.
+1. **Generalize the swipe hook + parity on cards** — extract a central
+   `SwipeTuning` config, add lifecycle edge-callbacks (`onArm`/`onDisarm`/
+   `onStart`/`onSnapBack`) as the effects seam, rename `useRowSwipe`→`useSwipe`
+   (→ `lib/swipe/`), then wire it onto the card surfaces (Shortlist / Tracking /
+   Trash) with per-surface direction mapping enumerated. Haptics/sound are
+   *enabled by* this work, not built here. Backend-free. (Spec §5 Track A.)
 
 ### Phase 25 — Grab bag (Track B, builds on 24)
 
@@ -222,3 +286,8 @@ de-risks the larger phase and never blocks on gesture plumbing.
   confirmed by user.
 - **2026-06-24** — Split phasing into two milestones (§6): Phase 24 = swipe
   parity (first, standalone, backend-free), Phase 25 = grab bag (builds on 24).
+- **2026-06-24** — Broadened Phase 24 scope (§5 Track A): central `SwipeTuning`
+  config + named thresholds (axis-slop dead zone vs. commit trigger line),
+  lifecycle edge-callbacks as the effects seam (haptics/sound droppable later,
+  not built now), and `useRowSwipe`→`useSwipe` rename/relocate. Issue #420
+  rewritten to match.
