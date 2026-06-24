@@ -267,6 +267,10 @@ function AppShell({ email }: { email: string }) {
                   onSelect={(app) => selectCurrentJob(app.dedup_hash, 'shortlist', app)}
                   emptyMessage="No shortlisted jobs yet."
                   renderRowActions={(app) => <ShortlistRowActions application={app} />}
+                  swipeActions={{
+                    left: { to: 'passed', label: 'Trash', polarity: 'negative' },
+                    right: { to: 'to_apply', label: 'Pursue', polarity: 'positive' },
+                  }}
                 />
               }
             />
@@ -286,6 +290,9 @@ function AppShell({ email }: { email: string }) {
                   onSelect={(app) => selectCurrentJob(app.dedup_hash, 'trash', app)}
                   emptyMessage="Trash is empty."
                   renderRowActions={(app) => <TrashRowActions application={app} />}
+                  swipeActions={{
+                    right: { to: 'remove', label: 'Un-trash', polarity: 'positive' },
+                  }}
                 />
               }
             />

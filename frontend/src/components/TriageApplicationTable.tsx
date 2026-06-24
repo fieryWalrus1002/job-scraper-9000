@@ -3,11 +3,21 @@ import { useApplications } from '../hooks/useApplications'
 import { STATUS_LABELS, type Application, type ApplicationStatus } from '../types'
 import type { components } from '../schema.gen'
 import { Badge } from './ui/badge'
+import { useSwipe } from '@/lib/swipe/useSwipe'
+import { SwipeAffordance } from '@/lib/swipe/SwipeAffordance'
+import { useTriageAction, type TriageTarget } from '../hooks/useTriage'
+import { ArrowRight, ArrowUp, Trash2 } from 'lucide-react'
 
 type LatestEvent = components['schemas']['LatestEvent']
 
 type ApplicationSortCol = 'status' | 'title' | 'score' | 'updated'
 type SortDir = 'asc' | 'desc'
+
+/** Per-direction swipe commit target; omit a direction to make it a no-op. */
+export interface RowSwipeActions {
+  left?: { to: TriageTarget; label: string; polarity: 'positive' | 'negative' }
+  right?: { to: TriageTarget; label: string; polarity: 'positive' | 'negative' }
+}
 
 interface Props {
   statuses: ApplicationStatus[]
@@ -15,6 +25,8 @@ interface Props {
   emptyMessage: string
   /** Optional per-row actions; when set, a trailing actions column is rendered. */
   renderRowActions?: (application: Application) => ReactNode
+  /** Optional swipe-to-triage mapping per direction. */
+  swipeActions?: RowSwipeActions
 }
 
 /**
@@ -26,6 +38,7 @@ export function TriageApplicationTable({
   onSelect,
   emptyMessage,
   renderRowActions,
+  swipeActions,
 }: Props) {
   const { data, isLoading, isError, error } = useApplications(statuses)
 
@@ -56,6 +69,7 @@ export function TriageApplicationTable({
         applications={applications}
         onSelect={onSelect}
         renderRowActions={renderRowActions}
+        swipeActions={swipeActions}
       />
     </div>
   )
@@ -65,7 +79,200 @@ interface ApplicationTableProps {
   applications: Application[]
   onSelect: (application: Application) => void
   renderRowActions?: (application: Application) => ReactNode
+  swipeActions?: RowSwipeActions
 }
+
+// ── Row components ──────────────────────────────────────────────────────────
+
+// Shared cell content — rendered inside either a plain <tr> or a swipeable wrapper.
+function AppRowCells({ app }: { app: Application }) {
+  return (
+    <>
+      <td>
+        <Badge variant="secondary">{STATUS_LABELS[app.status]}</Badge>
+      </td>
+      <td>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0 text-fg">
+            {app.title ?? '—'}
+          </span>
+          {app.source_url && (
+            <a
+              className="shrink-0 text-[11px] text-faint no-underline leading-none hover:text-primary-hov transition-colors"
+              href={app.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open job posting"
+            >
+              ↗
+            </a>
+          )}
+        </div>
+        <span className="text-muted text-[11px]">{app.company ?? '—'}</span>
+      </td>
+      <td>
+        {app.fit_score != null ? (
+          <Badge
+            variant={
+              app.fit_score >= 4 ? 'score_high' : app.fit_score === 3 ? 'score_mid' : 'score_low'
+            }
+            className="font-mono"
+          >
+            {app.fit_score}
+          </Badge>
+        ) : (
+          <span className="text-faint">—</span>
+        )}
+      </td>
+      <td>
+        <span className="truncate block text-muted font-mono text-[11px]">
+          {new Date(app.updated_at).toLocaleDateString()}
+        </span>
+      </td>
+      <td>
+        <span className="truncate block text-muted text-[12px]">
+          {renderLatestActivity(app.latest_event)}
+        </span>
+      </td>
+    </>
+  )
+}
+
+// Plain (non-swipeable) row — used by TrackingBoard and surfaces without swipe.
+function AppRowContent({
+  app,
+  onSelect,
+  renderRowActions,
+}: {
+  app: Application
+  onSelect: (application: Application) => void
+  renderRowActions?: (application: Application) => ReactNode
+}) {
+  return (
+    <tr className="cursor-pointer transition-colors hover:bg-hover" onClick={() => onSelect(app)}>
+      <AppRowCells app={app} />
+      {renderRowActions && (
+        <td
+          className="text-right pr-3"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <div className="inline-flex justify-end">{renderRowActions(app)}</div>
+        </td>
+      )}
+    </tr>
+  )
+}
+
+// Icon + color mapping for swipe action labels.
+const SWIPE_ACTION_VISUALS: Record<string, { icon: typeof Trash2; color: string }> = {
+  Trash: { icon: Trash2, color: 'var(--color-score-low)' },
+  'Un-trash': { icon: ArrowUp, color: 'var(--color-score-mid)' },
+  Pursue: { icon: ArrowRight, color: 'var(--color-score-mid)' },
+}
+
+// Swipeable application row — wraps the row in swipe gesture handlers and
+// reveals an affordance as the row slides. When swipeActions is set, the row
+// responds to horizontal drag; otherwise it falls back to plain tap-to-select.
+function SwipeableAppRow({
+  app,
+  onSelect,
+  renderRowActions,
+  swipeActions,
+}: {
+  app: Application
+  onSelect: (application: Application) => void
+  renderRowActions?: (application: Application) => ReactNode
+  swipeActions: RowSwipeActions
+}) {
+  const { triage } = useTriageAction()
+
+  const activeDir =
+    swipeActions.left && swipeActions.right
+      ? null
+      : swipeActions.left
+        ? 'right'
+        : swipeActions.right
+          ? 'left'
+          : null
+
+  const { offset, progress, armed, direction, settling, handlers, consumeClickSuppression } =
+    useSwipe({
+      onCommit: (dir) => {
+        const action = swipeActions[dir]
+        if (!action) return
+        triage({ dedupHash: app.dedup_hash, from: app.status, to: action.to })
+      },
+    })
+
+  const tint = direction
+    ? `color-mix(in oklab, ${
+        swipeActions[direction]?.polarity === 'negative'
+          ? 'var(--color-score-low)'
+          : 'var(--color-score-mid)'
+      } ${armed ? 22 : 6 + progress * 10}%, transparent)`
+    : undefined
+  const edgeCell = direction ? { overflow: 'visible' as const } : undefined
+
+  return (
+    <tr
+      {...handlers}
+      className="cursor-pointer hover:bg-hover"
+      style={{
+        position: 'relative',
+        transform: direction ? `translateX(${offset}px)` : undefined,
+        backgroundColor: tint,
+        touchAction: 'pan-y',
+        ...(settling
+          ? { transition: 'transform 150ms ease-out, background-color 150ms ease-out' }
+          : {}),
+      }}
+      onClick={() => {
+        if (consumeClickSuppression()) return
+        onSelect(app)
+      }}
+    >
+      {activeDir && swipeActions[activeDir] && (
+        <td className="w-11 max-w-11" style={edgeCell}>
+          <SwipeAffordance
+            direction={activeDir}
+            progress={progress}
+            armed={armed}
+            offset={offset}
+            label={swipeActions[activeDir].label}
+            {...SWIPE_ACTION_VISUALS[swipeActions[activeDir].label]}
+          />
+        </td>
+      )}
+      <AppRowCells app={app} />
+      {renderRowActions && (
+        <td
+          className="text-right pr-3"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={edgeCell}
+        >
+          <div className="inline-flex justify-end">{renderRowActions(app)}</div>
+        </td>
+      )}
+      {activeDir && swipeActions[activeDir] && (
+        <td className="w-11 max-w-11" style={edgeCell}>
+          <SwipeAffordance
+            direction={activeDir}
+            progress={progress}
+            armed={armed}
+            offset={offset}
+            label={swipeActions[activeDir].label}
+            {...SWIPE_ACTION_VISUALS[swipeActions[activeDir].label]}
+          />
+        </td>
+      )}
+    </tr>
+  )
+}
+
+// ── Table component ─────────────────────────────────────────────────────────
 
 /**
  * Presentational, sortable table of applications. Does no fetching — callers pass
@@ -75,6 +282,7 @@ export function ApplicationTable({
   applications,
   onSelect,
   renderRowActions,
+  swipeActions,
 }: ApplicationTableProps) {
   const [sortCol, setSortCol] = useState<ApplicationSortCol>('updated')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -124,70 +332,24 @@ export function ApplicationTable({
         </tr>
       </thead>
       <tbody>
-        {visible.map((app) => (
-          <tr
-            key={app.dedup_hash}
-            className="cursor-pointer transition-colors hover:bg-hover"
-            onClick={() => onSelect(app)}
-          >
-            <td>
-              <Badge variant="secondary">{STATUS_LABELS[app.status]}</Badge>
-            </td>
-            <td>
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0 text-fg">
-                  {app.title ?? '—'}
-                </span>
-                {app.source_url && (
-                  <a
-                    className="shrink-0 text-[11px] text-faint no-underline leading-none hover:text-primary-hov transition-colors"
-                    href={app.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    title="Open job posting"
-                  >
-                    ↗
-                  </a>
-                )}
-              </div>
-              <span className="text-muted text-[11px]">{app.company ?? '—'}</span>
-            </td>
-            <td>
-              {app.fit_score != null ? (
-                <Badge
-                  variant={
-                    app.fit_score >= 4
-                      ? 'score_high'
-                      : app.fit_score === 3
-                        ? 'score_mid'
-                        : 'score_low'
-                  }
-                  className="font-mono"
-                >
-                  {app.fit_score}
-                </Badge>
-              ) : (
-                <span className="text-faint">—</span>
-              )}
-            </td>
-            <td>
-              <span className="truncate block text-muted font-mono text-[11px]">
-                {new Date(app.updated_at).toLocaleDateString()}
-              </span>
-            </td>
-            <td>
-              <span className="truncate block text-muted text-[12px]">
-                {renderLatestActivity(app.latest_event)}
-              </span>
-            </td>
-            {renderRowActions && (
-              <td className="text-right pr-3" onClick={(e) => e.stopPropagation()}>
-                <div className="inline-flex justify-end">{renderRowActions(app)}</div>
-              </td>
-            )}
-          </tr>
-        ))}
+        {visible.map((app) =>
+          swipeActions ? (
+            <SwipeableAppRow
+              key={app.dedup_hash}
+              app={app}
+              onSelect={onSelect}
+              renderRowActions={renderRowActions}
+              swipeActions={swipeActions}
+            />
+          ) : (
+            <AppRowContent
+              key={app.dedup_hash}
+              app={app}
+              onSelect={onSelect}
+              renderRowActions={renderRowActions}
+            />
+          ),
+        )}
       </tbody>
     </table>
   )
