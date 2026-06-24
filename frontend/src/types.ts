@@ -62,6 +62,7 @@ export type UpcomingStepsResponse = components['schemas']['UpcomingStepsResponse
 export type StaleToApplyAlertOut = components['schemas']['StaleToApplyAlertOut']
 export type PostInterviewAlertOut = components['schemas']['PostInterviewAlertOut']
 export type InactivityAlertOut = components['schemas']['InactivityAlertOut']
+export type PostApplicationAlertOut = components['schemas']['PostApplicationAlertOut']
 export interface ManualJobCreate {
   title: string
   fit_score: number

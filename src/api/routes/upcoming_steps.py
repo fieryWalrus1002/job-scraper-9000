@@ -18,6 +18,7 @@ from fastapi import APIRouter
 from ..dependencies import CurrentUser, Pool
 from ..schemas import (
     InactivityAlertOut,
+    PostApplicationAlertOut,
     PostInterviewAlertOut,
     StaleToApplyAlertOut,
     UpcomingStepsResponse,
@@ -25,8 +26,10 @@ from ..schemas import (
 from ..upcoming_steps import (
     _DEFAULT_INACTIVITY_DAYS,
     _DEFAULT_INTERVIEW_DAYS,
+    _DEFAULT_POST_APPLICATION_DAYS,
     _DEFAULT_STALE_DAYS,
     check_inactivity,
+    check_post_application,
     check_post_interview,
     check_stale_to_apply,
 )
@@ -72,6 +75,18 @@ def _build_messages(alerts):
                     days=alert.days,
                 )
             )
+        elif alert.kind == "post_application":
+            out.append(
+                PostApplicationAlertOut(
+                    message=(
+                        f"{alert.count} application(s) have gone {alert.days}+ "
+                        f"days without a follow-up."
+                    ),
+                    count=alert.count,
+                    dedup_hashes=alert.dedup_hashes,
+                    days=alert.days,
+                )
+            )
         else:
             # FAIL FAST: an alert kind the engine produced but this builder
             # doesn't handle would otherwise vanish silently from the response.
@@ -114,8 +129,27 @@ async def get_upcoming_steps(
         row["post_interview_nudge_days"] if row else _DEFAULT_INTERVIEW_DAYS
     )
     inactivity_days = row["inactivity_days"] if row else _DEFAULT_INACTIVITY_DAYS
+    post_app_days = (
+        row["post_application_nudge_days"] if row else _DEFAULT_POST_APPLICATION_DAYS
+    )
 
-    # 3. Run pure rule functions
+    # 3. Fetch follow_up / contact touchpoints (event-kind rows)
+    touchpoints = cast(
+        "list[dict[str, Any]]",
+        await (
+            await conn.execute(
+                "SELECT dedup_hash, occurred_at "
+                "FROM app.application_events "
+                "WHERE user_id = %(user_id)s "
+                "AND kind = 'event' "
+                "AND tags && ARRAY['follow_up','contact'] "
+                "ORDER BY occurred_at",
+                {"user_id": user.id},
+            )
+        ).fetchall(),
+    )
+
+    # 4. Run pure rule functions
     now = datetime.now(timezone.utc)
     alerts = []
     stale = check_stale_to_apply(events, now, stale_days)
@@ -127,6 +161,9 @@ async def get_upcoming_steps(
     inactive = check_inactivity(events, now, inactivity_days)
     if inactive:
         alerts.append(inactive)
+    post_app = check_post_application(events, touchpoints, now, post_app_days)
+    if post_app:
+        alerts.append(post_app)
 
-    # 4. Build response with human-readable messages
+    # 5. Build response with human-readable messages
     return UpcomingStepsResponse(alerts=_build_messages(alerts))

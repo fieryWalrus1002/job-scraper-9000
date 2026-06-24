@@ -855,6 +855,25 @@ export interface components {
             enabled: boolean;
         };
         /**
+         * PostApplicationAlertOut
+         * @description Jobs in *applied*\/*screening* with no follow-up for > threshold days.
+         */
+        PostApplicationAlertOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "post_application";
+            /** Message */
+            message: string;
+            /** Count */
+            count: number;
+            /** Dedup Hashes */
+            dedup_hashes: string[];
+            /** Days */
+            days: number;
+        };
+        /**
          * PostInterviewAlertOut
          * @description Jobs that entered *interview* and haven't progressed past threshold.
          */
@@ -1077,7 +1096,7 @@ export interface components {
          */
         UpcomingStepsResponse: {
             /** Alerts */
-            alerts: (components["schemas"]["StaleToApplyAlertOut"] | components["schemas"]["PostInterviewAlertOut"] | components["schemas"]["InactivityAlertOut"])[];
+            alerts: (components["schemas"]["StaleToApplyAlertOut"] | components["schemas"]["PostInterviewAlertOut"] | components["schemas"]["InactivityAlertOut"] | components["schemas"]["PostApplicationAlertOut"])[];
         };
         /** User */
         User: {
