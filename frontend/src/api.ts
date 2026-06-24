@@ -20,6 +20,7 @@ import type {
   SearchConfigInput,
   SearchSaveResponse,
   SettingsResponse,
+  UpcomingStepsResponse,
 } from './types'
 import type { SortState } from './lib/sort'
 
@@ -297,4 +298,12 @@ export async function deleteEvalCorrection(dedupHash: string): Promise<void> {
   // The UI "Clear" flow can race with stale state or concurrent deletes.
   if (res.status === 404) return
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+}
+
+// ───── Upcoming steps ─────
+
+export async function fetchUpcomingSteps(signal?: AbortSignal): Promise<UpcomingStepsResponse> {
+  const res = await fetch(`${API_BASE}/api/upcoming-steps`, { signal })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<UpcomingStepsResponse>
 }

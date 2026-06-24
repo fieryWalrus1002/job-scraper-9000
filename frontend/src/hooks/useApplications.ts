@@ -7,6 +7,7 @@ import {
   deleteEvent,
   fetchApplicationEvents,
   fetchApplications,
+  fetchUpcomingSteps,
   normalizeApplicationStatuses,
   updateApplication,
   updateEvent,
@@ -19,6 +20,7 @@ import type {
   ApplicationStatus,
   ApplicationUpdate,
   ManualJobCreate,
+  UpcomingStepsResponse,
 } from '../types'
 import { logMutationError } from '../lib/mutations'
 
@@ -38,6 +40,14 @@ export function useApplicationEvents(dedupHash: string) {
   })
 }
 
+export function useUpcomingSteps() {
+  return useQuery<UpcomingStepsResponse, Error>({
+    queryKey: ['upcoming-steps'],
+    queryFn: ({ signal }) => fetchUpcomingSteps(signal),
+    retry: false,
+  })
+}
+
 export function useMarkApplication() {
   const qc = useQueryClient()
   return useMutation({
@@ -54,6 +64,8 @@ export function useMarkApplication() {
       invalidateApplications(qc)
       // A status change auto-emits a status_change event (#381) — refresh the timeline.
       invalidateEvents(qc, variables.dedupHash)
+      // Status changes alter which alerts fire — refresh upcoming-steps.
+      invalidateUpcomingSteps(qc)
     },
     onError: logMutationError('mark application'),
   })
@@ -68,6 +80,8 @@ export function useUpdateApplication() {
       invalidateApplications(qc)
       // A status change auto-emits a status_change event (#381) — refresh the timeline.
       invalidateEvents(qc, variables.dedupHash)
+      // Status changes alter which alerts fire — refresh upcoming-steps.
+      invalidateUpcomingSteps(qc)
     },
     onError: logMutationError('update application'),
   })
@@ -96,7 +110,11 @@ export function useCreateEvent() {
   return useMutation({
     mutationFn: ({ dedupHash, body }: { dedupHash: string; body: ApplicationEventCreate }) =>
       createEvent(dedupHash, body),
-    onSuccess: (_, variables) => invalidateEvents(qc, variables.dedupHash),
+    onSuccess: (_, variables) => {
+      invalidateEvents(qc, variables.dedupHash)
+      // Events can affect alert derivation — refresh upcoming-steps.
+      invalidateUpcomingSteps(qc)
+    },
     onError: logMutationError('create event'),
   })
 }
@@ -113,7 +131,10 @@ export function useUpdateEvent() {
       eventId: string
       update: ApplicationEventUpdate
     }) => updateEvent(dedupHash, eventId, update),
-    onSuccess: (_, variables) => invalidateEvents(qc, variables.dedupHash),
+    onSuccess: (_, variables) => {
+      invalidateEvents(qc, variables.dedupHash)
+      invalidateUpcomingSteps(qc)
+    },
     onError: logMutationError('update event'),
   })
 }
@@ -123,7 +144,10 @@ export function useDeleteEvent() {
   return useMutation({
     mutationFn: ({ dedupHash, eventId }: { dedupHash: string; eventId: string }) =>
       deleteEvent(dedupHash, eventId),
-    onSuccess: (_, variables) => invalidateEvents(qc, variables.dedupHash),
+    onSuccess: (_, variables) => {
+      invalidateEvents(qc, variables.dedupHash)
+      invalidateUpcomingSteps(qc)
+    },
     onError: logMutationError('delete event'),
   })
 }
@@ -143,4 +167,8 @@ function invalidateApplicationsAndJobs(qc: QueryClient) {
 
 function invalidateEvents(qc: QueryClient, dedupHash: string) {
   void qc.invalidateQueries({ queryKey: ['application-events', dedupHash] })
+}
+
+function invalidateUpcomingSteps(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ['upcoming-steps'] })
 }
