@@ -166,14 +166,3 @@ async def test_patch_status_auto_emits_status_change(db_client: AsyncClient) -> 
     changes = [e for e in events if e["kind"] == "status_change"]
     assert len(changes) == 1
     assert changes[0]["metadata"] == {"from_status": "to_apply", "to_status": "applied"}
-
-
-async def test_patch_notes_only_emits_no_event(db_client: AsyncClient) -> None:
-    """A notes-only PATCH must not emit a status_change event."""
-    resp = await db_client.patch(
-        f"/api/applications/{DEDUP}", json={"notes": "called recruiter"}
-    )
-    assert resp.status_code == 200, resp.text
-
-    events = (await db_client.get(f"/api/applications/{DEDUP}/events")).json()
-    assert [e for e in events if e["kind"] == "status_change"] == []

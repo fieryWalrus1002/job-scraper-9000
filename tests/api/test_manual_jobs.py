@@ -17,7 +17,6 @@ FAKE_MANUAL_APP_ROW: dict[str, Any] = {
     "dedup_hash": "a" * 64,
     "status": "maybe",
     "applied_at": None,
-    "notes": None,
     "created_at": datetime(2026, 6, 3, 10, 0, 0),
     "updated_at": datetime(2026, 6, 3, 10, 0, 0),
     "title": "Staff Engineer",
