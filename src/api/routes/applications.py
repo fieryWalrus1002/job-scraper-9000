@@ -72,9 +72,22 @@ async def list_applications(
     sql = f"""
         SELECT
             a.dedup_hash, a.status, a.applied_at, a.notes, a.created_at, a.updated_at,
-            p.title, p.company, s.fit_score, p.source_url
+            p.title, p.company, s.fit_score, p.source_url,
+            le.latest_event
         FROM app.user_applications a
         {_JOINS}
+        LEFT JOIN LATERAL (
+            SELECT json_build_object(
+                'kind', e.kind,
+                'occurred_at', e.occurred_at,
+                'body', e.body,
+                'to_status', e.metadata->>'to_status'
+            ) AS latest_event
+            FROM app.application_events e
+            WHERE e.user_id = a.user_id AND e.dedup_hash = a.dedup_hash
+            ORDER BY e.occurred_at DESC
+            LIMIT 1
+        ) le ON true
         {where}
         ORDER BY a.updated_at DESC
     """

@@ -92,6 +92,16 @@ ApplicationStatus = Literal[
 APPLICATION_STATUSES: tuple[str, ...] = get_args(ApplicationStatus)
 
 
+class LatestEvent(BaseModel):
+    """Most-recent activity for a job — display-only summary for the
+    Tracking list. Inert: rendered, never queried."""
+
+    kind: Literal["status_change", "event"]
+    occurred_at: datetime
+    body: str | None = None  # note text; null for status_change
+    to_status: ApplicationStatus | None = None  # null for events
+
+
 class Application(BaseModel):
     dedup_hash: str
     status: ApplicationStatus
@@ -104,6 +114,7 @@ class Application(BaseModel):
     company: str | None = None
     fit_score: int | None = None
     source_url: str | None = None
+    latest_event: LatestEvent | None = None
 
 
 class ApplicationCreate(BaseModel):
