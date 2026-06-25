@@ -27,6 +27,7 @@ import { TRACKING_STATUSES } from './lib/trackingGroups'
 import { ShortlistRowActions } from './components/ShortlistRowActions'
 import { TrashRowActions } from './components/TrashRowActions'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { GrabBagView } from './components/GrabBagView'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
 import { UnsavedGuardProvider, useUnsavedGuard } from './components/UnsavedGuard'
 import { isEditableTarget } from './lib/keyboard'
@@ -173,6 +174,7 @@ function AppShell({ email }: { email: string }) {
     '/jobs': jobsCount,
     '/shortlist': shortlistCount,
     '/tracking': trackingCount,
+    '/grab-bag': undefined,
   }
 
   return (
@@ -300,6 +302,23 @@ function AppShell({ email }: { email: string }) {
                     right: { to: 'remove', label: 'Un-trash', polarity: 'positive', icon: ArrowUp },
                   }}
                 />
+              }
+            />
+            <Route
+              path="/grab-bag"
+              element={
+                <ErrorBoundary label="Grab bag" resetKeys={[currentPath]}>
+                  <GrabBagView
+                    onSelect={(hash, surface, applicationSnapshot, summary) =>
+                      selectCurrentJob(
+                        hash,
+                        surface,
+                        applicationSnapshot as Application | undefined,
+                        summary as JobSummary | undefined,
+                      )
+                    }
+                  />
+                </ErrorBoundary>
               }
             />
             <Route

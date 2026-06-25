@@ -60,6 +60,41 @@ function parseValidationErrors(detail: FastApiDetailItem[]): FieldErrors {
   return fields
 }
 
+export interface GrabBagFilters {
+  minScore?: number
+  maxScore?: number
+  remoteClassification?: string[]
+  minPostedAt?: string
+  maxPostedAt?: string
+  minSalaryK?: number
+  search?: string
+  company?: string
+}
+
+export async function fetchGrabBag(
+  seed: number,
+  filters?: GrabBagFilters,
+  signal?: AbortSignal,
+): Promise<JobListResponse> {
+  const params = new URLSearchParams()
+  params.set('mode', 'grabbag')
+  params.set('seed', String(seed))
+  if (filters) {
+    if (filters.minScore) params.set('min_score', String(filters.minScore))
+    if (filters.maxScore) params.set('max_score', String(filters.maxScore))
+    filters.remoteClassification?.forEach((v) => params.append('remote_classification', v))
+    if (filters.minPostedAt) params.set('min_posted_at', filters.minPostedAt)
+    if (filters.maxPostedAt) params.set('max_posted_at', filters.maxPostedAt)
+    if (filters.minSalaryK) params.set('min_salary_usd', String(Number(filters.minSalaryK) * 1000))
+    if (filters.search) params.set('search', filters.search)
+    if (filters.company) params.set('company', filters.company)
+  }
+
+  const res = await fetch(`${API_BASE}/api/jobs?${params.toString()}`, { signal })
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<JobListResponse>
+}
+
 export async function fetchJobs(
   filters: Filters,
   page: number,

@@ -34,7 +34,7 @@ function renderApp() {
         <UnsavedGuardProvider>
           <AppHeader
             email="me@example.com"
-            counts={{ '/jobs': 0, '/shortlist': 0, '/tracking': 0, '/trash': 0 }}
+            counts={{ '/jobs': 0, '/shortlist': 0, '/tracking': 0, '/trash': 0, '/grab-bag': 0 }}
             onAddJob={() => {}}
             onShowShortcuts={() => {}}
           />
