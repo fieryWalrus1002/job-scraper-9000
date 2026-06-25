@@ -65,6 +65,8 @@ _LIST_FROM = """
 async def list_jobs(
     pool: Pool,
     user: CurrentUser,
+    mode: Annotated[Literal["table", "grabbag"], Query()] = "table",
+    seed: Annotated[int, Query(ge=0, le=2147483647)] = 0,
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     # Superset filter: the remote_with_*_travel values are legacy as of
@@ -133,6 +135,105 @@ async def list_jobs(
         params["company"] = f"%{company.strip()}%"
 
     where = "WHERE " + " AND ".join(filters)
+
+    # -----------------------------------------------------------------------
+    # Grab-bag mode: seeded, weighted-by-fit sampling (Efraimidis–Spirakis)
+    # -----------------------------------------------------------------------
+    if mode == "grabbag":
+        # Grab-bag is a stateless seeded sample, not a paged list: offset has no
+        # meaning here. Rather than silently ignore it (and let a caller believe
+        # they're paging), fail loud on an explicit non-zero offset.
+        if offset != 0:
+            raise HTTPException(
+                status_code=400,
+                detail="offset is not supported in grab-bag mode; reroll with a new seed instead.",
+            )
+
+        # Batch size + floor come from the user's settings, falling back to the
+        # migration-0016 column defaults (20 / 3) when no config row exists — NOT
+        # to the table-mode `limit` (default 500), which is intentionally ignored
+        # in grab-bag mode: a bag is sized by grab_bag_size, not the list limit.
+        grab_bag_size = 20
+        grab_bag_score_floor: int = 3
+
+        # Build the explicit column list from _LIST_COLS so
+        # JobSummary.model_validate sees exactly its expected keys.
+        # Strip table prefixes (p.x, s.x) and casts (::TEXT) to get bare names.
+        list_cols_names = [
+            col.strip()
+            .split(" AS ")[-1]
+            .strip()
+            .split(".")[-1]
+            .strip()
+            .split("::")[0]
+            .strip()
+            for col in _LIST_COLS.split(",")
+        ]
+        outer_select = ", ".join(list_cols_names)
+
+        grabbag_sql = f"""
+            WITH scored AS (
+                SELECT {_LIST_COLS},
+                       ((abs(hashtextextended(p.dedup_hash, %(seed)s)) %% 1000000) + 1) / 1000000.0 AS u
+                {_LIST_FROM}
+                {where}
+                AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s
+            )
+            SELECT {outer_select}
+            FROM scored
+            ORDER BY power(u, 1.0 / fit_score) DESC
+            LIMIT %(limit)s
+        """
+
+        # total = candidate-pool size (count of untriaged, above-floor jobs)
+        count_sql = (
+            f"SELECT COUNT(*) AS n {_LIST_FROM} {where} "
+            "AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s"
+        )
+
+        async with pool.connection() as conn:
+            # Read user settings for grab-bag defaults
+            config_row = await (
+                await conn.execute(
+                    "SELECT grab_bag_size, grab_bag_score_floor "
+                    "FROM app.user_search_configs WHERE user_id = %(uid)s",
+                    {"uid": user.id},
+                )
+            ).fetchone()
+            if config_row:
+                config_row = cast(dict[str, Any], config_row)
+                grab_bag_size = config_row["grab_bag_size"]
+                grab_bag_score_floor = config_row["grab_bag_score_floor"]
+            # Clamp both on read: the PUT path validates 1–50 / 1–5, but the
+            # columns carry no CHECK, so a stray write shouldn't escape the
+            # documented contract at the read edge.
+            grab_bag_size = max(1, min(50, grab_bag_size))
+            grab_bag_score_floor = max(1, min(5, grab_bag_score_floor))
+
+            grabbag_params = {
+                **params,
+                "seed": seed,
+                "score_floor": grab_bag_score_floor,
+                "limit": grab_bag_size,
+            }
+            cur = await conn.execute(grabbag_sql, grabbag_params)  # type: ignore[arg-type]
+            rows = await cur.fetchall()
+
+            count_params = {**params, "score_floor": grab_bag_score_floor}
+            cur = await conn.execute(count_sql, count_params)  # type: ignore[arg-type]
+            count_row = await cur.fetchone()
+            total = cast(dict[str, Any], count_row)["n"] if count_row else 0
+
+        return JobListResponse(
+            total=total,
+            limit=grab_bag_size,
+            offset=0,
+            items=[JobSummary.model_validate(r) for r in rows],
+        )
+
+    # -----------------------------------------------------------------------
+    # Table mode (default): sorted, paginated list — unchanged
+    # -----------------------------------------------------------------------
 
     # sort/order are Literals and the column is a dict lookup, so this string is
     # built only from whitelisted values. scored_at + dedup_hash are a stable

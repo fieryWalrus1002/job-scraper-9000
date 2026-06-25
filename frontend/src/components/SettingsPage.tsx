@@ -97,6 +97,8 @@ export default function SettingsPage() {
                 postInterviewNudgeDays={data?.post_interview_nudge_days ?? null}
                 postApplicationNudgeDays={data?.post_application_nudge_days ?? null}
                 inactivityDays={data?.inactivity_days ?? null}
+                grabBagSize={data?.grab_bag_size ?? null}
+                grabBagScoreFloor={data?.grab_bag_score_floor ?? null}
               />
             </div>
           </div>

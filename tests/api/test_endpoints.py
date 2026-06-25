@@ -115,6 +115,22 @@ async def test_jobs_invalid_params_return_422(
     assert resp.status_code == 422
 
 
+@pytest.mark.parametrize(
+    "param,value",
+    [
+        ("mode", "invalid"),
+        ("seed", "-1"),
+        ("seed", "2147483648"),
+    ],
+)
+async def test_jobs_grabbag_invalid_params_return_422(
+    client: AsyncClient, fake_conn, param: str, value: str
+) -> None:
+    setup_list_response(fake_conn, [])
+    resp = await client.get("/api/jobs", params={param: value})
+    assert resp.status_code == 422
+
+
 async def test_jobs_valid_score_filter(client: AsyncClient, fake_conn) -> None:
     setup_list_response(fake_conn, [FAKE_JOB_ROW])
     resp = await client.get("/api/jobs", params={"min_score": "4", "max_score": "5"})

@@ -3,13 +3,14 @@ import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import { useUnsavedGuard } from './UnsavedGuard'
 
-export type FunnelPath = '/trash' | '/jobs' | '/shortlist' | '/tracking'
+export type FunnelPath = '/trash' | '/jobs' | '/shortlist' | '/tracking' | '/grab-bag'
 
 const FUNNEL_TABS: { path: FunnelPath; label: string; muted?: boolean }[] = [
   { path: '/trash', label: 'Trash', muted: true },
   { path: '/jobs', label: 'Jobs' },
   { path: '/shortlist', label: 'Shortlist' },
   { path: '/tracking', label: 'Tracking' },
+  { path: '/grab-bag', label: 'Grab bag' },
 ]
 
 const tabBtn =
