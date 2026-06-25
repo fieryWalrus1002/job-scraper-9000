@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -121,7 +122,9 @@ def _extract_row(record: dict) -> dict:
         "title": record.get("title"),
         "company": record.get("company"),
         "location": record.get("location"),
-        "posted_at": record.get("posted_at") or record.get("scraped_at"),
+        "posted_at": record.get("posted_at")
+        or record.get("scraped_at")
+        or date.today().isoformat(),
         "description": record.get("description"),
         "scraped_at": record.get("scraped_at"),
         "remote_classification": record.get("remote_classification"),

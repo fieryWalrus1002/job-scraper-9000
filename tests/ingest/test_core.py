@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import json
 from unittest.mock import MagicMock
 
@@ -148,12 +150,15 @@ def test_extract_row_posted_at_empty_string_falls_back_to_scraped_at() -> None:
     assert row["posted_at"] == "2026-05-31T08:00:00Z"
 
 
-def test_extract_row_posted_at_both_missing_stays_none() -> None:
+def test_extract_row_posted_at_both_missing_defaults_to_today() -> None:
+    """When both posted_at and scraped_at are missing, default to today's
+    date so the NOT NULL constraint on raw.job_postings.posted_at (#431) is
+    never violated."""
     record = _make_record()
     del record["posted_at"]
     del record["scraped_at"]
     row = _extract_row(record)
-    assert row["posted_at"] is None
+    assert row["posted_at"] == date.today().isoformat()
 
 
 # ---------------------------------------------------------------------------
