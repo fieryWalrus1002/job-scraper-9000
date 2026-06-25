@@ -140,9 +140,12 @@ async def list_jobs(
     # Grab-bag mode: seeded, weighted-by-fit sampling (Efraimidis–Spirakis)
     # -----------------------------------------------------------------------
     if mode == "grabbag":
-        # Resolve grab-bag defaults from user settings
-        grab_bag_size = limit  # caller override takes precedence
-        grab_bag_score_floor: int = 3  # fallback default
+        # Batch size + floor come from the user's settings, falling back to the
+        # migration-0016 column defaults (20 / 3) when no config row exists — NOT
+        # to the table-mode `limit` (default 500), which is intentionally ignored
+        # in grab-bag mode: a bag is sized by grab_bag_size, not the list limit.
+        grab_bag_size = 20
+        grab_bag_score_floor: int = 3
 
         # Build the explicit column list from _LIST_COLS so
         # JobSummary.model_validate sees exactly its expected keys.
@@ -165,7 +168,7 @@ async def list_jobs(
                        ((abs(hashtextextended(p.dedup_hash, %(seed)s)) %% 1000000) + 1) / 1000000.0 AS u
                 {_LIST_FROM}
                 {where}
-                AND s.fit_score >= %(score_floor)s
+                AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s
             )
             SELECT {outer_select}
             FROM scored
@@ -174,7 +177,10 @@ async def list_jobs(
         """
 
         # total = candidate-pool size (count of untriaged, above-floor jobs)
-        count_sql = f"SELECT COUNT(*) AS n {_LIST_FROM} {where} AND s.fit_score >= %(score_floor)s"
+        count_sql = (
+            f"SELECT COUNT(*) AS n {_LIST_FROM} {where} "
+            "AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s"
+        )
 
         async with pool.connection() as conn:
             # Read user settings for grab-bag defaults

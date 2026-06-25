@@ -146,6 +146,16 @@ async def test_grabbag_excludes_below_floor_null_and_triaged(
     assert "hash-triaged" not in hashes  # has an application row
 
 
+async def test_grabbag_size_defaults_to_20_without_config(
+    db_client: AsyncClient,
+) -> None:
+    """With no user_search_configs row, the bag is sized by the migration-0016
+    default (20), NOT the table-mode `limit` default (500)."""
+    resp = await db_client.get("/api/jobs", params={"mode": "grabbag", "seed": 1})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["limit"] == 20
+
+
 async def test_grabbag_honors_score_filters(db_client: AsyncClient) -> None:
     """Existing filters still apply in grab-bag mode (a user can constrain the bag)."""
     resp = await db_client.get(
