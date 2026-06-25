@@ -638,6 +638,8 @@ export interface components {
             grab_bag_size: number;
             /** Grab Bag Score Floor */
             grab_bag_score_floor: number;
+            /** Grab Bag Max Age Days */
+            grab_bag_max_age_days: number | null;
             /**
              * Updated At
              * Format: date-time
@@ -653,6 +655,8 @@ export interface components {
             grab_bag_size: number;
             /** Grab Bag Score Floor */
             grab_bag_score_floor: number;
+            /** Grab Bag Max Age Days */
+            grab_bag_max_age_days?: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1101,6 +1105,8 @@ export interface components {
             grab_bag_size?: number | null;
             /** Grab Bag Score Floor */
             grab_bag_score_floor?: number | null;
+            /** Grab Bag Max Age Days */
+            grab_bag_max_age_days?: number | null;
         };
         /**
          * StaleToApplyAlertOut
