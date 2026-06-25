@@ -138,12 +138,17 @@ async def test_grabbag_excludes_below_floor_null_and_triaged(
     db_client: AsyncClient,
 ) -> None:
     """Default floor=3 admits only fit3/4/5; NULL fit and triaged jobs never appear."""
-    hashes = set(await _grabbag_hashes(db_client, seed=42))
+    resp = await db_client.get("/api/jobs", params={"mode": "grabbag", "seed": 42})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    hashes = {item["dedup_hash"] for item in body["items"]}
     assert hashes <= {"hash-fit3", "hash-fit4", "hash-fit5"}
     assert "hash-fit2" not in hashes  # below floor
     assert "hash-fit1" not in hashes  # below floor
     assert "hash-null" not in hashes  # unscored (fit_score IS NULL)
     assert "hash-triaged" not in hashes  # has an application row
+    # total = candidate-pool size: exactly the 3 untriaged, above-floor jobs.
+    assert body["total"] == 3
 
 
 async def test_grabbag_size_defaults_to_20_without_config(

@@ -204,6 +204,10 @@ async def list_jobs(
                 config_row = cast(dict[str, Any], config_row)
                 grab_bag_size = config_row["grab_bag_size"]
                 grab_bag_score_floor = config_row["grab_bag_score_floor"]
+            # Clamp both on read: the PUT path validates 1–50 / 1–5, but the
+            # columns carry no CHECK, so a stray write shouldn't escape the
+            # documented contract at the read edge.
+            grab_bag_size = max(1, min(50, grab_bag_size))
             grab_bag_score_floor = max(1, min(5, grab_bag_score_floor))
 
             grabbag_params = {
