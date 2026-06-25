@@ -93,5 +93,15 @@ function DetailSurface(props: {
       return <TrackingDetailSurface {...props} />
     case 'trash':
       return <TrashDetailSurface {...props} />
+    case 'grabbag':
+      // Grab-bag cards are untriaged jobs — same detail actions as the Jobs
+      // surface (shortlist / trash / pursue). Reuse it rather than forking.
+      return <JobsDetailSurface {...props} />
+    default: {
+      // Exhaustiveness guard: a new JobDetailSurface added without a case here
+      // is a compile error, not a silently blank panel (FAIL FAST).
+      const unhandled: never = props.surface
+      throw new Error(`Unhandled detail surface: ${String(unhandled)}`)
+    }
   }
 }

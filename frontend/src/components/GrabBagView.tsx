@@ -39,13 +39,18 @@ export function GrabBagView({ onSelect }: Props) {
   const [urlParams, setUrlParams] = useSearchParams()
   const { data: applications } = useApplications()
 
-  // Read seed from URL; generate one on first visit if absent.
+  // Read seed from URL; generate one when absent OR malformed. A hand-edited
+  // `?seed=abc` parses to NaN, which would otherwise be sent as `seed=NaN` and
+  // wedge the query — treat any non-integer/negative seed as absent and reroll.
   const urlSeed = urlParams.get('seed')
-  const seed = urlSeed !== null ? parseInt(urlSeed, 10) : generateSeed()
+  const parsedSeed = urlSeed !== null ? Number(urlSeed) : NaN
+  const seedIsValid = Number.isInteger(parsedSeed) && parsedSeed >= 0
+  const seed = seedIsValid ? parsedSeed : generateSeed()
 
-  // Write seed to URL on mount if it was generated (not from URL).
+  // Write the seed to the URL on mount when it was generated (absent/invalid),
+  // so refresh is stable and a garbage seed self-heals to a valid one.
   useEffect(() => {
-    if (urlSeed === null) {
+    if (!seedIsValid) {
       setUrlParams({ seed: String(seed) }, { replace: true })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- only run once on mount

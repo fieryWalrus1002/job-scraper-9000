@@ -104,7 +104,9 @@ function installFetch({
       return Promise.resolve(jsonResponse([...triaged.values()]))
     }
 
-    return Promise.resolve(jsonResponse({}))
+    // Fail loud on an unexpected endpoint so a wrong-URL regression in this
+    // surface surfaces as a test failure rather than a silent 200.
+    throw new Error(`Unexpected fetch in GrabBag test: ${method} ${u}`)
   })
 
   vi.stubGlobal('fetch', fetchMock)
@@ -168,6 +170,23 @@ describe('GrabBagView — render batch', () => {
     const [url] = grabBagCalls()[0]
     expect(String(url)).toContain('mode=grabbag')
     expect(seedOf(url)).not.toBeNull()
+  })
+})
+
+describe('GrabBagView — malformed seed', () => {
+  it('a non-numeric ?seed= self-heals to a valid integer (never queries seed=NaN)', async () => {
+    installFetch({ grabbag: batch([{ title: 'Healed Job', company: 'HealCo', fit_score: 4 }]) })
+
+    render(<GrabBagView onSelect={vi.fn()} />, {
+      wrapper: makeWrapper(['/grab-bag?seed=abc']),
+    })
+
+    await waitFor(() => expect(screen.getByText('Healed Job')).toBeInTheDocument())
+
+    const seed = seedOf(grabBagCalls()[0][0])
+    expect(seed).not.toBeNull()
+    expect(Number.isInteger(Number(seed))).toBe(true)
+    expect(seed).not.toBe('NaN')
   })
 })
 
