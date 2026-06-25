@@ -48,6 +48,7 @@ FAKE_SEARCH_ROW: dict[str, Any] = {
     "inactivity_days": 14,
     "grab_bag_size": 20,
     "grab_bag_score_floor": 3,
+    "grab_bag_max_age_days": None,
 }
 
 
@@ -77,6 +78,7 @@ async def test_get_settings_onboarding_state(
         "inactivity_days": None,
         "grab_bag_size": None,
         "grab_bag_score_floor": None,
+        "grab_bag_max_age_days": None,
     }
 
 
@@ -100,6 +102,7 @@ async def test_get_settings_configured(
     assert data["inactivity_days"] == 14
     assert data["grab_bag_size"] == 20
     assert data["grab_bag_score_floor"] == 3
+    assert data["grab_bag_max_age_days"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +341,7 @@ async def test_put_grab_bag_settings_updates_successfully(
             {
                 "grab_bag_size": params["grab_bag_size"],
                 "grab_bag_score_floor": params["grab_bag_score_floor"],
+                "grab_bag_max_age_days": params["grab_bag_max_age_days"],
                 "updated_at": datetime(2026, 6, 25),
             }
         )
@@ -346,15 +350,21 @@ async def test_put_grab_bag_settings_updates_successfully(
 
     resp = await client.put(
         "/api/settings/grab-bag",
-        json={"grab_bag_size": 15, "grab_bag_score_floor": 4},
+        json={
+            "grab_bag_size": 15,
+            "grab_bag_score_floor": 4,
+            "grab_bag_max_age_days": 90,
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["grab_bag_size"] == 15
     assert data["grab_bag_score_floor"] == 4
+    assert data["grab_bag_max_age_days"] == 90
     assert "updated_at" in data
     assert str(captured["params"]["uid"]) == "00000000-0000-0000-0000-000000000001"
     assert "WHERE user_id = %(uid)s" in captured["sql"]
+    assert captured["params"]["grab_bag_max_age_days"] == 90
 
 
 async def test_put_grab_bag_settings_rejects_bad_input(
@@ -376,6 +386,71 @@ async def test_put_grab_bag_settings_rejects_bad_input(
         json={"grab_bag_size": 20, "grab_bag_score_floor": 6},
     )
     assert resp.status_code == 422
+
+    # max_age_days = 0 (ge=1)
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={
+            "grab_bag_size": 20,
+            "grab_bag_score_floor": 3,
+            "grab_bag_max_age_days": 0,
+        },
+    )
+    assert resp.status_code == 422
+
+    # max_age_days negative
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={
+            "grab_bag_size": 20,
+            "grab_bag_score_floor": 3,
+            "grab_bag_max_age_days": -5,
+        },
+    )
+    assert resp.status_code == 422
+
+    # max_age_days over upper bound (le=3650)
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={
+            "grab_bag_size": 20,
+            "grab_bag_score_floor": 3,
+            "grab_bag_max_age_days": 4000,
+        },
+    )
+    assert resp.status_code == 422
+
+
+async def test_put_grab_bag_settings_accepts_null_max_age(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """Explicit null to clear the age limit is accepted."""
+    captured: dict[str, Any] = {}
+
+    async def _execute(sql: str, params: dict[str, Any]) -> AsyncMock:
+        captured["params"] = params
+        return _make_cursor(
+            {
+                "grab_bag_size": params["grab_bag_size"],
+                "grab_bag_score_floor": params["grab_bag_score_floor"],
+                "grab_bag_max_age_days": None,
+                "updated_at": datetime(2026, 6, 25),
+            }
+        )
+
+    fake_conn.execute = AsyncMock(side_effect=_execute)
+
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={
+            "grab_bag_size": 20,
+            "grab_bag_score_floor": 3,
+            "grab_bag_max_age_days": None,
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["grab_bag_max_age_days"] is None
+    assert captured["params"]["grab_bag_max_age_days"] is None
 
 
 async def test_put_grab_bag_settings_rejects_extra_field(
