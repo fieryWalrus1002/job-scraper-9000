@@ -188,15 +188,6 @@ function SwipeableAppRow({
 }) {
   const { triage } = useTriageAction()
 
-  const activeDir =
-    swipeActions.left && swipeActions.right
-      ? null
-      : swipeActions.left
-        ? 'right'
-        : swipeActions.right
-          ? 'left'
-          : null
-
   const { offset, progress, armed, direction, settling, handlers, consumeClickSuppression } =
     useSwipe({
       onCommit: (dir) => {
@@ -233,15 +224,15 @@ function SwipeableAppRow({
         onSelect(app)
       }}
     >
-      {activeDir && swipeActions[activeDir] && (
+      {direction === 'right' && swipeActions.right && (
         <td className="w-11 max-w-11" style={edgeCell}>
           <SwipeAffordance
-            direction={activeDir}
+            direction="right"
             progress={progress}
             armed={armed}
             offset={offset}
-            label={swipeActions[activeDir].label}
-            {...SWIPE_ACTION_VISUALS[swipeActions[activeDir].label]}
+            label={swipeActions.right.label}
+            {...SWIPE_ACTION_VISUALS[swipeActions.right.label]}
           />
         </td>
       )}
@@ -256,15 +247,15 @@ function SwipeableAppRow({
           <div className="inline-flex justify-end">{renderRowActions(app)}</div>
         </td>
       )}
-      {activeDir && swipeActions[activeDir] && (
+      {direction === 'left' && swipeActions.left && (
         <td className="w-11 max-w-11" style={edgeCell}>
           <SwipeAffordance
-            direction={activeDir}
+            direction="left"
             progress={progress}
             armed={armed}
             offset={offset}
-            label={swipeActions[activeDir].label}
-            {...SWIPE_ACTION_VISUALS[swipeActions[activeDir].label]}
+            label={swipeActions.left.label}
+            {...SWIPE_ACTION_VISUALS[swipeActions.left.label]}
           />
         </td>
       )}

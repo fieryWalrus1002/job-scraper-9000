@@ -46,6 +46,15 @@ function swipeRow(row: HTMLElement, deltaX: number) {
   fireEvent.pointerUp(row, { ...opts, clientX: startX + deltaX })
 }
 
+// Start a drag (pointerDown + pointerMove) but do NOT release — captures mid-drag
+// state where the swipe affordance pill is visible.
+function dragRow(row: HTMLElement, deltaX: number) {
+  const startX = 200
+  const opts = { pointerId: 1, pointerType: 'touch', clientY: 100 }
+  fireEvent.pointerDown(row, { ...opts, clientX: startX })
+  fireEvent.pointerMove(row, { ...opts, clientX: startX + deltaX })
+}
+
 function applicationCalls() {
   return vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/applications'))
 }
@@ -188,5 +197,79 @@ describe('Tracking (no swipeActions) — unchanged', () => {
     // A tap selects the row.
     fireEvent.click(row)
     expect(onSelect).toHaveBeenCalledWith(APP)
+  })
+})
+
+describe('Swipe affordance pills', () => {
+  it('Shortlist: right-drag shows Pursue pill', () => {
+    render(
+      <ApplicationTable
+        applications={[APP]}
+        onSelect={vi.fn()}
+        swipeActions={{
+          left: { to: 'passed', label: 'Trash', polarity: 'negative' },
+          right: { to: 'to_apply', label: 'Pursue', polarity: 'positive' },
+        }}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const row = screen.getByText('Swipeable Role').closest('tr')!
+    dragRow(row, 120)
+    expect(screen.queryByText('Pursue')).not.toBeNull()
+  })
+
+  it('Shortlist: left-drag shows Trash pill', () => {
+    render(
+      <ApplicationTable
+        applications={[APP]}
+        onSelect={vi.fn()}
+        swipeActions={{
+          left: { to: 'passed', label: 'Trash', polarity: 'negative' },
+          right: { to: 'to_apply', label: 'Pursue', polarity: 'positive' },
+        }}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const row = screen.getByText('Swipeable Role').closest('tr')!
+    dragRow(row, -120)
+    expect(screen.queryByText('Trash')).not.toBeNull()
+  })
+
+  it('Trash: right-drag shows Un-trash pill', () => {
+    render(
+      <ApplicationTable
+        applications={[APP_TRASHED]}
+        onSelect={vi.fn()}
+        swipeActions={{
+          right: { to: 'remove', label: 'Un-trash', polarity: 'positive' },
+        }}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const row = screen.getByText('Swipeable Role').closest('tr')!
+    dragRow(row, 120)
+    expect(screen.queryByText('Un-trash')).not.toBeNull()
+  })
+
+  it('Trash: left-drag shows no pill (no left action defined)', () => {
+    render(
+      <ApplicationTable
+        applications={[APP_TRASHED]}
+        onSelect={vi.fn()}
+        swipeActions={{
+          right: { to: 'remove', label: 'Un-trash', polarity: 'positive' },
+        }}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const row = screen.getByText('Swipeable Role').closest('tr')!
+    dragRow(row, -120)
+    // No affordance pill should appear for left-drag on Trash surface
+    expect(screen.queryByText('Un-trash')).toBeNull()
+    expect(screen.queryByText('Pursue')).toBeNull()
   })
 })
