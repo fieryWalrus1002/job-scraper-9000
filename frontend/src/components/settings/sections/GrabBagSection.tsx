@@ -77,7 +77,8 @@ export function GrabBagSection({
   return (
     <Section title="Grab bag">
       <p className="text-[12px] text-muted">
-        Configure the grab-bag view: how many jobs per batch and the minimum fit score to surface.
+        Configure the grab-bag view: how many jobs per batch, the minimum fit score to surface, and
+        an optional max posting age (blank = no limit).
       </p>
 
       <div className="grid grid-cols-2 gap-x-4">
