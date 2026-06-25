@@ -498,3 +498,55 @@ def test_0015_downgrade_recreates_notes_column(fresh_pg):
               AND column_name = 'notes'
         """).fetchone()
         assert col_exists is not None, "notes column not restored by downgrade"
+
+
+# ---------------------------------------------------------------------------
+# 0016: grab_bag_size + grab_bag_score_floor columns
+# ---------------------------------------------------------------------------
+
+
+@skip_if_no_docker
+def test_0016_adds_grab_bag_columns_with_defaults(fresh_pg):
+    """Migration 0016 adds grab_bag_size (default 20) and grab_bag_score_floor
+    (default 3) to app.user_search_configs."""
+    _run_alembic("0015", fresh_pg, extra_env=_BOOTSTRAP)
+
+    # Seed a search config row so we can check defaults
+    with psycopg.connect(fresh_pg) as conn:
+        uid = conn.execute("SELECT id FROM app.users WHERE role = 'admin'").fetchone()[
+            0
+        ]
+        conn.execute(
+            "INSERT INTO app.user_search_configs (user_id, payload, policies) "
+            "VALUES (%s, '{}'::jsonb, '{}'::jsonb)",
+            (uid,),
+        )
+
+    _run_alembic("0016", fresh_pg, extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        row = conn.execute(
+            "SELECT grab_bag_size, grab_bag_score_floor FROM app.user_search_configs"
+        ).fetchone()
+        assert row[0] == 20, "grab_bag_size default should be 20"
+        assert row[1] == 3, "grab_bag_score_floor default should be 3"
+
+
+@skip_if_no_docker
+def test_0016_downgrade_drops_grab_bag_columns(fresh_pg):
+    """Downgrade from 0016 back to 0015 must remove grab_bag columns."""
+    _run_alembic("0016", fresh_pg, extra_env=_BOOTSTRAP)
+    _run_alembic("0015", fresh_pg, command="downgrade", extra_env=_BOOTSTRAP)
+
+    with psycopg.connect(fresh_pg) as conn:
+        for col in ("grab_bag_size", "grab_bag_score_floor"):
+            exists = conn.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'app'
+                  AND table_name = 'user_search_configs'
+                  AND column_name = %s
+            """,
+                (col,),
+            ).fetchone()
+            assert exists is None, f"{col} should be dropped after downgrade"

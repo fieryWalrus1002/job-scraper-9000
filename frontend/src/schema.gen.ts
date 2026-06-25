@@ -284,6 +284,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/grab-bag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Grab Bag Settings */
+        put: operations["put_grab_bag_settings_api_settings_grab_bag_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/upcoming-steps": {
         parameters: {
             query?: never;
@@ -614,6 +631,28 @@ export interface components {
             };
             /** Occurred At */
             occurred_at?: string | null;
+        };
+        /** GrabBagSettingsResponse */
+        GrabBagSettingsResponse: {
+            /** Grab Bag Size */
+            grab_bag_size: number;
+            /** Grab Bag Score Floor */
+            grab_bag_score_floor: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * GrabBagSettingsUpdate
+         * @description Per-user grab-bag sampling settings.
+         */
+        GrabBagSettingsUpdate: {
+            /** Grab Bag Size */
+            grab_bag_size: number;
+            /** Grab Bag Score Floor */
+            grab_bag_score_floor: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1058,6 +1097,10 @@ export interface components {
             post_application_nudge_days?: number | null;
             /** Inactivity Days */
             inactivity_days?: number | null;
+            /** Grab Bag Size */
+            grab_bag_size?: number | null;
+            /** Grab Bag Score Floor */
+            grab_bag_score_floor?: number | null;
         };
         /**
          * StaleToApplyAlertOut
@@ -1215,6 +1258,8 @@ export interface operations {
     list_jobs_api_jobs_get: {
         parameters: {
             query?: {
+                mode?: "table" | "grabbag";
+                seed?: number;
                 min_score?: number | null;
                 max_score?: number | null;
                 remote_classification?: ("fully_remote" | "remote_with_quarterly_travel" | "remote_with_monthly_travel" | "remote_with_frequent_travel" | "hybrid" | "onsite_disguised" | "location_restricted" | "unclear")[] | null;
@@ -1862,6 +1907,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertThresholdsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_grab_bag_settings_api_settings_grab_bag_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrabBagSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrabBagSettingsResponse"];
                 };
             };
             /** @description Validation Error */

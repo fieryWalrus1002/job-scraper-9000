@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   fetchSettings,
   saveAlertThresholds,
+  saveGrabBagSettings,
   savePipelineEnabled,
   saveProfile,
   saveSearch,
@@ -9,6 +10,7 @@ import {
 import type {
   AlertThresholdsUpdate,
   CandidateProfileInput,
+  GrabBagSettingsUpdate,
   SearchConfigInput,
   SettingsResponse,
 } from '../types'
@@ -48,6 +50,14 @@ export function useSaveAlertThresholds() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: AlertThresholdsUpdate) => saveAlertThresholds(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+}
+
+export function useSaveGrabBagSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: GrabBagSettingsUpdate) => saveGrabBagSettings(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 }
