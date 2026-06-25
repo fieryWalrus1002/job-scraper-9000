@@ -113,6 +113,20 @@ def _extract_row(record: dict) -> dict:
         k: v for k, v in metadata.items() if k not in _PROMOTED_METADATA_KEYS
     }
 
+    # posted_at must never be NULL (raw.job_postings enforces NOT NULL — #431).
+    # Prefer the source's date, then the scrape time. If both are missing we
+    # fabricate today's date rather than fail the whole ingest on a flaky
+    # scraper — but log it loudly so a systematic scraper regression surfaces
+    # instead of silently fabricating posting dates (FAIL FAST, but LOG WELL).
+    posted_at = record.get("posted_at") or record.get("scraped_at")
+    if not posted_at:
+        posted_at = date.today().isoformat()
+        log.warning(
+            "posting %s has no posted_at or scraped_at; defaulting posted_at to today (%s)",
+            record.get("dedup_hash") or record.get("source_url") or "<unknown>",
+            posted_at,
+        )
+
     return {
         "dedup_hash": record["dedup_hash"],
         "user_email": record.get("user_email"),
@@ -122,9 +136,7 @@ def _extract_row(record: dict) -> dict:
         "title": record.get("title"),
         "company": record.get("company"),
         "location": record.get("location"),
-        "posted_at": record.get("posted_at")
-        or record.get("scraped_at")
-        or date.today().isoformat(),
+        "posted_at": posted_at,
         "description": record.get("description"),
         "scraped_at": record.get("scraped_at"),
         "remote_classification": record.get("remote_classification"),
