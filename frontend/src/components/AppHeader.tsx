@@ -6,11 +6,11 @@ import { useUnsavedGuard } from './UnsavedGuard'
 export type FunnelPath = '/trash' | '/jobs' | '/shortlist' | '/tracking' | '/grab-bag'
 
 const FUNNEL_TABS: { path: FunnelPath; label: string; muted?: boolean }[] = [
-  { path: '/trash', label: 'Trash', muted: true },
-  { path: '/jobs', label: 'Jobs' },
+  { path: '/grab-bag', label: 'Grab bag' },
+  { path: '/jobs', label: 'Search / All jobs' },
   { path: '/shortlist', label: 'Shortlist' },
   { path: '/tracking', label: 'Tracking' },
-  { path: '/grab-bag', label: 'Grab bag' },
+  { path: '/trash', label: 'Trash', muted: true },
 ]
 
 const tabBtn =
@@ -51,7 +51,18 @@ export function AppHeader({ email, counts, onAddJob, onShowShortcuts }: Props) {
       <nav className="flex items-center gap-1.5" aria-label="Triage funnel">
         {FUNNEL_TABS.map((tab) => {
           const count = counts[tab.path]
-          const to = { pathname: tab.path, search: tab.path === '/jobs' ? location.search : '' }
+          const seedParam = new URLSearchParams(location.search).get('seed')
+          const to = {
+            pathname: tab.path,
+            search:
+              tab.path === '/jobs'
+                ? location.search
+                : tab.path === '/grab-bag'
+                  ? seedParam
+                    ? `?seed=${seedParam}`
+                    : ''
+                  : '',
+          }
           return (
             <NavLink
               key={tab.path}

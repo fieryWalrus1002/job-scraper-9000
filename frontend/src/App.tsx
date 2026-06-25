@@ -220,10 +220,7 @@ function AppShell({ email }: { email: string }) {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <Routes>
-            <Route
-              path="/"
-              element={<Navigate to={{ pathname: '/jobs', search: location.search }} replace />}
-            />
+            <Route path="/" element={<Navigate to="/grab-bag" replace />} />
             <Route
               path="/jobs"
               element={
@@ -329,7 +326,7 @@ function AppShell({ email }: { email: string }) {
                 </ErrorBoundary>
               }
             />
-            <Route path="*" element={<Navigate to="/jobs" replace />} />
+            <Route path="*" element={<Navigate to="/grab-bag" replace />} />
           </Routes>
         </div>
       </div>

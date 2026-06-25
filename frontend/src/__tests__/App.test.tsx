@@ -81,7 +81,10 @@ describe('App auth gate', () => {
 
     expect(await screen.findByRole('navigation', { name: 'Triage funnel' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Trash/ })).toHaveAttribute('href', '/trash')
-    expect(screen.getByRole('link', { name: /Jobs/ })).toHaveAttribute('href', '/jobs')
+    expect(screen.getByRole('link', { name: /Search \/ All jobs/ })).toHaveAttribute(
+      'href',
+      '/jobs',
+    )
     expect(screen.getByRole('link', { name: /Shortlist/ })).toHaveAttribute('href', '/shortlist')
     expect(screen.getByRole('link', { name: /Tracking/ })).toHaveAttribute('href', '/tracking')
   })
@@ -99,18 +102,16 @@ describe('App auth gate', () => {
     expect(screen.queryByLabelText(/Collapse filters|Expand filters/)).not.toBeInTheDocument()
   })
 
-  it('redirects root to jobs while preserving filters', async () => {
+  it('redirects root to grab-bag', async () => {
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
       userId: 'u1',
       userDetails: 'test@example.com',
       userRoles: ['authenticated'],
     })
 
-    renderApp(['/?min_score=4'])
+    renderApp(['/'])
 
-    await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent('/jobs?min_score=4'),
-    )
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/grab-bag'))
   })
 
   it('passes the clicked application row into status-tab detail panels', async () => {
@@ -265,7 +266,7 @@ describe('App auth gate', () => {
     expect(screen.queryByText('Triaged Role')).not.toBeInTheDocument()
   })
 
-  it('redirects unknown paths to jobs', async () => {
+  it('redirects unknown paths to grab-bag', async () => {
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
       userId: 'u1',
       userDetails: 'test@example.com',
@@ -274,7 +275,7 @@ describe('App auth gate', () => {
 
     renderApp(['/not-a-real-route'])
 
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/jobs'))
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/grab-bag'))
   })
 })
 
