@@ -99,6 +99,7 @@ export default function SettingsPage() {
                 inactivityDays={data?.inactivity_days ?? null}
                 grabBagSize={data?.grab_bag_size ?? null}
                 grabBagScoreFloor={data?.grab_bag_score_floor ?? null}
+                grabBagMaxAgeDays={data?.grab_bag_max_age_days ?? null}
               />
             </div>
           </div>

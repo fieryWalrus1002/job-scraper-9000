@@ -13,6 +13,7 @@ interface AccountSectionProps {
   inactivityDays: number | null
   grabBagSize: number | null
   grabBagScoreFloor: number | null
+  grabBagMaxAgeDays: number | null
 }
 
 /**
@@ -28,6 +29,7 @@ export function AccountSection({
   inactivityDays,
   grabBagSize,
   grabBagScoreFloor,
+  grabBagMaxAgeDays,
 }: AccountSectionProps) {
   const { principal, isLoading } = useAuth()
   const savePipelineEnabled = useSavePipelineEnabled()
@@ -106,6 +108,7 @@ export function AccountSection({
       <GrabBagSection
         grabBagSize={grabBagSize}
         grabBagScoreFloor={grabBagScoreFloor}
+        grabBagMaxAgeDays={grabBagMaxAgeDays}
         hasSearchConfig={hasSearchConfig}
       />
     </div>
