@@ -301,6 +301,17 @@ export function ApplicationTable({
   const [sortCol, setSortCol] = useState<ApplicationSortCol>('updated')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
+  // Fail loud on a broken config: enabling swipe with neither direction bound is
+  // always a mistake (an unbound *single* direction is fine — that's a legal
+  // one-way surface like Trash). A per-direction no-op at commit time is intended;
+  // a wholly-empty map is not.
+  if (swipeActions && !swipeActions.left && !swipeActions.right) {
+    throw new Error(
+      'ApplicationTable: `swipeActions` was provided but binds neither direction. ' +
+        'Bind `left` and/or `right`, or omit the prop to disable swipe.',
+    )
+  }
+
   const visible = sortApplications(applications, sortCol, sortDir)
 
   function handleSort(col: ApplicationSortCol) {

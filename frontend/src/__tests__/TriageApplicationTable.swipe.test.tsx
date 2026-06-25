@@ -274,6 +274,19 @@ describe('Swipe affordance pills', () => {
   })
 })
 
+describe('swipeActions config validation', () => {
+  it('throws (fail-loud) if swipeActions is provided but binds neither direction', () => {
+    // React logs the thrown render error; silence it so the suite output stays clean.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(() =>
+      render(<ApplicationTable applications={[APP]} onSelect={vi.fn()} swipeActions={{}} />, {
+        wrapper: makeWrapper(),
+      }),
+    ).toThrow(/binds neither direction/)
+    spy.mockRestore()
+  })
+})
+
 describe('Swipeable row column count is stable mid-drag', () => {
   const SHORTLIST_ACTIONS = {
     left: { to: 'passed' as const, label: 'Trash', polarity: 'negative' as const },

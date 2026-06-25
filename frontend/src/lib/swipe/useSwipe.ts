@@ -16,6 +16,9 @@ export interface UseSwipeArgs {
   onDisarm?: () => void
   /** One-shot: fires on release when horizontal but NOT committed (snap home). */
   onSnapBack?: () => void
+  /** One-shot: fires when an in-progress horizontal gesture is aborted
+   *  (pointercancel) rather than released — distinct from onSnapBack. */
+  onCancel?: () => void
   /** Override default tuning values. */
   tuning?: Partial<SwipeTuning>
 }
@@ -64,7 +67,7 @@ function dampOffset(dx: number, tuning: SwipeTuning): number {
  * axis only after axisSlop so vertical scrolling still works, and ignores pointer
  * types not in the tuning set. A release past commitPx fires onCommit; otherwise
  * the row snaps home. Emits one-shot lifecycle edge callbacks (onStart, onArm,
- * onDisarm, onSnapBack) that a later effects layer can subscribe to.
+ * onDisarm, onSnapBack, onCancel) that a later effects layer can subscribe to.
  */
 export function useSwipe({
   onCommit,
@@ -72,6 +75,7 @@ export function useSwipe({
   onArm,
   onDisarm,
   onSnapBack,
+  onCancel,
   tuning: tuningOverride,
 }: UseSwipeArgs): UseSwipeResult {
   const tuning = { ...DEFAULT_SWIPE_TUNING, ...tuningOverride }
@@ -165,6 +169,10 @@ export function useSwipe({
   }
 
   function onPointerCancel() {
+    // Only a horizontal gesture that was actually in progress counts as a cancel;
+    // a stray cancel before axis-lock is a no-op. Distinct from onSnapBack (which
+    // is a deliberate release), so an effects layer can treat abort differently.
+    if (axis.current === 'horizontal') onCancel?.()
     setSettling(true)
     reset()
   }

@@ -71,6 +71,7 @@ describe('useSwipe edge callbacks', () => {
     onArm: vi.fn(),
     onDisarm: vi.fn(),
     onSnapBack: vi.fn(),
+    onCancel: vi.fn(),
     onCommit: vi.fn(),
   }
 
@@ -187,7 +188,7 @@ describe('useSwipe edge callbacks', () => {
     expect(callbacks.onSnapBack).not.toHaveBeenCalled()
   })
 
-  it('does NOT fire onSnapBack on cancel (even after arming)', () => {
+  it('fires onCancel (not onSnapBack/onCommit) when an active gesture is aborted', () => {
     const { container } = render(
       <TestSwipeTarget
         onCommit={callbacks.onCommit}
@@ -195,6 +196,7 @@ describe('useSwipe edge callbacks', () => {
         onArm={callbacks.onArm}
         onDisarm={callbacks.onDisarm}
         onSnapBack={callbacks.onSnapBack}
+        onCancel={callbacks.onCancel}
       />,
     )
     const row = container.querySelector('div')!
@@ -203,10 +205,22 @@ describe('useSwipe edge callbacks', () => {
     swipeTo(row, 100)
     expect(callbacks.onArm).toHaveBeenCalledTimes(1)
 
-    // Cancel instead of release.
+    // Cancel instead of release: onCancel fires once; snap-back/commit do not.
     cancelSwipe(row)
+    expect(callbacks.onCancel).toHaveBeenCalledTimes(1)
     expect(callbacks.onSnapBack).not.toHaveBeenCalled()
     expect(callbacks.onCommit).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire onCancel on a normal release', () => {
+    const { container } = render(
+      <TestSwipeTarget onCommit={callbacks.onCommit} onCancel={callbacks.onCancel} />,
+    )
+    const row = container.querySelector('div')!
+
+    swipeRow(row, 100) // a committed release
+    expect(callbacks.onCommit).toHaveBeenCalledWith('right')
+    expect(callbacks.onCancel).not.toHaveBeenCalled()
   })
 
   it('fires onArm/onDisarm multiple times across separate gesture cycles', () => {
@@ -245,6 +259,7 @@ function TestSwipeTarget({
   onArm,
   onDisarm,
   onSnapBack,
+  onCancel,
   tuning,
 }: {
   onCommit: (dir: 'left' | 'right') => void
@@ -252,8 +267,17 @@ function TestSwipeTarget({
   onArm?: (dir: 'left' | 'right') => void
   onDisarm?: () => void
   onSnapBack?: () => void
+  onCancel?: () => void
   tuning?: Parameters<typeof useSwipe>[0]['tuning']
 }) {
-  const { handlers } = useSwipe({ onCommit, onStart, onArm, onDisarm, onSnapBack, tuning })
+  const { handlers } = useSwipe({
+    onCommit,
+    onStart,
+    onArm,
+    onDisarm,
+    onSnapBack,
+    onCancel,
+    tuning,
+  })
   return <div {...handlers} style={{ width: 400, height: 40, touchAction: 'pan-y' }} />
 }
