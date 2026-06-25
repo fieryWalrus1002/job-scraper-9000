@@ -156,6 +156,15 @@ async def test_grabbag_size_defaults_to_20_without_config(
     assert resp.json()["limit"] == 20
 
 
+async def test_grabbag_rejects_nonzero_offset(db_client: AsyncClient) -> None:
+    """Grab-bag mode is not paged; an explicit offset must fail loud, not be ignored."""
+    resp = await db_client.get(
+        "/api/jobs", params={"mode": "grabbag", "seed": 1, "offset": 20}
+    )
+    assert resp.status_code == 400, resp.text
+    assert "offset" in resp.json()["detail"]
+
+
 async def test_grabbag_honors_score_filters(db_client: AsyncClient) -> None:
     """Existing filters still apply in grab-bag mode (a user can constrain the bag)."""
     resp = await db_client.get(

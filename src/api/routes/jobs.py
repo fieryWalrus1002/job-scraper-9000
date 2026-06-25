@@ -140,6 +140,15 @@ async def list_jobs(
     # Grab-bag mode: seeded, weighted-by-fit sampling (Efraimidis–Spirakis)
     # -----------------------------------------------------------------------
     if mode == "grabbag":
+        # Grab-bag is a stateless seeded sample, not a paged list: offset has no
+        # meaning here. Rather than silently ignore it (and let a caller believe
+        # they're paging), fail loud on an explicit non-zero offset.
+        if offset != 0:
+            raise HTTPException(
+                status_code=400,
+                detail="offset is not supported in grab-bag mode; reroll with a new seed instead.",
+            )
+
         # Batch size + floor come from the user's settings, falling back to the
         # migration-0016 column defaults (20 / 3) when no config row exists — NOT
         # to the table-mode `limit` (default 500), which is intentionally ignored
