@@ -100,8 +100,10 @@ interface ApplicationTableProps {
 
 // Shared cell content — rendered inside either a plain <tr> or a swipeable wrapper.
 // `leading`/`trailing` host the swipe affordance inside the first/last existing
-// cell (it's absolutely positioned against the row, so it pins to the row edge);
-// this keeps the column count identical to a non-swiping row — no extra <td>s.
+// cell, which becomes the positioned ancestor (`position: relative`) so the
+// absolutely-positioned pill pins to that edge cell — the same pattern JobTable
+// uses, and it keeps the column count identical to a non-swiping row (no extra
+// <td>s). Trailing falls here only when there's no actions cell to host it.
 function AppRowCells({
   app,
   leading,
@@ -113,7 +115,7 @@ function AppRowCells({
 }) {
   return (
     <>
-      <td>
+      <td style={leading ? { position: 'relative' } : undefined}>
         {leading}
         <Badge variant="secondary">{STATUS_LABELS[app.status]}</Badge>
       </td>
@@ -156,7 +158,7 @@ function AppRowCells({
           {new Date(app.updated_at).toLocaleDateString()}
         </span>
       </td>
-      <td>
+      <td style={trailing ? { position: 'relative' } : undefined}>
         {trailing}
         <span className="truncate block text-muted text-[12px]">
           {renderLatestActivity(app.latest_event)}
@@ -224,8 +226,10 @@ function SwipeableAppRow({
       }%, transparent)`
     : undefined
 
-  // The affordance pins to the row edge (absolute vs the relative <tr>), so it
-  // lives inside an existing edge cell rather than adding a column.
+  // The affordance lives inside an existing edge cell (the cell is the positioned
+  // ancestor), so it adds no column. Right-swipe pins to the first cell (left
+  // edge); left-swipe pins to the row's right edge — the actions cell when there
+  // is one, else the last data cell.
   const affordance = (dir: 'left' | 'right') => {
     if (direction !== dir) return undefined
     const action = swipeActions[dir]
@@ -243,12 +247,13 @@ function SwipeableAppRow({
     )
   }
 
+  const leftAffordance = affordance('left')
+
   return (
     <tr
       {...handlers}
       className="cursor-pointer hover:bg-hover"
       style={{
-        position: 'relative',
         transform: direction ? `translateX(${offset}px)` : undefined,
         backgroundColor: tint,
         touchAction: 'pan-y',
@@ -261,13 +266,19 @@ function SwipeableAppRow({
         onSelect(app)
       }}
     >
-      <AppRowCells app={app} leading={affordance('right')} trailing={affordance('left')} />
+      <AppRowCells
+        app={app}
+        leading={affordance('right')}
+        trailing={renderRowActions ? undefined : leftAffordance}
+      />
       {renderRowActions && (
         <td
           className="text-right pr-3"
+          style={leftAffordance ? { position: 'relative' } : undefined}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {leftAffordance}
           <div className="inline-flex justify-end">{renderRowActions(app)}</div>
         </td>
       )}
