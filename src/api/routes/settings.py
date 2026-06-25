@@ -54,6 +54,7 @@ class SettingsResponse(BaseModel):
     inactivity_days: int | None = None
     grab_bag_size: int | None = None
     grab_bag_score_floor: int | None = None
+    grab_bag_max_age_days: int | None = None
 
 
 class ProfileSaveResponse(BaseModel):
@@ -102,6 +103,7 @@ class GrabBagSettingsUpdate(BaseModel):
 
     grab_bag_size: int = Field(ge=1, le=50)
     grab_bag_score_floor: int = Field(ge=1, le=5)
+    grab_bag_max_age_days: int | None = Field(default=None, ge=1, le=3650)
 
     model_config = {"extra": "forbid"}
 
@@ -109,6 +111,7 @@ class GrabBagSettingsUpdate(BaseModel):
 class GrabBagSettingsResponse(BaseModel):
     grab_bag_size: int
     grab_bag_score_floor: int
+    grab_bag_max_age_days: int | None
     updated_at: datetime
 
 
@@ -127,7 +130,7 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
                 "SELECT payload, policies, updated_at, pipeline_enabled, "
                 "stale_to_apply_days, post_interview_nudge_days, "
                 "post_application_nudge_days, inactivity_days, "
-                "grab_bag_size, grab_bag_score_floor "
+                "grab_bag_size, grab_bag_score_floor, grab_bag_max_age_days "
                 "FROM app.user_search_configs WHERE user_id = %(uid)s",
                 {"uid": user.id},
             )
@@ -151,6 +154,7 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         inactivity_days=srch["inactivity_days"] if srch else None,
         grab_bag_size=srch["grab_bag_size"] if srch else None,
         grab_bag_score_floor=srch["grab_bag_score_floor"] if srch else None,
+        grab_bag_max_age_days=srch["grab_bag_max_age_days"] if srch else None,
     )
 
 
@@ -293,14 +297,16 @@ async def put_grab_bag_settings(
                 UPDATE app.user_search_configs
                 SET grab_bag_size = %(grab_bag_size)s,
                     grab_bag_score_floor = %(grab_bag_score_floor)s,
+                    grab_bag_max_age_days = %(grab_bag_max_age_days)s,
                     updated_at = now()
                 WHERE user_id = %(uid)s
-                RETURNING grab_bag_size, grab_bag_score_floor, updated_at
+                RETURNING grab_bag_size, grab_bag_score_floor, grab_bag_max_age_days, updated_at
                 """,
                 {
                     "uid": user.id,
                     "grab_bag_size": body.grab_bag_size,
                     "grab_bag_score_floor": body.grab_bag_score_floor,
+                    "grab_bag_max_age_days": body.grab_bag_max_age_days,
                 },
             )
         ).fetchone()
@@ -316,5 +322,6 @@ async def put_grab_bag_settings(
     return GrabBagSettingsResponse(
         grab_bag_size=row["grab_bag_size"],
         grab_bag_score_floor=row["grab_bag_score_floor"],
+        grab_bag_max_age_days=row["grab_bag_max_age_days"],
         updated_at=row["updated_at"],
     )

@@ -155,6 +155,7 @@ async def list_jobs(
         # in grab-bag mode: a bag is sized by grab_bag_size, not the list limit.
         grab_bag_size = 20
         grab_bag_score_floor: int = 3
+        grab_bag_max_age_days: int | None = None
 
         # Build the explicit column list from _LIST_COLS so
         # JobSummary.model_validate sees exactly its expected keys.
@@ -171,31 +172,11 @@ async def list_jobs(
         ]
         outer_select = ", ".join(list_cols_names)
 
-        grabbag_sql = f"""
-            WITH scored AS (
-                SELECT {_LIST_COLS},
-                       ((abs(hashtextextended(p.dedup_hash, %(seed)s)) %% 1000000) + 1) / 1000000.0 AS u
-                {_LIST_FROM}
-                {where}
-                AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s
-            )
-            SELECT {outer_select}
-            FROM scored
-            ORDER BY power(u, 1.0 / fit_score) DESC
-            LIMIT %(limit)s
-        """
-
-        # total = candidate-pool size (count of untriaged, above-floor jobs)
-        count_sql = (
-            f"SELECT COUNT(*) AS n {_LIST_FROM} {where} "
-            "AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s"
-        )
-
         async with pool.connection() as conn:
             # Read user settings for grab-bag defaults
             config_row = await (
                 await conn.execute(
-                    "SELECT grab_bag_size, grab_bag_score_floor "
+                    "SELECT grab_bag_size, grab_bag_score_floor, grab_bag_max_age_days "
                     "FROM app.user_search_configs WHERE user_id = %(uid)s",
                     {"uid": user.id},
                 )
@@ -204,11 +185,44 @@ async def list_jobs(
                 config_row = cast(dict[str, Any], config_row)
                 grab_bag_size = config_row["grab_bag_size"]
                 grab_bag_score_floor = config_row["grab_bag_score_floor"]
+                grab_bag_max_age_days = config_row["grab_bag_max_age_days"]
             # Clamp both on read: the PUT path validates 1–50 / 1–5, but the
             # columns carry no CHECK, so a stray write shouldn't escape the
             # documented contract at the read edge.
             grab_bag_size = max(1, min(50, grab_bag_size))
             grab_bag_score_floor = max(1, min(5, grab_bag_score_floor))
+
+            # Age filter: relative window from user settings (NULL = no limit).
+            # posted_at is NOT NULL (migration 0017), so direct date comparison.
+            age_filter = (
+                " AND p.posted_at >= (now() - make_interval(days => %(max_age_days)s))::date"
+                if grab_bag_max_age_days is not None
+                else ""
+            )
+
+            # Build SQL with {age_filter} interpolated — it's a static fragment
+            # (empty string or a full AND clause) so no caller text is interpolated.
+            grabbag_sql = f"""
+                WITH scored AS (
+                    SELECT {_LIST_COLS},
+                           ((abs(hashtextextended(p.dedup_hash, %(seed)s)) %% 1000000) + 1) / 1000000.0 AS u
+                    {_LIST_FROM}
+                    {where}
+                    AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s
+                    {age_filter}
+                )
+                SELECT {outer_select}
+                FROM scored
+                ORDER BY power(u, 1.0 / fit_score) DESC
+                LIMIT %(limit)s
+            """
+
+            # total = candidate-pool size (count of untriaged, above-floor jobs)
+            count_sql = (
+                f"SELECT COUNT(*) AS n {_LIST_FROM} {where} "
+                f"AND s.fit_score IS NOT NULL AND s.fit_score >= %(score_floor)s"
+                f" {age_filter}"
+            )
 
             grabbag_params = {
                 **params,
@@ -216,10 +230,14 @@ async def list_jobs(
                 "score_floor": grab_bag_score_floor,
                 "limit": grab_bag_size,
             }
+            if grab_bag_max_age_days is not None:
+                grabbag_params["max_age_days"] = grab_bag_max_age_days
             cur = await conn.execute(grabbag_sql, grabbag_params)  # type: ignore[arg-type]
             rows = await cur.fetchall()
 
             count_params = {**params, "score_floor": grab_bag_score_floor}
+            if grab_bag_max_age_days is not None:
+                count_params["max_age_days"] = grab_bag_max_age_days
             cur = await conn.execute(count_sql, count_params)  # type: ignore[arg-type]
             count_row = await cur.fetchone()
             total = cast(dict[str, Any], count_row)["n"] if count_row else 0

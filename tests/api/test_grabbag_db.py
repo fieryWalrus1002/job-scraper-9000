@@ -198,3 +198,78 @@ async def test_table_mode_unchanged(db_client: AsyncClient) -> None:
     table_hashes = {item["dedup_hash"] for item in body["items"]}
     assert "hash-triaged" not in table_hashes
     assert "hash-fit1" in table_hashes  # no floor in table mode
+
+
+async def test_grabbag_max_age_filter_excludes_old_postings(
+    db_client: AsyncClient,
+) -> None:
+    """When grab_bag_max_age_days is set, postings older than N days are excluded
+    from both items and total count."""
+    from datetime import date, timedelta
+    from api.dependencies import get_pool
+
+    pool = app.dependency_overrides[get_pool]
+    pool = pool()  # type: ignore[call-arg]
+
+    # Seed a config row with max_age_days=5 (very short window)
+    async with pool.connection() as conn:
+        await conn.execute(
+            "INSERT INTO app.user_search_configs "
+            "(user_id, payload, policies, grab_bag_size, grab_bag_score_floor, grab_bag_max_age_days) "
+            "VALUES (%(uid)s, '{}'::jsonb, '{}'::jsonb, 20, 3, 5) "
+            "ON CONFLICT (user_id) DO UPDATE SET grab_bag_max_age_days = 5",
+            {"uid": SEED_USER.id},
+        )
+        # Update some postings to be very recent (today) and some to be old
+        today = date.today()
+        old_date = today - timedelta(days=30)
+        await conn.execute(
+            "UPDATE raw.job_postings SET posted_at = %(d)s WHERE dedup_hash = 'hash-fit5'",
+            {"d": today},
+        )
+        await conn.execute(
+            "UPDATE raw.job_postings SET posted_at = %(d)s WHERE dedup_hash = 'hash-fit4'",
+            {"d": today},
+        )
+        await conn.execute(
+            "UPDATE raw.job_postings SET posted_at = %(d)s WHERE dedup_hash = 'hash-fit3'",
+            {"d": old_date},
+        )
+
+    # With max_age_days=5, only fit5 and fit4 (posted today) should appear
+    resp = await db_client.get("/api/jobs", params={"mode": "grabbag", "seed": 42})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    hashes = {item["dedup_hash"] for item in body["items"]}
+    assert "hash-fit5" in hashes, "recent posting should be included"
+    assert "hash-fit4" in hashes, "recent posting should be included"
+    assert "hash-fit3" not in hashes, "old posting should be excluded"
+    # total should reflect only the recent postings
+    assert body["total"] == 2
+
+
+async def test_grabbag_no_age_filter_when_null(
+    db_client: AsyncClient,
+) -> None:
+    """When grab_bag_max_age_days is NULL (not set), no age filtering is applied.
+    All postings above the score floor are included regardless of age."""
+    from api.dependencies import get_pool
+
+    pool = app.dependency_overrides[get_pool]
+    pool = pool()  # type: ignore[call-arg]
+
+    # Clear the max_age_days setting (set to NULL)
+    async with pool.connection() as conn:
+        await conn.execute(
+            "UPDATE app.user_search_configs SET grab_bag_max_age_days = NULL",
+        )
+
+    # All three above-floor jobs should appear regardless of posted_at
+    resp = await db_client.get("/api/jobs", params={"mode": "grabbag", "seed": 42})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    hashes = {item["dedup_hash"] for item in body["items"]}
+    assert "hash-fit3" in hashes, "old posting should be included when no age limit"
+    assert "hash-fit4" in hashes
+    assert "hash-fit5" in hashes
+    assert body["total"] == 3
