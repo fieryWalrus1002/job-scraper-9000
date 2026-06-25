@@ -6,11 +6,11 @@ import { useUnsavedGuard } from './UnsavedGuard'
 export type FunnelPath = '/trash' | '/jobs' | '/shortlist' | '/tracking' | '/grab-bag'
 
 const FUNNEL_TABS: { path: FunnelPath; label: string; muted?: boolean }[] = [
+  { path: '/trash', label: 'Trash', muted: true },
   { path: '/grab-bag', label: 'Grab bag' },
   { path: '/jobs', label: 'Search / All jobs' },
   { path: '/shortlist', label: 'Shortlist' },
   { path: '/tracking', label: 'Tracking' },
-  { path: '/trash', label: 'Trash', muted: true },
 ]
 
 const tabBtn =
