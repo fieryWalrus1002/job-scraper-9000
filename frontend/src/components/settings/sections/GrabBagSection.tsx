@@ -8,6 +8,7 @@ import { Section } from '../fields'
 interface GrabBagSectionProps {
   grabBagSize: number | null
   grabBagScoreFloor: number | null
+  grabBagMaxAgeDays: number | null
   hasSearchConfig: boolean
 }
 
@@ -23,12 +24,14 @@ const LABELS: Record<keyof typeof DEFAULTS, string> = {
 }
 
 /**
- * Grab-bag settings: batch size (1–50) and score floor (1–5).
+ * Grab-bag settings: batch size (1–50), score floor (1–5), and optional
+ * max posting age in days (blank = no limit).
  * Mirrors the alert-thresholds section pattern.
  */
 export function GrabBagSection({
   grabBagSize,
   grabBagScoreFloor,
+  grabBagMaxAgeDays,
   hasSearchConfig,
 }: GrabBagSectionProps) {
   const save = useSaveGrabBagSettings()
@@ -36,6 +39,7 @@ export function GrabBagSection({
     grab_bag_size: grabBagSize ?? DEFAULTS.grab_bag_size,
     grab_bag_score_floor: grabBagScoreFloor ?? DEFAULTS.grab_bag_score_floor,
   })
+  const [maxAgeDays, setMaxAgeDays] = useState<number | null>(grabBagMaxAgeDays ?? null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
@@ -56,7 +60,10 @@ export function GrabBagSection({
     setSaveError(null)
     setSaved(false)
     try {
-      await save.mutateAsync(values)
+      await save.mutateAsync({
+        ...values,
+        grab_bag_max_age_days: maxAgeDays,
+      })
       setSaved(true)
     } catch (err) {
       if (err instanceof ApiValidationError) {
@@ -70,7 +77,8 @@ export function GrabBagSection({
   return (
     <Section title="Grab bag">
       <p className="text-[12px] text-muted">
-        Configure the grab-bag view: how many jobs per batch and the minimum fit score to surface.
+        Configure the grab-bag view: how many jobs per batch, the minimum fit score to surface, and
+        an optional max posting age (blank = no limit).
       </p>
 
       <div className="grid grid-cols-2 gap-x-4">
@@ -88,6 +96,17 @@ export function GrabBagSection({
             </Field>
           )
         })}
+
+        <Field label="Max posting age (days)" error={fieldErrors.grab_bag_max_age_days}>
+          <Input
+            type="number"
+            min={1}
+            placeholder="No limit"
+            value={maxAgeDays ?? ''}
+            onChange={(e) => setMaxAgeDays(e.target.value === '' ? null : Number(e.target.value))}
+          />
+          <span className="text-[10px] text-muted">Blank = no age limit</span>
+        </Field>
       </div>
 
       <div className="flex items-center gap-3">

@@ -25,6 +25,9 @@ const ONBOARDING_SETTINGS = {
   post_interview_nudge_days: null,
   post_application_nudge_days: null,
   inactivity_days: null,
+  grab_bag_size: null,
+  grab_bag_score_floor: null,
+  grab_bag_max_age_days: null,
 }
 
 const CONFIGURED_SETTINGS = {
@@ -45,6 +48,9 @@ const CONFIGURED_SETTINGS = {
   post_interview_nudge_days: 7,
   post_application_nudge_days: 10,
   inactivity_days: 14,
+  grab_bag_size: 20,
+  grab_bag_score_floor: 3,
+  grab_bag_max_age_days: null,
 }
 
 /** Route the global fetch mock by URL + method. */
@@ -53,6 +59,7 @@ function stubFetch(handlers: {
   putProfile?: { status: number; body: unknown }
   putPipelineEnabled?: { status: number; body: unknown }
   putAlertThresholds?: { status: number; body: unknown }
+  putGrabBagSettings?: { status: number; body: unknown }
 }) {
   vi.stubGlobal(
     'fetch',
@@ -82,6 +89,18 @@ function stubFetch(handlers: {
             post_interview_nudge_days: 7,
             post_application_nudge_days: 10,
             inactivity_days: 14,
+            updated_at: '2026-06-11T00:00:00Z',
+          },
+        }
+        return Promise.resolve(new Response(JSON.stringify(h.body), { status: h.status }))
+      }
+      if (url.endsWith('/api/settings/grab-bag') && opts?.method === 'PUT') {
+        const h = handlers.putGrabBagSettings ?? {
+          status: 200,
+          body: {
+            grab_bag_size: 20,
+            grab_bag_score_floor: 3,
+            grab_bag_max_age_days: null,
             updated_at: '2026-06-11T00:00:00Z',
           },
         }
@@ -270,5 +289,96 @@ describe('SettingsPage four-section nav', () => {
       post_application_nudge_days: 10,
       inactivity_days: 14,
     })
+  })
+})
+
+describe('GrabBagSection — max posting age', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('renders the max posting age field in the grab-bag section', async () => {
+    stubFetch({ getSettings: CONFIGURED_SETTINGS })
+    renderPage()
+    await screen.findByDisplayValue(/Backend engineer with a decade/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(screen.getByRole('heading', { name: 'Grab bag' })).toBeInTheDocument()
+    expect(screen.getByText('Max posting age (days)')).toBeInTheDocument()
+    expect(screen.getByText(/Blank = no age limit/i)).toBeInTheDocument()
+  })
+
+  it('saves grab_bag_max_age_days as null when the field is empty', async () => {
+    stubFetch({ getSettings: CONFIGURED_SETTINGS })
+    renderPage()
+    await screen.findByDisplayValue(/Backend engineer with a decade/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(screen.getByRole('heading', { name: 'Grab bag' })).toBeInTheDocument()
+
+    // The max-age field starts empty (null) since CONFIGURED_SETTINGS has null
+    fireEvent.click(screen.getByRole('button', { name: /Save grab-bag settings/i }))
+
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls
+      expect(calls.some(([url]) => String(url).endsWith('/api/settings/grab-bag'))).toBe(true)
+    })
+    const putCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).endsWith('/api/settings/grab-bag'))
+    const body = JSON.parse(String(putCall?.[1]?.body))
+    expect(body.grab_bag_max_age_days).toBeNull()
+  })
+
+  it('saves grab_bag_max_age_days as a number when filled', async () => {
+    stubFetch({ getSettings: CONFIGURED_SETTINGS })
+    renderPage()
+    await screen.findByDisplayValue(/Backend engineer with a decade/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(screen.getByRole('heading', { name: 'Grab bag' })).toBeInTheDocument()
+
+    // Find the max-age input by its placeholder and type it into
+    const maxAgeInput = screen.getByPlaceholderText('No limit')
+    fireEvent.change(maxAgeInput, { target: { value: '30' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /Save grab-bag settings/i }))
+
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls
+      expect(calls.some(([url]) => String(url).endsWith('/api/settings/grab-bag'))).toBe(true)
+    })
+    const putCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).endsWith('/api/settings/grab-bag'))
+    const body = JSON.parse(String(putCall?.[1]?.body))
+    expect(body.grab_bag_max_age_days).toBe(30)
+  })
+
+  it('clearing the max-age field saves null', async () => {
+    stubFetch({
+      getSettings: { ...CONFIGURED_SETTINGS, grab_bag_max_age_days: 60 },
+    })
+    renderPage()
+    await screen.findByDisplayValue(/Backend engineer with a decade/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Account & Activity' }))
+    expect(screen.getByRole('heading', { name: 'Grab bag' })).toBeInTheDocument()
+
+    // The input should be seeded with 60
+    const maxAgeInput = screen.getByPlaceholderText('No limit')
+    expect(maxAgeInput).toHaveValue(60)
+
+    // Clear it
+    fireEvent.change(maxAgeInput, { target: { value: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: /Save grab-bag settings/i }))
+
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls
+      expect(calls.some(([url]) => String(url).endsWith('/api/settings/grab-bag'))).toBe(true)
+    })
+    const putCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).endsWith('/api/settings/grab-bag'))
+    const body = JSON.parse(String(putCall?.[1]?.body))
+    expect(body.grab_bag_max_age_days).toBeNull()
   })
 })
