@@ -56,6 +56,17 @@ export function GrabBagView({ onSelect }: Props) {
   const visibleJobs = (data?.items ?? []).filter((j) => !applications?.has(j.dedup_hash))
   const isCaughtUp = !isLoading && !isError && visibleJobs.length === 0
 
+  // Triage a job by creating an application row (from: null → to: status).
+  // The applications mutation invalidates the applications query, which triggers
+  // a re-render and filters the triaged card out of visibleJobs.
+  const { triage } = useTriageAction()
+  const triageJob = useCallback(
+    (job: JobSummary, to: 'passed' | 'maybe') => {
+      triage({ dedupHash: job.dedup_hash, from: null, to })
+    },
+    [triage],
+  )
+
   // "New batch": generate a fresh seed, write it to URL (replace), and refetch.
   const handleNewBatch = useCallback(() => {
     const newSeed = generateSeed()
@@ -69,7 +80,7 @@ export function GrabBagView({ onSelect }: Props) {
       if (!job) return
       triageJob(job, 'passed')
     },
-    [visibleJobs],
+    [visibleJobs, triageJob],
   )
 
   const handleShortlist = useCallback(
@@ -78,7 +89,7 @@ export function GrabBagView({ onSelect }: Props) {
       if (!job) return
       triageJob(job, 'maybe')
     },
-    [visibleJobs],
+    [visibleJobs, triageJob],
   )
 
   const handleOpen = useCallback(
@@ -96,15 +107,6 @@ export function GrabBagView({ onSelect }: Props) {
     onShortlist: handleShortlist,
     onOpen: handleOpen,
   })
-
-  // Triage a job by creating an application row (from: null → to: status).
-  // The applications mutation invalidates the applications query, which triggers
-  // a re-render and filters the triaged card out of visibleJobs.
-  const { triage } = useTriageAction()
-
-  function triageJob(job: JobSummary, to: 'passed' | 'maybe') {
-    triage({ dedupHash: job.dedup_hash, from: null, to })
-  }
 
   // Swipe action mapping: left → trash (passed), right → shortlist (maybe).
   const swipeActions = {
@@ -159,7 +161,6 @@ export function GrabBagView({ onSelect }: Props) {
                 job={job}
                 actions={swipeActions}
                 onSelect={(j) => onSelect(j.dedup_hash, 'grabbag', undefined, j)}
-                index={i}
                 isFocused={i === focusedIndex}
               />
             ))}

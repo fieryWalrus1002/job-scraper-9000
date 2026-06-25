@@ -23,8 +23,6 @@ interface Props {
   job: JobSummary
   actions: CardSwipeActions
   onSelect: (job: JobSummary) => void
-  /** Index of this card in the batch (for keyboard cursor highlighting). */
-  index: number
   /** True when the keyboard cursor is on this card. */
   isFocused: boolean
 }
@@ -38,7 +36,7 @@ function polarityColor(polarity: 'positive' | 'negative'): string {
  * `SwipeAffordance` pill from the table surface. On commit the card triages
  * via the existing applications mutation; on tap it opens the detail panel.
  */
-export function GrabBagCard({ job, actions, onSelect, index: _index, isFocused }: Props) {
+export function GrabBagCard({ job, actions, onSelect, isFocused }: Props) {
   const { triage } = useTriageAction()
 
   const { offset, progress, armed, direction, settling, handlers, consumeClickSuppression } =
