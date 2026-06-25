@@ -6,7 +6,8 @@ interface SwipeAffordanceProps {
   armed: boolean
   offset: number
   label: string
-  icon: ComponentType<{ className?: string }>
+  /** Optional decorative glyph; the label alone is enough if a surface omits it. */
+  icon?: ComponentType<{ className?: string }>
   color: string
 }
 
@@ -38,7 +39,7 @@ export function SwipeAffordance({
         backgroundColor: armed ? color : `color-mix(in oklab, ${color} 16%, transparent)`,
       }}
     >
-      <Icon className="size-3.5" />
+      {Icon && <Icon className="size-3.5" />}
       {label}
     </span>
   )

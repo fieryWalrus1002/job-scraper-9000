@@ -273,3 +273,30 @@ describe('Swipe affordance pills', () => {
     expect(screen.queryByText('Pursue')).toBeNull()
   })
 })
+
+describe('Swipeable row column count is stable mid-drag', () => {
+  const SHORTLIST_ACTIONS = {
+    left: { to: 'passed' as const, label: 'Trash', polarity: 'negative' as const },
+    right: { to: 'to_apply' as const, label: 'Pursue', polarity: 'positive' as const },
+  }
+
+  it('keeps the same <td> count idle and mid-drag (affordance adds no column)', () => {
+    const renderRowActions = () => <button>act</button>
+    render(
+      <ApplicationTable
+        applications={[APP]}
+        onSelect={vi.fn()}
+        renderRowActions={renderRowActions}
+        swipeActions={SHORTLIST_ACTIONS}
+      />,
+      { wrapper: makeWrapper() },
+    )
+
+    const row = screen.getByText('Swipeable Role').closest('tr')!
+    const idleCount = row.querySelectorAll('td').length
+
+    dragRow(row, 120) // right-drag: affordance is now visible
+    expect(screen.queryByText('Pursue')).not.toBeNull() // affordance actually rendered
+    expect(row.querySelectorAll('td').length).toBe(idleCount) // …but no extra column
+  })
+})

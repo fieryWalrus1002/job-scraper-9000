@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ArrowRight, ArrowUp, Trash2 } from 'lucide-react'
 import {
   Navigate,
   Route,
@@ -268,8 +269,13 @@ function AppShell({ email }: { email: string }) {
                   emptyMessage="No shortlisted jobs yet."
                   renderRowActions={(app) => <ShortlistRowActions application={app} />}
                   swipeActions={{
-                    left: { to: 'passed', label: 'Trash', polarity: 'negative' },
-                    right: { to: 'to_apply', label: 'Pursue', polarity: 'positive' },
+                    left: { to: 'passed', label: 'Trash', polarity: 'negative', icon: Trash2 },
+                    right: {
+                      to: 'to_apply',
+                      label: 'Pursue',
+                      polarity: 'positive',
+                      icon: ArrowRight,
+                    },
                   }}
                 />
               }
@@ -291,7 +297,7 @@ function AppShell({ email }: { email: string }) {
                   emptyMessage="Trash is empty."
                   renderRowActions={(app) => <TrashRowActions application={app} />}
                   swipeActions={{
-                    right: { to: 'remove', label: 'Un-trash', polarity: 'positive' },
+                    right: { to: 'remove', label: 'Un-trash', polarity: 'positive', icon: ArrowUp },
                   }}
                 />
               }

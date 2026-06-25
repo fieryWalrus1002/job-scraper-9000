@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ComponentType, type ReactNode } from 'react'
 import { useApplications } from '../hooks/useApplications'
 import { STATUS_LABELS, type Application, type ApplicationStatus } from '../types'
 import type { components } from '../schema.gen'
@@ -6,17 +6,31 @@ import { Badge } from './ui/badge'
 import { useSwipe } from '@/lib/swipe/useSwipe'
 import { SwipeAffordance } from '@/lib/swipe/SwipeAffordance'
 import { useTriageAction, type TriageTarget } from '../hooks/useTriage'
-import { ArrowRight, ArrowUp, Trash2 } from 'lucide-react'
 
 type LatestEvent = components['schemas']['LatestEvent']
 
 type ApplicationSortCol = 'status' | 'title' | 'score' | 'updated'
 type SortDir = 'asc' | 'desc'
 
-/** Per-direction swipe commit target; omit a direction to make it a no-op. */
+/** A single swipe direction's commit + affordance. The defining surface owns the
+ *  glyph, so there is no label→icon lookup to keep in sync (and nothing to crash
+ *  on a missing entry). `polarity` drives the tint/affordance color. */
+export interface RowSwipeAction {
+  to: TriageTarget
+  label: string
+  polarity: 'positive' | 'negative'
+  icon?: ComponentType<{ className?: string }>
+}
+
+/** Per-direction swipe mapping; omit a direction to make it a no-op. */
 export interface RowSwipeActions {
-  left?: { to: TriageTarget; label: string; polarity: 'positive' | 'negative' }
-  right?: { to: TriageTarget; label: string; polarity: 'positive' | 'negative' }
+  left?: RowSwipeAction
+  right?: RowSwipeAction
+}
+
+// Tint/affordance color for a swipe action, derived from its polarity.
+function polarityColor(polarity: 'positive' | 'negative'): string {
+  return polarity === 'negative' ? 'var(--color-score-low)' : 'var(--color-score-mid)'
 }
 
 interface Props {
@@ -85,10 +99,22 @@ interface ApplicationTableProps {
 // ── Row components ──────────────────────────────────────────────────────────
 
 // Shared cell content — rendered inside either a plain <tr> or a swipeable wrapper.
-function AppRowCells({ app }: { app: Application }) {
+// `leading`/`trailing` host the swipe affordance inside the first/last existing
+// cell (it's absolutely positioned against the row, so it pins to the row edge);
+// this keeps the column count identical to a non-swiping row — no extra <td>s.
+function AppRowCells({
+  app,
+  leading,
+  trailing,
+}: {
+  app: Application
+  leading?: ReactNode
+  trailing?: ReactNode
+}) {
   return (
     <>
       <td>
+        {leading}
         <Badge variant="secondary">{STATUS_LABELS[app.status]}</Badge>
       </td>
       <td>
@@ -131,6 +157,7 @@ function AppRowCells({ app }: { app: Application }) {
         </span>
       </td>
       <td>
+        {trailing}
         <span className="truncate block text-muted text-[12px]">
           {renderLatestActivity(app.latest_event)}
         </span>
@@ -165,13 +192,6 @@ function AppRowContent({
   )
 }
 
-// Icon + color mapping for swipe action labels.
-const SWIPE_ACTION_VISUALS: Record<string, { icon: typeof Trash2; color: string }> = {
-  Trash: { icon: Trash2, color: 'var(--color-score-low)' },
-  'Un-trash': { icon: ArrowUp, color: 'var(--color-score-mid)' },
-  Pursue: { icon: ArrowRight, color: 'var(--color-score-mid)' },
-}
-
 // Swipeable application row — wraps the row in swipe gesture handlers and
 // reveals an affordance as the row slides. When swipeActions is set, the row
 // responds to horizontal drag; otherwise it falls back to plain tap-to-select.
@@ -197,14 +217,31 @@ function SwipeableAppRow({
       },
     })
 
-  const tint = direction
-    ? `color-mix(in oklab, ${
-        swipeActions[direction]?.polarity === 'negative'
-          ? 'var(--color-score-low)'
-          : 'var(--color-score-mid)'
-      } ${armed ? 22 : 6 + progress * 10}%, transparent)`
+  const activeAction = direction ? swipeActions[direction] : undefined
+  const tint = activeAction
+    ? `color-mix(in oklab, ${polarityColor(activeAction.polarity)} ${
+        armed ? 22 : 6 + progress * 10
+      }%, transparent)`
     : undefined
-  const edgeCell = direction ? { overflow: 'visible' as const } : undefined
+
+  // The affordance pins to the row edge (absolute vs the relative <tr>), so it
+  // lives inside an existing edge cell rather than adding a column.
+  const affordance = (dir: 'left' | 'right') => {
+    if (direction !== dir) return undefined
+    const action = swipeActions[dir]
+    if (!action) return undefined
+    return (
+      <SwipeAffordance
+        direction={dir}
+        progress={progress}
+        armed={armed}
+        offset={offset}
+        label={action.label}
+        icon={action.icon}
+        color={polarityColor(action.polarity)}
+      />
+    )
+  }
 
   return (
     <tr
@@ -224,39 +261,14 @@ function SwipeableAppRow({
         onSelect(app)
       }}
     >
-      {direction === 'right' && swipeActions.right && (
-        <td className="w-11 max-w-11" style={edgeCell}>
-          <SwipeAffordance
-            direction="right"
-            progress={progress}
-            armed={armed}
-            offset={offset}
-            label={swipeActions.right.label}
-            {...SWIPE_ACTION_VISUALS[swipeActions.right.label]}
-          />
-        </td>
-      )}
-      <AppRowCells app={app} />
+      <AppRowCells app={app} leading={affordance('right')} trailing={affordance('left')} />
       {renderRowActions && (
         <td
           className="text-right pr-3"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          style={edgeCell}
         >
           <div className="inline-flex justify-end">{renderRowActions(app)}</div>
-        </td>
-      )}
-      {direction === 'left' && swipeActions.left && (
-        <td className="w-11 max-w-11" style={edgeCell}>
-          <SwipeAffordance
-            direction="left"
-            progress={progress}
-            armed={armed}
-            offset={offset}
-            label={swipeActions.left.label}
-            {...SWIPE_ACTION_VISUALS[swipeActions.left.label]}
-          />
         </td>
       )}
     </tr>
