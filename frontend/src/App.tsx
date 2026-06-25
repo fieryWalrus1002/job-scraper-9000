@@ -220,7 +220,10 @@ function AppShell({ email }: { email: string }) {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <Routes>
-            <Route path="/" element={<Navigate to="/grab-bag" replace />} />
+            <Route
+              path="/"
+              element={<Navigate to={{ pathname: '/grab-bag', search: location.search }} replace />}
+            />
             <Route
               path="/jobs"
               element={

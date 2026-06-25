@@ -57,10 +57,8 @@ export function AppHeader({ email, counts, onAddJob, onShowShortcuts }: Props) {
             search:
               tab.path === '/jobs'
                 ? location.search
-                : tab.path === '/grab-bag'
-                  ? seedParam
-                    ? `?seed=${seedParam}`
-                    : ''
+                : tab.path === '/grab-bag' && seedParam
+                  ? `?${new URLSearchParams({ seed: seedParam }).toString()}`
                   : '',
           }
           return (

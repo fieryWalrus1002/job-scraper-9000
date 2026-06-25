@@ -114,6 +114,20 @@ describe('App auth gate', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/grab-bag'))
   })
 
+  it('preserves an incoming seed when redirecting root to grab-bag', async () => {
+    vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
+      userId: 'u1',
+      userDetails: 'test@example.com',
+      userRoles: ['authenticated'],
+    })
+
+    renderApp(['/?seed=42'])
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/grab-bag?seed=42'),
+    )
+  })
+
   it('passes the clicked application row into status-tab detail panels', async () => {
     vi.spyOn(auth, 'fetchPrincipal').mockResolvedValue({
       userId: 'u1',
