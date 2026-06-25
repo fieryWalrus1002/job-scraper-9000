@@ -222,7 +222,7 @@ function AppShell({ email }: { email: string }) {
           <Routes>
             <Route
               path="/"
-              element={<Navigate to={{ pathname: '/jobs', search: location.search }} replace />}
+              element={<Navigate to={{ pathname: '/grab-bag', search: location.search }} replace />}
             />
             <Route
               path="/jobs"
@@ -329,7 +329,7 @@ function AppShell({ email }: { email: string }) {
                 </ErrorBoundary>
               }
             />
-            <Route path="*" element={<Navigate to="/jobs" replace />} />
+            <Route path="*" element={<Navigate to="/grab-bag" replace />} />
           </Routes>
         </div>
       </div>
