@@ -121,7 +121,7 @@ def _extract_row(record: dict) -> dict:
         "title": record.get("title"),
         "company": record.get("company"),
         "location": record.get("location"),
-        "posted_at": record.get("posted_at"),
+        "posted_at": record.get("posted_at") or record.get("scraped_at"),
         "description": record.get("description"),
         "scraped_at": record.get("scraped_at"),
         "remote_classification": record.get("remote_classification"),

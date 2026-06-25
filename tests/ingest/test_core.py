@@ -131,6 +131,31 @@ def test_extract_row_carries_user_email() -> None:
     assert row["user_email"] == "friend@example.com"
 
 
+def test_extract_row_posted_at_present() -> None:
+    row = _extract_row(_make_record())
+    assert row["posted_at"] == "2026-05-01"
+
+
+def test_extract_row_posted_at_missing_falls_back_to_scraped_at() -> None:
+    record = _make_record()
+    del record["posted_at"]
+    row = _extract_row(record)
+    assert row["posted_at"] == "2026-05-31T08:00:00Z"
+
+
+def test_extract_row_posted_at_empty_string_falls_back_to_scraped_at() -> None:
+    row = _extract_row(_make_record(posted_at=""))
+    assert row["posted_at"] == "2026-05-31T08:00:00Z"
+
+
+def test_extract_row_posted_at_both_missing_stays_none() -> None:
+    record = _make_record()
+    del record["posted_at"]
+    del record["scraped_at"]
+    row = _extract_row(record)
+    assert row["posted_at"] is None
+
+
 # ---------------------------------------------------------------------------
 # _strip_nul
 # ---------------------------------------------------------------------------
