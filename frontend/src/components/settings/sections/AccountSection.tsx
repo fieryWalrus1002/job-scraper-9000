@@ -2,6 +2,7 @@ import { useSavePipelineEnabled } from '../../../hooks/useSettings'
 import { useAuth } from '../../../hooks/useAuth'
 import { Section } from '../fields'
 import { AlertThresholdsSection } from './AlertThresholdsSection'
+import { GrabBagSection } from './GrabBagSection'
 
 interface AccountSectionProps {
   pipelineEnabled: boolean | null
@@ -10,6 +11,8 @@ interface AccountSectionProps {
   postInterviewNudgeDays: number | null
   postApplicationNudgeDays: number | null
   inactivityDays: number | null
+  grabBagSize: number | null
+  grabBagScoreFloor: number | null
 }
 
 /**
@@ -23,6 +26,8 @@ export function AccountSection({
   postInterviewNudgeDays,
   postApplicationNudgeDays,
   inactivityDays,
+  grabBagSize,
+  grabBagScoreFloor,
 }: AccountSectionProps) {
   const { principal, isLoading } = useAuth()
   const savePipelineEnabled = useSavePipelineEnabled()
@@ -95,6 +100,12 @@ export function AccountSection({
         postInterviewNudgeDays={postInterviewNudgeDays}
         postApplicationNudgeDays={postApplicationNudgeDays}
         inactivityDays={inactivityDays}
+        hasSearchConfig={hasSearchConfig}
+      />
+
+      <GrabBagSection
+        grabBagSize={grabBagSize}
+        grabBagScoreFloor={grabBagScoreFloor}
         hasSearchConfig={hasSearchConfig}
       />
     </div>

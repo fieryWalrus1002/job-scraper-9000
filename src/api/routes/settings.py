@@ -52,6 +52,8 @@ class SettingsResponse(BaseModel):
     post_interview_nudge_days: int | None = None
     post_application_nudge_days: int | None = None
     inactivity_days: int | None = None
+    grab_bag_size: int | None = None
+    grab_bag_score_floor: int | None = None
 
 
 class ProfileSaveResponse(BaseModel):
@@ -95,6 +97,21 @@ class AlertThresholdsResponse(BaseModel):
     updated_at: datetime
 
 
+class GrabBagSettingsUpdate(BaseModel):
+    """Per-user grab-bag sampling settings."""
+
+    grab_bag_size: int = Field(ge=1, le=50)
+    grab_bag_score_floor: int = Field(ge=1, le=5)
+
+    model_config = {"extra": "forbid"}
+
+
+class GrabBagSettingsResponse(BaseModel):
+    grab_bag_size: int
+    grab_bag_score_floor: int
+    updated_at: datetime
+
+
 @router.get("", response_model=SettingsResponse)
 async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
     async with pool.connection() as conn:
@@ -109,7 +126,8 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
             await conn.execute(
                 "SELECT payload, policies, updated_at, pipeline_enabled, "
                 "stale_to_apply_days, post_interview_nudge_days, "
-                "post_application_nudge_days, inactivity_days "
+                "post_application_nudge_days, inactivity_days, "
+                "grab_bag_size, grab_bag_score_floor "
                 "FROM app.user_search_configs WHERE user_id = %(uid)s",
                 {"uid": user.id},
             )
@@ -131,6 +149,8 @@ async def get_settings(pool: Pool, user: CurrentUser) -> SettingsResponse:
         if srch
         else None,
         inactivity_days=srch["inactivity_days"] if srch else None,
+        grab_bag_size=srch["grab_bag_size"] if srch else None,
+        grab_bag_score_floor=srch["grab_bag_score_floor"] if srch else None,
     )
 
 
@@ -258,5 +278,43 @@ async def put_alert_thresholds(
         post_interview_nudge_days=row["post_interview_nudge_days"],
         post_application_nudge_days=row["post_application_nudge_days"],
         inactivity_days=row["inactivity_days"],
+        updated_at=row["updated_at"],
+    )
+
+
+@router.put("/grab-bag", response_model=GrabBagSettingsResponse)
+async def put_grab_bag_settings(
+    body: GrabBagSettingsUpdate, pool: Pool, user: CurrentUser
+) -> GrabBagSettingsResponse:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                """
+                UPDATE app.user_search_configs
+                SET grab_bag_size = %(grab_bag_size)s,
+                    grab_bag_score_floor = %(grab_bag_score_floor)s,
+                    updated_at = now()
+                WHERE user_id = %(uid)s
+                RETURNING grab_bag_size, grab_bag_score_floor, updated_at
+                """,
+                {
+                    "uid": user.id,
+                    "grab_bag_size": body.grab_bag_size,
+                    "grab_bag_score_floor": body.grab_bag_score_floor,
+                },
+            )
+        ).fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No search config exists for the current user; create search "
+                "settings before configuring grab-bag settings."
+            ),
+        )
+    row = cast(dict[str, Any], row)
+    return GrabBagSettingsResponse(
+        grab_bag_size=row["grab_bag_size"],
+        grab_bag_score_floor=row["grab_bag_score_floor"],
         updated_at=row["updated_at"],
     )

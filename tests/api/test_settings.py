@@ -46,6 +46,8 @@ FAKE_SEARCH_ROW: dict[str, Any] = {
     "post_interview_nudge_days": 7,
     "post_application_nudge_days": 10,
     "inactivity_days": 14,
+    "grab_bag_size": 20,
+    "grab_bag_score_floor": 3,
 }
 
 
@@ -73,6 +75,8 @@ async def test_get_settings_onboarding_state(
         "post_interview_nudge_days": None,
         "post_application_nudge_days": None,
         "inactivity_days": None,
+        "grab_bag_size": None,
+        "grab_bag_score_floor": None,
     }
 
 
@@ -94,6 +98,8 @@ async def test_get_settings_configured(
     assert data["post_interview_nudge_days"] == 7
     assert data["post_application_nudge_days"] == 10
     assert data["inactivity_days"] == 14
+    assert data["grab_bag_size"] == 20
+    assert data["grab_bag_score_floor"] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +316,88 @@ async def test_put_alert_thresholds_fails_without_search_config(
             "post_application_nudge_days": 10,
             "inactivity_days": 14,
         },
+    )
+    assert resp.status_code == 404
+    assert "No search config exists" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# PUT /api/settings/grab-bag
+# ---------------------------------------------------------------------------
+
+
+async def test_put_grab_bag_settings_updates_successfully(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def _execute(sql: str, params: dict[str, Any]) -> AsyncMock:
+        captured["sql"] = sql
+        captured["params"] = params
+        return _make_cursor(
+            {
+                "grab_bag_size": params["grab_bag_size"],
+                "grab_bag_score_floor": params["grab_bag_score_floor"],
+                "updated_at": datetime(2026, 6, 25),
+            }
+        )
+
+    fake_conn.execute = AsyncMock(side_effect=_execute)
+
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={"grab_bag_size": 15, "grab_bag_score_floor": 4},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["grab_bag_size"] == 15
+    assert data["grab_bag_score_floor"] == 4
+    assert "updated_at" in data
+    assert str(captured["params"]["uid"]) == "00000000-0000-0000-0000-000000000001"
+    assert "WHERE user_id = %(uid)s" in captured["sql"]
+
+
+async def test_put_grab_bag_settings_rejects_bad_input(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock()  # must never be reached
+
+    # Size out of range (ge=1, le=50)
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={"grab_bag_size": 0, "grab_bag_score_floor": 3},
+    )
+    assert resp.status_code == 422
+    fake_conn.execute.assert_not_called()
+
+    # Floor out of range (ge=1, le=5)
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={"grab_bag_size": 20, "grab_bag_score_floor": 6},
+    )
+    assert resp.status_code == 422
+
+
+async def test_put_grab_bag_settings_rejects_extra_field(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock()
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={"grab_bag_size": 20, "grab_bag_score_floor": 3, "bogus_field": 99},
+    )
+    assert resp.status_code == 422
+    fake_conn.execute.assert_not_called()
+
+
+async def test_put_grab_bag_settings_fails_without_search_config(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    fake_conn.execute = AsyncMock(return_value=_make_cursor())
+
+    resp = await client.put(
+        "/api/settings/grab-bag",
+        json={"grab_bag_size": 20, "grab_bag_score_floor": 3},
     )
     assert resp.status_code == 404
     assert "No search config exists" in resp.json()["detail"]

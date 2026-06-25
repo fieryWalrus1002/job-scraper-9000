@@ -12,6 +12,8 @@ import type {
   EvalCorrectionIn,
   EvalCorrectionOut,
   Filters,
+  GrabBagSettingsResponse,
+  GrabBagSettingsUpdate,
   JobDetail,
   JobListResponse,
   ManualJobCreate,
@@ -264,6 +266,26 @@ export async function saveAlertThresholds(
   }
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
   return res.json() as Promise<AlertThresholdsResponse>
+}
+
+export async function saveGrabBagSettings(
+  body: GrabBagSettingsUpdate,
+): Promise<GrabBagSettingsResponse> {
+  const res = await fetch(`${API_BASE}/api/settings/grab-bag`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 422) {
+    const data = (await res.json()) as { detail?: FastApiDetailItem[] }
+    throw new ApiValidationError(parseValidationErrors(data.detail ?? []))
+  }
+  if (res.status === 404) {
+    const data = (await res.json()) as { detail?: string }
+    throw new Error(data.detail ?? 'No search config exists for the current user')
+  }
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`)
+  return res.json() as Promise<GrabBagSettingsResponse>
 }
 
 // ───── Eval corrections ─────
