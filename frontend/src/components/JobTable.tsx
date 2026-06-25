@@ -17,7 +17,8 @@ import {
   tableColumns,
 } from '../lib/columns'
 import { useTriageAction } from '../hooks/useTriage'
-import { useRowSwipe } from './JobTable/useRowSwipe'
+import { useSwipe } from '@/lib/swipe/useSwipe'
+import { SwipeAffordance } from '@/lib/swipe/SwipeAffordance'
 import { useTriageKeys } from './JobTable/useTriageKeys'
 import { TitleCell } from './JobTable/cells/TitleCell'
 import { PostedAtCell } from './JobTable/cells/PostedAtCell'
@@ -190,41 +191,6 @@ const SWIPE_ACTIONS = {
   right: { label: 'Shortlist', icon: Star, color: 'var(--color-score-mid)' },
 } as const
 
-// The action affordance revealed in the gap a swipe opens up. It lives inside an
-// edge cell (which we let overflow) but counter-translates by the row's offset so
-// it stays pinned at the table edge — i.e. it appears to sit still while the row
-// slides off it. Fades/scales in with progress and flips to a solid "armed" fill
-// once releasing would commit.
-function SwipeAffordance({
-  direction,
-  progress,
-  armed,
-  offset,
-}: {
-  direction: 'left' | 'right'
-  progress: number
-  armed: boolean
-  offset: number
-}) {
-  const { label, icon: Icon, color } = SWIPE_ACTIONS[direction]
-  return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute top-1/2 z-20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap"
-      style={{
-        [direction === 'left' ? 'right' : 'left']: 12,
-        transform: `translateY(-50%) translateX(${-offset}px) scale(${0.85 + progress * 0.15})`,
-        opacity: Math.min(progress * 1.5, 1),
-        color: armed ? '#fff' : color,
-        backgroundColor: armed ? color : `color-mix(in oklab, ${color} 16%, transparent)`,
-      }}
-    >
-      <Icon className="size-3.5" />
-      {label}
-    </span>
-  )
-}
-
 // A single Jobs-feed row. Swipe left = Trash, right = Shortlist — both route
 // through the same triage primitive as the buttons, so undo comes for free. The
 // row slides (rubber-banded), tints toward the action color, and reveals an
@@ -254,7 +220,7 @@ function JobRow({
     if (focused) rowRef.current?.scrollIntoView({ block: 'nearest' })
   }, [focused])
   const { offset, progress, armed, direction, settling, handlers, consumeClickSuppression } =
-    useRowSwipe({
+    useSwipe({
       onCommit: (dir) =>
         triage({
           dedupHash: job.dedup_hash,
@@ -300,7 +266,13 @@ function JobRow({
     >
       <td className="w-11 max-w-11 text-right text-muted" style={edgeCell}>
         {direction === 'right' && (
-          <SwipeAffordance direction="right" progress={progress} armed={armed} offset={offset} />
+          <SwipeAffordance
+            direction="right"
+            progress={progress}
+            armed={armed}
+            offset={offset}
+            {...SWIPE_ACTIONS.right}
+          />
         )}
         {rank}
       </td>
@@ -311,7 +283,13 @@ function JobRow({
       ))}
       <td className="w-[220px] min-w-[220px] max-w-[220px]" style={edgeCell}>
         {direction === 'left' && (
-          <SwipeAffordance direction="left" progress={progress} armed={armed} offset={offset} />
+          <SwipeAffordance
+            direction="left"
+            progress={progress}
+            armed={armed}
+            offset={offset}
+            {...SWIPE_ACTIONS.left}
+          />
         )}
         <QuickMark dedupHash={job.dedup_hash} current={appStatus} />
       </td>
