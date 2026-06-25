@@ -5,7 +5,7 @@ All tests use the mock pool fixture — no live Postgres required.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -128,3 +128,36 @@ async def test_create_manual_job_fit_score_stored(
     resp = await client.post("/api/jobs", json={**_BODY, "fit_score": 5})
     assert resp.status_code == 201
     assert resp.json()["fit_score"] == 5
+
+
+async def test_create_manual_job_posted_at_provided(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """When posted_at is in the body, it is passed through unchanged."""
+    fake_conn.execute = AsyncMock(side_effect=_three_cursors(FAKE_MANUAL_APP_ROW))
+    resp = await client.post("/api/jobs", json=_BODY)  # _BODY has posted_at
+    assert resp.status_code == 201
+    # The first call to execute is the posting INSERT — check its params
+    call_args = fake_conn.execute.call_args_list[0]
+    params = call_args[0][1]  # second positional arg is the params dict
+    assert params["posted_at"] == date(2026, 6, 1)
+
+
+async def test_create_manual_job_posted_at_missing_defaults_to_today(
+    client: AsyncClient, fake_conn: AsyncMock
+) -> None:
+    """When posted_at is omitted, it defaults to today's date."""
+    body_without_posted_at = {
+        "title": "Staff Engineer",
+        "fit_score": 3,
+        "company": "Initech",
+        "source_url": "https://example.com/jobs/staff",
+        "location": "Remote",
+        "status": "maybe",
+    }
+    fake_conn.execute = AsyncMock(side_effect=_three_cursors(FAKE_MANUAL_APP_ROW))
+    resp = await client.post("/api/jobs", json=body_without_posted_at)
+    assert resp.status_code == 201
+    call_args = fake_conn.execute.call_args_list[0]
+    params = call_args[0][1]
+    assert params["posted_at"] == date.today()

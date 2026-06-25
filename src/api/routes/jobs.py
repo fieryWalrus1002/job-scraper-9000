@@ -303,7 +303,7 @@ async def create_manual_job(body: ManualJobCreate, pool: Pool, user: CurrentUser
                 "source_url": body.source_url,
                 "description": body.description,
                 "location": body.location,
-                "posted_at": body.posted_at,
+                "posted_at": body.posted_at or now.date(),
                 "created_by": user.id,
             },
         )
