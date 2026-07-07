@@ -39,6 +39,7 @@ from agents.skills_fit.io import (
     write_output,
 )
 
+from utils.concurrent import imap_unordered
 from utils.dedup import dedup_jobs
 from utils.git_info import get_git_metadata
 from utils.openai_pricing import estimate_cost
@@ -232,6 +233,7 @@ def run_skills_fit(
             temperature=temperature,
         )
         llm_config = config.get("llm") or {}
+        max_workers = int(llm_config.get("max_workers", 8))
         config_hash = hash_file(config_file)
 
         profile_file = Path(
@@ -335,92 +337,153 @@ def run_skills_fit(
                 resolved_paths.output,
             )
 
+        # Results keyed by original input index for stable output ordering
+        # regardless of concurrent completion order.
+        results_by_index: dict[int, dict[str, Any]] = {}
+
         try:
-            try:
-                for job in deduped_records:
-                    existing = existing_output_records.get(str(job["dedup_hash"]))
-                    if existing is not None and is_processed_output_record(existing):
-                        enriched_records.append(existing)
-                        resumed_existing += 1
-                        continue
+            # --- Phase 1: Plan pass (main thread) ---
+            # Handle resume-existing and missing-description inline; partition
+            # remaining jobs into cache hits (no LLM call) and cache misses
+            # (need concurrent LLM call).
+            cache_hit_items: list[dict[str, Any]] = []
+            cache_miss_items: list[dict[str, Any]] = []
 
-                    input_source: InputSource = job["__input_source"]
-                    input_path = job["__input_path"]
-                    title = job.get("title") or None
-                    location = job.get("location") or None
-                    description = job.get("description") or ""
+            for orig_idx, job in enumerate(deduped_records):
+                existing = existing_output_records.get(str(job["dedup_hash"]))
+                if existing is not None and is_processed_output_record(existing):
+                    results_by_index[orig_idx] = existing
+                    resumed_existing += 1
+                    continue
 
-                    if not description:
-                        log.warning(
-                            "Skipping %s — missing description",
-                            title or job["dedup_hash"],
-                        )
-                        skipped_missing_description += 1
-                        metadata = _build_metadata(
-                            input_source=input_source,
-                            input_path=input_path,
-                            failure_reason="missing_description",
-                        )
-                        enriched_records.append(
-                            _build_scored_posting(job, ai_fit=None, metadata=metadata)
-                        )
-                        continue
+                input_source: InputSource = job["__input_source"]
+                input_path = job["__input_path"]
+                title = job.get("title") or None
+                location = job.get("location") or None
+                description = job.get("description") or ""
 
-                    analysis = cache.get(
-                        dedup_hash=str(job["dedup_hash"]),
-                        prompt_hash=prompt_hash,
-                        provider=provider_name,
-                        model=model_name,
-                        profile_version=profile_version,
+                if not description:
+                    log.warning(
+                        "Skipping %s — missing description",
+                        title or job["dedup_hash"],
                     )
-                    if analysis is not None:
-                        cache_hits += 1
-                    else:
-                        cache_misses += 1
-                        call_started = time.time()
-                        analysis = analyze_skills_fit(
-                            description,
-                            candidate_profile=profile,
-                            title=title,
-                            location=location,
-                            llm_config=llm_config,
-                            prompt_path=prompt_file,
-                            usage_callback=run.add_token_usage,
-                        )
-                        run.record_call_latency(time.time() - call_started)
-                        if analysis is not None:
-                            cache.put(
-                                dedup_hash=str(job["dedup_hash"]),
-                                prompt_hash=prompt_hash,
-                                provider=provider_name,
-                                model=model_name,
-                                profile_version=profile_version,
-                                analysis=analysis,
-                            )
-                    if analysis is None:
-                        log.warning("Agent failed on %s", title or job["dedup_hash"])
-                        failed_agent += 1
-                        run.increment_failures()
-                        metadata = _build_metadata(
-                            input_source=input_source,
-                            input_path=input_path,
-                            failure_reason="agent_failed",
-                        )
-                        enriched_records.append(
-                            _build_scored_posting(job, ai_fit=None, metadata=metadata)
-                        )
-                        continue
-
+                    skipped_missing_description += 1
                     metadata = _build_metadata(
                         input_source=input_source,
                         input_path=input_path,
+                        failure_reason="missing_description",
                     )
-                    enriched_records.append(
-                        _build_scored_posting(job, ai_fit=analysis, metadata=metadata)
+                    results_by_index[orig_idx] = _build_scored_posting(
+                        job, ai_fit=None, metadata=metadata
                     )
-                    scored_successfully += 1
+                    continue
+
+                analysis = cache.get(
+                    dedup_hash=str(job["dedup_hash"]),
+                    prompt_hash=prompt_hash,
+                    provider=provider_name,
+                    model=model_name,
+                    profile_version=profile_version,
+                )
+                if analysis is not None:
+                    cache_hits += 1
+                    cache_hit_items.append(
+                        {
+                            "orig_idx": orig_idx,
+                            "job": job,
+                            "analysis": analysis,
+                            "input_source": input_source,
+                            "input_path": input_path,
+                        }
+                    )
+                else:
+                    cache_misses += 1
+                    cache_miss_items.append(
+                        {
+                            "orig_idx": orig_idx,
+                            "job": job,
+                            "description": description,
+                            "title": title,
+                            "location": location,
+                            "input_source": input_source,
+                            "input_path": input_path,
+                        }
+                    )
+
+            # --- Phase 2: Process cache hits (main thread, no LLM call) ---
+            for hit in cache_hit_items:
+                metadata = _build_metadata(
+                    input_source=hit["input_source"],
+                    input_path=hit["input_path"],
+                )
+                results_by_index[hit["orig_idx"]] = _build_scored_posting(
+                    hit["job"], ai_fit=hit["analysis"], metadata=metadata
+                )
+                scored_successfully += 1
+
+            # --- Phase 3: Concurrent LLM calls for cache misses ---
+            def _work(miss: dict[str, Any]) -> tuple:
+                usage: dict[str, int] = {}
+                started = time.time()
+                analysis = analyze_skills_fit(
+                    miss["description"],
+                    candidate_profile=profile,
+                    title=miss["title"],
+                    location=miss["location"],
+                    llm_config=llm_config,
+                    prompt_path=prompt_file,
+                    usage_callback=lambda u: usage.update(u),
+                )
+                return (analysis, usage, time.time() - started)  # type: ignore[return-value]
+
+            try:
+                for miss, (analysis, usage, elapsed) in imap_unordered(
+                    _work, cache_miss_items, max_workers=max_workers
+                ):
+                    # Sink — all shared-state mutations on main thread
+                    run.add_token_usage(usage)
+                    run.record_call_latency(elapsed)
+
+                    if analysis is not None:
+                        cache.put(
+                            dedup_hash=str(miss["job"]["dedup_hash"]),
+                            prompt_hash=prompt_hash,
+                            provider=provider_name,
+                            model=model_name,
+                            profile_version=profile_version,
+                            analysis=analysis,
+                        )
+
+                    if analysis is None:
+                        log.warning(
+                            "Agent failed on %s",
+                            miss["title"] or miss["job"]["dedup_hash"],
+                        )
+                        failed_agent += 1
+                        run.increment_failures()
+                        metadata = _build_metadata(
+                            input_source=miss["input_source"],
+                            input_path=miss["input_path"],
+                            failure_reason="agent_failed",
+                        )
+                        results_by_index[miss["orig_idx"]] = _build_scored_posting(
+                            miss["job"], ai_fit=None, metadata=metadata
+                        )
+                    else:
+                        metadata = _build_metadata(
+                            input_source=miss["input_source"],
+                            input_path=miss["input_path"],
+                        )
+                        results_by_index[miss["orig_idx"]] = _build_scored_posting(
+                            miss["job"], ai_fit=analysis, metadata=metadata
+                        )
+                        scored_successfully += 1
             except KeyboardInterrupt:
-                if enriched_records:
+                # Build partial results from whatever we've collected so far
+                if results_by_index:
+                    enriched_records = [
+                        results_by_index[i] for i in sorted(results_by_index)
+                    ]
                     write_output(enriched_records, resolved_paths.output)
                     message = (
                         f"Interrupted — wrote {len(enriched_records)} partial records to "
@@ -432,6 +495,9 @@ def run_skills_fit(
                 run.add_notable(message)
                 raise
 
+            # Build final ordered list — sorted by original input index so output
+            # order is deterministic regardless of concurrent completion order.
+            enriched_records = [results_by_index[i] for i in sorted(results_by_index)]
             write_output(enriched_records, resolved_paths.output)
         finally:
             run.add_output(

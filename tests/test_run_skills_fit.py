@@ -1025,3 +1025,72 @@ def test_script_wrapper_reexports_runner_main(monkeypatch):
 
     assert module.main(["--run-date", "2026-05-23"]) == 7
     assert calls == [["--run-date", "2026-05-23"]]
+
+
+def test_run_skills_fit_scores_concurrently(tmp_path, monkeypatch):
+    """Verify that cache-miss jobs are scored concurrently, not serially."""
+    import threading
+    import time
+
+    module = load_script_module()
+    monkeypatch.chdir(tmp_path)
+
+    config_path = tmp_path / "config/agent/skills_fit.yml"
+    profile_path = tmp_path / "config/profile/candidate_profile.yml"
+    prompt_path = tmp_path / "prompts/skills_fit/system_prompt.txt"
+    remote_input = tmp_path / "data/filtered/2026-05-23/remote_filter_pass.jsonl"
+    write_config(config_path)
+    write_profile(profile_path)
+    write_prompt(prompt_path)
+
+    # 10 jobs, all cache misses → should be scored concurrently
+    write_jsonl(
+        remote_input,
+        [
+            {
+                "dedup_hash": f"hash-{i}",
+                "title": f"Job {i}",
+                "description": f"description for job {i}",
+            }
+            for i in range(10)
+        ],
+    )
+
+    # Track max concurrent in-flight calls
+    concurrent_count = 0
+    max_concurrent = 0
+    lock = threading.Lock()
+
+    def fake_analyze(*args, title=None, usage_callback=None, **kwargs):
+        nonlocal concurrent_count, max_concurrent
+        with lock:
+            concurrent_count += 1
+            max_concurrent = max(max_concurrent, concurrent_count)
+        # Simulate ~100ms of network latency
+        time.sleep(0.1)
+        with lock:
+            concurrent_count -= 1
+        assert title is not None
+        return analysis(4, title)
+
+    monkeypatch.setattr(module, "SKILLS_FIT_PROMPT_PATH", prompt_path)
+    monkeypatch.setattr(module, "analyze_skills_fit", fake_analyze)
+    monkeypatch.setattr(module, "generate_run_id", lambda prefix=None: "concurrent_run")
+    monkeypatch.setattr(
+        module,
+        "get_git_metadata",
+        lambda: {
+            "commit": "abc123",
+            "dirty": False,
+            "timestamp": "2026-05-23T12:00:00+00:00",
+        },
+    )
+
+    summary = module.run_skills_fit(run_date="2026-05-23", config_path=config_path)
+
+    assert summary["scored_successfully"] == 10
+    assert summary["cache_misses"] == 10
+    # With max_workers=8 and 10 jobs, we should see >1 concurrent call
+    assert max_concurrent > 1, (
+        f"Expected concurrent scoring, got max_concurrent={max_concurrent}"
+    )

@@ -2,6 +2,7 @@ llm:
   provider: openai        # openai | ollama
   model: gpt-5.4-mini
   temperature: 0.1
+  max_workers: 8          # concurrent LLM calls; ~8 is safe for gpt-4o-mini at a normal usage tier
   api_key_env: OPENAI_API_KEY_SKILLS_FIT  # Optional override for API key environment variable
 
 profile_file: config/profile/candidate_profile.yml
