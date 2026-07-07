@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -243,3 +245,88 @@ def test_run_remote_filter_raises_when_no_jobs_found(tmp_path):
             trash_path=tmp_path / "trash.jsonl",
             config_path=config_path,
         )
+
+
+def test_run_remote_filter_runs_concurrently(tmp_path):
+    """Assert that LLM calls are executed in parallel, not sequentially."""
+    input_path = tmp_path / "raw.jsonl"
+    pass_path = tmp_path / "pass.jsonl"
+    trash_path = tmp_path / "trash.jsonl"
+    config_path = tmp_path / "remote_agent.yml"
+    cache_path = tmp_path / "cache.jsonl"
+
+    # Config with max_workers=4 to ensure parallelism.
+    config_path.write_text(
+        """\
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_workers: 4
+
+policy_thresholds:
+  disallowed_classifications:
+    - hybrid
+    - onsite_disguised
+  travel:
+    max_estimated_days_per_year: 15
+  relocation:
+    allow_required_relocation: false
+    allow_local_presence_required: false
+  uncertainty:
+    on_unclear_classification: reject
+  timezone:
+    rejected_timezone_keywords:
+      - EST
+""",
+        encoding="utf-8",
+    )
+
+    # Write 6 jobs so the pool has enough to overlap.
+    jobs = [
+        _job(source_job_id=str(i), title=f"Engineer {i}", dedup_hash=f"h{i}")
+        for i in range(6)
+    ]
+    _write_jsonl(input_path, jobs)
+
+    # Track max concurrent calls.
+    concurrent_count = 0
+    max_concurrent = 0
+    lock = threading.Lock()
+    gate = threading.Event()
+    # Block workers until the gate opens so they all start together.
+    gate_blocked = threading.Event()
+
+    def slow_analyze(*args, **kwargs):
+        with lock:
+            nonlocal concurrent_count, max_concurrent
+            concurrent_count += 1
+            max_concurrent = max(max_concurrent, concurrent_count)
+            # Signal that at least one worker is in-flight.
+            gate_blocked.set()
+        # Wait for the gate so all workers pile up.
+        gate.wait(timeout=5)
+        time.sleep(0.05)  # Simulate network latency.
+        with lock:
+            concurrent_count -= 1
+        return _analysis("fully_remote")
+
+    with patch("agents.remote_filter.runner.analyze_remote", side_effect=slow_analyze):
+        with patch(
+            "agents.remote_filter.runner.build_filter_metadata",
+            return_value=FILTER_METADATA,
+        ):
+            counts = run_remote_filter(
+                input_path=input_path,
+                pass_path=pass_path,
+                trash_path=trash_path,
+                config_path=config_path,
+                user_location="USA",
+                cache_path=cache_path,
+            )
+
+    assert counts["pass"] == 6
+    assert counts["trash"] == 0
+    assert counts["cache_misses"] == 6
+    # With max_workers=4 and 6 jobs, we should see >1 concurrent call.
+    assert max_concurrent > 1, f"Expected concurrent calls > 1, got {max_concurrent}"

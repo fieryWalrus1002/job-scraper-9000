@@ -19,6 +19,7 @@ from agents.remote_filter.utils import (
     passes_remote_filter,
     resolve_provider_and_model,
 )
+from utils.concurrent import imap_unordered
 from utils.dedup import dedup_jobs
 from utils.git_info import get_git_metadata, get_prompt_hash
 from utils.openai_pricing import estimate_cost
@@ -106,7 +107,10 @@ def run_remote_filter(
             100 * deduped / total_loaded,
         )
 
-    log.info("Running remote-filter on %d jobs...", len(jobs))
+    max_workers = int(llm_config.get("max_workers", 8))
+    log.info(
+        "Running remote-filter on %d jobs (max_workers=%d)...", len(jobs), max_workers
+    )
 
     filter_meta = build_filter_metadata()
     log.info(
@@ -160,6 +164,12 @@ def run_remote_filter(
                 pass_path.open("w", encoding="utf-8") as pass_f,
                 trash_path.open("w", encoding="utf-8") as trash_f,
             ):
+                # --- Phase (a): Plan pass (main thread) ---
+                # Classify jobs into cache hits (no LLM call) and misses (need LLM).
+                # All shared-state mutations stay on the main thread.
+                hits: list[dict[str, Any]] = []
+                misses: list[dict[str, Any]] = []
+
                 for job in jobs:
                     description = job.get("description", "")
                     title = job.get("title", "")
@@ -174,8 +184,8 @@ def run_remote_filter(
                     search_context = build_search_context(job, user_timezone)
                     dedup_key = job.get("dedup_hash") or job.get("source_job_id") or ""
                     context_fp = context_fingerprint(search_context)
+
                     analysis = None
-                    from_cache = False
                     cache_keyable = cache is not None and bool(dedup_key)
                     if cache_keyable:
                         assert cache is not None
@@ -187,71 +197,143 @@ def run_remote_filter(
                             context_fp=context_fp,
                         )
                         if analysis is not None:
-                            from_cache = True
                             cache_hits += 1
                         else:
                             # Count the miss at lookup time so the hit-rate metric
                             # stays honest even when the LLM call below fails.
                             cache_misses += 1
 
-                    if analysis is None:
-                        call_started = time.time()
-                        analysis = analyze_remote(
-                            description,
-                            title=title,
-                            location=location,
-                            search_context=search_context or None,
-                            llm_config=llm_config,
-                            usage_callback=run.add_token_usage,
+                    if analysis is not None:
+                        # Cache hit — no LLM call needed.
+                        hits.append(
+                            {
+                                "job": job,
+                                "title": title,
+                                "company": company,
+                                "analysis": analysis,
+                                "from_cache": True,
+                            }
                         )
-                        run.record_call_latency(time.time() - call_started)
-                        if analysis is None:
-                            log.warning(
-                                "Agent failed on %s @ %s — skipping", title, company
-                            )
-                            skipped += 1
-                            run.increment_failures()
-                            continue
-                        if cache_keyable:
-                            assert cache is not None
-                            cache.put(
-                                dedup_hash=dedup_key,
-                                prompt_hash=prompt_hash,
-                                provider=provider,
-                                model=model,
-                                context_fp=context_fp,
-                                analysis=analysis,
-                            )
+                    else:
+                        # Cache miss — needs an LLM call.
+                        misses.append(
+                            {
+                                "job": job,
+                                "description": description,
+                                "title": title,
+                                "company": company,
+                                "location": location,
+                                "search_context": search_context,
+                                "dedup_key": dedup_key,
+                                "context_fp": context_fp,
+                                "cache_keyable": cache_keyable,
+                            }
+                        )
 
+                # --- Phase (b): Concurrent LLM calls ---
+                def work(m: dict[str, Any]):
+                    usage: dict[str, int] = {}
+                    started = time.time()
+                    analysis = analyze_remote(
+                        m["description"],
+                        title=m["title"],
+                        location=m["location"],
+                        search_context=m["search_context"] or None,
+                        llm_config=llm_config,
+                        usage_callback=lambda u: usage.update(u),
+                    )
+                    return analysis, usage, time.time() - started
+
+                # --- Phase (c): Sink (main thread) ---
+                # Process cache hits first (instant, no LLM call).
+                for hit in hits:
+                    analysis = hit["analysis"]
                     ok, reason = passes_remote_filter(analysis, config, user_location)
 
                     enriched = {
-                        **job,
+                        **hit["job"],
                         "_remote_analysis": analysis.model_dump(),
                         "_filter_result": "pass" if ok else "trash",
                         "_filter_reason": reason,
-                        "_filter_metadata": {**filter_meta, "from_cache": from_cache},
+                        "_filter_metadata": {**filter_meta, "from_cache": True},
                     }
 
                     if ok:
                         pass_f.write(json.dumps(enriched) + "\n")
                         passed += 1
                         log.info(
-                            "PASS  %s @ %s (%s)%s",
-                            title,
-                            company,
+                            "PASS  %s @ %s (%s) [cached]",
+                            hit["title"],
+                            hit["company"],
                             analysis.remote_classification,
-                            " [cached]" if from_cache else "",
                         )
                     else:
                         trash_f.write(json.dumps(enriched) + "\n")
                         failed += 1
                         log.info(
-                            "TRASH %s @ %s — %s%s",
-                            title,
-                            company,
+                            "TRASH %s @ %s — %s [cached]",
+                            hit["title"],
+                            hit["company"],
                             reason,
-                            " [cached]" if from_cache else "",
+                        )
+
+                # Process misses from the concurrent pool.
+                for miss, (analysis, usage, elapsed) in imap_unordered(
+                    work, misses, max_workers=max_workers
+                ):
+                    # Apply token usage and latency on main thread.
+                    run.add_token_usage(usage)
+                    run.record_call_latency(elapsed)
+
+                    if analysis is None:
+                        log.warning(
+                            "Agent failed on %s @ %s — skipping",
+                            miss["title"],
+                            miss["company"],
+                        )
+                        skipped += 1
+                        run.increment_failures()
+                        continue
+
+                    # Write miss results to cache.
+                    if miss["cache_keyable"]:
+                        assert cache is not None
+                        cache.put(
+                            dedup_hash=miss["dedup_key"],
+                            prompt_hash=prompt_hash,
+                            provider=provider,
+                            model=model,
+                            context_fp=miss["context_fp"],
+                            analysis=analysis,
+                        )
+
+                    ok, reason = passes_remote_filter(analysis, config, user_location)
+
+                    enriched = {
+                        **miss["job"],
+                        "_remote_analysis": analysis.model_dump(),
+                        "_filter_result": "pass" if ok else "trash",
+                        "_filter_reason": reason,
+                        "_filter_metadata": {**filter_meta, "from_cache": False},
+                    }
+
+                    if ok:
+                        pass_f.write(json.dumps(enriched) + "\n")
+                        passed += 1
+                        log.info(
+                            "PASS  %s @ %s (%s)",
+                            miss["title"],
+                            miss["company"],
+                            analysis.remote_classification,
+                        )
+                    else:
+                        trash_f.write(json.dumps(enriched) + "\n")
+                        failed += 1
+                        log.info(
+                            "TRASH %s @ %s — %s",
+                            miss["title"],
+                            miss["company"],
+                            reason,
                         )
         finally:
             # Roll up counts and cost even if the loop raised, so partial-run
