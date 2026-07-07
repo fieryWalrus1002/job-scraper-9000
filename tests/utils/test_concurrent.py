@@ -33,7 +33,13 @@ def test_generator_input_is_materialized():
 
 
 def test_exception_propagates_and_cancels_queued_futures():
-    """An exception in one item propagates; unstarted futures are cancelled."""
+    """An exception in one item propagates; queued futures are cancelled.
+
+    Timing is the definitive proof: without cancel_futures=True, shutdown(wait=True)
+    blocks until remaining items complete their 0.1s sleep (~0.8s for items 2-9).
+    With cancellation the test exits in well under 0.5s even if one extra item
+    races in before shutdown fires (a genuine race with max_workers=1).
+    """
     started = []
     lock = threading.Lock()
 
@@ -42,19 +48,24 @@ def test_exception_propagates_and_cancels_queued_futures():
             started.append(x)
         if x == 1:
             raise ValueError("boom")
-        time.sleep(0.05)
+        time.sleep(0.1)  # long enough to make cancellation detectable via timing
         return x
 
-    items = list(range(10))  # 10 items, but only 1 worker
+    items = list(range(10))
+    t0 = time.monotonic()
     with pytest.raises(ValueError, match="boom"):
         for _ in imap_unordered(slow_work, items, max_workers=1):
             pass
+    elapsed = time.monotonic() - t0
 
-    # With 1 worker, at most 1-2 items could have started (the one that raised
-    # and possibly one already in flight). Far fewer than all 10.
+    # Without cancel_futures=True, shutdown would block ~0.8s for items 2–9.
+    # With cancellation, wall time is dominated by item 0's sleep (0.1s).
+    assert elapsed < 0.5, (
+        f"Took {elapsed:.2f}s — queued futures may not have been cancelled"
+    )
     with lock:
         assert len(started) < len(items), (
-            f"Expected cancellation, but {len(started)}/{len(items)} started"
+            f"Expected far fewer than {len(items)} items to run, got {started}"
         )
 
 

@@ -29,6 +29,11 @@ def imap_unordered(
     consuming loop on the main thread. Exceptions raised by ``work`` propagate from
     the corresponding ``next()`` (fail fast); remaining futures are cancelled and the
     pool is torn down. ``max_workers`` is clamped to at least 1.
+
+    ``items`` is **eagerly materialized** before any work starts — all futures are
+    submitted up front. Callers must pass a finite, bounded iterable; passing an
+    infinite or very large generator will exhaust memory before the first result
+    is yielded. This repo's job lists are always bounded, so that constraint holds.
     """
     materialized = list(items)
     if not materialized:
