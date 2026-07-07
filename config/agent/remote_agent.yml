@@ -11,6 +11,8 @@ llm:
   model: gpt-4o-mini
   temperature: 0.1
   api_key_env: OPENAI_API_KEY
+  # concurrent LLM calls; ~8 is safe for gpt-4o-mini at a normal usage tier
+  max_workers: 8
 
   # |-- Ollama --|
   # provider: ollama
