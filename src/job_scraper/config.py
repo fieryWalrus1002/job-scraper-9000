@@ -111,7 +111,7 @@ def _lookup_slug(conn: "psycopg.Connection", company: str) -> tuple[str, str] | 
     """Return (board, slug) from raw.company_aliases or None on miss/unresolved."""
     row = conn.execute(
         "SELECT board, slug FROM raw.company_aliases WHERE normalized_input = %s AND status = 'resolved'",
-        (company,),
+        (company.strip().lower(),),
     ).fetchone()
     return (row[0], row[1]) if row else None
 

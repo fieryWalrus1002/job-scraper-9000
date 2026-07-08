@@ -106,24 +106,28 @@ def test_heuristic_candidates_filler_only():
     ],
 )
 def test_resolve_golden_fixture_resolved(name, expected_board, expected_slug):
-    """Test the 5 golden pairs reachable by heuristics."""
-    # Determine which board domain to mock based on expected board
-    if expected_board == "greenhouse":
-        board_domain = "greenhouse.io"
-        expected_board_actual = "greenhouse"
-    elif expected_board == "lever":
-        board_domain = "lever.co"
-        expected_board_actual = "lever"
-    elif expected_board == "ashby":
-        board_domain = "ashbyhq.com"
-        expected_board_actual = "ashby"
+    """Test the 5 golden pairs reachable by heuristics.
+
+    Mocks return 200 only for the specific (board, slug) URL so the test
+    verifies the correct slug is returned, not just that some slug hit.
+    """
+    # Slug-specific URL fragments per board — matches the probe URL templates
+    # in discover._PROBE_URLS so only the expected slug returns 200.
+    _slug_url = {
+        "greenhouse": f"boards/{expected_slug}/jobs",
+        "lever": f"postings/{expected_slug}",
+        "ashby": f"job-board/{expected_slug}",
+    }
+    if expected_board is not None:
+        mock_key = _slug_url[expected_board]
+        expected_board_actual = expected_board
     else:
-        # "any board" — pick lever as the mock target
-        board_domain = "lever.co"
+        # "any board" — mock lever with the specific slug
+        mock_key = f"postings/{expected_slug}"
         expected_board_actual = "lever"
 
     with patch(
-        "job_scraper.discover.requests.get", side_effect=_mock_get({board_domain: 200})
+        "job_scraper.discover.requests.get", side_effect=_mock_get({mock_key: 200})
     ):
         result = resolve(name)
 

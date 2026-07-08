@@ -61,12 +61,27 @@ def run(
     discovered = discover_probe(companies)
     if conn is not None:
         from pipeline.alias_cache import AliasCache
-        from pipeline.resolver import ResolveResult
+        from pipeline.resolver import ResolveResult, normalize
 
         for slug, boards in discovered.items():
-            if boards:
-                result = ResolveResult(board=boards[0], slug=slug, status="resolved")
-                AliasCache.write(conn, slug, result)
+            norm = normalize(slug)
+            if len(boards) == 1:
+                AliasCache.write(
+                    conn,
+                    norm,
+                    ResolveResult(board=boards[0], slug=slug, status="resolved"),
+                )
+            elif len(boards) > 1:
+                log.warning(
+                    "discover: %r returned multiple boards %s — marking needs_review",
+                    slug,
+                    boards,
+                )
+                AliasCache.write(
+                    conn,
+                    norm,
+                    ResolveResult(board=None, slug=slug, status="needs_review"),
+                )
     else:
         log.warning("discover.run() called without conn — results not persisted to DB")
     return discovered
