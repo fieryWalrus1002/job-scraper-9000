@@ -5,6 +5,7 @@ and validation errors.
 
 import textwrap
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -801,3 +802,68 @@ def test_no_scraper_sections_includes_sel_in_error(tmp_path):
     cfg = _write_config(tmp_path, "global:\n  default_max_results: 10\n")
     with pytest.raises(ConfigError, match="sel"):
         load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Companies section — DB slug lookup + flat-file fallback
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_conn(fetchone_return):
+    """Build a minimal mock psycopg.Connection whose execute().fetchone() returns a fixed value."""
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = fetchone_return
+    return mock_conn
+
+
+def test_load_config_companies_uses_db_slug(tmp_path):
+    """DB hit: normalized name 'rocket lab' resolves to ('lever', 'rocketlab').
+    The produced LeverScraper must use the slug, not the raw name."""
+    cfg = _write_config(
+        tmp_path,
+        """\
+        companies:
+          - rocket lab
+    """,
+    )
+    mock_conn = _make_mock_conn(("lever", "rocketlab"))
+    scrapers = load_config(cfg, conn=mock_conn)
+
+    assert len(scrapers) == 1
+    assert isinstance(scrapers[0], LeverScraper)
+    assert scrapers[0].query.company == "rocketlab"
+
+
+def test_load_config_companies_fallback_to_flat_file(tmp_path):
+    """conn=None: companies resolved entirely from the flat-file DB.
+    'stripe' is in config/company_boards.json → greenhouse."""
+    cfg = _write_config(
+        tmp_path,
+        """\
+        companies:
+          - stripe
+    """,
+    )
+    scrapers = load_config(cfg, conn=None)
+
+    assert len(scrapers) == 1
+    assert isinstance(scrapers[0], GreenhouseScraper)
+    assert scrapers[0].query.board_token == "stripe"
+
+
+def test_load_config_companies_db_miss_falls_back(tmp_path):
+    """DB miss (fetchone returns None): should fall back to flat-file.
+    'stripe' is in the flat-file → GreenhouseScraper with token 'stripe'."""
+    cfg = _write_config(
+        tmp_path,
+        """\
+        companies:
+          - stripe
+    """,
+    )
+    mock_conn = _make_mock_conn(None)  # DB miss
+    scrapers = load_config(cfg, conn=mock_conn)
+
+    assert len(scrapers) == 1
+    assert isinstance(scrapers[0], GreenhouseScraper)
+    assert scrapers[0].query.board_token == "stripe"

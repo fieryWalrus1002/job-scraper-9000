@@ -40,10 +40,12 @@ from user_config import UserPolicies
 
 log = logging.getLogger(__name__)
 
-ScrapeFn = Callable[[str, dict[str, Any]], Iterable[Any]]
-"""``(source, query_payload) -> iterable of scraped postings`` (either
+ScrapeFn = Callable[[str, dict[str, Any], "psycopg.Connection | None"], Iterable[Any]]
+"""``(source, query_payload, conn) -> iterable of scraped postings`` (either
 dataclass instances or already-dict). The worker calls ``asdict`` on any
-dataclass, then JSON-serializes; non-dataclass dict inputs pass through."""
+dataclass, then JSON-serializes; non-dataclass dict inputs pass through.
+``conn`` is forwarded to ``load_config`` so the companies section can resolve
+normalized names to verified ATS slugs via ``raw.company_aliases``."""
 
 
 # ---------------------------------------------------------------------------
@@ -51,19 +53,24 @@ dataclass, then JSON-serializes; non-dataclass dict inputs pass through."""
 # ---------------------------------------------------------------------------
 
 
-def default_scrape_fn(source: str, query_payload: dict[str, Any]) -> list[Any]:
+def default_scrape_fn(
+    source: str,
+    query_payload: dict[str, Any],
+    conn: "psycopg.Connection | None" = None,
+) -> list[Any]:
     """Real scrape: write payload to a temp YAML, load_config, run scrapers.
 
     ``query_payload`` is the per-source slice the planner stored
     (``{source: <section>, "global": {...}}``). The temp YAML lives only for
-    the duration of the call.
+    the duration of the call.  ``conn`` is forwarded so the companies section
+    can hit ``raw.company_aliases`` for verified slugs.
     """
     from job_scraper.config import load_config
 
     tmp_yaml = Path(f".pipeline-scrape-input-{source}.yml")
     tmp_yaml.write_text(yaml.safe_dump(query_payload, sort_keys=False))
     try:
-        scrapers = load_config(tmp_yaml)
+        scrapers = load_config(tmp_yaml, conn=conn)
     finally:
         try:
             tmp_yaml.unlink()
@@ -179,7 +186,7 @@ def process_job(
     run_dir = run_user_dir(runs_dir, job["run_id"], email)
     policies = _load_policies(run_dir)
 
-    raw_jobs = list(scrape_fn(job["source"], job["query_payload"]))
+    raw_jobs = list(scrape_fn(job["source"], job["query_payload"], conn))
     job_dicts = [_to_dict(j) for j in raw_jobs]
     filtered = _apply_title_filter(job_dicts, policies.prefilter.excluded_title_terms)
 
