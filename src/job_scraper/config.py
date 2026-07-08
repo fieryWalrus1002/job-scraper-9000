@@ -366,15 +366,14 @@ def _build_scrapers(
             scrapers.append(AshbyScraper(AshbyQuery(company=company)))
 
     if co:
+        if conn is None:
+            raise ConfigError(
+                f"companies section lists {len(co.companies)} company name(s) but no DB "
+                "connection was supplied to load_config(); pass conn= so names can be "
+                "resolved via raw.company_aliases"
+            )
         unknown = []
         for company in co.companies:
-            if conn is None:
-                log.warning(
-                    "Company %r cannot be resolved: no DB connection in load_config; pass conn= to enable slug lookup",
-                    company,
-                )
-                unknown.append(company)
-                continue
             db_hit = _lookup_slug(conn, company)
             if db_hit:
                 board, slug = db_hit

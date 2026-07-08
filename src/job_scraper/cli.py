@@ -269,6 +269,9 @@ def _add_ashby(sub: argparse._SubParsersAction) -> None:
 
 
 def _cmd_discover(args) -> None:
+    # CLI has no DB connection, so results are printed only — not persisted to
+    # raw.company_aliases. Run the planner pre-pass or wire conn= into discover.run()
+    # if you need persistence.
     from job_scraper.discover import run as discover_run
 
     companies = args.companies

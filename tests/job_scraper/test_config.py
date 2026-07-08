@@ -833,9 +833,9 @@ def test_load_config_companies_uses_db_slug(tmp_path):
     assert scrapers[0].query.company == "rocketlab"
 
 
-def test_load_config_companies_conn_none_logs_warning(tmp_path, caplog):
-    """conn=None: company cannot be resolved; warning is logged and no scrapers produced."""
-    import logging
+def test_load_config_companies_conn_none_raises(tmp_path):
+    """conn=None with a companies section must raise ConfigError (fail fast)."""
+    from job_scraper.config import ConfigError
 
     cfg = _write_config(
         tmp_path,
@@ -843,11 +843,8 @@ def test_load_config_companies_conn_none_logs_warning(tmp_path, caplog):
           - stripe
     """,
     )
-    with caplog.at_level(logging.WARNING, logger="job_scraper.config"):
-        scrapers = load_config(cfg, conn=None)
-
-    assert scrapers == []
-    assert any("cannot be resolved" in r.message for r in caplog.records)
+    with pytest.raises(ConfigError, match="no DB connection"):
+        load_config(cfg, conn=None)
 
 
 def test_load_config_companies_db_miss_adds_to_unknown(tmp_path, caplog):
