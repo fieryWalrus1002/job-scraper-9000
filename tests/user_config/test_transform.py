@@ -24,6 +24,7 @@ from user_config import (
     CandidateProfileInput,
     SalaryFloorK,
     SearchConfigInput,
+    UserPolicies,
     candidate_profile_to_pipeline_yaml,
     derive_policies,
     dump_yaml,
@@ -252,3 +253,26 @@ def test_max_travel_days_threads_into_remote_policy():
     cfg.work_constraints.max_travel_days = 20
     policies = derive_policies(cfg)
     assert policies.remote.max_travel_days == 20
+
+
+def test_relocation_willing_true_sets_both_flags():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.locations.relocation.willing = True
+    policies = derive_policies(cfg)
+    assert policies.relocation.allow_required_relocation is True
+    assert policies.relocation.allow_local_presence_required is True
+
+
+def test_relocation_willing_false_clears_both_flags():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.locations.relocation.willing = False
+    policies = derive_policies(cfg)
+    assert policies.relocation.allow_required_relocation is False
+    assert policies.relocation.allow_local_presence_required is False
+
+
+def test_relocation_defaults_to_restrictive_when_missing():
+    """A stored policies dict with no 'relocation' key defaults to False/False."""
+    policies = UserPolicies.model_validate({})
+    assert policies.relocation.allow_required_relocation is False
+    assert policies.relocation.allow_local_presence_required is False

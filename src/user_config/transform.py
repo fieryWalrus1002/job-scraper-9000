@@ -41,6 +41,7 @@ from .models import (
     CandidateProfileInput,
     Location,
     PrefilterPolicy,
+    RelocationPolicy,
     RemoteClassification,
     RemotePolicy,
     SearchConfigInput,
@@ -207,6 +208,12 @@ def derive_policies(search: SearchConfigInput) -> UserPolicies:
         c for c in REMOTE_CLASSIFICATIONS if c in classes
     ]
 
+    willing = search.locations.relocation.willing
+    relocation = RelocationPolicy(
+        allow_required_relocation=willing,
+        allow_local_presence_required=willing,
+    )
+
     return UserPolicies(
         remote=RemotePolicy(
             acceptable_classifications=ordered,
@@ -217,6 +224,7 @@ def derive_policies(search: SearchConfigInput) -> UserPolicies:
                 search.roles.excluded_titles + search.keywords.excluded
             )
         ),
+        relocation=relocation,
     )
 
 
