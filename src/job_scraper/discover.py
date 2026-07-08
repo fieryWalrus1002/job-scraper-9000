@@ -2,14 +2,16 @@
 Company → board discovery.
 
 Probes each ATS API endpoint directly and records 200 responses.
-Results are written to company_boards.json.
+Results are persisted to raw.company_aliases via AliasCache.
 """
 
 import logging
+from typing import TYPE_CHECKING
 
 import requests
 
-from .company_boards import DEFAULT_PATH, load, merge, save
+if TYPE_CHECKING:
+    import psycopg
 
 log = logging.getLogger(__name__)
 
@@ -53,12 +55,33 @@ def discover_probe(companies: list[str]) -> dict[str, list[str]]:
 def run(
     companies: list[str],
     *,
-    db_path=DEFAULT_PATH,
+    conn: "psycopg.Connection | None" = None,
 ) -> dict[str, list[str]]:
-    """Probe companies and persist results to company_boards.json."""
+    """Probe companies and (optionally) persist results to raw.company_aliases."""
     discovered = discover_probe(companies)
-    db = load(db_path)
-    updated = merge(db, discovered)
-    save(updated, db_path)
-    log.info("Updated %s — %d companies total", db_path, len(updated))
+    if conn is not None:
+        from pipeline.alias_cache import AliasCache
+        from pipeline.resolver import ResolveResult, normalize
+
+        for slug, boards in discovered.items():
+            norm = normalize(slug)
+            if len(boards) == 1:
+                AliasCache.write(
+                    conn,
+                    norm,
+                    ResolveResult(board=boards[0], slug=slug, status="resolved"),
+                )
+            elif len(boards) > 1:
+                log.warning(
+                    "discover: %r returned multiple boards %s — marking needs_review",
+                    slug,
+                    boards,
+                )
+                AliasCache.write(
+                    conn,
+                    norm,
+                    ResolveResult(board=None, slug=slug, status="needs_review"),
+                )
+    else:
+        log.warning("discover.run() called without conn — results not persisted to DB")
     return discovered

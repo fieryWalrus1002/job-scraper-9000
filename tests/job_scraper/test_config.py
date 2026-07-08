@@ -5,6 +5,7 @@ and validation errors.
 
 import textwrap
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -801,3 +802,64 @@ def test_no_scraper_sections_includes_sel_in_error(tmp_path):
     cfg = _write_config(tmp_path, "global:\n  default_max_results: 10\n")
     with pytest.raises(ConfigError, match="sel"):
         load_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Companies section — DB slug lookup
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_conn(fetchone_return):
+    """Build a minimal mock psycopg.Connection whose execute().fetchone() returns a fixed value."""
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = fetchone_return
+    return mock_conn
+
+
+def test_load_config_companies_uses_db_slug(tmp_path):
+    """DB hit: normalized name 'rocket lab' resolves to ('lever', 'rocketlab').
+    The produced LeverScraper must use the slug, not the raw name."""
+    cfg = _write_config(
+        tmp_path,
+        """        companies:
+          - rocket lab
+    """,
+    )
+    mock_conn = _make_mock_conn(("lever", "rocketlab"))
+    scrapers = load_config(cfg, conn=mock_conn)
+
+    assert len(scrapers) == 1
+    assert isinstance(scrapers[0], LeverScraper)
+    assert scrapers[0].query.company == "rocketlab"
+
+
+def test_load_config_companies_conn_none_raises(tmp_path):
+    """conn=None with a companies section must raise ConfigError (fail fast)."""
+    from job_scraper.config import ConfigError
+
+    cfg = _write_config(
+        tmp_path,
+        """        companies:
+          - stripe
+    """,
+    )
+    with pytest.raises(ConfigError, match="no DB connection"):
+        load_config(cfg, conn=None)
+
+
+def test_load_config_companies_db_miss_adds_to_unknown(tmp_path, caplog):
+    """DB miss (fetchone returns None): company goes to unknown list, warning logged."""
+    import logging
+
+    cfg = _write_config(
+        tmp_path,
+        """        companies:
+          - stripe
+    """,
+    )
+    mock_conn = _make_mock_conn(None)  # DB miss
+    with caplog.at_level(logging.WARNING, logger="job_scraper.config"):
+        scrapers = load_config(cfg, conn=mock_conn)
+
+    assert scrapers == []
+    assert any("not resolved in alias table" in r.message for r in caplog.records)

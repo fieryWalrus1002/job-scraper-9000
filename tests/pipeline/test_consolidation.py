@@ -368,7 +368,7 @@ def test_run_overnight_runs_full_pipeline_through_scoring(migrated_pg, tmp_path)
         run_id="overnight-2026-06-12",
         runs_dir=tmp_path,
         database_url=migrated_pg,
-        scrape_fn=lambda source, payload: [posting],
+        scrape_fn=lambda source, payload, conn: [posting],
         classify_fn=_fake_classify_factory(classify_calls),
         score_fn=_fake_score_factory(score_calls),
     )
@@ -419,7 +419,7 @@ def test_run_overnight_all_scrapes_failed_is_all_failed(migrated_pg, tmp_path):
     """Every user's scrape raising → nothing consolidated, and the run
     summary's verdict is all-failed (the CLI exits non-zero on it)."""
 
-    def _boom(source, payload):
+    def _boom(source, payload, conn):
         raise RuntimeError("scraper exploded")
 
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
@@ -457,7 +457,7 @@ def test_run_overnight_skips_tail_when_nothing_consolidated(migrated_pg, tmp_pat
         run_id="overnight-2026-06-12",
         runs_dir=tmp_path,
         database_url=migrated_pg,
-        scrape_fn=lambda source, payload: [],
+        scrape_fn=lambda source, payload, conn: [],
         classify_fn=_fake_classify_factory(classify_calls),
         score_fn=_fake_score_factory(score_calls),
     )

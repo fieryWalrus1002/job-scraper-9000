@@ -550,3 +550,34 @@ def test_0016_downgrade_drops_grab_bag_columns(fresh_pg):
                 (col,),
             ).fetchone()
             assert exists is None, f"{col} should be dropped after downgrade"
+
+
+# ---------------------------------------------------------------------------
+# 0019: raw.company_aliases + raw.company_boards
+# ---------------------------------------------------------------------------
+
+
+@skip_if_no_docker
+def test_0019_downgrade_drops_both_tables(fresh_pg):
+    """Downgrade from 0019 to 0018 must drop both tables."""
+    _run_alembic(
+        "0019", fresh_pg, extra_env={"BOOTSTRAP_ADMIN_EMAIL": "admin@example.com"}
+    )
+
+    # Confirm tables exist after upgrade
+    with psycopg.connect(fresh_pg) as conn:
+        for table in ("raw.company_aliases", "raw.company_boards"):
+            exists = conn.execute(
+                f"SELECT to_regclass('{table}') IS NOT NULL"
+            ).fetchone()[0]
+            assert exists is True, f"{table} missing after upgrade"
+
+    _run_alembic("0018", fresh_pg, command="downgrade")
+
+    # Confirm tables are gone after downgrade
+    with psycopg.connect(fresh_pg) as conn:
+        for table in ("raw.company_aliases", "raw.company_boards"):
+            exists = conn.execute(
+                f"SELECT to_regclass('{table}') IS NOT NULL"
+            ).fetchone()[0]
+            assert exists is False, f"{table} still present after downgrade"

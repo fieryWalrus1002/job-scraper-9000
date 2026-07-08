@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import logging
 import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 
+if TYPE_CHECKING:
+    import psycopg
+
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
-from .company_boards import DEFAULT_PATH as BOARDS_DB_PATH, load as load_boards
 from .query import LinkedInSearchQuery, SALARY_FLOOR, SELSearchQuery
 from .scrapers.base import BaseScraper
 from .scrapers.ashby import AshbyScraper, AshbyQuery
@@ -102,12 +107,28 @@ def _expand(value: str) -> str:
     return re.sub(r"\$\{([^}]+)\}", _sub, value)
 
 
-def load_config(path: str | Path) -> list[BaseScraper]:
-    """Parse a YAML search config and return a flat list of configured scrapers."""
+def _lookup_slug(conn: "psycopg.Connection", company: str) -> tuple[str, str] | None:
+    """Return (board, slug) from raw.company_aliases or None on miss/unresolved."""
+    row = conn.execute(
+        "SELECT board, slug FROM raw.company_aliases WHERE normalized_input = %s AND status = 'resolved'",
+        (company.strip().lower(),),
+    ).fetchone()
+    return (row[0], row[1]) if row else None
+
+
+def load_config(
+    path: str | Path, conn: "psycopg.Connection | None" = None
+) -> list[BaseScraper]:
+    """Parse a YAML search config and return a flat list of configured scrapers.
+
+    If ``conn`` is supplied the companies section resolves names via
+    ``raw.company_aliases``.  Without a connection, companies are skipped with
+    a warning.
+    """
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict):
         raise ConfigError(f"Config must be a YAML mapping, got {type(raw).__name__}")
-    return _build_scrapers(raw)
+    return _build_scrapers(raw, conn=conn)
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +254,9 @@ def _parse_companies_section(raw: dict) -> _CompaniesSection | None:
 # ---------------------------------------------------------------------------
 
 
-def _build_scrapers(raw: dict) -> list[BaseScraper]:
+def _build_scrapers(
+    raw: dict, *, conn: "psycopg.Connection | None" = None
+) -> list[BaseScraper]:
     glob = _parse_global(raw)
     sl = _parse_sel_section(raw)
     li = _parse_linkedin_section(raw)
@@ -343,33 +366,38 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
             scrapers.append(AshbyScraper(AshbyQuery(company=company)))
 
     if co:
-        db = load_boards(BOARDS_DB_PATH)
+        if conn is None:
+            raise ConfigError(
+                f"companies section lists {len(co.companies)} company name(s) but no DB "
+                "connection was supplied to load_config(); pass conn= so names can be "
+                "resolved via raw.company_aliases"
+            )
         unknown = []
         for company in co.companies:
-            boards = db.get(company, [])
-            if not boards:
-                unknown.append(company)
-                continue
-            for board in boards:
+            db_hit = _lookup_slug(conn, company)
+            if db_hit:
+                board, slug = db_hit
                 if board == "greenhouse":
                     scrapers.append(
-                        GreenhouseScraper(GreenhouseQuery(board_token=company))
+                        GreenhouseScraper(GreenhouseQuery(board_token=slug))
                     )
                 elif board == "lever":
-                    scrapers.append(LeverScraper(LeverQuery(company=company)))
+                    scrapers.append(LeverScraper(LeverQuery(company=slug)))
                 elif board == "ashby":
-                    scrapers.append(AshbyScraper(AshbyQuery(company=company)))
+                    scrapers.append(AshbyScraper(AshbyQuery(company=slug)))
                 else:
                     log.warning(
-                        "Company %r has unsupported board %r in company_boards.json",
+                        "Company %r resolved to unsupported board %r (slug=%r) — skipping",
                         company,
                         board,
+                        slug,
                     )
-                    if company not in unknown:
-                        unknown.append(company)
+                    unknown.append(company)
+            else:
+                unknown.append(company)
         if unknown:
             log.warning(
-                "%d companies have no boards recorded in company_boards.json — run 'discover' first: %s",
+                "%d companies not resolved in alias table: %s",
                 len(unknown),
                 unknown,
             )

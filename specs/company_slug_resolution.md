@@ -97,7 +97,7 @@ For a cache-miss input:
    | 1   | squash: lowercase + strip all non-alphanumeric | `commonwealthfusionsystems`     |
    | 2   | drop trailing filler word(s), then squash      | `commonwealthfusion`            |
    | 3   | first significant word                         | `commonwealth`                  |
-   | 4   | acronym: first letter of each significant word | `cfs`                           |
+   | 4   | acronym: first letter of each significant word | `cf`                            |
 
    Filler list (rule 2): `systems, technologies, technology, inc, corp, corporation, llc, co, company, group, labs, laboratories, aviation, space, energy`. Order matters only for
    probe economy — first 200 wins, so cheap common-case rules (squash) go first.
@@ -217,6 +217,9 @@ Nothing blocking remains; ready to ratify and slice.
 
 ## Changelog
 
+- 2026-07-08 — Implementation complete (PR #461). Corrected rule 4 example: acronym of
+  "commonwealth fusion systems" is `cf` not `cfs` — "systems" is a filler word so
+  significant words are ["commonwealth", "fusion"]. Discovered during verification.
 - 2026-07-08 — Initial draft. Design converged from `notes/discovery-dorks/`: two `raw.*`
   tables, heuristic-probe primary + cached search fallback, global shared alias table with
   verify-before-trust, slug-as-canonical-identity. All open questions resolved same day:

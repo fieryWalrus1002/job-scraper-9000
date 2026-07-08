@@ -8,7 +8,6 @@ skills_fit loader, so format drift against either consumer fails loudly.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import get_args
 
@@ -87,18 +86,20 @@ def test_transform_is_deterministic():
 # ---------------------------------------------------------------------------
 
 
-def test_search_output_loads_through_real_parser(tmp_path, monkeypatch):
-    # Empty boards DB: target_companies resolve to zero scrapers (with a loud
-    # warning), keeping the expected count independent of company_boards.json.
-    boards = tmp_path / "boards.json"
-    boards.write_text(json.dumps({}))
-    monkeypatch.setattr(scraper_config, "BOARDS_DB_PATH", boards)
+def test_search_output_loads_through_real_parser(tmp_path):
+    from unittest.mock import MagicMock
 
     out = search_config_to_pipeline_yaml(_search("search_engineer.yml"))
     cfg_file = tmp_path / "search.yml"
     cfg_file.write_text(dump_yaml(out))
 
-    scrapers = scraper_config.load_config(cfg_file)
+    # Provide a mock conn so load_config can process the companies section;
+    # fetchone() returns None (DB miss) so companies contribute 0 scrapers,
+    # keeping the expected count independent of any alias table state.
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = None
+
+    scrapers = scraper_config.load_config(cfg_file, conn=mock_conn)
 
     # 6 titles -> 6 linkedin + 6 national jobspy + 12 local jobspy (2 locations)
     assert len(scrapers) == 24
@@ -172,10 +173,8 @@ def test_salary_floor_literal_matches_scraper_buckets():
     assert set(get_args(SalaryFloorK)) == scraper_config._VALID_SALARY_K
 
 
-def test_salary_floor_loads_through_real_parser(tmp_path, monkeypatch):
-    boards = tmp_path / "boards.json"
-    boards.write_text(json.dumps({}))
-    monkeypatch.setattr(scraper_config, "BOARDS_DB_PATH", boards)
+def test_salary_floor_loads_through_real_parser(tmp_path):
+    from unittest.mock import MagicMock
 
     cfg = _search("search_engineer.yml").model_copy(deep=True)
     cfg.scrape_preferences.salary_floor_k = 120
@@ -184,7 +183,10 @@ def test_salary_floor_loads_through_real_parser(tmp_path, monkeypatch):
     cfg_file = tmp_path / "search.yml"
     cfg_file.write_text(dump_yaml(out))
 
-    scrapers = scraper_config.load_config(cfg_file)
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = None
+
+    scrapers = scraper_config.load_config(cfg_file, conn=mock_conn)
     linkedin = [s.query for s in scrapers if isinstance(s, LinkedInJobScraper)]
     assert linkedin and all(q.salary_floor == 120_000 for q in linkedin)
     assert all(q.experience == "3,4" for q in linkedin)
