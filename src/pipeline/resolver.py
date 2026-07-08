@@ -6,9 +6,10 @@ wraps it.
 
 from __future__ import annotations
 
-import re
 import logging
+import re
 from dataclasses import dataclass
+from typing import Callable
 
 from job_scraper.discover import probe_company
 
@@ -97,11 +98,14 @@ def heuristic_candidates(name: str) -> list[str]:
     return candidates
 
 
-def resolve(name: str) -> ResolveResult:
+SearchFn = Callable[[str], "ResolveResult | None"]
+
+
+def resolve(name: str, search_fn: SearchFn | None = None) -> ResolveResult:
     """Try heuristic candidates against ATS probes. Return first 200 hit.
 
+    On all-heuristic-miss, calls *search_fn* if provided (e.g. Google CSE).
     Returns ResolveResult with status='unresolved' if nothing hits.
-    The search-fallback path (#454) is called by the cache layer on miss.
     """
     candidates = heuristic_candidates(name)
     log.debug("resolve(%r): candidates=%s", name, candidates)
@@ -120,6 +124,12 @@ def resolve(name: str) -> ResolveResult:
                 boards,
             )
             return ResolveResult(board=None, slug=candidate, status="needs_review")
+
+    # All heuristic candidates missed — try search fallback if provided
+    if search_fn is not None:
+        result = search_fn(name)
+        if result is not None:
+            return result
 
     log.info("resolve(%r): no candidate hit any ATS board", name)
     return ResolveResult(board=None, slug=None, status="unresolved")

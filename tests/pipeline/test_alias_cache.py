@@ -187,3 +187,41 @@ def test_resolve_and_cache_uses_cache_on_hit(migrated_pg: str) -> None:
     assert result.board == "linkedin"
     assert result.slug == "cachedco"
     assert result.status == "resolved"
+
+
+# ---------------------------------------------------------------------------
+# resolve_and_cache — CSE golden pairs
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_and_cache_golden_cse_pairs(migrated_pg: str) -> None:
+    """Golden pairs that require CSE search fallback resolve correctly."""
+    conn = psycopg.connect(migrated_pg)
+
+    # Mock CSE to return the correct slug for each golden pair
+    cse_responses = {
+        "commonwealth fusion systems": ResolveResult(
+            board="lever", slug="cfsenergy", status="resolved"
+        ),
+        "avalanche energy": ResolveResult(
+            board="ashby", slug="avalanchefusion", status="resolved"
+        ),
+    }
+
+    def fake_cse_search(name: str):
+        return cse_responses.get(name.lower())
+
+    with patch("pipeline.alias_cache._cse_search", side_effect=fake_cse_search):
+        with patch("pipeline.resolver.probe_company", return_value=[]):
+            # All heuristic candidates miss (probe returns []), so search_fn fires
+            for name, expected in cse_responses.items():
+                result = AliasCache.resolve_and_cache(conn, name)
+                assert result.status == "resolved"
+                assert result.board == expected.board
+                assert result.slug == expected.slug
+
+                # Alias row was written
+                cached = AliasCache.lookup(conn, name.lower())
+                assert cached is not None
+                assert cached.status == "resolved"
+                assert cached.slug == expected.slug

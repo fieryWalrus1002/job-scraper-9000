@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 
 import psycopg
 
+from pipeline.cse_search import cse_search as _cse_search
 from pipeline.resolver import normalize, resolve, ResolveResult, RESOLVER_VERSION
 
 log = logging.getLogger(__name__)
@@ -131,6 +132,6 @@ class AliasCache:
             log.debug("cache hit for %r → %s", norm, cached.status)
             return cached
 
-        result = resolve(name)
+        result = resolve(name, search_fn=_cse_search)
         AliasCache.write(conn, norm, result)
         return result
