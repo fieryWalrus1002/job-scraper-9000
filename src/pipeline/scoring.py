@@ -282,13 +282,16 @@ def score_run(
     for row in user_rows:
         email = row["email"]
         try:
-            remote_policy = UserPolicies.model_validate(row["policies"] or {}).remote
+            policies = UserPolicies.model_validate(row["policies"] or {})
+            remote_policy = policies.remote
+            relocation_policy = policies.relocation
             acceptable = set(remote_policy.acceptable_classifications)
             max_travel_days = remote_policy.max_travel_days
 
             survivors: list[dict[str, Any]] = []
             unclassified = 0
             travel_filtered = 0
+            relocation_filtered = 0
             for dedup_hash in row["dedup_hashes"]:
                 rec = classified.get(dedup_hash)
                 if rec is None:
@@ -308,6 +311,19 @@ def score_run(
                 ):
                     travel_filtered += 1
                     continue
+                # Per-user relocation gate. Missing or None flags treated as
+                # False (not flagged → never dropped).
+                analysis = rec.get("_remote_analysis") or {}
+                if not relocation_policy.allow_required_relocation and analysis.get(
+                    "requires_relocation"
+                ):
+                    relocation_filtered += 1
+                    continue
+                if not relocation_policy.allow_local_presence_required and analysis.get(
+                    "requires_local_presence"
+                ):
+                    relocation_filtered += 1
+                    continue
                 survivors.append(rec)
             summary["postings_unclassified"] += unclassified
             if travel_filtered:
@@ -317,16 +333,23 @@ def score_run(
                     travel_filtered,
                     max_travel_days,
                 )
+            if relocation_filtered:
+                log.info(
+                    "%s — %d posting(s) dropped: relocation not allowed",
+                    email,
+                    relocation_filtered,
+                )
 
             if not survivors:
                 log.info(
                     "%s — no postings survived remote policy "
-                    "(%d requested, %d unclassified, %d travel-filtered); "
-                    "skipping skills_fit",
+                    "(%d requested, %d unclassified, %d travel-filtered, "
+                    "%d relocation-filtered); skipping skills_fit",
                     email,
                     len(row["dedup_hashes"]),
                     unclassified,
                     travel_filtered,
+                    relocation_filtered,
                 )
                 summary["users_skipped_no_postings"] += 1
                 summary["per_user"].append(

@@ -40,8 +40,8 @@ policy_thresholds:
     max_estimated_days_per_year: 15
 
   relocation:
-    allow_required_relocation: false
-    allow_local_presence_required: false
+    allow_required_relocation: true
+    allow_local_presence_required: true
 
   uncertainty:
     # Options: "reject", "pass"

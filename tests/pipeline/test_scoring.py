@@ -104,6 +104,55 @@ def _set_policy(
     )
 
 
+def _classified_with_relocation(
+    dedup_hash: str,
+    classification: str,
+    *,
+    requires_relocation: bool = False,
+    requires_local_presence: bool = False,
+) -> dict:
+    return {
+        "dedup_hash": dedup_hash,
+        "title": "Eng",
+        "description": "d",
+        "_remote_analysis": {
+            "remote_classification": classification,
+            "estimated_travel_days_per_year": None,
+            "requires_relocation": requires_relocation,
+            "requires_local_presence": requires_local_presence,
+        },
+    }
+
+
+def _set_full_policy(
+    conn: psycopg.Connection,
+    user_id: str,
+    acceptable: list[str],
+    *,
+    max_travel_days: int | None = None,
+    allow_required_relocation: bool = False,
+    allow_local_presence_required: bool = False,
+) -> None:
+    remote: dict = {"acceptable_classifications": acceptable}
+    if max_travel_days is not None:
+        remote["max_travel_days"] = max_travel_days
+    conn.execute(
+        "UPDATE app.user_search_configs SET policies = %s WHERE user_id = %s::uuid",
+        (
+            Json(
+                {
+                    "remote": remote,
+                    "relocation": {
+                        "allow_required_relocation": allow_required_relocation,
+                        "allow_local_presence_required": allow_local_presence_required,
+                    },
+                }
+            ),
+            user_id,
+        ),
+    )
+
+
 def _score_factory(calls: list[dict]):
     def _fn(*, input_path, output_path, profile_file, run_date, parent_run_id):
         lines = [ln for ln in input_path.read_text().splitlines() if ln.strip()]
@@ -556,3 +605,93 @@ def test_scored_records_round_trip_through_ingest(migrated_pg, tmp_path):
         ("alice@example.com", "h-shared"),
         ("bob@example.com", "h-shared"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Relocation gate tests
+# ---------------------------------------------------------------------------
+
+
+@skip_if_no_docker
+def test_relocation_gate_drops_flagged_jobs_when_unwilling(migrated_pg, tmp_path):
+    """willing=False: jobs flagged requires_relocation or requires_local_presence
+    are dropped."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+        )
+        _seed_consolidated(conn, dedup_hash="h-relo", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-local", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-ok", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-relo", "fully_remote", requires_relocation=True
+            ),
+            _classified_with_relocation(
+                "h-local", "fully_remote", requires_local_presence=True
+            ),
+            _classified_with_relocation("h-ok", "fully_remote"),
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 1
+    assert calls[0]["hashes"] == ["h-ok"]
+
+
+@skip_if_no_docker
+def test_relocation_gate_passes_flagged_jobs_when_willing(migrated_pg, tmp_path):
+    """willing=True: jobs flagged requires_relocation or requires_local_presence
+    survive."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "bob@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=True,
+            allow_local_presence_required=True,
+        )
+        for h in ["h-relo", "h-local", "h-ok"]:
+            _seed_consolidated(conn, dedup_hash=h, requested_by=[u1])
+
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-relo", "fully_remote", requires_relocation=True
+            ),
+            _classified_with_relocation(
+                "h-local", "fully_remote", requires_local_presence=True
+            ),
+            _classified_with_relocation("h-ok", "fully_remote"),
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 1
+    assert sorted(calls[0]["hashes"]) == ["h-local", "h-ok", "h-relo"]
