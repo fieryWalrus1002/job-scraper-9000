@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
-from .company_boards import DEFAULT_PATH as BOARDS_DB_PATH, load as load_boards
 from .query import LinkedInSearchQuery, SALARY_FLOOR, SELSearchQuery
 from .scrapers.base import BaseScraper
 from .scrapers.ashby import AshbyScraper, AshbyQuery
@@ -123,9 +122,8 @@ def load_config(
     """Parse a YAML search config and return a flat list of configured scrapers.
 
     If ``conn`` is supplied the companies section resolves names via
-    ``raw.company_aliases`` first, falling back to the flat-file DB on a miss.
-    Without ``conn`` the flat-file is the only source (safe during the migration
-    window when the alias table may be empty).
+    ``raw.company_aliases``.  Without a connection, companies are skipped with
+    a warning.
     """
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict):
@@ -368,57 +366,39 @@ def _build_scrapers(
             scrapers.append(AshbyScraper(AshbyQuery(company=company)))
 
     if co:
-        db = load_boards(BOARDS_DB_PATH)  # flat-file fallback still loaded
         unknown = []
         for company in co.companies:
-            # DB lookup: use verified slug when available
-            if conn is not None:
-                db_hit = _lookup_slug(conn, company)
-                if db_hit:
-                    board, slug = db_hit
-                    if board == "greenhouse":
-                        scrapers.append(
-                            GreenhouseScraper(GreenhouseQuery(board_token=slug))
-                        )
-                    elif board == "lever":
-                        scrapers.append(LeverScraper(LeverQuery(company=slug)))
-                    elif board == "ashby":
-                        scrapers.append(AshbyScraper(AshbyQuery(company=slug)))
-                    else:
-                        log.warning(
-                            "Company %r resolved to unsupported board %r (slug=%r) — skipping",
-                            company,
-                            board,
-                            slug,
-                        )
-                        unknown.append(company)
-                    continue
-
-            # Flat-file fallback (no conn, or DB miss)
-            boards = db.get(company, [])
-            if not boards:
+            if conn is None:
+                log.warning(
+                    "Company %r cannot be resolved: no DB connection in load_config; pass conn= to enable slug lookup",
+                    company,
+                )
                 unknown.append(company)
                 continue
-            for board in boards:
+            db_hit = _lookup_slug(conn, company)
+            if db_hit:
+                board, slug = db_hit
                 if board == "greenhouse":
                     scrapers.append(
-                        GreenhouseScraper(GreenhouseQuery(board_token=company))
+                        GreenhouseScraper(GreenhouseQuery(board_token=slug))
                     )
                 elif board == "lever":
-                    scrapers.append(LeverScraper(LeverQuery(company=company)))
+                    scrapers.append(LeverScraper(LeverQuery(company=slug)))
                 elif board == "ashby":
-                    scrapers.append(AshbyScraper(AshbyQuery(company=company)))
+                    scrapers.append(AshbyScraper(AshbyQuery(company=slug)))
                 else:
                     log.warning(
-                        "Company %r has unsupported board %r in company_boards.json",
+                        "Company %r resolved to unsupported board %r (slug=%r) — skipping",
                         company,
                         board,
+                        slug,
                     )
-                    if company not in unknown:
-                        unknown.append(company)
+                    unknown.append(company)
+            else:
+                unknown.append(company)
         if unknown:
             log.warning(
-                "%d companies have no boards recorded — run 'discover' first or check alias table: %s",
+                "%d companies not resolved in alias table: %s",
                 len(unknown),
                 unknown,
             )

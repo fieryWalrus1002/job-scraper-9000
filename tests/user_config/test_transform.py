@@ -8,7 +8,6 @@ skills_fit loader, so format drift against either consumer fails loudly.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import get_args
 
@@ -87,13 +86,9 @@ def test_transform_is_deterministic():
 # ---------------------------------------------------------------------------
 
 
-def test_search_output_loads_through_real_parser(tmp_path, monkeypatch):
-    # Empty boards DB: target_companies resolve to zero scrapers (with a loud
-    # warning), keeping the expected count independent of company_boards.json.
-    boards = tmp_path / "boards.json"
-    boards.write_text(json.dumps({}))
-    monkeypatch.setattr(scraper_config, "BOARDS_DB_PATH", boards)
-
+def test_search_output_loads_through_real_parser(tmp_path):
+    # target_companies resolve to zero scrapers without a conn (warning is logged),
+    # keeping the expected count independent of any company boards DB.
     out = search_config_to_pipeline_yaml(_search("search_engineer.yml"))
     cfg_file = tmp_path / "search.yml"
     cfg_file.write_text(dump_yaml(out))
@@ -172,11 +167,7 @@ def test_salary_floor_literal_matches_scraper_buckets():
     assert set(get_args(SalaryFloorK)) == scraper_config._VALID_SALARY_K
 
 
-def test_salary_floor_loads_through_real_parser(tmp_path, monkeypatch):
-    boards = tmp_path / "boards.json"
-    boards.write_text(json.dumps({}))
-    monkeypatch.setattr(scraper_config, "BOARDS_DB_PATH", boards)
-
+def test_salary_floor_loads_through_real_parser(tmp_path):
     cfg = _search("search_engineer.yml").model_copy(deep=True)
     cfg.scrape_preferences.salary_floor_k = 120
     cfg.scrape_preferences.linkedin_experience_codes = ["3", "4"]

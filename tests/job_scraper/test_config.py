@@ -805,7 +805,7 @@ def test_no_scraper_sections_includes_sel_in_error(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Companies section — DB slug lookup + flat-file fallback
+# Companies section — DB slug lookup
 # ---------------------------------------------------------------------------
 
 
@@ -821,8 +821,7 @@ def test_load_config_companies_uses_db_slug(tmp_path):
     The produced LeverScraper must use the slug, not the raw name."""
     cfg = _write_config(
         tmp_path,
-        """\
-        companies:
+        """        companies:
           - rocket lab
     """,
     )
@@ -834,36 +833,36 @@ def test_load_config_companies_uses_db_slug(tmp_path):
     assert scrapers[0].query.company == "rocketlab"
 
 
-def test_load_config_companies_fallback_to_flat_file(tmp_path):
-    """conn=None: companies resolved entirely from the flat-file DB.
-    'stripe' is in config/company_boards.json → greenhouse."""
+def test_load_config_companies_conn_none_logs_warning(tmp_path, caplog):
+    """conn=None: company cannot be resolved; warning is logged and no scrapers produced."""
+    import logging
+
     cfg = _write_config(
         tmp_path,
-        """\
-        companies:
+        """        companies:
           - stripe
     """,
     )
-    scrapers = load_config(cfg, conn=None)
+    with caplog.at_level(logging.WARNING, logger="job_scraper.config"):
+        scrapers = load_config(cfg, conn=None)
 
-    assert len(scrapers) == 1
-    assert isinstance(scrapers[0], GreenhouseScraper)
-    assert scrapers[0].query.board_token == "stripe"
+    assert scrapers == []
+    assert any("cannot be resolved" in r.message for r in caplog.records)
 
 
-def test_load_config_companies_db_miss_falls_back(tmp_path):
-    """DB miss (fetchone returns None): should fall back to flat-file.
-    'stripe' is in the flat-file → GreenhouseScraper with token 'stripe'."""
+def test_load_config_companies_db_miss_adds_to_unknown(tmp_path, caplog):
+    """DB miss (fetchone returns None): company goes to unknown list, warning logged."""
+    import logging
+
     cfg = _write_config(
         tmp_path,
-        """\
-        companies:
+        """        companies:
           - stripe
     """,
     )
     mock_conn = _make_mock_conn(None)  # DB miss
-    scrapers = load_config(cfg, conn=mock_conn)
+    with caplog.at_level(logging.WARNING, logger="job_scraper.config"):
+        scrapers = load_config(cfg, conn=mock_conn)
 
-    assert len(scrapers) == 1
-    assert isinstance(scrapers[0], GreenhouseScraper)
-    assert scrapers[0].query.board_token == "stripe"
+    assert scrapers == []
+    assert any("not resolved in alias table" in r.message for r in caplog.records)
