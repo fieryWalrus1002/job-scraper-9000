@@ -3,6 +3,7 @@ Tests for discover.py — probe method and DB persistence.
 All HTTP is mocked.
 """
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -91,32 +92,58 @@ def test_discover_probe_returns_mapping():
 
 
 # ---------------------------------------------------------------------------
-# run — integration (DB persistence)
+# run — DB persistence via AliasCache
 # ---------------------------------------------------------------------------
 
 
-def test_run_persists_to_db(tmp_path):
-    db_path = tmp_path / "boards.json"
-    with patch(
-        "job_scraper.discover.discover_probe", return_value={"stripe": ["lever"]}
+def test_run_with_conn_writes_to_alias_cache():
+    """When conn is provided and probe finds boards, AliasCache.write is called."""
+    from pipeline.resolver import ResolveResult
+
+    mock_conn = MagicMock()
+    with (
+        patch(
+            "job_scraper.discover.discover_probe",
+            return_value={"stripe": ["lever"]},
+        ),
+        patch("pipeline.alias_cache.AliasCache.write") as mock_write,
     ):
-        run(["stripe"], db_path=db_path)
-    from job_scraper.company_boards import load
+        result = run(["stripe"], conn=mock_conn)
 
-    assert load(db_path)["stripe"] == ["lever"]
+    assert result == {"stripe": ["lever"]}
+    mock_write.assert_called_once_with(
+        mock_conn,
+        "stripe",
+        ResolveResult(board="lever", slug="stripe", status="resolved"),
+    )
 
 
-def test_run_merges_with_existing_db(tmp_path):
-    db_path = tmp_path / "boards.json"
-    from job_scraper.company_boards import save
-
-    save({"anthropic": ["greenhouse"]}, db_path)
-    with patch(
-        "job_scraper.discover.discover_probe", return_value={"stripe": ["lever"]}
+def test_run_without_conn_logs_warning(caplog):
+    """When conn=None, a warning is logged and results are still returned."""
+    with (
+        patch(
+            "job_scraper.discover.discover_probe",
+            return_value={"stripe": ["lever"]},
+        ),
+        caplog.at_level(logging.WARNING, logger="job_scraper.discover"),
     ):
-        run(["stripe"], db_path=db_path)
-    from job_scraper.company_boards import load
+        result = run(["stripe"], conn=None)
 
-    db = load(db_path)
-    assert "anthropic" in db
-    assert "stripe" in db
+    assert result == {"stripe": ["lever"]}
+    assert any("not persisted" in r.message for r in caplog.records)
+
+
+def test_run_with_conn_skips_write_for_empty_probe():
+    """Companies with no boards found do not trigger AliasCache.write."""
+    mock_conn = MagicMock()
+    with (
+        patch(
+            "job_scraper.discover.discover_probe",
+            return_value={"nobody": []},
+        ),
+        patch("pipeline.alias_cache.AliasCache.write") as mock_write,
+    ):
+        result = run(["nobody"], conn=mock_conn)
+
+    assert result == {"nobody": []}
+    mock_write.assert_not_called()

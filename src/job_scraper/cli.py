@@ -270,24 +270,18 @@ def _add_ashby(sub: argparse._SubParsersAction) -> None:
 
 def _cmd_discover(args) -> None:
     from job_scraper.discover import run as discover_run
-    from job_scraper.company_boards import (
-        load as load_boards,
-        DEFAULT_PATH as BOARDS_PATH,
-    )
 
     companies = args.companies
     log.info("Probing %d companies...", len(companies))
-    discover_run(companies)
+    discovered = discover_run(companies)
 
-    db = load_boards(BOARDS_PATH)
-
-    found = {c: db[c] for c in companies if db.get(c)}
-    not_found = [c for c in companies if not db.get(c)]
+    found = {c: discovered[c] for c in companies if discovered.get(c)}
+    not_found = [c for c in companies if not discovered.get(c)]
 
     print(f"\n{'Company':<30} {'Boards'}")
     print("-" * 50)
     for company in companies:
-        boards = db.get(company, [])
+        boards = discovered.get(company, [])
         print(f"  {company:<28} {', '.join(boards) if boards else '(not found)'}")
 
     print("\n# --- paste into config yml ---")
