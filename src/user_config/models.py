@@ -304,6 +304,12 @@ class PrefilterPolicy(_Strict):
     excluded_title_terms: list[str] = Field(default_factory=list)
 
 
+class RelocationPolicy(_Strict):
+    allow_required_relocation: bool = False
+    allow_local_presence_required: bool = False
+
+
 class UserPolicies(_Strict):
     remote: RemotePolicy = Field(default_factory=RemotePolicy)
     prefilter: PrefilterPolicy = Field(default_factory=PrefilterPolicy)
+    relocation: RelocationPolicy = Field(default_factory=RelocationPolicy)
