@@ -31,6 +31,7 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
+from pipeline.alias_cache import AliasCache
 from pipeline.queue import enqueue
 from pipeline.worker import run_user_dir
 from user_config import (
@@ -97,6 +98,34 @@ def _materialize_user(
     return pipeline_search
 
 
+def _gather_companies(rows: list[dict]) -> list[str]:
+    """Collect deduped union of all company names across eligible user rows.
+
+    Returns normalized names (lowercase, stripped). Only includes users who
+    have both profile and search config (same eligibility as the enqueue loop).
+    """
+    seen: set[str] = set()
+    names: list[str] = []
+    for row in rows:
+        if row["profile_payload"] is None or row["search_payload"] is None:
+            continue
+        if row["pipeline_enabled"] is False:
+            continue
+        # Read target_companies directly from the raw search_payload
+        # (the DB dict), not the materialized pipeline_search.
+        orgs = (
+            (row["search_payload"] or {})
+            .get("organizations", {})
+            .get("target_companies", [])
+        )
+        for name in orgs:
+            norm = name.strip().lower()
+            if norm and norm not in seen:
+                seen.add(norm)
+                names.append(norm)
+    return names
+
+
 def _sources_for(pipeline_search: dict) -> list[str]:
     """Which queue ``source`` names this user's search.yml touches."""
     return [k for k in _SCRAPER_SOURCE_KEYS if pipeline_search.get(k)]
@@ -119,11 +148,35 @@ def plan_run(
         "users_skipped": 0,
         "rows_enqueued": 0,
         "skipped_emails": [],
+        "companies_resolved": 0,
     }
 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(_SELECT_USERS)
         rows = cur.fetchall()
+
+    # --- Resolution pre-pass ---
+    all_companies = _gather_companies(rows)
+    if all_companies:
+        log.info(
+            "Resolving %d distinct company name(s) before enqueue...",
+            len(all_companies),
+        )
+        for name in all_companies:
+            result = AliasCache.resolve_and_cache(conn, name)
+            log.info(
+                "  %r → %s (board=%s, slug=%s)",
+                name,
+                result.status,
+                result.board,
+                result.slug,
+            )
+        summary["companies_resolved"] = len(all_companies)
+        log.info(
+            "Company resolution pre-pass complete: %d name(s) processed",
+            summary["companies_resolved"],
+        )
+    # --- End resolution pre-pass ---
 
     for row in rows:
         email = row["email"]
