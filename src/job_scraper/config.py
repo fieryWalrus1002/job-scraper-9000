@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import logging
 import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
+
+if TYPE_CHECKING:
+    import psycopg
 
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
@@ -102,12 +108,29 @@ def _expand(value: str) -> str:
     return re.sub(r"\$\{([^}]+)\}", _sub, value)
 
 
-def load_config(path: str | Path) -> list[BaseScraper]:
-    """Parse a YAML search config and return a flat list of configured scrapers."""
+def _lookup_slug(conn: "psycopg.Connection", company: str) -> tuple[str, str] | None:
+    """Return (board, slug) from raw.company_aliases or None on miss/unresolved."""
+    row = conn.execute(
+        "SELECT board, slug FROM raw.company_aliases WHERE normalized_input = %s AND status = 'resolved'",
+        (company,),
+    ).fetchone()
+    return (row[0], row[1]) if row else None
+
+
+def load_config(
+    path: str | Path, conn: "psycopg.Connection | None" = None
+) -> list[BaseScraper]:
+    """Parse a YAML search config and return a flat list of configured scrapers.
+
+    If ``conn`` is supplied the companies section resolves names via
+    ``raw.company_aliases`` first, falling back to the flat-file DB on a miss.
+    Without ``conn`` the flat-file is the only source (safe during the migration
+    window when the alias table may be empty).
+    """
     raw = yaml.safe_load(Path(path).read_text())
     if not isinstance(raw, dict):
         raise ConfigError(f"Config must be a YAML mapping, got {type(raw).__name__}")
-    return _build_scrapers(raw)
+    return _build_scrapers(raw, conn=conn)
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +256,9 @@ def _parse_companies_section(raw: dict) -> _CompaniesSection | None:
 # ---------------------------------------------------------------------------
 
 
-def _build_scrapers(raw: dict) -> list[BaseScraper]:
+def _build_scrapers(
+    raw: dict, *, conn: "psycopg.Connection | None" = None
+) -> list[BaseScraper]:
     glob = _parse_global(raw)
     sl = _parse_sel_section(raw)
     li = _parse_linkedin_section(raw)
@@ -343,9 +368,33 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
             scrapers.append(AshbyScraper(AshbyQuery(company=company)))
 
     if co:
-        db = load_boards(BOARDS_DB_PATH)
+        db = load_boards(BOARDS_DB_PATH)  # flat-file fallback still loaded
         unknown = []
         for company in co.companies:
+            # DB lookup: use verified slug when available
+            if conn is not None:
+                db_hit = _lookup_slug(conn, company)
+                if db_hit:
+                    board, slug = db_hit
+                    if board == "greenhouse":
+                        scrapers.append(
+                            GreenhouseScraper(GreenhouseQuery(board_token=slug))
+                        )
+                    elif board == "lever":
+                        scrapers.append(LeverScraper(LeverQuery(company=slug)))
+                    elif board == "ashby":
+                        scrapers.append(AshbyScraper(AshbyQuery(company=slug)))
+                    else:
+                        log.warning(
+                            "Company %r resolved to unsupported board %r (slug=%r) — skipping",
+                            company,
+                            board,
+                            slug,
+                        )
+                        unknown.append(company)
+                    continue
+
+            # Flat-file fallback (no conn, or DB miss)
             boards = db.get(company, [])
             if not boards:
                 unknown.append(company)
@@ -369,7 +418,7 @@ def _build_scrapers(raw: dict) -> list[BaseScraper]:
                         unknown.append(company)
         if unknown:
             log.warning(
-                "%d companies have no boards recorded in company_boards.json — run 'discover' first: %s",
+                "%d companies have no boards recorded — run 'discover' first or check alias table: %s",
                 len(unknown),
                 unknown,
             )

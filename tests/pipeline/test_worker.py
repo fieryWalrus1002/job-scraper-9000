@@ -55,13 +55,13 @@ def _seed_user_with_runs_dir(
 
 
 def _fake_scrape_factory(jobs: list[dict]):
-    def _fn(source: str, query_payload: dict):
+    def _fn(source: str, query_payload: dict, conn=None):
         return list(jobs)
 
     return _fn
 
 
-def _raising_scrape_fn(source: str, query_payload: dict):
+def _raising_scrape_fn(source: str, query_payload: dict, conn=None):
     raise RuntimeError("scraper exploded")
 
 
@@ -193,7 +193,7 @@ def test_run_worker_isolates_failures_and_continues(migrated_pg, tmp_path):
 
         good_jobs = [{"title": "ML Eng", "company": "Acme"}]
 
-        def selective(source: str, query_payload: dict):
+        def selective(source: str, query_payload: dict, conn=None):
             if source == "linkedin":
                 raise RuntimeError("LinkedIn rate-limit-pocalypse")
             return list(good_jobs)
