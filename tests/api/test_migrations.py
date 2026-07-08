@@ -560,7 +560,9 @@ def test_0016_downgrade_drops_grab_bag_columns(fresh_pg):
 @skip_if_no_docker
 def test_0019_downgrade_drops_both_tables(fresh_pg):
     """Downgrade from 0019 to 0018 must drop both tables."""
-    _run_alembic("0019", fresh_pg)
+    _run_alembic(
+        "0019", fresh_pg, extra_env={"BOOTSTRAP_ADMIN_EMAIL": "admin@example.com"}
+    )
 
     # Confirm tables exist after upgrade
     with psycopg.connect(fresh_pg) as conn:
