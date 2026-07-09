@@ -29,6 +29,7 @@ from user_config import (
     dump_yaml,
     search_config_to_pipeline_yaml,
 )
+from user_config.models import HomeLocation, Location
 
 FIXTURES = Path(__file__).parent / "fixtures"
 GOLDEN = Path(__file__).parent / "golden"
@@ -273,8 +274,57 @@ def test_relocation_willing_false_clears_both_flags():
     assert policies.relocation.allow_local_presence_required is False
 
 
+def _policy_location_tuples(policies: UserPolicies) -> list[tuple[str, str, str]]:
+    return [
+        (loc.city, loc.region, loc.country)
+        for loc in policies.relocation.acceptable_locations
+    ]
+
+
+def test_relocation_policy_accepts_home_then_distinct_locations():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    policies = derive_policies(cfg)
+    assert _policy_location_tuples(policies) == [
+        ("Pullman", "WA", "US"),
+        ("Seattle", "WA", "US"),
+    ]
+
+
+def test_relocation_policy_deduplicates_home_and_acceptable_case_insensitive():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.user.home_location = HomeLocation(city="Seattle", region="WA", country="US")
+    cfg.locations.acceptable = [Location(city="seattle", region="wa", country="us")]
+    policies = derive_policies(cfg)
+    assert _policy_location_tuples(policies) == [("Seattle", "WA", "US")]
+
+
+def test_relocation_policy_defaults_to_empty_without_home_or_acceptable_locations():
+    cfg = _search("search_engineer.yml").model_copy(deep=True)
+    cfg.user.home_location = None
+    cfg.locations.acceptable = []
+    policies = derive_policies(cfg)
+    assert policies.relocation.acceptable_locations == []
+
+
+def test_relocation_policy_acceptable_locations_do_not_depend_on_willing():
+    cfg_false = _search("search_engineer.yml").model_copy(deep=True)
+    cfg_false.locations.relocation.willing = False
+    cfg_true = cfg_false.model_copy(deep=True)
+    cfg_true.locations.relocation.willing = True
+
+    false_policies = derive_policies(cfg_false)
+    true_policies = derive_policies(cfg_true)
+
+    assert false_policies.relocation.allow_local_presence_required is False
+    assert true_policies.relocation.allow_local_presence_required is True
+    assert _policy_location_tuples(false_policies) == _policy_location_tuples(
+        true_policies
+    )
+
+
 def test_relocation_defaults_to_restrictive_when_missing():
     """A stored policies dict with no 'relocation' key defaults to False/False."""
     policies = UserPolicies.model_validate({})
     assert policies.relocation.allow_required_relocation is False
     assert policies.relocation.allow_local_presence_required is False
+    assert policies.relocation.acceptable_locations == []
