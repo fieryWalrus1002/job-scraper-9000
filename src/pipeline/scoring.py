@@ -347,6 +347,8 @@ def score_run(
             unclassified = 0
             travel_filtered = 0
             relocation_filtered = 0
+            local_presence_out_of_area = 0
+            local_presence_ambiguous = 0
             for dedup_hash in row["dedup_hashes"]:
                 rec = classified.get(dedup_hash)
                 if rec is None:
@@ -366,19 +368,32 @@ def score_run(
                 ):
                     travel_filtered += 1
                     continue
-                # Per-user relocation gate. Missing or None flags treated as
-                # False (not flagged → never dropped).
                 analysis = rec.get("_remote_analysis") or {}
+                # requires_relocation stays a clean veto.
                 if not relocation_policy.allow_required_relocation and analysis.get(
                     "requires_relocation"
                 ):
                     relocation_filtered += 1
                     continue
-                if not relocation_policy.allow_local_presence_required and analysis.get(
-                    "requires_local_presence"
+                # requires_local_presence is location-aware (spec §8.2).
+                # willing=True users have allow_local_presence_required=True and accept
+                # near any office (unchanged). A willing=False user keeps only postings
+                # in an acceptable location.
+                if (
+                    analysis.get("requires_local_presence")
+                    and not relocation_policy.allow_local_presence_required
                 ):
-                    relocation_filtered += 1
-                    continue
+                    job_location = rec.get("location")
+                    if _location_matches(
+                        job_location, relocation_policy.acceptable_locations
+                    ):
+                        pass  # local to a place they accept — keep
+                    elif not (job_location or "").strip():
+                        local_presence_ambiguous += 1
+                        continue
+                    else:
+                        local_presence_out_of_area += 1
+                        continue
                 survivors.append(rec)
             summary["postings_unclassified"] += unclassified
             if travel_filtered:
@@ -394,17 +409,32 @@ def score_run(
                     email,
                     relocation_filtered,
                 )
+            if local_presence_out_of_area:
+                log.info(
+                    "%s — %d posting(s) dropped: requires local presence outside acceptable locations",
+                    email,
+                    local_presence_out_of_area,
+                )
+            if local_presence_ambiguous:
+                log.info(
+                    "%s — %d posting(s) dropped: requires local presence, posting location missing/ambiguous",
+                    email,
+                    local_presence_ambiguous,
+                )
 
             if not survivors:
                 log.info(
                     "%s — no postings survived remote policy "
                     "(%d requested, %d unclassified, %d travel-filtered, "
-                    "%d relocation-filtered); skipping skills_fit",
+                    "%d relocation-filtered, %d local-presence-out-of-area, "
+                    "%d local-presence-ambiguous); skipping skills_fit",
                     email,
                     len(row["dedup_hashes"]),
                     unclassified,
                     travel_filtered,
                     relocation_filtered,
+                    local_presence_out_of_area,
+                    local_presence_ambiguous,
                 )
                 summary["users_skipped_no_postings"] += 1
                 summary["per_user"].append(
