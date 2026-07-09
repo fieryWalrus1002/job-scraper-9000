@@ -24,10 +24,12 @@ from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
 from pipeline.planner import _slug
 from pipeline.scoring import (
     SCORED_NAME,
+    _location_matches,
     iter_run_user_outputs,
     score_run,
     skills_fit_dir,
 )
+from user_config.models import Location
 
 from .conftest import seed_user, skip_if_no_docker
 
@@ -184,6 +186,23 @@ def _scored_hashes(runs_dir: Path, email: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
+
+def test_location_matches_requires_city_and_region_token():
+    acceptable = [Location(city="Portland", region="OR", country="US")]
+
+    assert _location_matches("Portland, OR", acceptable) is True
+    assert _location_matches("Portland, ME", acceptable) is False
+    assert _location_matches("Seattle, WA", acceptable) is False
+    assert _location_matches("", acceptable) is False
+    assert _location_matches(None, acceptable) is False
+
+
+def test_location_matches_city_as_substring_region_as_token():
+    acceptable = [Location(city="Seattle", region="WA", country="US")]
+
+    assert _location_matches("Greater Seattle Area, WA", acceptable) is True
+    assert _location_matches("Seattle, Washington", acceptable) is False
 
 
 @skip_if_no_docker

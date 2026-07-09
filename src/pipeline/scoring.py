@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import traceback
 from collections.abc import Iterator
 from pathlib import Path
@@ -56,6 +57,7 @@ from pipeline.consolidation import (
 )
 from pipeline.worker import run_user_dir
 from user_config import UserPolicies
+from user_config.models import Location
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +67,32 @@ SCORED_NAME = "scored.jsonl"
 
 ScoreFn = Callable[..., dict[str, Any]]
 """``(input_path=, output_path=, profile_file=, run_date=, parent_run_id=) -> summary``."""
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def _location_matches(job_location: str | None, acceptable: list[Location]) -> bool:
+    """True if the scraped posting location matches any acceptable location
+    (specs/relocation_policy.md §8.4). City = casefolded substring; region =
+    exact casefolded token (so 'WA' matches 'Seattle, WA' but not 'seattle');
+    the token guard keeps 'Portland, OR' from matching 'Portland, ME'. Empty/None
+    job_location never matches. Country is not required to appear."""
+    if not job_location or not job_location.strip():
+        return False
+    hay = job_location.casefold()
+    tokens = set(_TOKEN_RE.findall(hay))
+    for loc in acceptable:
+        city = loc.city.casefold().strip()
+        region = loc.region.casefold().strip()
+        if not city or city not in hay:
+            continue
+        # Spec §8.4: require BOTH city and region. Location.region is a required
+        # field, so an empty region is malformed data — never match on city alone
+        # (that would let 'Portland' match any Portland).
+        if region and region in tokens:
+            return True
+    return False
+
 
 # Per-user query: invert consolidated_postings.requested_by into one row per
 # user with the dedup_hashes they want, plus their stored policies. A user
