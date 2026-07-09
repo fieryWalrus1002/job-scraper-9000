@@ -23,6 +23,7 @@ import psycopg
 from jobs_cli._common import _parse_run_date
 from pipeline.consolidation import (
     ClassifyFn,
+    batch_classify_fn,
     classify_consolidated,
     consolidate_run,
     default_classify_fn,
@@ -31,6 +32,7 @@ from pipeline.planner import plan_run
 from pipeline.queue import pending_count, requeue_running
 from pipeline.scoring import (
     ScoreFn,
+    batch_score_fn,
     default_score_fn,
     score_run,
 )
@@ -263,12 +265,20 @@ def _cmd_overnight(args: argparse.Namespace) -> None:
     _configure_overnight_logging(run_date=args.run_date, log_file=log_file)
     _install_interrupt_handlers()
 
+    # --batch swaps both LLM phases onto their OpenAI Batch API twins via the
+    # same hooks the tests inject through; the default fns stay untouched.
+    llm_fns: dict[str, Any] = {}
+    if args.batch:
+        log.info("--batch: classification + scoring will use the OpenAI Batch API")
+        llm_fns = {"classify_fn": batch_classify_fn, "score_fn": batch_score_fn}
+
     try:
         summary = run_overnight(
             run_date=args.run_date,
             run_id=run_id,
             runs_dir=Path(args.runs_dir),
             scrape_only=args.scrape_only,
+            **llm_fns,
         )
     except _OperatorInterrupt as exc:
         log.warning("Overnight pipeline interrupted by operator (%s)", exc.signame)
@@ -320,6 +330,15 @@ def _add_overnight(sub: argparse._SubParsersAction) -> None:
         "--scrape-only",
         action="store_true",
         help="Stop after plan + scrape (skip consolidation + classification)",
+    )
+    p.add_argument(
+        "--batch",
+        action="store_true",
+        help=(
+            "Run classification + scoring through the OpenAI Batch API "
+            "(~50%% cheaper; blocks polling until each batch completes; "
+            "requires provider=openai)"
+        ),
     )
     log_group = p.add_mutually_exclusive_group()
     log_group.add_argument(

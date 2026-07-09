@@ -239,6 +239,33 @@ def default_score_fn(
     )
 
 
+def batch_score_fn(
+    *,
+    input_path: Path,
+    output_path: Path,
+    profile_file: Path,
+    run_date: str | None,
+    parent_run_id: str,
+) -> dict[str, Any]:
+    """Batch-API twin of :func:`default_score_fn` (``overnight --batch``).
+
+    Same cache, telemetry, and scored-record shape — but cache-miss rows go
+    through the OpenAI Batch API (~50% cheaper). Note :func:`score_run` loops
+    users serially, so each user's batch is submitted and polled to completion
+    before the next user starts; the waits stack with user count. OpenAI-only;
+    the batch runner fails fast on any other provider.
+    """
+    from agents.skills_fit.batch import run_skills_fit_batch
+
+    return run_skills_fit_batch(
+        run_date=run_date,
+        remote_input=input_path,
+        output=output_path,
+        profile_file=profile_file,
+        parent_run_id=parent_run_id,
+    )
+
+
 def score_run(
     conn: psycopg.Connection,
     *,

@@ -235,6 +235,30 @@ def default_classify_fn(
     )
 
 
+def batch_classify_fn(
+    *,
+    input_path: Path,
+    pass_path: Path,
+    trash_path: Path,
+    parent_run_id: str,
+) -> dict[str, Any]:
+    """Batch-API twin of :func:`default_classify_fn` (``overnight --batch``).
+
+    Same cache, telemetry, and pass/trash output shape — but cache-miss jobs
+    go through the OpenAI Batch API (~50% cheaper) instead of live calls, and
+    the phase blocks polling until the batch reaches a terminal state.
+    OpenAI-only; the batch runner fails fast on any other provider.
+    """
+    from agents.remote_filter.batch import run_remote_filter_batch
+
+    return run_remote_filter_batch(
+        input_path=input_path,
+        pass_path=pass_path,
+        trash_path=trash_path,
+        parent_run_id=parent_run_id,
+    )
+
+
 def classify_consolidated(
     *,
     runs_dir: Path,
