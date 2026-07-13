@@ -738,7 +738,9 @@ def run_skills_fit_batch(**kwargs) -> dict[str, Any]:
                 submission.client, submission.batch_id, poll_interval
             )
         return collect_skills_fit_batch(submission, batch)
-    except Exception as exc:
+    except BaseException as exc:
+        # Catch BaseException (matching submit) so a KeyboardInterrupt/SystemExit
+        # during poll/collect still closes the tracker instead of leaking it.
         # Cleanup must never mask the primary failure: log any abort error and
         # re-raise the original exception.
         try:
