@@ -466,6 +466,39 @@ def test_abort_and_failed_batch_close_run_tracker(tmp_path, monkeypatch):
     )
 
 
+def test_run_batch_cleanup_does_not_mask_primary_failure(tmp_path, monkeypatch, caplog):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "skills_fit.yml"
+    profile_path = tmp_path / "profile.yml"
+    input_path = tmp_path / "remote.jsonl"
+    _write_profile(profile_path)
+    _write_config(config_path, profile_path)
+    _write_jsonl(input_path, [_job()])
+
+    def _boom_abort(self, exc):
+        raise RuntimeError("abort blew up")
+
+    with (
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client", return_value=(MagicMock(), "gpt-4o-mini")),
+        patch.object(
+            batch, "upload_and_create_batch", return_value=("batch-test", "file-1")
+        ),
+        patch.object(batch, "poll_until_done", return_value=_failed_batch()),
+        patch.object(batch.SkillsFitBatchSubmission, "abort", _boom_abort),
+    ):
+        # The primary failure (batch status=failed) must propagate, not the abort error.
+        with pytest.raises(RuntimeError, match="status=failed"):
+            batch.run_skills_fit_batch(
+                remote_input=input_path,
+                local_input=tmp_path / "missing_local.jsonl",
+                output=tmp_path / "scored.jsonl",
+                config_path=config_path,
+            )
+
+    assert "Failed to abort skills_fit submission" in caplog.text
+
+
 def test_run_batch_rejects_non_openai_provider(tmp_path):
     config_path = tmp_path / "skills_fit.yml"
     profile_path = tmp_path / "profile.yml"

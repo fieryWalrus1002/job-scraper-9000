@@ -245,8 +245,10 @@ class SkillsFitBatchSubmission:
         if self._closed:
             raise RuntimeError(f"RunTracker for {self.run_id} is already closed")
         self._finalize_telemetry()
-        self.run.__exit__(exc_type, exc, tb)
+        # Mark closed before __exit__ so that if __exit__ itself raises, a later
+        # abort() hits the already-closed guard instead of calling __exit__ twice.
         self._closed = True
+        self.run.__exit__(exc_type, exc, tb)
 
     def _finalize_telemetry(self) -> None:
         """Body of the old ``finally`` block — records outputs/cache/cost on the
@@ -737,5 +739,13 @@ def run_skills_fit_batch(**kwargs) -> dict[str, Any]:
             )
         return collect_skills_fit_batch(submission, batch)
     except Exception as exc:
-        submission.abort(exc)
+        # Cleanup must never mask the primary failure: log any abort error and
+        # re-raise the original exception.
+        try:
+            submission.abort(exc)
+        except Exception:
+            log.exception(
+                "Failed to abort skills_fit submission %s during cleanup",
+                submission.run_id,
+            )
         raise
