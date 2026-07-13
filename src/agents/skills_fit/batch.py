@@ -12,10 +12,14 @@ from __future__ import annotations
 import functools
 import json
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from openai import OpenAI
+from openai.types import Batch
 from pydantic import ValidationError
 
 from agent_eval.provenance import generate_run_id, hash_file
@@ -32,7 +36,7 @@ from agents.skills_fit.io import (
     validate_dedup_hashes,
     write_output,
 )
-from agents.skills_fit.models import InputSource, SkillsFitAnalysis
+from agents.skills_fit.models import InputSource, JobMetadata, SkillsFitAnalysis
 from agents.skills_fit.runner import (
     _build_scored_posting,
     build_record_metadata,
@@ -183,7 +187,157 @@ def _log_batch_failure(client, batch, run_id: str) -> None:
     log.error("Batch error file written to %s", path)
 
 
-def run_skills_fit_batch(
+@dataclass
+class SkillsFitBatchSubmission:
+    """State handle spanning submit → collect for one skills_fit batch run.
+
+    Owns an **entered, not-yet-exited** ``RunTracker``: ``submit`` enters it,
+    ``collect`` (success) or ``abort`` (failure) exits it. ``batch_id is None``
+    means the local pass served everything and nothing was submitted — collect
+    skips straight to writing.
+    """
+
+    run: RunTracker
+    client: OpenAI | None
+    batch_id: str | None
+    poll_interval: int
+    plan: list[dict[str, Any]]
+    enriched_records: list[dict[str, Any]]
+    cache: AnalysisCache
+    build_metadata: Callable[..., JobMetadata]
+    output_path: Path
+    cache_path: Path
+    run_id: str
+    provider_name: str
+    model_name: str
+    prompt_hash: str
+    profile_version: str
+    # counters — resolved-so-far at submit time; collect mutates the last two
+    cache_hits: int
+    cache_misses: int
+    resumed_existing: int
+    skipped_missing_description: int
+    submitted: int
+    deduped: int
+    scored_successfully: int
+    failed_agent: int
+    # tallies fixed at submit time (for the summary dict + tracker extras)
+    remote_loaded: int
+    local_loaded: int
+    merged_before_dedupe: int
+    merged_after_dedupe: int
+    _telemetry_finalized: bool = field(default=False, init=False, repr=False)
+    _closed: bool = field(default=False, init=False, repr=False)
+
+    def abort(self, exc: BaseException) -> dict[str, Any]:
+        """Close the tracker with a failure after recording telemetry, so a
+        failed/expired batch (or a collect that raised) still writes a complete,
+        failure-marked run record instead of leaking an open tracker."""
+        self._close_tracker(type(exc), exc, exc.__traceback__)
+        return self._summary()
+
+    def _close_tracker(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: Any | None,
+    ) -> None:
+        if self._closed:
+            raise RuntimeError(f"RunTracker for {self.run_id} is already closed")
+        self._finalize_telemetry()
+        self.run.__exit__(exc_type, exc, tb)
+        self._closed = True
+
+    def _finalize_telemetry(self) -> None:
+        """Body of the old ``finally`` block — records outputs/cache/cost on the
+        tracker. Safe to call exactly once per submission (from collect success
+        or from abort)."""
+        if self._telemetry_finalized:
+            return
+        run = self.run
+        run.add_output(
+            label="scored_rows",
+            path=str(self.output_path),
+            record_count=len(self.enriched_records),
+        )
+        if self.scored_successfully:
+            run.add_output(
+                label="scored_successfully", record_count=self.scored_successfully
+            )
+        if self.resumed_existing:
+            run.add_output(label="reused_existing", record_count=self.resumed_existing)
+        if self.skipped_missing_description:
+            run.add_output(
+                label="missing_description",
+                record_count=self.skipped_missing_description,
+            )
+        if self.failed_agent:
+            run.add_output(label="agent_failed", record_count=self.failed_agent)
+
+        run.set_cache(
+            path=str(self.cache_path), hits=self.cache_hits, misses=self.cache_misses
+        )
+        run.update_llm_stats(calls_made=self.submitted, calls_failed=self.failed_agent)
+        run.record.extras.update(
+            {
+                "merged_after_dedupe": self.merged_after_dedupe,
+                "deduped": self.deduped,
+                "resumed_existing": self.resumed_existing,
+                "scored_successfully": self.scored_successfully,
+                "skipped_missing_description": self.skipped_missing_description,
+                "failed_agent": self.failed_agent,
+                "cache_hits": self.cache_hits,
+                "cache_misses": self.cache_misses,
+                "submitted": self.submitted,
+            }
+        )
+        if self.resumed_existing:
+            run.add_notable(f"Reused existing scored rows: {self.resumed_existing}")
+        if self.skipped_missing_description:
+            run.add_notable(
+                f"Skipped missing description: {self.skipped_missing_description}"
+            )
+        if self.failed_agent:
+            run.add_notable(f"Agent failures: {self.failed_agent}")
+        breakdown = estimate_cost(self.model_name, batch=True, **run.token_totals)
+        if breakdown is not None:
+            total = breakdown.pop("total")
+            run.set_cost(estimated_total=total, breakdown=breakdown)
+        else:
+            run.add_notable(
+                f"No pricing entry for model '{self.model_name}' — actual cost will need backfill"
+            )
+        self._telemetry_finalized = True
+
+    def _summary(self) -> dict[str, Any]:
+        """The dict + logging previously after the ``with`` block."""
+        if self.resumed_existing:
+            log.info("Reused existing scored rows: %d", self.resumed_existing)
+        log.info("Cache hits: %d", self.cache_hits)
+        log.info("Cache misses: %d", self.cache_misses)
+        log.info("Submitted to batch: %d", self.submitted)
+        log.info("Scored successfully: %d", self.scored_successfully)
+        log.info("Skipped missing description: %d", self.skipped_missing_description)
+        log.info("Failed agent: %d", self.failed_agent)
+        log.info("Wrote %d records to %s", len(self.enriched_records), self.output_path)
+        return {
+            "run_id": self.run_id,
+            "remote_loaded": self.remote_loaded,
+            "local_loaded": self.local_loaded,
+            "merged_before_dedupe": self.merged_before_dedupe,
+            "merged_after_dedupe": self.merged_after_dedupe,
+            "deduped": self.deduped,
+            "scored_successfully": self.scored_successfully,
+            "skipped_missing_description": self.skipped_missing_description,
+            "failed_agent": self.failed_agent,
+            "cache_hits": self.cache_hits,
+            "cache_misses": self.cache_misses,
+            "submitted": self.submitted,
+            "output_path": str(self.output_path),
+        }
+
+
+def submit_skills_fit_batch(
     *,
     run_date: str | None = None,
     remote_input: str | Path | None = None,
@@ -198,13 +352,8 @@ def run_skills_fit_batch(
     run_type: str = "production",
     parent_run_id: str | None = None,
     poll_interval: int = 60,
-) -> dict[str, Any]:
-    """Run skills-fit scoring via the OpenAI Batch API.
-
-    Cache misses are submitted as one batch; cache hits, existing output rows,
-    and missing-description rows are handled locally so the final JSONL matches
-    ``run_skills_fit``'s record shape.
-    """
+) -> SkillsFitBatchSubmission:
+    """Run the local pass and submit cache misses without polling."""
     resolved_paths = resolve_paths(
         run_date=run_date,
         remote_input=remote_input,
@@ -235,14 +384,20 @@ def run_skills_fit_batch(
     merged_records: list[dict[str, Any]] = []
     deduped_records: list[dict[str, Any]] = []
     enriched_records: list[dict[str, Any]] = []
+    requests: list[dict[str, Any]] = []
+    plan: list[dict[str, Any]] = []
+    client: OpenAI | None = None
+    batch_id: str | None = None
 
-    with RunTracker(
+    run = RunTracker(
         component="skills_fit",
         run_type=run_type,
         run_date=tracker_run_date,
         run_id=run_id,
         parent_run_id=parent_run_id,
-    ) as run:
+    )
+    run.__enter__()
+    try:
         run.record.extras.update(
             {
                 "remote_input_path": str(resolved_paths.remote_input),
@@ -376,222 +531,211 @@ def run_skills_fit_batch(
                 resolved_paths.output,
             )
 
-        try:
-            requests: list[dict[str, Any]] = []
-            plan: list[dict[str, Any]] = []
+        for job in deduped_records:
+            existing = existing_output_records.get(str(job["dedup_hash"]))
+            if existing is not None and is_processed_output_record(existing):
+                enriched_records.append(existing)
+                resumed_existing += 1
+                continue
 
-            for job in deduped_records:
-                existing = existing_output_records.get(str(job["dedup_hash"]))
-                if existing is not None and is_processed_output_record(existing):
-                    enriched_records.append(existing)
-                    resumed_existing += 1
-                    continue
+            input_source: InputSource = job["__input_source"]
+            input_path = job["__input_path"]
+            title = job.get("title") or None
+            description = job.get("description") or ""
 
-                input_source: InputSource = job["__input_source"]
-                input_path = job["__input_path"]
-                title = job.get("title") or None
-                description = job.get("description") or ""
-
-                if not description:
-                    log.warning(
-                        "Skipping %s — missing description",
-                        title or job["dedup_hash"],
-                    )
-                    skipped_missing_description += 1
-                    metadata = _build_metadata(
-                        input_source=input_source,
-                        input_path=input_path,
-                        failure_reason="missing_description",
-                    )
-                    enriched_records.append(
-                        _build_scored_posting(job, ai_fit=None, metadata=metadata)
-                    )
-                    continue
-
-                analysis = cache.get(
-                    dedup_hash=str(job["dedup_hash"]),
-                    prompt_hash=prompt_hash,
-                    provider=provider_name,
-                    model=model_name,
-                    profile_version=profile_version,
+            if not description:
+                log.warning(
+                    "Skipping %s — missing description",
+                    title or job["dedup_hash"],
                 )
-                if analysis is not None:
-                    cache_hits += 1
-                    metadata = _build_metadata(
-                        input_source=input_source,
-                        input_path=input_path,
-                    )
-                    enriched_records.append(
-                        _build_scored_posting(job, ai_fit=analysis, metadata=metadata)
-                    )
-                    scored_successfully += 1
-                    continue
-
-                cache_misses += 1
-                idx = len(requests)
-                requests.append(
-                    build_request(
-                        job,
-                        idx,
-                        model=model_name,
-                        temperature=request_temperature,
-                        prompt_text=prompt_text,
-                        candidate_profile=profile,
-                    )
-                )
-                plan.append(
-                    {
-                        "job": job,
-                        "input_source": input_source,
-                        "input_path": input_path,
-                        "custom_id": f"job-{idx}",
-                    }
-                )
-
-            submitted = len(requests)
-
-            results: dict[str, dict[str, Any]] = {}
-            if requests:
-                request_file = _write_request_file(requests, run.run_id)
-                client, _ = _get_client(llm_config)
-                batch_id, _input_file_id = upload_and_create_batch(client, request_file)
-                log.info(
-                    "Submitted %d requests as batch %s — polling every %ds",
-                    submitted,
-                    batch_id,
-                    poll_interval,
-                )
-                batch = poll_until_done(client, batch_id, poll_interval)
-                if batch.status != "completed":
-                    _log_batch_failure(client, batch, run.run_id)
-                    raise RuntimeError(
-                        f"Batch {batch.id} ended with status={batch.status}"
-                    )
-                results = _index_results(download_results(client, batch))
-            else:
-                log.info("All scorable jobs served locally — no batch submitted")
-
-            for entry in plan:
-                job = entry["job"]
-                title = job.get("title") or None
-                item = results.get(entry["custom_id"])
-                analysis: SkillsFitAnalysis | None = None
-                if item is None:
-                    log.warning(
-                        "No batch result for %s (%s) — recording agent_failed",
-                        entry["custom_id"],
-                        title or job["dedup_hash"],
-                    )
-                else:
-                    run.add_token_usage(_usage_from_item(item))
-                    analysis = parse_analysis(item)
-
-                if analysis is None:
-                    log.warning("Agent failed on %s", title or job["dedup_hash"])
-                    failed_agent += 1
-                    run.increment_failures()
-                    metadata = _build_metadata(
-                        input_source=entry["input_source"],
-                        input_path=entry["input_path"],
-                        failure_reason="agent_failed",
-                    )
-                    enriched_records.append(
-                        _build_scored_posting(job, ai_fit=None, metadata=metadata)
-                    )
-                    continue
-
-                cache.put(
-                    dedup_hash=str(job["dedup_hash"]),
-                    prompt_hash=prompt_hash,
-                    provider=provider_name,
-                    model=model_name,
-                    profile_version=profile_version,
-                    analysis=analysis,
-                )
+                skipped_missing_description += 1
                 metadata = _build_metadata(
-                    input_source=entry["input_source"],
-                    input_path=entry["input_path"],
+                    input_source=input_source,
+                    input_path=input_path,
+                    failure_reason="missing_description",
+                )
+                enriched_records.append(
+                    _build_scored_posting(job, ai_fit=None, metadata=metadata)
+                )
+                continue
+
+            analysis = cache.get(
+                dedup_hash=str(job["dedup_hash"]),
+                prompt_hash=prompt_hash,
+                provider=provider_name,
+                model=model_name,
+                profile_version=profile_version,
+            )
+            if analysis is not None:
+                cache_hits += 1
+                metadata = _build_metadata(
+                    input_source=input_source,
+                    input_path=input_path,
                 )
                 enriched_records.append(
                     _build_scored_posting(job, ai_fit=analysis, metadata=metadata)
                 )
                 scored_successfully += 1
+                continue
 
-            write_output(enriched_records, resolved_paths.output)
-        finally:
-            run.add_output(
-                label="scored_rows",
-                path=str(resolved_paths.output),
-                record_count=len(enriched_records),
+            cache_misses += 1
+            idx = len(requests)
+            requests.append(
+                build_request(
+                    job,
+                    idx,
+                    model=model_name,
+                    temperature=request_temperature,
+                    prompt_text=prompt_text,
+                    candidate_profile=profile,
+                )
             )
-            if scored_successfully:
-                run.add_output(
-                    label="scored_successfully", record_count=scored_successfully
-                )
-            if resumed_existing:
-                run.add_output(label="reused_existing", record_count=resumed_existing)
-            if skipped_missing_description:
-                run.add_output(
-                    label="missing_description",
-                    record_count=skipped_missing_description,
-                )
-            if failed_agent:
-                run.add_output(label="agent_failed", record_count=failed_agent)
-
-            run.set_cache(path=str(cache_path), hits=cache_hits, misses=cache_misses)
-            run.update_llm_stats(calls_made=submitted, calls_failed=failed_agent)
-            run.record.extras.update(
+            plan.append(
                 {
-                    "merged_after_dedupe": len(deduped_records),
-                    "deduped": deduped,
-                    "resumed_existing": resumed_existing,
-                    "scored_successfully": scored_successfully,
-                    "skipped_missing_description": skipped_missing_description,
-                    "failed_agent": failed_agent,
-                    "cache_hits": cache_hits,
-                    "cache_misses": cache_misses,
-                    "submitted": submitted,
+                    "job": job,
+                    "input_source": input_source,
+                    "input_path": input_path,
+                    "custom_id": f"job-{idx}",
                 }
             )
-            if resumed_existing:
-                run.add_notable(f"Reused existing scored rows: {resumed_existing}")
-            if skipped_missing_description:
-                run.add_notable(
-                    f"Skipped missing description: {skipped_missing_description}"
-                )
-            if failed_agent:
-                run.add_notable(f"Agent failures: {failed_agent}")
-            breakdown = estimate_cost(model_name, batch=True, **run.token_totals)
-            if breakdown is not None:
-                total = breakdown.pop("total")
-                run.set_cost(estimated_total=total, breakdown=breakdown)
-            else:
-                run.add_notable(
-                    f"No pricing entry for model '{model_name}' — actual cost will need backfill"
-                )
 
-    if resumed_existing:
-        log.info("Reused existing scored rows: %d", resumed_existing)
-    log.info("Cache hits: %d", cache_hits)
-    log.info("Cache misses: %d", cache_misses)
-    log.info("Submitted to batch: %d", submitted)
-    log.info("Scored successfully: %d", scored_successfully)
-    log.info("Skipped missing description: %d", skipped_missing_description)
-    log.info("Failed agent: %d", failed_agent)
-    log.info("Wrote %d records to %s", len(enriched_records), resolved_paths.output)
+        submitted = len(requests)
 
-    return {
-        "run_id": run_id,
-        "remote_loaded": len(remote_records),
-        "local_loaded": len(local_records),
-        "merged_before_dedupe": len(merged_records),
-        "merged_after_dedupe": len(deduped_records),
-        "deduped": deduped,
-        "scored_successfully": scored_successfully,
-        "skipped_missing_description": skipped_missing_description,
-        "failed_agent": failed_agent,
-        "cache_hits": cache_hits,
-        "cache_misses": cache_misses,
-        "submitted": submitted,
-        "output_path": str(resolved_paths.output),
-    }
+        if requests:
+            request_file = _write_request_file(requests, run.run_id)
+            client, _ = _get_client(llm_config)
+            batch_id, _input_file_id = upload_and_create_batch(client, request_file)
+            log.info(
+                "Submitted %d requests as batch %s (will poll later)",
+                submitted,
+                batch_id,
+            )
+        else:
+            log.info("All scorable jobs served locally — no batch submitted")
+    except BaseException as exc:
+        run.__exit__(type(exc), exc, exc.__traceback__)
+        raise
+
+    return SkillsFitBatchSubmission(
+        run=run,
+        client=client,
+        batch_id=batch_id,
+        poll_interval=poll_interval,
+        plan=plan,
+        enriched_records=enriched_records,
+        cache=cache,
+        build_metadata=_build_metadata,
+        output_path=resolved_paths.output,
+        cache_path=cache_path,
+        run_id=run_id,
+        provider_name=provider_name,
+        model_name=model_name,
+        prompt_hash=prompt_hash,
+        profile_version=profile_version,
+        cache_hits=cache_hits,
+        cache_misses=cache_misses,
+        resumed_existing=resumed_existing,
+        skipped_missing_description=skipped_missing_description,
+        submitted=submitted,
+        deduped=deduped,
+        scored_successfully=scored_successfully,
+        failed_agent=failed_agent,
+        remote_loaded=len(remote_records),
+        local_loaded=len(local_records),
+        merged_before_dedupe=len(merged_records),
+        merged_after_dedupe=len(deduped_records),
+    )
+
+
+def collect_skills_fit_batch(
+    submission: SkillsFitBatchSubmission, batch: Batch | None
+) -> dict[str, Any]:
+    """Resolve a submitted batch and write output; close the tracker on success.
+
+    On any failure path this raises with the tracker still OPEN — the caller must
+    call ``submission.abort(exc)``. ``batch`` is the terminal Batch the caller
+    polled; it is ignored when ``submission.batch_id is None`` (nothing submitted).
+    """
+    run = submission.run
+    results: dict[str, dict[str, Any]] = {}
+    if submission.batch_id is not None:
+        if batch is None:
+            raise RuntimeError(
+                f"collect requires the terminal batch for {submission.batch_id}, got None"
+            )
+        if submission.client is None:
+            raise RuntimeError(f"submission {submission.run_id} has no OpenAI client")
+        if batch.status != "completed":
+            _log_batch_failure(submission.client, batch, submission.run_id)
+            raise RuntimeError(f"Batch {batch.id} ended with status={batch.status}")
+        results = _index_results(download_results(submission.client, batch))
+
+    for entry in submission.plan:
+        job = entry["job"]
+        title = job.get("title") or None
+        item = results.get(entry["custom_id"])
+        analysis = None
+        if item is None:
+            log.warning(
+                "No batch result for %s (%s) — recording agent_failed",
+                entry["custom_id"],
+                title or job["dedup_hash"],
+            )
+        else:
+            run.add_token_usage(_usage_from_item(item))
+            analysis = parse_analysis(item)
+
+        if analysis is None:
+            log.warning("Agent failed on %s", title or job["dedup_hash"])
+            submission.failed_agent += 1
+            run.increment_failures()
+            metadata = submission.build_metadata(
+                input_source=entry["input_source"],
+                input_path=entry["input_path"],
+                failure_reason="agent_failed",
+            )
+            submission.enriched_records.append(
+                _build_scored_posting(job, ai_fit=None, metadata=metadata)
+            )
+            continue
+
+        submission.cache.put(
+            dedup_hash=str(job["dedup_hash"]),
+            prompt_hash=submission.prompt_hash,
+            provider=submission.provider_name,
+            model=submission.model_name,
+            profile_version=submission.profile_version,
+            analysis=analysis,
+        )
+        metadata = submission.build_metadata(
+            input_source=entry["input_source"], input_path=entry["input_path"]
+        )
+        submission.enriched_records.append(
+            _build_scored_posting(job, ai_fit=analysis, metadata=metadata)
+        )
+        submission.scored_successfully += 1
+
+    write_output(submission.enriched_records, submission.output_path)
+    submission._close_tracker(None, None, None)
+    return submission._summary()
+
+
+def run_skills_fit_batch(**kwargs) -> dict[str, Any]:
+    """Submit → poll → collect, composed. Preserves #462's single-user semantics
+    and the standalone ``--batch`` CLI byte-for-byte."""
+    poll_interval = kwargs.get("poll_interval", 60)
+    submission = submit_skills_fit_batch(**kwargs)
+    try:
+        batch = None
+        if submission.batch_id is not None:
+            if submission.client is None:
+                raise RuntimeError(
+                    f"submission {submission.run_id} has no OpenAI client"
+                )
+            batch = poll_until_done(
+                submission.client, submission.batch_id, poll_interval
+            )
+        return collect_skills_fit_batch(submission, batch)
+    except Exception as exc:
+        submission.abort(exc)
+        raise
