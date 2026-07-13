@@ -31,8 +31,9 @@ from pipeline.consolidation import (
 from pipeline.planner import plan_run
 from pipeline.queue import pending_count, requeue_running
 from pipeline.scoring import (
+    BATCH_SCORE_FNS,
+    BatchScoreFns,
     ScoreFn,
-    batch_score_fn,
     default_score_fn,
     score_run,
 )
@@ -66,6 +67,7 @@ def run_overnight(
     scrape_fn: ScrapeFn = default_scrape_fn,
     classify_fn: ClassifyFn = default_classify_fn,
     score_fn: ScoreFn = default_score_fn,
+    batch_score_fns: BatchScoreFns | None = None,
 ) -> dict[str, Any]:
     """Plan + scrape + consolidate + classify + score (produce-only).
 
@@ -130,6 +132,7 @@ def run_overnight(
             run_date=run_date,
             runs_dir=runs_dir,
             score_fn=score_fn,
+            batch_score_fns=batch_score_fns,
         )
 
     return _finalize(url, summary)
@@ -270,7 +273,7 @@ def _cmd_overnight(args: argparse.Namespace) -> None:
     llm_fns: dict[str, Any] = {}
     if args.batch:
         log.info("--batch: classification + scoring will use the OpenAI Batch API")
-        llm_fns = {"classify_fn": batch_classify_fn, "score_fn": batch_score_fn}
+        llm_fns = {"classify_fn": batch_classify_fn, "batch_score_fns": BATCH_SCORE_FNS}
 
     try:
         summary = run_overnight(

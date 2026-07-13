@@ -25,6 +25,7 @@ from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
 from pipeline.planner import _slug
 from pipeline.scoring import (
     SCORED_NAME,
+    BatchScoreFns,
     _location_matches,
     iter_run_user_outputs,
     score_run,
@@ -181,6 +182,68 @@ def _score_factory(calls: list[dict]):
     return _fn
 
 
+class _FakeBatchSubmission:
+    def __init__(
+        self,
+        *,
+        hashes: list[str],
+        input_path: Path,
+        output_path: Path,
+        batch_id: str | None,
+    ) -> None:
+        self.hashes = hashes
+        self.input_path = input_path
+        self.output_path = output_path
+        self.batch_id = batch_id
+        self.client = object()
+        self.poll_interval = 0.01
+        self.aborted: list[BaseException] = []
+
+    def abort(self, exc: BaseException) -> None:
+        self.aborted.append(exc)
+
+
+def _batch_score_fns(
+    events: list[tuple[str, tuple[str, ...]]],
+    submissions: list[_FakeBatchSubmission],
+    *,
+    fail_submit_for: set[str] | None = None,
+    fail_collect_for: set[str] | None = None,
+    local_only_for: set[str] | None = None,
+) -> BatchScoreFns:
+    fail_submit_for = fail_submit_for or set()
+    fail_collect_for = fail_collect_for or set()
+    local_only_for = local_only_for or set()
+
+    def _submit(*, input_path, output_path, profile_file, run_date, parent_run_id):
+        lines = [ln for ln in input_path.read_text().splitlines() if ln.strip()]
+        hashes = [json.loads(ln)["dedup_hash"] for ln in lines]
+        events.append(("submit", tuple(hashes)))
+        if fail_submit_for.intersection(hashes):
+            raise RuntimeError(f"submit failed for {hashes}")
+        batch_id = None if local_only_for.intersection(hashes) else f"batch-{hashes[0]}"
+        submission = _FakeBatchSubmission(
+            hashes=hashes,
+            input_path=input_path,
+            output_path=output_path,
+            batch_id=batch_id,
+        )
+        submissions.append(submission)
+        return submission
+
+    def _collect(submission, batch):
+        events.append(("collect", tuple(submission.hashes)))
+        if fail_collect_for.intersection(submission.hashes):
+            raise RuntimeError(f"collect failed for {submission.hashes}")
+        lines = [
+            ln for ln in submission.input_path.read_text().splitlines() if ln.strip()
+        ]
+        submission.output_path.write_text("".join(ln + "\n" for ln in lines))
+        return {"scored": len(lines)}
+
+    return BatchScoreFns(submit=_submit, collect=_collect)
+
+
 def _scored_hashes(runs_dir: Path, email: str) -> list[str]:
     """dedup_hashes in a user's written ``scored.jsonl`` (the fake score_fn
     copies its input through, so this is the user's scored survivors)."""
@@ -259,6 +322,242 @@ def test_scores_each_user_against_their_own_profile(migrated_pg, tmp_path):
     # Produce-only: each user's survivors land in their own scored.jsonl.
     assert _scored_hashes(tmp_path, "alice@example.com") == ["h-alice", "h-shared"]
     assert _scored_hashes(tmp_path, "bob@example.com") == ["h-shared"]
+
+
+@skip_if_no_docker
+def test_two_phase_batch_submits_all_then_collects_in_user_order(
+    migrated_pg, tmp_path, monkeypatch
+):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-bob", requested_by=[u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-alice", "fully_remote"),
+            _classified("h-bob", "fully_remote"),
+        ],
+    )
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+
+    def fake_poll_all(client, batch_ids, poll_interval):
+        events.append(("poll", tuple(batch_ids)))
+        return {batch_id: object() for batch_id in batch_ids}
+
+    monkeypatch.setattr("pipeline.scoring.poll_all_until_done", fake_poll_all)
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            batch_score_fns=_batch_score_fns(events, submissions),
+        )
+
+    assert summary["users_scored"] == 2
+    assert summary["postings_scored"] == 2
+    assert _scored_hashes(tmp_path, "alice@example.com") == ["h-alice"]
+    assert _scored_hashes(tmp_path, "bob@example.com") == ["h-bob"]
+    assert {
+        r["user_email"] for r in _scored_records(tmp_path, "alice@example.com")
+    } == {"alice@example.com"}
+    assert {r["user_email"] for r in _scored_records(tmp_path, "bob@example.com")} == {
+        "bob@example.com"
+    }
+    assert [event[0] for event in events] == [
+        "submit",
+        "submit",
+        "poll",
+        "collect",
+        "collect",
+    ]
+    assert max(i for i, event in enumerate(events) if event[0] == "submit") < min(
+        i for i, event in enumerate(events) if event[0] == "collect"
+    )
+
+
+@skip_if_no_docker
+def test_two_phase_batch_isolates_submit_failure(migrated_pg, tmp_path, monkeypatch):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-bob", requested_by=[u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-alice", "fully_remote"),
+            _classified("h-bob", "fully_remote"),
+        ],
+    )
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+    monkeypatch.setattr(
+        "pipeline.scoring.poll_all_until_done",
+        lambda client, batch_ids, poll_interval: {
+            batch_id: object() for batch_id in batch_ids
+        },
+    )
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            batch_score_fns=_batch_score_fns(
+                events, submissions, fail_submit_for={"h-alice"}
+            ),
+        )
+
+    assert summary["users_scored"] == 1
+    assert summary["users_failed"] == 1
+    assert _scored_hashes(tmp_path, "bob@example.com") == ["h-bob"]
+    assert not (
+        skills_fit_dir(tmp_path, "alice@example.com", RUN_ID) / SCORED_NAME
+    ).exists()
+    assert ("collect", ("h-bob",)) in events
+    assert ("collect", ("h-alice",)) not in events
+
+
+@skip_if_no_docker
+def test_two_phase_batch_isolates_collect_failure(migrated_pg, tmp_path, monkeypatch):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-bob", requested_by=[u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-alice", "fully_remote"),
+            _classified("h-bob", "fully_remote"),
+        ],
+    )
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+    monkeypatch.setattr(
+        "pipeline.scoring.poll_all_until_done",
+        lambda client, batch_ids, poll_interval: {
+            batch_id: object() for batch_id in batch_ids
+        },
+    )
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            batch_score_fns=_batch_score_fns(
+                events, submissions, fail_collect_for={"h-alice"}
+            ),
+        )
+
+    assert summary["users_scored"] == 1
+    assert summary["users_failed"] == 1
+    assert _scored_hashes(tmp_path, "bob@example.com") == ["h-bob"]
+    by_hash = {submission.hashes[0]: submission for submission in submissions}
+    assert len(by_hash["h-alice"].aborted) == 1
+    assert by_hash["h-bob"].aborted == []
+
+
+@skip_if_no_docker
+def test_two_phase_batch_marks_pending_users_failed_when_polling_dies(
+    migrated_pg, tmp_path, monkeypatch
+):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-bob", requested_by=[u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-alice", "fully_remote"),
+            _classified("h-bob", "fully_remote"),
+        ],
+    )
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+
+    def fail_poll(client, batch_ids, poll_interval):
+        raise RuntimeError("poll died")
+
+    monkeypatch.setattr("pipeline.scoring.poll_all_until_done", fail_poll)
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            batch_score_fns=_batch_score_fns(events, submissions),
+        )
+
+    assert summary["users_scored"] == 0
+    assert summary["users_failed"] == 2
+    assert all(len(submission.aborted) == 1 for submission in submissions)
+    assert [event for event in events if event[0] == "collect"] == []
+
+
+@skip_if_no_docker
+def test_two_phase_batch_summary_shape_matches_serial_path(
+    migrated_pg, tmp_path, monkeypatch
+):
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _write_classified(tmp_path, passed=[_classified("h-alice", "fully_remote")])
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+    monkeypatch.setattr(
+        "pipeline.scoring.poll_all_until_done",
+        lambda client, batch_ids, poll_interval: {
+            batch_id: object() for batch_id in batch_ids
+        },
+    )
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            batch_score_fns=_batch_score_fns(events, submissions),
+        )
+
+    assert set(summary) == {
+        "users_scored",
+        "users_skipped_no_postings",
+        "users_failed",
+        "postings_scored",
+        "postings_unclassified",
+        "per_user",
+    }
 
 
 @skip_if_no_docker
