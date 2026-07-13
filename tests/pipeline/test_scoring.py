@@ -23,6 +23,7 @@ from psycopg.types.json import Json
 from ingest.core import ingest, read_jsonl
 from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
 from pipeline.planner import _slug
+from pipeline import scoring
 from pipeline.scoring import (
     SCORED_NAME,
     BatchScoreFns,
@@ -475,6 +476,66 @@ def test_two_phase_batch_isolates_collect_failure(migrated_pg, tmp_path, monkeyp
     assert _scored_hashes(tmp_path, "bob@example.com") == ["h-bob"]
     by_hash = {submission.hashes[0]: submission for submission in submissions}
     assert len(by_hash["h-alice"].aborted) == 1
+    assert by_hash["h-bob"].aborted == []
+
+
+@skip_if_no_docker
+def test_two_phase_batch_isolates_post_collect_failure_without_reabort(
+    migrated_pg, tmp_path, monkeypatch
+):
+    """A failure AFTER a successful collect (e.g. _stamp_user_email) must isolate
+    that user without re-aborting the already-closed tracker — re-abort would
+    raise "already closed" and break isolation for the whole run."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-bob", requested_by=[u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-alice", "fully_remote"),
+            _classified("h-bob", "fully_remote"),
+        ],
+    )
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+    monkeypatch.setattr(
+        "pipeline.scoring.poll_all_until_done",
+        lambda client, batch_ids, poll_interval: {
+            batch_id: object() for batch_id in batch_ids
+        },
+    )
+
+    real_stamp = scoring._stamp_user_email
+
+    def _stamp_but_fail_alice(path, email):
+        if email == "alice@example.com":
+            raise RuntimeError("stamp blew up after collect")
+        return real_stamp(path, email)
+
+    monkeypatch.setattr("pipeline.scoring._stamp_user_email", _stamp_but_fail_alice)
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            batch_score_fns=_batch_score_fns(events, submissions),
+        )
+
+    # alice failed post-collect, bob still scored — isolation held, no crash.
+    assert summary["users_scored"] == 1
+    assert summary["users_failed"] == 1
+    assert _scored_hashes(tmp_path, "bob@example.com") == ["h-bob"]
+    by_hash = {submission.hashes[0]: submission for submission in submissions}
+    # collect succeeded and closed the tracker, so abort must NOT be called again.
+    assert by_hash["h-alice"].aborted == []
     assert by_hash["h-bob"].aborted == []
 
 

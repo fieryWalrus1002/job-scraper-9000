@@ -545,7 +545,15 @@ def _score_run_batch(
                 if submission.batch_id is not None
                 else None
             )
-            batch_score_fns.collect(submission, batch)
+            # Only a failing collect leaves the tracker open and needs abort;
+            # once collect succeeds the tracker is already closed, so a later
+            # failure (e.g. _stamp_user_email) must NOT re-abort it — that would
+            # raise "already closed" and break per-user isolation for the run.
+            try:
+                batch_score_fns.collect(submission, batch)
+            except Exception:
+                submission.abort(RuntimeError("collect failed"))
+                raise
             _stamp_user_email(gated.scored_path, email)
             summary["users_scored"] += 1
             summary["postings_scored"] += len(gated.survivors)
@@ -563,9 +571,10 @@ def _score_run_batch(
                 gated.scored_path,
             )
         except Exception:
+            # collect failure already aborted the tracker above; a post-collect
+            # failure lands here too — isolate the user either way.
             tb = traceback.format_exc()
             log.error("%s — skills_fit collect failed; isolating:\n%s", email, tb)
-            submission.abort(RuntimeError("collect failed"))
             summary["users_failed"] += 1
             summary["per_user"].append(
                 {"email": email, "postings_scored": 0, "failed": True, "error": tb}
