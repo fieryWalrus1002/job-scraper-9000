@@ -587,6 +587,56 @@ def test_two_phase_batch_marks_pending_users_failed_when_polling_dies(
 
 
 @skip_if_no_docker
+def test_two_phase_batch_aborts_open_submissions_on_interrupt(
+    migrated_pg, tmp_path, monkeypatch
+):
+    """A BaseException (operator interrupt) during the long poll must abort every
+    still-open submission — no leaked tracker — and still propagate."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "alice@example.com")
+        u2 = seed_user(conn, "bob@example.com")
+        _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-bob", requested_by=[u2])
+
+    _materialize_profile(tmp_path, "alice@example.com")
+    _materialize_profile(tmp_path, "bob@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-alice", "fully_remote"),
+            _classified("h-bob", "fully_remote"),
+        ],
+    )
+
+    events: list[tuple[str, tuple[str, ...]]] = []
+    submissions: list[_FakeBatchSubmission] = []
+
+    def interrupt_poll(client, batch_ids, poll_interval):
+        raise KeyboardInterrupt("operator ^C during poll")
+
+    monkeypatch.setattr("pipeline.scoring.poll_all_until_done", interrupt_poll)
+
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        with pytest.raises(KeyboardInterrupt):
+            score_run(
+                conn,
+                run_id=RUN_ID,
+                run_date=RUN_DATE,
+                runs_dir=tmp_path,
+                batch_score_fns=_batch_score_fns(events, submissions),
+            )
+
+    # Both submitted trackers were aborted (once) with the interrupt itself.
+    assert len(submissions) == 2
+    assert all(len(submission.aborted) == 1 for submission in submissions)
+    assert all(
+        isinstance(submission.aborted[0], KeyboardInterrupt)
+        for submission in submissions
+    )
+    assert [event for event in events if event[0] == "collect"] == []
+
+
+@skip_if_no_docker
 def test_two_phase_batch_summary_shape_matches_serial_path(
     migrated_pg, tmp_path, monkeypatch
 ):

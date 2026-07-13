@@ -467,6 +467,16 @@ def _gate_user(
     return _GatedUser(email, input_path, scored_path, profile_file, survivors)
 
 
+def _safe_abort(submission: Any, exc: BaseException) -> None:
+    """Abort a batch submission's tracker, logging (never raising) if the
+    cleanup itself fails. Cleanup must not mask the primary failure, nor stop
+    the caller from aborting the remaining open submissions."""
+    try:
+        submission.abort(exc)
+    except Exception:
+        log.exception("Failed to abort skills_fit submission during cleanup")
+
+
 def _score_run_batch(
     user_rows: list[dict[str, Any]],
     classified: dict[str, dict[str, Any]],
@@ -477,112 +487,136 @@ def _score_run_batch(
     summary: dict[str, Any],
     batch_score_fns: BatchScoreFns,
 ) -> None:
-    # Phase 1 — submit every user's gated batch up front.
+    # Submissions with a still-open RunTracker (entered by submit, not yet
+    # collected or aborted). The outer BaseException handler drains this so an
+    # operator interrupt (SIGTERM/Ctrl-C) during the long poll never leaks a
+    # tracker — every submission still ends in exactly one collect or abort.
     pending: list[tuple[_GatedUser, Any]] = []
-    for row in user_rows:
-        email = row["email"]
-        try:
-            gated = _gate_user(
-                row, classified, runs_dir=runs_dir, run_id=run_id, summary=summary
-            )
-            if gated is None:
-                continue
-            submission = batch_score_fns.submit(
-                input_path=gated.input_path,
-                output_path=gated.scored_path,
-                profile_file=gated.profile_file,
-                run_date=run_date,
-                parent_run_id=run_id,
-            )
-            pending.append((gated, submission))
-        except Exception:
-            tb = traceback.format_exc()
-            log.error("%s — skills_fit submit failed; isolating:\n%s", email, tb)
-            summary["users_failed"] += 1
-            summary["per_user"].append(
-                {"email": email, "postings_scored": 0, "failed": True, "error": tb}
-            )
-
-    # Phase 2 — poll all real batches at once (one shared client; batch mode is
-    # OpenAI-only).
-    aborted: set[int] = set()
-    to_poll = [(g, s) for g, s in pending if s.batch_id is not None]
-    batches: dict[str, Any] = {}
-    if to_poll:
-        client = to_poll[0][1].client
-        poll_interval = to_poll[0][1].poll_interval
-        try:
-            batches = poll_all_until_done(
-                client, [s.batch_id for _, s in to_poll], poll_interval
-            )
-        except Exception as exc:
-            tb = traceback.format_exc()
-            log.error(
-                "skills_fit batch polling died; failing all pending users:\n%s", tb
-            )
-            for gated, submission in to_poll:
-                # Pass the real polling exception so the run record captures the
-                # true cause, not a generic message.
-                submission.abort(exc)
-                aborted.add(id(submission))
+    open_submissions: dict[int, Any] = {}
+    try:
+        # Phase 1 — submit every user's gated batch up front.
+        for row in user_rows:
+            email = row["email"]
+            try:
+                gated = _gate_user(
+                    row, classified, runs_dir=runs_dir, run_id=run_id, summary=summary
+                )
+                if gated is None:
+                    continue
+                submission = batch_score_fns.submit(
+                    input_path=gated.input_path,
+                    output_path=gated.scored_path,
+                    profile_file=gated.profile_file,
+                    run_date=run_date,
+                    parent_run_id=run_id,
+                )
+                pending.append((gated, submission))
+                open_submissions[id(submission)] = submission
+            except Exception:
+                tb = traceback.format_exc()
+                log.error("%s — skills_fit submit failed; isolating:\n%s", email, tb)
                 summary["users_failed"] += 1
                 summary["per_user"].append(
-                    {
-                        "email": gated.email,
-                        "postings_scored": 0,
-                        "failed": True,
-                        "error": tb,
-                    }
+                    {"email": email, "postings_scored": 0, "failed": True, "error": tb}
                 )
 
-    # Phase 3 — collect in user order; a bad batch or collect error fails only
-    # that user.
-    for gated, submission in pending:
-        if id(submission) in aborted:
-            continue
-        email = gated.email
-        try:
-            batch = (
-                batches.get(submission.batch_id)
-                if submission.batch_id is not None
-                else None
-            )
-            # Only a failing collect leaves the tracker open and needs abort;
-            # once collect succeeds the tracker is already closed, so a later
-            # failure (e.g. _stamp_user_email) must NOT re-abort it — that would
-            # raise "already closed" and break per-user isolation for the run.
+        # Phase 2 — poll all real batches at once (one shared client; batch mode
+        # is OpenAI-only).
+        aborted: set[int] = set()
+        to_poll = [(g, s) for g, s in pending if s.batch_id is not None]
+        batches: dict[str, Any] = {}
+        if to_poll:
+            client = to_poll[0][1].client
+            poll_interval = to_poll[0][1].poll_interval
             try:
-                batch_score_fns.collect(submission, batch)
+                batches = poll_all_until_done(
+                    client, [s.batch_id for _, s in to_poll], poll_interval
+                )
             except Exception as exc:
-                # Pass the real collect exception so the run record captures the
-                # true cause, not a generic message.
-                submission.abort(exc)
-                raise
-            _stamp_user_email(gated.scored_path, email)
-            summary["users_scored"] += 1
-            summary["postings_scored"] += len(gated.survivors)
-            summary["per_user"].append(
-                {
-                    "email": email,
-                    "postings_scored": len(gated.survivors),
-                    "skipped": False,
-                }
+                tb = traceback.format_exc()
+                log.error(
+                    "skills_fit batch polling died; failing all pending users:\n%s",
+                    tb,
+                )
+                for gated, submission in to_poll:
+                    # Pass the real polling exception so the run record captures
+                    # the true cause, not a generic message.
+                    _safe_abort(submission, exc)
+                    open_submissions.pop(id(submission), None)
+                    aborted.add(id(submission))
+                    summary["users_failed"] += 1
+                    summary["per_user"].append(
+                        {
+                            "email": gated.email,
+                            "postings_scored": 0,
+                            "failed": True,
+                            "error": tb,
+                        }
+                    )
+
+        # Phase 3 — collect in user order; a bad batch or collect error fails
+        # only that user.
+        for gated, submission in pending:
+            if id(submission) in aborted:
+                continue
+            email = gated.email
+            try:
+                batch = (
+                    batches.get(submission.batch_id)
+                    if submission.batch_id is not None
+                    else None
+                )
+                # Only a failing collect leaves the tracker open and needs abort;
+                # once collect succeeds the tracker is already closed, so a later
+                # failure (e.g. _stamp_user_email) must NOT re-abort it — that
+                # would raise "already closed" and break isolation for the run.
+                try:
+                    batch_score_fns.collect(submission, batch)
+                except Exception as exc:
+                    # Pass the real collect exception so the run record captures
+                    # the true cause, not a generic message.
+                    _safe_abort(submission, exc)
+                    open_submissions.pop(id(submission), None)
+                    raise
+                open_submissions.pop(id(submission), None)  # collect closed it
+                _stamp_user_email(gated.scored_path, email)
+                summary["users_scored"] += 1
+                summary["postings_scored"] += len(gated.survivors)
+                summary["per_user"].append(
+                    {
+                        "email": email,
+                        "postings_scored": len(gated.survivors),
+                        "skipped": False,
+                    }
+                )
+                log.info(
+                    "%s — scored %d posting(s) → %s",
+                    email,
+                    len(gated.survivors),
+                    gated.scored_path,
+                )
+            except Exception:
+                # collect failure already aborted the tracker above; a
+                # post-collect failure lands here too — isolate the user either
+                # way.
+                tb = traceback.format_exc()
+                log.error("%s — skills_fit collect failed; isolating:\n%s", email, tb)
+                summary["users_failed"] += 1
+                summary["per_user"].append(
+                    {"email": email, "postings_scored": 0, "failed": True, "error": tb}
+                )
+    except BaseException as exc:
+        # Operator interrupt or other fatal during the fan-out: abort every
+        # submission whose tracker is still open so none leaks, then re-raise so
+        # the interrupt still propagates.
+        if open_submissions:
+            log.error(
+                "skills_fit batch scoring interrupted; aborting %d open submission(s)",
+                len(open_submissions),
             )
-            log.info(
-                "%s — scored %d posting(s) → %s",
-                email,
-                len(gated.survivors),
-                gated.scored_path,
-            )
-        except Exception:
-            # collect failure already aborted the tracker above; a post-collect
-            # failure lands here too — isolate the user either way.
-            tb = traceback.format_exc()
-            log.error("%s — skills_fit collect failed; isolating:\n%s", email, tb)
-            summary["users_failed"] += 1
-            summary["per_user"].append(
-                {"email": email, "postings_scored": 0, "failed": True, "error": tb}
-            )
+        for submission in open_submissions.values():
+            _safe_abort(submission, exc)
+        raise
 
 
 def score_run(
