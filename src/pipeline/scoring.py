@@ -349,6 +349,7 @@ def score_run(
             relocation_filtered = 0
             local_presence_out_of_area = 0
             local_presence_ambiguous = 0
+            local_presence_no_policy = 0
             for dedup_hash in row["dedup_hashes"]:
                 rec = classified.get(dedup_hash)
                 if rec is None:
@@ -388,6 +389,15 @@ def score_run(
                         job_location, relocation_policy.acceptable_locations
                     ):
                         pass  # local to a place they accept — keep
+                    elif not relocation_policy.acceptable_locations:
+                        # No acceptable locations stored (e.g. an existing user
+                        # whose policy predates this field). The drop matches
+                        # prior behavior, but the cause is missing policy data,
+                        # not the posting — label it distinctly so the fix
+                        # (a settings re-save / derive_policies backfill) is
+                        # obvious to the morning admin (spec §8.5).
+                        local_presence_no_policy += 1
+                        continue
                     elif not (job_location or "").strip():
                         local_presence_ambiguous += 1
                         continue
@@ -421,13 +431,22 @@ def score_run(
                     email,
                     local_presence_ambiguous,
                 )
+            if local_presence_no_policy:
+                log.info(
+                    "%s — %d posting(s) dropped: requires local presence but no "
+                    "acceptable locations in policy (settings re-save needed to "
+                    "backfill acceptable_locations)",
+                    email,
+                    local_presence_no_policy,
+                )
 
             if not survivors:
                 log.info(
                     "%s — no postings survived remote policy "
                     "(%d requested, %d unclassified, %d travel-filtered, "
                     "%d relocation-filtered, %d local-presence-out-of-area, "
-                    "%d local-presence-ambiguous); skipping skills_fit",
+                    "%d local-presence-ambiguous, %d local-presence-no-policy); "
+                    "skipping skills_fit",
                     email,
                     len(row["dedup_hashes"]),
                     unclassified,
@@ -435,6 +454,7 @@ def score_run(
                     relocation_filtered,
                     local_presence_out_of_area,
                     local_presence_ambiguous,
+                    local_presence_no_policy,
                 )
                 summary["users_skipped_no_postings"] += 1
                 summary["per_user"].append(

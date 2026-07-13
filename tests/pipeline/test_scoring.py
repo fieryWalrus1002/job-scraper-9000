@@ -729,6 +729,57 @@ def test_local_presence_gate_drops_out_of_area_when_unwilling(
 
 
 @skip_if_no_docker
+def test_local_presence_gate_no_acceptable_locations_logs_distinct_reason(
+    migrated_pg, tmp_path, caplog
+):
+    """willing=False with an empty acceptable_locations set (e.g. a user whose
+    policy predates the field) still drops local-presence jobs, but the drop is
+    logged as a policy-data gap — not 'out of area' — so the fix (a settings
+    re-save) is obvious (spec §8.5)."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "nopolicy@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            # acceptable_locations omitted → empty set (pre-backfill user)
+        )
+        _seed_consolidated(conn, dedup_hash="h-seattle", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "nopolicy@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-seattle",
+                "fully_remote",
+                requires_local_presence=True,
+                location="Seattle, WA",
+            )
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 0
+    assert summary["users_skipped_no_postings"] == 1
+    assert calls == []
+    assert "no acceptable locations in policy" in caplog.text
+    assert "1 local-presence-no-policy" in caplog.text
+    # A pre-backfill drop must NOT be mislabeled as out-of-area.
+    assert "requires local presence outside acceptable locations" not in caplog.text
+
+
+@skip_if_no_docker
 def test_relocation_gate_still_drops_relocation_required_when_unwilling(
     migrated_pg, tmp_path, caplog
 ):
