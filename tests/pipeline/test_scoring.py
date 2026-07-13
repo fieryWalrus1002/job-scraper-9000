@@ -476,6 +476,8 @@ def test_two_phase_batch_isolates_collect_failure(migrated_pg, tmp_path, monkeyp
     assert _scored_hashes(tmp_path, "bob@example.com") == ["h-bob"]
     by_hash = {submission.hashes[0]: submission for submission in submissions}
     assert len(by_hash["h-alice"].aborted) == 1
+    # abort must receive the real collect exception, not a generic message.
+    assert "collect failed for" in str(by_hash["h-alice"].aborted[0])
     assert by_hash["h-bob"].aborted == []
 
 
@@ -579,6 +581,8 @@ def test_two_phase_batch_marks_pending_users_failed_when_polling_dies(
     assert summary["users_scored"] == 0
     assert summary["users_failed"] == 2
     assert all(len(submission.aborted) == 1 for submission in submissions)
+    # abort must receive the real polling exception, not a generic message.
+    assert all("poll died" in str(submission.aborted[0]) for submission in submissions)
     assert [event for event in events if event[0] == "collect"] == []
 
 

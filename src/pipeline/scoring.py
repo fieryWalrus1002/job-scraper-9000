@@ -515,13 +515,15 @@ def _score_run_batch(
             batches = poll_all_until_done(
                 client, [s.batch_id for _, s in to_poll], poll_interval
             )
-        except Exception:
+        except Exception as exc:
             tb = traceback.format_exc()
             log.error(
                 "skills_fit batch polling died; failing all pending users:\n%s", tb
             )
             for gated, submission in to_poll:
-                submission.abort(RuntimeError("batch polling failed"))
+                # Pass the real polling exception so the run record captures the
+                # true cause, not a generic message.
+                submission.abort(exc)
                 aborted.add(id(submission))
                 summary["users_failed"] += 1
                 summary["per_user"].append(
@@ -551,8 +553,10 @@ def _score_run_batch(
             # raise "already closed" and break per-user isolation for the run.
             try:
                 batch_score_fns.collect(submission, batch)
-            except Exception:
-                submission.abort(RuntimeError("collect failed"))
+            except Exception as exc:
+                # Pass the real collect exception so the run record captures the
+                # true cause, not a generic message.
+                submission.abort(exc)
                 raise
             _stamp_user_email(gated.scored_path, email)
             summary["users_scored"] += 1

@@ -82,6 +82,10 @@ def run_overnight(
     production callers take the defaults. ``run_id`` is normally minted by the
     CLI (so the log file and run dir share one timestamp); it defaults to a
     freshly-minted id for direct callers.
+
+    Passing ``batch_score_fns`` (the CLI does this under ``--batch``) opts into
+    the submit-all-then-poll-all two-phase scoring path instead of the per-user
+    serial ``score_fn`` loop; when it is ``None`` scoring stays serial.
     """
     url = database_url or os.environ.get("DATABASE_URL")
     if not url:
