@@ -1,3 +1,4 @@
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -50,6 +51,19 @@ class _FakeBatches:
         return _batch(batch_id=batch_id, status=status)
 
 
+class _MultiFakeBatches:
+    """Retrieve returns the next status for each id from its own sequence."""
+
+    def __init__(self, status_seqs: dict[str, list[str]]):
+        self._seqs = {k: list(v) for k, v in status_seqs.items()}
+        self.retrieve_calls = 0
+
+    def retrieve(self, batch_id):
+        self.retrieve_calls += 1
+        status = self._seqs[batch_id].pop(0)
+        return _batch(batch_id=batch_id, status=status)
+
+
 class _FakeClient:
     def __init__(self, files=None, batches=None):
         self.files = files or _FakeFiles()
@@ -89,6 +103,51 @@ def test_poll_until_done_loops_until_terminal(monkeypatch):
 
     assert batch.status == "completed"
     assert batches.retrieve_calls == 3
+
+
+def test_poll_all_until_done_drops_terminal_batches(monkeypatch):
+    monkeypatch.setattr(batch_api.time, "sleep", lambda _s: None)
+    batches = _MultiFakeBatches({"b1": ["in_progress", "completed"], "b2": ["failed"]})
+    client = _FakeClient(batches=batches)
+
+    result = batch_api.poll_all_until_done(client, ["b1", "b2"], poll_interval=0)
+
+    assert set(result) == {"b1", "b2"}
+    assert result["b1"].status == "completed"
+    assert result["b2"].status == "failed"
+    assert batches.retrieve_calls == 3
+
+
+def test_poll_all_until_done_empty_input_never_retrieves_or_sleeps(monkeypatch):
+    sleep_calls = []
+    monkeypatch.setattr(
+        batch_api.time, "sleep", lambda seconds: sleep_calls.append(seconds)
+    )
+    batches = _MultiFakeBatches({})
+    client = _FakeClient(batches=batches)
+
+    result = batch_api.poll_all_until_done(client, [], poll_interval=0)
+
+    assert result == {}
+    assert batches.retrieve_calls == 0
+    assert sleep_calls == []
+
+
+def test_poll_all_until_done_logs_per_tick_progress(monkeypatch, caplog):
+    monkeypatch.setattr(batch_api.time, "sleep", lambda _s: None)
+    batches = _MultiFakeBatches({"b1": ["in_progress", "completed"], "b2": ["failed"]})
+    client = _FakeClient(batches=batches)
+    caplog.set_level(logging.INFO, logger=batch_api.log.name)
+
+    batch_api.poll_all_until_done(client, ["b1", "b2"], poll_interval=0)
+
+    progress_lines = [
+        record.message
+        for record in caplog.records
+        if "of" in record.message and "terminal" in record.message
+    ]
+    assert progress_lines
+    assert progress_lines[-1] == "2 of 2 batch(es) terminal (0 still running)"
 
 
 def test_download_results_returns_output_text():
