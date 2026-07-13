@@ -111,6 +111,18 @@ def _completed_batch():
     return batch_obj
 
 
+def _failed_batch():
+    batch_obj = MagicMock()
+    batch_obj.id = "batch-test"
+    batch_obj.status = "failed"
+    batch_obj.error_file_id = None
+    return batch_obj
+
+
+def _run_records(tmp_path: Path) -> list[dict]:
+    return _read_jsonl(tmp_path / "data/run_telemetry/runs.jsonl")
+
+
 # ---------------------------------------------------------------------------
 # build_request / parse_analysis (pure)
 # ---------------------------------------------------------------------------
@@ -264,6 +276,227 @@ def test_run_batch_serves_cache_hits_without_submitting(tmp_path, monkeypatch):
     assert counts["submitted"] == 0
     assert counts["scored_successfully"] == 1
     assert _read_jsonl(output_path)[0]["ai_fit"]["fit_score"] == 4
+
+
+def test_submit_batch_returns_local_handle_without_polling(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "skills_fit.yml"
+    profile_path = tmp_path / "profile.yml"
+    input_path = tmp_path / "remote.jsonl"
+    output_path = tmp_path / "scored.jsonl"
+    _write_profile(profile_path)
+    _write_config(config_path, profile_path)
+    _write_jsonl(input_path, [_job()])
+
+    cache = AnalysisCache(tmp_path / "data/cache/skills_fit_analyses.jsonl")
+
+    def fake_hash_file(path):
+        return f"hash:{Path(path).name}"
+
+    with patch.object(batch, "hash_file", side_effect=fake_hash_file):
+        prompt_hash = batch.hash_file(batch.SKILLS_FIT_PROMPT_PATH)
+    cache.put(
+        dedup_hash="hashA",
+        prompt_hash=prompt_hash,
+        provider="openai",
+        model="gpt-4o-mini",
+        profile_version="test-v1",
+        analysis=_analysis(4),
+    )
+
+    with (
+        patch.object(batch, "hash_file", side_effect=fake_hash_file),
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client") as mock_client,
+        patch.object(batch, "upload_and_create_batch") as mock_upload,
+        patch.object(batch, "poll_until_done") as mock_poll,
+        patch.object(batch, "download_results") as mock_download,
+    ):
+        submission = batch.submit_skills_fit_batch(
+            remote_input=input_path,
+            local_input=tmp_path / "missing_local.jsonl",
+            output=output_path,
+            config_path=config_path,
+        )
+        counts = batch.collect_skills_fit_batch(submission, None)
+
+    assert submission.batch_id is None
+    assert submission.submitted == 0
+    assert submission.cache_hits == 1
+    assert counts["scored_successfully"] == 1
+    mock_client.assert_not_called()
+    mock_upload.assert_not_called()
+    mock_poll.assert_not_called()
+    mock_download.assert_not_called()
+    assert _read_jsonl(output_path)[0]["ai_fit"]["fit_score"] == 4
+    assert _run_records(tmp_path)[-1]["events"]["failure_count"] == 0
+
+
+def test_submit_batch_returns_remote_handle_without_polling(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "skills_fit.yml"
+    profile_path = tmp_path / "profile.yml"
+    input_path = tmp_path / "remote.jsonl"
+    output_path = tmp_path / "scored.jsonl"
+    _write_profile(profile_path)
+    _write_config(config_path, profile_path)
+    _write_jsonl(input_path, [_job()])
+    client = MagicMock()
+
+    with (
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client", return_value=(client, "gpt-4o-mini")),
+        patch.object(
+            batch, "upload_and_create_batch", return_value=("batch-test", "file-1")
+        ) as mock_upload,
+        patch.object(batch, "poll_until_done") as mock_poll,
+        patch.object(batch, "download_results") as mock_download,
+    ):
+        submission = batch.submit_skills_fit_batch(
+            remote_input=input_path,
+            local_input=tmp_path / "missing_local.jsonl",
+            output=output_path,
+            config_path=config_path,
+        )
+
+    assert submission.batch_id == "batch-test"
+    assert submission.client is client
+    assert submission.submitted == 1
+    assert len(submission.plan) == 1
+    mock_upload.assert_called_once()
+    mock_poll.assert_not_called()
+    mock_download.assert_not_called()
+
+    summary = submission.abort(RuntimeError("test cleanup"))
+    assert summary["submitted"] == 1
+    assert _run_records(tmp_path)[-1]["events"]["failure_count"] == 1
+
+
+def test_collect_batch_writes_output_cache_and_run_record(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "skills_fit.yml"
+    profile_path = tmp_path / "profile.yml"
+    input_path = tmp_path / "remote.jsonl"
+    output_path = tmp_path / "scored.jsonl"
+    _write_profile(profile_path)
+    _write_config(config_path, profile_path)
+    _write_jsonl(input_path, [_job()])
+
+    with (
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client", return_value=(MagicMock(), "gpt-4o-mini")),
+        patch.object(
+            batch, "upload_and_create_batch", return_value=("batch-test", "file-1")
+        ),
+        patch.object(batch, "download_results", return_value=_result_line("job-0")),
+    ):
+        submission = batch.submit_skills_fit_batch(
+            remote_input=input_path,
+            local_input=tmp_path / "missing_local.jsonl",
+            output=output_path,
+            config_path=config_path,
+        )
+        counts = batch.collect_skills_fit_batch(submission, _completed_batch())
+
+    assert counts["scored_successfully"] == 1
+    assert counts["submitted"] == 1
+    assert output_path.exists()
+    assert _read_jsonl(output_path)[0]["ai_fit"]["fit_score"] == 5
+    assert len(_read_jsonl(tmp_path / "data/cache/skills_fit_analyses.jsonl")) == 1
+    record = _run_records(tmp_path)[-1]
+    assert record["run_id"] == counts["run_id"]
+    assert record["events"]["failure_count"] == 0
+    assert record["llm"]["calls_made"] == 1
+
+
+def test_abort_and_failed_batch_close_run_tracker(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "skills_fit.yml"
+    profile_path = tmp_path / "profile.yml"
+    input_path = tmp_path / "remote.jsonl"
+    output_path = tmp_path / "scored.jsonl"
+    _write_profile(profile_path)
+    _write_config(config_path, profile_path)
+    _write_jsonl(input_path, [_job()])
+
+    with (
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client", return_value=(MagicMock(), "gpt-4o-mini")),
+        patch.object(
+            batch, "upload_and_create_batch", return_value=("batch-test", "file-1")
+        ),
+    ):
+        submission = batch.submit_skills_fit_batch(
+            remote_input=input_path,
+            local_input=tmp_path / "missing_local.jsonl",
+            output=output_path,
+            config_path=config_path,
+        )
+
+    summary = submission.abort(RuntimeError("expired"))
+    assert summary["submitted"] == 1
+    first_record = _run_records(tmp_path)[-1]
+    assert first_record["events"]["failure_count"] == 1
+    assert "run raised RuntimeError: expired" in first_record["events"]["notable"]
+
+    with (
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client", return_value=(MagicMock(), "gpt-4o-mini")),
+        patch.object(
+            batch, "upload_and_create_batch", return_value=("batch-test", "file-1")
+        ),
+        patch.object(batch, "poll_until_done", return_value=_failed_batch()),
+        patch.object(batch, "download_results") as mock_download,
+    ):
+        with pytest.raises(RuntimeError, match="status=failed"):
+            batch.run_skills_fit_batch(
+                remote_input=input_path,
+                local_input=tmp_path / "missing_local.jsonl",
+                output=tmp_path / "failed_scored.jsonl",
+                config_path=config_path,
+            )
+
+    mock_download.assert_not_called()
+    second_record = _run_records(tmp_path)[-1]
+    assert second_record["run_id"] != first_record["run_id"]
+    assert second_record["events"]["failure_count"] == 1
+    assert (
+        "run raised RuntimeError: Batch batch-test ended with status=failed"
+        in second_record["events"]["notable"]
+    )
+
+
+def test_run_batch_cleanup_does_not_mask_primary_failure(tmp_path, monkeypatch, caplog):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "skills_fit.yml"
+    profile_path = tmp_path / "profile.yml"
+    input_path = tmp_path / "remote.jsonl"
+    _write_profile(profile_path)
+    _write_config(config_path, profile_path)
+    _write_jsonl(input_path, [_job()])
+
+    def _boom_abort(self, exc):
+        raise RuntimeError("abort blew up")
+
+    with (
+        patch.object(batch, "get_git_metadata", return_value=GIT_METADATA),
+        patch.object(batch, "_get_client", return_value=(MagicMock(), "gpt-4o-mini")),
+        patch.object(
+            batch, "upload_and_create_batch", return_value=("batch-test", "file-1")
+        ),
+        patch.object(batch, "poll_until_done", return_value=_failed_batch()),
+        patch.object(batch.SkillsFitBatchSubmission, "abort", _boom_abort),
+    ):
+        # The primary failure (batch status=failed) must propagate, not the abort error.
+        with pytest.raises(RuntimeError, match="status=failed"):
+            batch.run_skills_fit_batch(
+                remote_input=input_path,
+                local_input=tmp_path / "missing_local.jsonl",
+                output=tmp_path / "scored.jsonl",
+                config_path=config_path,
+            )
+
+    assert "Failed to abort skills_fit submission" in caplog.text
 
 
 def test_run_batch_rejects_non_openai_provider(tmp_path):
