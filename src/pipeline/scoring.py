@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import traceback
 from collections.abc import Iterator
 from pathlib import Path
@@ -56,6 +57,7 @@ from pipeline.consolidation import (
 )
 from pipeline.worker import run_user_dir
 from user_config import UserPolicies
+from user_config.models import Location
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +67,32 @@ SCORED_NAME = "scored.jsonl"
 
 ScoreFn = Callable[..., dict[str, Any]]
 """``(input_path=, output_path=, profile_file=, run_date=, parent_run_id=) -> summary``."""
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def _location_matches(job_location: str | None, acceptable: list[Location]) -> bool:
+    """True if the scraped posting location matches any acceptable location
+    (specs/relocation_policy.md §8.4). City = casefolded substring; region =
+    exact casefolded token (so 'WA' matches 'Seattle, WA' but not 'seattle');
+    the token guard keeps 'Portland, OR' from matching 'Portland, ME'. Empty/None
+    job_location never matches. Country is not required to appear."""
+    if not job_location or not job_location.strip():
+        return False
+    hay = job_location.casefold()
+    tokens = set(_TOKEN_RE.findall(hay))
+    for loc in acceptable:
+        city = loc.city.casefold().strip()
+        region = loc.region.casefold().strip()
+        if not city or city not in hay:
+            continue
+        # Spec §8.4: require BOTH city and region. Location.region is a required
+        # field, so an empty region is malformed data — never match on city alone
+        # (that would let 'Portland' match any Portland).
+        if region and region in tokens:
+            return True
+    return False
+
 
 # Per-user query: invert consolidated_postings.requested_by into one row per
 # user with the dedup_hashes they want, plus their stored policies. A user
@@ -319,6 +347,9 @@ def score_run(
             unclassified = 0
             travel_filtered = 0
             relocation_filtered = 0
+            local_presence_out_of_area = 0
+            local_presence_ambiguous = 0
+            local_presence_no_policy = 0
             for dedup_hash in row["dedup_hashes"]:
                 rec = classified.get(dedup_hash)
                 if rec is None:
@@ -338,19 +369,41 @@ def score_run(
                 ):
                     travel_filtered += 1
                     continue
-                # Per-user relocation gate. Missing or None flags treated as
-                # False (not flagged → never dropped).
                 analysis = rec.get("_remote_analysis") or {}
+                # requires_relocation stays a clean veto.
                 if not relocation_policy.allow_required_relocation and analysis.get(
                     "requires_relocation"
                 ):
                     relocation_filtered += 1
                     continue
-                if not relocation_policy.allow_local_presence_required and analysis.get(
-                    "requires_local_presence"
+                # requires_local_presence is location-aware (spec §8.2).
+                # willing=True users have allow_local_presence_required=True and accept
+                # near any office (unchanged). A willing=False user keeps only postings
+                # in an acceptable location.
+                if (
+                    analysis.get("requires_local_presence")
+                    and not relocation_policy.allow_local_presence_required
                 ):
-                    relocation_filtered += 1
-                    continue
+                    job_location = rec.get("location")
+                    if _location_matches(
+                        job_location, relocation_policy.acceptable_locations
+                    ):
+                        pass  # local to a place they accept — keep
+                    elif not relocation_policy.acceptable_locations:
+                        # No acceptable locations stored (e.g. an existing user
+                        # whose policy predates this field). The drop matches
+                        # prior behavior, but the cause is missing policy data,
+                        # not the posting — label it distinctly so the fix
+                        # (a settings re-save / derive_policies backfill) is
+                        # obvious to the morning admin (spec §8.5).
+                        local_presence_no_policy += 1
+                        continue
+                    elif not (job_location or "").strip():
+                        local_presence_ambiguous += 1
+                        continue
+                    else:
+                        local_presence_out_of_area += 1
+                        continue
                 survivors.append(rec)
             summary["postings_unclassified"] += unclassified
             if travel_filtered:
@@ -366,17 +419,42 @@ def score_run(
                     email,
                     relocation_filtered,
                 )
+            if local_presence_out_of_area:
+                log.info(
+                    "%s — %d posting(s) dropped: requires local presence outside acceptable locations",
+                    email,
+                    local_presence_out_of_area,
+                )
+            if local_presence_ambiguous:
+                log.info(
+                    "%s — %d posting(s) dropped: requires local presence, posting location missing/ambiguous",
+                    email,
+                    local_presence_ambiguous,
+                )
+            if local_presence_no_policy:
+                log.info(
+                    "%s — %d posting(s) dropped: requires local presence but no "
+                    "acceptable locations in policy (settings re-save needed to "
+                    "backfill acceptable_locations)",
+                    email,
+                    local_presence_no_policy,
+                )
 
             if not survivors:
                 log.info(
                     "%s — no postings survived remote policy "
                     "(%d requested, %d unclassified, %d travel-filtered, "
-                    "%d relocation-filtered); skipping skills_fit",
+                    "%d relocation-filtered, %d local-presence-out-of-area, "
+                    "%d local-presence-ambiguous, %d local-presence-no-policy); "
+                    "skipping skills_fit",
                     email,
                     len(row["dedup_hashes"]),
                     unclassified,
                     travel_filtered,
                     relocation_filtered,
+                    local_presence_out_of_area,
+                    local_presence_ambiguous,
+                    local_presence_no_policy,
                 )
                 summary["users_skipped_no_postings"] += 1
                 summary["per_user"].append(

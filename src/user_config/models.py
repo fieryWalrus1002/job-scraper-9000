@@ -307,6 +307,7 @@ class PrefilterPolicy(_Strict):
 class RelocationPolicy(_Strict):
     allow_required_relocation: bool = False
     allow_local_presence_required: bool = False
+    acceptable_locations: list[Location] = Field(default_factory=list)
 
 
 class UserPolicies(_Strict):

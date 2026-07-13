@@ -85,6 +85,28 @@ def _location_label(loc: Location) -> str:
     return f"{loc.city}, {loc.region}"
 
 
+def _acceptable_locations(search: SearchConfigInput) -> list[Location]:
+    """Structured acceptable locations for the per-user local-presence gate
+    (specs/relocation_policy.md §8.3): home_location + locations.acceptable,
+    de-duplicated on (city, region, country), home first."""
+    out: list[Location] = []
+    seen: set[tuple[str, str, str]] = set()
+    home = search.user.home_location
+    candidates: list[Location] = []
+    if home is not None:
+        candidates.append(
+            Location(city=home.city, region=home.region, country=home.country)
+        )
+    candidates.extend(search.locations.acceptable)
+    for loc in candidates:
+        key = (loc.city.casefold(), loc.region.casefold(), loc.country.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(loc)
+    return out
+
+
 def _national_location(search: SearchConfigInput) -> str:
     country = search.user.home_location.country if search.user.home_location else "US"
     return _COUNTRY_LABELS.get(country, country)
@@ -212,6 +234,7 @@ def derive_policies(search: SearchConfigInput) -> UserPolicies:
     relocation = RelocationPolicy(
         allow_required_relocation=willing,
         allow_local_presence_required=willing,
+        acceptable_locations=_acceptable_locations(search),
     )
 
     return UserPolicies(

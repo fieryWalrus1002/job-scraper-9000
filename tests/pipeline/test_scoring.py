@@ -12,6 +12,7 @@ query runs its actual SQL.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from pathlib import Path
 
@@ -24,10 +25,12 @@ from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
 from pipeline.planner import _slug
 from pipeline.scoring import (
     SCORED_NAME,
+    _location_matches,
     iter_run_user_outputs,
     score_run,
     skills_fit_dir,
 )
+from user_config.models import Location
 
 from .conftest import seed_user, skip_if_no_docker
 
@@ -110,8 +113,9 @@ def _classified_with_relocation(
     *,
     requires_relocation: bool = False,
     requires_local_presence: bool = False,
+    location: str | None = None,
 ) -> dict:
-    return {
+    rec = {
         "dedup_hash": dedup_hash,
         "title": "Eng",
         "description": "d",
@@ -122,6 +126,9 @@ def _classified_with_relocation(
             "requires_local_presence": requires_local_presence,
         },
     }
+    if location is not None:
+        rec["location"] = location
+    return rec
 
 
 def _set_full_policy(
@@ -132,20 +139,24 @@ def _set_full_policy(
     max_travel_days: int | None = None,
     allow_required_relocation: bool = False,
     allow_local_presence_required: bool = False,
+    acceptable_locations: list[dict] | None = None,
 ) -> None:
     remote: dict = {"acceptable_classifications": acceptable}
     if max_travel_days is not None:
         remote["max_travel_days"] = max_travel_days
+    relocation: dict = {
+        "allow_required_relocation": allow_required_relocation,
+        "allow_local_presence_required": allow_local_presence_required,
+    }
+    if acceptable_locations is not None:
+        relocation["acceptable_locations"] = acceptable_locations
     conn.execute(
         "UPDATE app.user_search_configs SET policies = %s WHERE user_id = %s::uuid",
         (
             Json(
                 {
                     "remote": remote,
-                    "relocation": {
-                        "allow_required_relocation": allow_required_relocation,
-                        "allow_local_presence_required": allow_local_presence_required,
-                    },
+                    "relocation": relocation,
                 }
             ),
             user_id,
@@ -184,6 +195,23 @@ def _scored_hashes(runs_dir: Path, email: str) -> list[str]:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
+
+def test_location_matches_requires_city_and_region_token():
+    acceptable = [Location(city="Portland", region="OR", country="US")]
+
+    assert _location_matches("Portland, OR", acceptable) is True
+    assert _location_matches("Portland, ME", acceptable) is False
+    assert _location_matches("Seattle, WA", acceptable) is False
+    assert _location_matches("", acceptable) is False
+    assert _location_matches(None, acceptable) is False
+
+
+def test_location_matches_city_as_substring_region_as_token():
+    acceptable = [Location(city="Seattle", region="WA", country="US")]
+
+    assert _location_matches("Greater Seattle Area, WA", acceptable) is True
+    assert _location_matches("Seattle, Washington", acceptable) is False
 
 
 @skip_if_no_docker
@@ -613,9 +641,10 @@ def test_scored_records_round_trip_through_ingest(migrated_pg, tmp_path):
 
 
 @skip_if_no_docker
-def test_relocation_gate_drops_flagged_jobs_when_unwilling(migrated_pg, tmp_path):
-    """willing=False: jobs flagged requires_relocation or requires_local_presence
-    are dropped."""
+def test_local_presence_gate_keeps_acceptable_location_when_unwilling(
+    migrated_pg, tmp_path
+):
+    """willing=False: local-presence jobs in acceptable locations survive."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "alice@example.com")
         _set_full_policy(
@@ -624,20 +653,157 @@ def test_relocation_gate_drops_flagged_jobs_when_unwilling(migrated_pg, tmp_path
             ["fully_remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
+            acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
         )
-        _seed_consolidated(conn, dedup_hash="h-relo", requested_by=[u1])
         _seed_consolidated(conn, dedup_hash="h-local", requested_by=[u1])
-        _seed_consolidated(conn, dedup_hash="h-ok", requested_by=[u1])
 
     _materialize_profile(tmp_path, "alice@example.com")
     _write_classified(
         tmp_path,
         passed=[
             _classified_with_relocation(
-                "h-relo", "fully_remote", requires_relocation=True
-            ),
+                "h-local",
+                "fully_remote",
+                requires_local_presence=True,
+                location="Seattle, WA",
+            )
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 1
+    assert calls[0]["hashes"] == ["h-local"]
+
+
+@skip_if_no_docker
+def test_local_presence_gate_drops_out_of_area_when_unwilling(
+    migrated_pg, tmp_path, caplog
+):
+    """willing=False: local-presence jobs outside acceptable locations drop."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "outofarea@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
+        )
+        _seed_consolidated(conn, dedup_hash="h-portland", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "outofarea@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
             _classified_with_relocation(
-                "h-local", "fully_remote", requires_local_presence=True
+                "h-portland",
+                "fully_remote",
+                requires_local_presence=True,
+                location="Portland, OR",
+            )
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 0
+    assert summary["users_skipped_no_postings"] == 1
+    assert calls == []
+    assert "requires local presence outside acceptable locations" in caplog.text
+    assert "1 local-presence-out-of-area" in caplog.text
+
+
+@skip_if_no_docker
+def test_local_presence_gate_no_acceptable_locations_logs_distinct_reason(
+    migrated_pg, tmp_path, caplog
+):
+    """willing=False with an empty acceptable_locations set (e.g. a user whose
+    policy predates the field) still drops local-presence jobs, but the drop is
+    logged as a policy-data gap — not 'out of area' — so the fix (a settings
+    re-save) is obvious (spec §8.5)."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "nopolicy@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            # acceptable_locations omitted → empty set (pre-backfill user)
+        )
+        _seed_consolidated(conn, dedup_hash="h-seattle", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "nopolicy@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-seattle",
+                "fully_remote",
+                requires_local_presence=True,
+                location="Seattle, WA",
+            )
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 0
+    assert summary["users_skipped_no_postings"] == 1
+    assert calls == []
+    assert "no acceptable locations in policy" in caplog.text
+    assert "1 local-presence-no-policy" in caplog.text
+    # A pre-backfill drop must NOT be mislabeled as out-of-area.
+    assert "requires local presence outside acceptable locations" not in caplog.text
+
+
+@skip_if_no_docker
+def test_relocation_gate_still_drops_relocation_required_when_unwilling(
+    migrated_pg, tmp_path, caplog
+):
+    """requires_relocation remains a clean veto for unwilling users."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "relocation@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
+        )
+        _seed_consolidated(conn, dedup_hash="h-relo", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-ok", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "relocation@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-relo", "fully_remote", requires_relocation=True
             ),
             _classified_with_relocation("h-ok", "fully_remote"),
         ],
@@ -653,35 +819,77 @@ def test_relocation_gate_drops_flagged_jobs_when_unwilling(migrated_pg, tmp_path
         )
     assert summary["users_scored"] == 1
     assert calls[0]["hashes"] == ["h-ok"]
+    assert "relocation not allowed" in caplog.text
 
 
 @skip_if_no_docker
-def test_relocation_gate_passes_flagged_jobs_when_willing(migrated_pg, tmp_path):
-    """willing=True: jobs flagged requires_relocation or requires_local_presence
-    survive."""
+def test_local_presence_gate_drops_missing_location_as_ambiguous(
+    migrated_pg, tmp_path, caplog
+):
+    """willing=False: local-presence jobs with no posting location drop as ambiguous."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
-        u1 = seed_user(conn, "bob@example.com")
+        u1 = seed_user(conn, "ambiguous@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
+        )
+        _seed_consolidated(conn, dedup_hash="h-missing", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "ambiguous@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-missing", "fully_remote", requires_local_presence=True
+            )
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 0
+    assert summary["users_skipped_no_postings"] == 1
+    assert calls == []
+    assert "posting location missing/ambiguous" in caplog.text
+    assert "1 local-presence-ambiguous" in caplog.text
+
+
+@skip_if_no_docker
+def test_local_presence_gate_passes_any_location_when_willing(migrated_pg, tmp_path):
+    """willing=True: local-presence jobs survive regardless of posting location."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "willing@example.com")
         _set_full_policy(
             conn,
             u1,
             ["fully_remote"],
             allow_required_relocation=True,
             allow_local_presence_required=True,
+            acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
         )
-        for h in ["h-relo", "h-local", "h-ok"]:
-            _seed_consolidated(conn, dedup_hash=h, requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-local", requested_by=[u1])
 
-    _materialize_profile(tmp_path, "bob@example.com")
+    _materialize_profile(tmp_path, "willing@example.com")
     _write_classified(
         tmp_path,
         passed=[
             _classified_with_relocation(
-                "h-relo", "fully_remote", requires_relocation=True
-            ),
-            _classified_with_relocation(
-                "h-local", "fully_remote", requires_local_presence=True
-            ),
-            _classified_with_relocation("h-ok", "fully_remote"),
+                "h-local",
+                "fully_remote",
+                requires_local_presence=True,
+                location="Portland, OR",
+            )
         ],
     )
     calls: list[dict] = []
@@ -694,4 +902,41 @@ def test_relocation_gate_passes_flagged_jobs_when_willing(migrated_pg, tmp_path)
             score_fn=_score_factory(calls),
         )
     assert summary["users_scored"] == 1
-    assert sorted(calls[0]["hashes"]) == ["h-local", "h-ok", "h-relo"]
+    assert calls[0]["hashes"] == ["h-local"]
+
+
+@skip_if_no_docker
+def test_fully_remote_jobs_do_not_use_location_gate(migrated_pg, tmp_path):
+    """Location only gates jobs flagged requires_local_presence."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "remote@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["fully_remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
+        )
+        _seed_consolidated(conn, dedup_hash="h-remote", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "remote@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified_with_relocation(
+                "h-remote", "fully_remote", location="Portland, OR"
+            )
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+    assert summary["users_scored"] == 1
+    assert calls[0]["hashes"] == ["h-remote"]

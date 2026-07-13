@@ -42,8 +42,12 @@ policy_thresholds:
     max_estimated_days_per_year: 15
 
   relocation:
-    allow_required_relocation: false
-    allow_local_presence_required: false
+    # Permissive at the global/consolidation layer. Relocation and local
+    # presence are per-user preferences, so they are gated per user in
+    # pipeline.scoring.score_run (from the stored UserPolicies), not here — the
+    # global pool stays maximally inclusive. See specs/relocation_policy.md §2.1.
+    allow_required_relocation: true
+    allow_local_presence_required: true
 
   uncertainty:
     on_unclear_classification: "reject"
@@ -141,13 +145,20 @@ ______________________________________________________________________
 
 A posting is trashed if any configured policy rule rejects it:
 
-- `requires_relocation` is true and relocation is not allowed
-- `requires_local_presence` is true and local presence is not allowed
 - classification is listed under `policy_thresholds.disallowed_classifications`
 - estimated travel days exceed `policy_thresholds.travel.max_estimated_days_per_year`
 - location restrictions conflict with `USER_LOCATION`
 - hard timezone requirements match rejected timezone keywords
 - classification is `unclear` and `on_unclear_classification` is `reject`
+
+The `requires_relocation` and `requires_local_presence` flags are **not** gated
+here — this global/consolidation layer is permissive on both (see the `relocation`
+config above). They are applied **per user** in `pipeline.scoring.score_run` against
+each user's stored `UserPolicies`: `requires_relocation` is a veto unless the user is
+willing to relocate, and `requires_local_presence` is **location-aware** — a
+non-relocating user keeps such jobs when the posting location matches their acceptable
+locations, and drops them (out-of-area / ambiguous / no-policy) otherwise. See
+[`specs/relocation_policy.md`](../../../specs/relocation_policy.md) §2.1 and §8.
 
 ______________________________________________________________________
 
