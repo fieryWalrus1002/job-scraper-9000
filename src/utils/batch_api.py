@@ -71,6 +71,43 @@ def poll_until_done(client: OpenAI, batch_id: str, poll_interval: int = 60) -> B
         time.sleep(poll_interval)
 
 
+def poll_all_until_done(
+    client: OpenAI, batch_ids: list[str], poll_interval: int = 60
+) -> dict[str, Batch]:
+    """Poll many batches in one loop until every one is terminal.
+
+    One ``client.batches.retrieve`` per still-outstanding id per tick; an id is
+    dropped from the outstanding set once its status is terminal. Logs
+    ``<n> of <m> terminal`` each tick. Returns ``{batch_id: terminal Batch}`` for
+    every requested id. One thread — this interleaves waiting, it does not
+    parallelize. An empty ``batch_ids`` returns ``{}`` without sleeping.
+    """
+    outstanding = list(dict.fromkeys(batch_ids))  # de-dup, preserve order
+    total = len(outstanding)
+    terminal: dict[str, Batch] = {}
+    if not outstanding:
+        return terminal
+    log.info("Polling %d batch(es) every %ds ...", total, poll_interval)
+    while outstanding:
+        still_pending: list[str] = []
+        for batch_id in outstanding:
+            batch = client.batches.retrieve(batch_id)
+            if batch.status in TERMINAL_STATUSES:
+                terminal[batch_id] = batch
+            else:
+                still_pending.append(batch_id)
+        log.info(
+            "%d of %d batch(es) terminal (%d still running)",
+            len(terminal),
+            total,
+            len(still_pending),
+        )
+        outstanding = still_pending
+        if outstanding:
+            time.sleep(poll_interval)
+    return terminal
+
+
 def download_results(client: OpenAI, batch: Batch) -> str:
     """Return the text of a completed batch's output file.
 
