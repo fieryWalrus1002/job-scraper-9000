@@ -31,8 +31,9 @@ from pipeline.consolidation import (
 from pipeline.planner import plan_run
 from pipeline.queue import pending_count, requeue_running
 from pipeline.scoring import (
+    BATCH_SCORE_FNS,
+    BatchScoreFns,
     ScoreFn,
-    batch_score_fn,
     default_score_fn,
     score_run,
 )
@@ -66,6 +67,7 @@ def run_overnight(
     scrape_fn: ScrapeFn = default_scrape_fn,
     classify_fn: ClassifyFn = default_classify_fn,
     score_fn: ScoreFn = default_score_fn,
+    batch_score_fns: BatchScoreFns | None = None,
 ) -> dict[str, Any]:
     """Plan + scrape + consolidate + classify + score (produce-only).
 
@@ -80,6 +82,10 @@ def run_overnight(
     production callers take the defaults. ``run_id`` is normally minted by the
     CLI (so the log file and run dir share one timestamp); it defaults to a
     freshly-minted id for direct callers.
+
+    Passing ``batch_score_fns`` (the CLI does this under ``--batch``) opts into
+    the submit-all-then-poll-all two-phase scoring path instead of the per-user
+    serial ``score_fn`` loop; when it is ``None`` scoring stays serial.
     """
     url = database_url or os.environ.get("DATABASE_URL")
     if not url:
@@ -130,6 +136,7 @@ def run_overnight(
             run_date=run_date,
             runs_dir=runs_dir,
             score_fn=score_fn,
+            batch_score_fns=batch_score_fns,
         )
 
     return _finalize(url, summary)
@@ -270,7 +277,7 @@ def _cmd_overnight(args: argparse.Namespace) -> None:
     llm_fns: dict[str, Any] = {}
     if args.batch:
         log.info("--batch: classification + scoring will use the OpenAI Batch API")
-        llm_fns = {"classify_fn": batch_classify_fn, "score_fn": batch_score_fn}
+        llm_fns = {"classify_fn": batch_classify_fn, "batch_score_fns": BATCH_SCORE_FNS}
 
     try:
         summary = run_overnight(

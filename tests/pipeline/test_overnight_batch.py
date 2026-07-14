@@ -1,7 +1,7 @@
 """Tests for the ``overnight --batch`` toggle.
 
 The flag swaps the classification + scoring hooks onto their OpenAI Batch API
-twins (``batch_classify_fn`` / ``batch_score_fn``); the default invocation
+twins (``batch_classify_fn`` / ``BATCH_SCORE_FNS``); the default invocation
 keeps the live-call fns. The batch runners themselves are faked here — their
 plumbing has its own tests — so nothing touches the network.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pipeline.overnight as overnight
 from pipeline.consolidation import batch_classify_fn, default_classify_fn
-from pipeline.scoring import batch_score_fn, default_score_fn
+from pipeline.scoring import BATCH_SCORE_FNS, default_score_fn
 
 
 # ---------------------------------------------------------------------------
@@ -48,16 +48,26 @@ def test_batch_classify_fn_forwards_hook_kwargs(monkeypatch):
     ]
 
 
-def test_batch_score_fn_maps_hook_kwargs_to_runner_names(monkeypatch):
-    calls: list[dict] = []
+def test_batch_score_fns_map_hook_kwargs_to_submit_collect(monkeypatch):
+    submit_calls: list[dict] = []
+    collect_calls: list[tuple[object, object]] = []
+    submission = object()
+    batch = object()
 
-    def fake(**kwargs):
-        calls.append(kwargs)
+    def fake_submit(**kwargs):
+        submit_calls.append(kwargs)
+        return submission
+
+    def fake_collect(submission_arg, batch_arg):
+        collect_calls.append((submission_arg, batch_arg))
         return {"scored_successfully": 2}
 
-    monkeypatch.setattr("agents.skills_fit.batch.run_skills_fit_batch", fake)
+    monkeypatch.setattr("agents.skills_fit.batch.submit_skills_fit_batch", fake_submit)
+    monkeypatch.setattr(
+        "agents.skills_fit.batch.collect_skills_fit_batch", fake_collect
+    )
 
-    result = batch_score_fn(
+    result = BATCH_SCORE_FNS.submit(
         input_path=Path("gated.jsonl"),
         output_path=Path("scored.jsonl"),
         profile_file=Path("candidate_profile.yml"),
@@ -65,8 +75,8 @@ def test_batch_score_fn_maps_hook_kwargs_to_runner_names(monkeypatch):
         parent_run_id="run-1",
     )
 
-    assert result == {"scored_successfully": 2}
-    assert calls == [
+    assert result is submission
+    assert submit_calls == [
         {
             "run_date": "2026-07-08",
             "remote_input": Path("gated.jsonl"),
@@ -75,6 +85,9 @@ def test_batch_score_fn_maps_hook_kwargs_to_runner_names(monkeypatch):
             "parent_run_id": "run-1",
         }
     ]
+
+    assert BATCH_SCORE_FNS.collect(submission, batch) == {"scored_successfully": 2}
+    assert collect_calls == [(submission, batch)]
 
 
 # ---------------------------------------------------------------------------
@@ -111,9 +124,11 @@ def test_cli_default_uses_live_call_fns(monkeypatch):
     captured = _run_cli(monkeypatch, _BASE_ARGV)
     assert captured.get("classify_fn", default_classify_fn) is default_classify_fn
     assert captured.get("score_fn", default_score_fn) is default_score_fn
+    assert captured.get("batch_score_fns") is None
 
 
 def test_cli_batch_flag_swaps_in_batch_fns(monkeypatch):
     captured = _run_cli(monkeypatch, [*_BASE_ARGV, "--batch"])
     assert captured["classify_fn"] is batch_classify_fn
-    assert captured["score_fn"] is batch_score_fn
+    assert captured.get("score_fn", default_score_fn) is default_score_fn
+    assert captured["batch_score_fns"] is BATCH_SCORE_FNS
