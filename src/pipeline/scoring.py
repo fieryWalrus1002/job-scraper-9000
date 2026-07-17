@@ -549,6 +549,7 @@ def _gate_user(
     survivors: list[dict[str, Any]] = []
     unclassified = 0
     travel_filtered = 0
+    location_filtered = 0
     relocation_filtered = 0
     local_presence_out_of_area = 0
     local_presence_ambiguous = 0
@@ -560,6 +561,15 @@ def _gate_user(
             continue
         if _classification_of(rec) not in acceptable:
             continue
+        analysis = rec.get("_remote_analysis") or {}
+        loc_restrictions = analysis.get("location_restrictions") or []
+        if not _passes_location_restrictions(
+            loc_restrictions,
+            relocation_policy.acceptable_locations,
+            relocation_policy.allow_required_relocation,
+        ):
+            location_filtered += 1
+            continue
         # Per-user travel gate (spec remote_filter_simplification.md §7). None
         # = no gate; a posting with no numeric estimate is never dropped here
         # (the classification gate above already decided remote-ness).
@@ -567,7 +577,6 @@ def _gate_user(
         if max_travel_days is not None and days is not None and days > max_travel_days:
             travel_filtered += 1
             continue
-        analysis = rec.get("_remote_analysis") or {}
         # requires_relocation stays a clean veto.
         if not relocation_policy.allow_required_relocation and analysis.get(
             "requires_relocation"
@@ -609,6 +618,12 @@ def _gate_user(
             travel_filtered,
             max_travel_days,
         )
+    if location_filtered:
+        log.info(
+            "%s — %d posting(s) dropped: location restrictions not satisfiable",
+            email,
+            location_filtered,
+        )
     if relocation_filtered:
         log.info(
             "%s — %d posting(s) dropped: relocation not allowed",
@@ -640,13 +655,15 @@ def _gate_user(
         log.info(
             "%s — no postings survived remote policy "
             "(%d requested, %d unclassified, %d travel-filtered, "
-            "%d relocation-filtered, %d local-presence-out-of-area, "
+            "%d location-filtered, %d relocation-filtered, "
+            "%d local-presence-out-of-area, "
             "%d local-presence-ambiguous, %d local-presence-no-policy); "
             "skipping skills_fit",
             email,
             len(row["dedup_hashes"]),
             unclassified,
             travel_filtered,
+            location_filtered,
             relocation_filtered,
             local_presence_out_of_area,
             local_presence_ambiguous,
