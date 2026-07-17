@@ -7,10 +7,10 @@ consolidated union (profile-free), this phase splits back out per user:
 1. :func:`score_run` — for each user that requested at least one posting,
    gate the union by *that user's*
    ``policies.remote.acceptable_classifications`` (the per-user remote
-   policy, applied post-classification per spec §3) and their
-   ``policies.remote.max_travel_days`` travel ceiling (numeric gate on
-   ``_remote_analysis.estimated_travel_days_per_year``; None = no gate),
-   then run skills_fit
+   policy, applied post-classification per spec §3), plus relocation and
+   local-presence policy. Travel is still extracted for display, but no
+   longer gated here per ``specs/remote_filter_taxonomy.md`` decision 2.
+   The phase then runs skills_fit
    over the survivors as **one batch per user** (prompt-cache warmth is per
    ``(user, profile_version)`` — a cross-user batch would carry the wrong
    candidate profile in its system prompt), writing the scored JSONL to
@@ -452,26 +452,6 @@ def _classification_of(record: dict[str, Any]) -> str | None:
     return analysis.get("remote_classification")
 
 
-def _travel_days_of(record: dict[str, Any]) -> int | None:
-    """Numeric travel estimate from the stored remote analysis.
-
-    ``estimated_travel_days_per_year`` is ``int | None`` on RemoteAnalysis;
-    a stored value of any other type is corrupt data and must not be
-    silently coerced or skipped — fail loud so the per-user isolation handler
-    records it (CLAUDE.md: fail fast, log well). ``bool`` is rejected too:
-    ``isinstance(True, int)`` is True, so a stored ``true`` would otherwise
-    sneak through as 1 day.
-    """
-    analysis = record.get("_remote_analysis") or {}
-    days = analysis.get("estimated_travel_days_per_year")
-    if days is not None and type(days) is not int:
-        raise TypeError(
-            f"estimated_travel_days_per_year is {type(days).__name__}, "
-            f"expected int|None: {days!r}"
-        )
-    return days
-
-
 def default_score_fn(
     *,
     input_path: Path,
@@ -547,11 +527,9 @@ def _gate_user(
     remote_policy = policies.remote
     relocation_policy = policies.relocation
     acceptable = set(remote_policy.acceptable_classifications)
-    max_travel_days = remote_policy.max_travel_days
 
     survivors: list[dict[str, Any]] = []
     unclassified = 0
-    travel_filtered = 0
     location_filtered = 0
     relocation_filtered = 0
     local_presence_out_of_area = 0
@@ -580,13 +558,6 @@ def _gate_user(
                 dedup_hash,
                 loc_restrictions,
             )
-            continue
-        # Per-user travel gate (spec remote_filter_simplification.md §7). None
-        # = no gate; a posting with no numeric estimate is never dropped here
-        # (the classification gate above already decided remote-ness).
-        days = _travel_days_of(rec)
-        if max_travel_days is not None and days is not None and days > max_travel_days:
-            travel_filtered += 1
             continue
         # requires_relocation stays a clean veto.
         if not relocation_policy.allow_required_relocation and analysis.get(
@@ -622,13 +593,6 @@ def _gate_user(
                 continue
         survivors.append(rec)
     summary["postings_unclassified"] += unclassified
-    if travel_filtered:
-        log.info(
-            "%s — %d posting(s) dropped: travel exceeds max_travel_days=%d",
-            email,
-            travel_filtered,
-            max_travel_days,
-        )
     if location_filtered:
         log.info(
             "%s — %d posting(s) dropped: location restrictions not satisfiable",
@@ -665,15 +629,13 @@ def _gate_user(
     if not survivors:
         log.info(
             "%s — no postings survived remote policy "
-            "(%d requested, %d unclassified, %d travel-filtered, "
-            "%d location-filtered, %d relocation-filtered, "
-            "%d local-presence-out-of-area, "
+            "(%d requested, %d unclassified, %d location-filtered, "
+            "%d relocation-filtered, %d local-presence-out-of-area, "
             "%d local-presence-ambiguous, %d local-presence-no-policy); "
             "skipping skills_fit",
             email,
             len(row["dedup_hashes"]),
             unclassified,
-            travel_filtered,
             location_filtered,
             relocation_filtered,
             local_presence_out_of_area,
