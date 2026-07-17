@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   EMPTY_FILTERS,
+  REMOTE_OPTIONS,
   buildJobsParams,
   filtersFromParams,
   filtersToParams,
@@ -8,6 +9,17 @@ import {
 } from '../lib/filters'
 import { DEFAULT_SORT } from '../lib/sort'
 import type { Filters } from '../types'
+
+describe('REMOTE_OPTIONS', () => {
+  it('offers only the canonical 4-way remote axis in the UI', () => {
+    expect(REMOTE_OPTIONS).toEqual([
+      { value: 'remote', label: 'Remote' },
+      { value: 'hybrid', label: 'Hybrid' },
+      { value: 'onsite', label: 'Onsite' },
+      { value: 'unclear', label: 'Unclear' },
+    ])
+  })
+})
 
 describe('filtersFromParams', () => {
   it('returns EMPTY_FILTERS for empty params', () => {

@@ -1268,7 +1268,7 @@ export interface operations {
                 seed?: number;
                 min_score?: number | null;
                 max_score?: number | null;
-                remote_classification?: ("fully_remote" | "remote_with_quarterly_travel" | "remote_with_monthly_travel" | "remote_with_frequent_travel" | "hybrid" | "onsite_disguised" | "location_restricted" | "unclear")[] | null;
+                remote_classification?: ("remote" | "fully_remote" | "remote_with_quarterly_travel" | "remote_with_monthly_travel" | "remote_with_frequent_travel" | "hybrid" | "onsite" | "onsite_disguised" | "location_restricted" | "unclear")[] | null;
                 min_posted_at?: string | null;
                 max_posted_at?: string | null;
                 min_salary_usd?: number | null;
