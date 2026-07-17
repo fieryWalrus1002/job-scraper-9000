@@ -20,8 +20,8 @@ from agents.remote_filter.utils import (
 
 def _make_analysis(**overrides) -> RemoteAnalysis:
     defaults = dict(
-        reasoning_trace="Explicitly states fully remote.",
-        remote_classification="fully_remote",
+        reasoning_trace="Explicitly states remote.",
+        remote_classification="remote",
         estimated_travel_days_per_year=None,
         location_restrictions=[],
         requires_relocation=False,
@@ -42,7 +42,7 @@ def _make_config(
     return {
         "policy_thresholds": {
             "disallowed_classifications": disallowed_classifications
-            or ["hybrid", "onsite_disguised"],
+            or ["hybrid", "onsite"],
             "travel": {
                 "max_estimated_days_per_year": max_days,
             },
@@ -74,7 +74,7 @@ def _write_jsonl(path: Path, records: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_fully_remote_passes():
+def test_remote_passes():
     ok, reason = passes_remote_filter(_make_analysis(), _make_config())
     assert ok
     assert reason == "passed"
@@ -88,12 +88,12 @@ def test_hybrid_fails():
     assert "hybrid" in reason
 
 
-def test_onsite_disguised_fails():
+def test_onsite_fails():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="onsite_disguised"), _make_config()
+        _make_analysis(remote_classification="onsite"), _make_config()
     )
     assert not ok
-    assert "onsite_disguised" in reason
+    assert "onsite" in reason
 
 
 def test_requires_relocation_fails():
@@ -112,13 +112,13 @@ def test_requires_local_presence_fails():
     assert reason == "requires_local_presence"
 
 
-# Travel is gated solely on the numeric estimate as of SCHEMA_VERSION 3.0.0.
-# A frequent-travel posting is now a fully_remote role with a high day count,
+# Travel is gated solely on the numeric estimate as of SCHEMA_VERSION 4.0.0.
+# A frequent-travel posting is now a remote role with a high day count,
 # trashed by the day threshold rather than a classification bucket.
 def test_frequent_travel_fails_via_day_threshold():
     ok, reason = passes_remote_filter(
         _make_analysis(
-            remote_classification="fully_remote",
+            remote_classification="remote",
             estimated_travel_days_per_year=40,
         ),
         _make_config(),
@@ -130,7 +130,7 @@ def test_frequent_travel_fails_via_day_threshold():
 def test_monthly_travel_passes_under_threshold():
     ok, _ = passes_remote_filter(
         _make_analysis(
-            remote_classification="fully_remote",
+            remote_classification="remote",
             estimated_travel_days_per_year=12,
         ),
         _make_config(),
@@ -141,7 +141,7 @@ def test_monthly_travel_passes_under_threshold():
 def test_quarterly_travel_passes():
     ok, _ = passes_remote_filter(
         _make_analysis(
-            remote_classification="fully_remote",
+            remote_classification="remote",
             estimated_travel_days_per_year=4,
         ),
         _make_config(),
@@ -185,10 +185,10 @@ def test_us_only_fails_for_non_us():
     assert reason == "location_restrictions_mismatch"
 
 
-def test_location_restricted_passes_for_matching_user_location():
+def test_remote_with_location_restriction_passes_for_matching_user_location():
     ok, _ = passes_remote_filter(
         _make_analysis(
-            remote_classification="location_restricted",
+            remote_classification="remote",
             location_restrictions=["US-only"],
         ),
         _make_config(),
@@ -197,10 +197,10 @@ def test_location_restricted_passes_for_matching_user_location():
     assert ok
 
 
-def test_location_restricted_fails_for_non_matching_user_location():
+def test_remote_with_location_restriction_fails_for_non_matching_user_location():
     ok, reason = passes_remote_filter(
         _make_analysis(
-            remote_classification="location_restricted",
+            remote_classification="remote",
             location_restrictions=["US-only"],
         ),
         _make_config(),
@@ -246,7 +246,7 @@ def test_no_timezone_requirement_passes():
 
 def test_relocation_check_takes_priority_over_classification():
     ok, reason = passes_remote_filter(
-        _make_analysis(remote_classification="fully_remote", requires_relocation=True),
+        _make_analysis(remote_classification="remote", requires_relocation=True),
         _make_config(),
     )
     assert not ok
@@ -281,7 +281,7 @@ def test_analyze_remote_returns_analysis_on_success():
         result = analyze_remote("We are a fully remote company.")
 
     assert result is not None
-    assert result.remote_classification == "fully_remote"
+    assert result.remote_classification == "remote"
 
 
 def test_analyze_remote_returns_none_after_all_retries_fail():

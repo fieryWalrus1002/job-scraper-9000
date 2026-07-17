@@ -41,7 +41,7 @@ llm:
 policy_thresholds:
   disallowed_classifications:
     - hybrid
-    - onsite_disguised
+    - onsite
   travel:
     max_estimated_days_per_year: 15
   relocation:
@@ -130,7 +130,7 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
         ],
     )
 
-    analyses = [_analysis("fully_remote"), _analysis("hybrid")]
+    analyses = [_analysis("remote"), _analysis("hybrid")]
 
     with patch("agents.remote_filter.runner.analyze_remote", side_effect=analyses):
         with patch(
@@ -161,9 +161,7 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
     assert pass_records[0]["title"] == "Remote Engineer"
     assert pass_records[0]["_filter_result"] == "pass"
     assert pass_records[0]["_filter_reason"] == "passed"
-    assert (
-        pass_records[0]["_remote_analysis"]["remote_classification"] == "fully_remote"
-    )
+    assert pass_records[0]["_remote_analysis"]["remote_classification"] == "remote"
     assert pass_records[0]["_filter_metadata"] == {
         **FILTER_METADATA,
         "from_cache": False,
@@ -267,7 +265,7 @@ llm:
 policy_thresholds:
   disallowed_classifications:
     - hybrid
-    - onsite_disguised
+    - onsite
   travel:
     max_estimated_days_per_year: 15
   relocation:
@@ -309,7 +307,7 @@ policy_thresholds:
         time.sleep(0.05)  # Simulate network latency.
         with lock:
             concurrent_count -= 1
-        return _analysis("fully_remote")
+        return _analysis("remote")
 
     with patch("agents.remote_filter.runner.analyze_remote", side_effect=slow_analyze):
         with patch(

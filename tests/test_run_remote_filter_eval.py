@@ -17,8 +17,7 @@ def _config() -> dict:
         "policy_thresholds": {
             "disallowed_classifications": [
                 "hybrid",
-                "onsite_disguised",
-                "location_restricted",
+                "onsite",
             ],
             "travel": {
                 "max_estimated_days_per_year": 15,
@@ -47,7 +46,7 @@ def test_parallel_eval_preserves_input_order_and_counts(monkeypatch):
             "company": "B",
             "description": "desc",
             "_human_verdict": "pass",
-            "_human_policy": "fully_remote",
+            "_human_policy": "remote",
             "dedup_hash": "bbbb2222",
         },
         {
@@ -65,7 +64,7 @@ def test_parallel_eval_preserves_input_order_and_counts(monkeypatch):
         time.sleep(delays[title])
         if title == "fast-fn":
             return _analysis("hybrid")
-        return _analysis("fully_remote")
+        return _analysis("remote")
 
     monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
 
@@ -86,7 +85,7 @@ def test_run_eval_counts_skipped_records_without_inference(monkeypatch):
     def fake_analyze_remote(*args, **kwargs):
         nonlocal calls
         calls += 1
-        return _analysis("fully_remote")
+        return _analysis("remote")
 
     monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
 
