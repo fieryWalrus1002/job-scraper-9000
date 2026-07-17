@@ -30,7 +30,7 @@ llm:
 policy_thresholds:
   disallowed_classifications:
     - hybrid
-    - onsite_disguised
+    - onsite
   travel:
     max_estimated_days_per_year: 15
   relocation:
@@ -66,7 +66,7 @@ def _job(**overrides) -> dict:
     return {**base, **overrides}
 
 
-def _analysis(classification: str = "fully_remote", **overrides) -> RemoteAnalysis:
+def _analysis(classification: str = "remote", **overrides) -> RemoteAnalysis:
     data = {
         "reasoning_trace": "ok",
         "remote_classification": classification,
@@ -143,10 +143,10 @@ def test_build_request_uses_structured_remote_analysis_schema():
 
 
 def test_parse_analysis_happy_path():
-    item = json.loads(_result_line("job-0", "fully_remote"))
+    item = json.loads(_result_line("job-0", "remote"))
     analysis = batch.parse_analysis(item)
     assert analysis is not None
-    assert analysis.remote_classification == "fully_remote"
+    assert analysis.remote_classification == "remote"
 
 
 def test_parse_analysis_returns_none_on_error_or_bad_status():
@@ -198,10 +198,7 @@ def test_run_batch_splits_pass_and_trash(tmp_path, monkeypatch):
     )
 
     content = (
-        _result_line("job-0", "fully_remote")
-        + "\n"
-        + _result_line("job-1", "hybrid")
-        + "\n"
+        _result_line("job-0", "remote") + "\n" + _result_line("job-1", "hybrid") + "\n"
     )
 
     with (
@@ -258,7 +255,7 @@ def test_run_batch_serves_cache_hits_without_submitting(tmp_path, monkeypatch):
         provider="openai",
         model="gpt-4o-mini",
         context_fp=primed_fp,
-        analysis=_analysis("fully_remote"),
+        analysis=_analysis("remote"),
     )
 
     with (

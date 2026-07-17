@@ -11,8 +11,7 @@ def _config() -> dict:
         "policy_thresholds": {
             "disallowed_classifications": [
                 "hybrid",
-                "onsite_disguised",
-                "location_restricted",
+                "onsite",
             ],
             "travel": {
                 "max_estimated_days_per_year": 15,
@@ -80,7 +79,7 @@ def test_evaluate_batch_results_preserves_order_and_counts():
             "title": "fn",
             "company": "B",
             "_human_verdict": "pass",
-            "_human_policy": "fully_remote",
+            "_human_policy": "remote",
             "dedup_hash": "bbbb2222",
         },
         {
@@ -92,8 +91,8 @@ def test_evaluate_batch_results_preserves_order_and_counts():
         },
     ]
     results = {
-        "job-2": _batch_item("job-2", _analysis_json("fully_remote")),
-        "job-0": _batch_item("job-0", _analysis_json("fully_remote")),
+        "job-2": _batch_item("job-2", _analysis_json("remote")),
+        "job-0": _batch_item("job-0", _analysis_json("remote")),
         "job-1": _batch_item("job-1", _analysis_json("hybrid")),
     }
 

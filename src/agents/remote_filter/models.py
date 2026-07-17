@@ -19,16 +19,15 @@ from pydantic import BaseModel, Field
 #   - Refactoring how the Literal or constants are expressed in code
 #   - Changes to LEGACY_CLASSIFICATIONS (UI-only, never produced by the LLM)
 #   - Prompt edits (prompt identity is tracked separately via prompt_hash)
-SCHEMA_VERSION = "3.0.0"
+SCHEMA_VERSION = "4.0.0"
 
-# Remote-ness axis only. Travel frequency is no longer a classification bucket;
-# it survives entirely as the numeric estimated_travel_days_per_year, which
-# policy code thresholds. See specs/remote_filter_simplification.md.
+# Remote-ness axis only. The LLM is a pure extractor: travel, geography,
+# relocation, and local-presence details live in dedicated fields instead of
+# classification buckets. See specs/remote_filter_taxonomy.md.
 RemoteClassification = Literal[
-    "fully_remote",
+    "remote",
     "hybrid",
-    "onsite_disguised",
-    "location_restricted",
+    "onsite",
     "unclear",
 ]
 
@@ -37,11 +36,13 @@ REMOTE_CLASSIFICATIONS: list[str] = list(get_args(RemoteClassification))
 # Values the LLM no longer produces but that still appear in historical eval
 # records and DB rows; kept so those parse and render.
 LEGACY_CLASSIFICATIONS: list[str] = [
+    "fully_remote",  # pre-taxonomy: renamed to "remote"
+    "onsite_disguised",  # pre-taxonomy: collapsed into "onsite"
+    "location_restricted",  # pre-taxonomy: folded into "remote" + location_restrictions
     "remote_with_quarterly_travel",  # pre-3.0: travel collapsed into numeric days
     "remote_with_monthly_travel",  # pre-3.0
     "remote_with_frequent_travel",  # pre-3.0
     "remote_with_occasional_travel",  # pre-2.0 teacher runs
-    "onsite",  # pre-2.0 teacher runs
 ]
 
 

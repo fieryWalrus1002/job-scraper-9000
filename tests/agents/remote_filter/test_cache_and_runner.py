@@ -72,7 +72,7 @@ def _job(**overrides) -> dict:
     return {**base, **overrides}
 
 
-def _analysis(classification: str = "fully_remote", **overrides) -> RemoteAnalysis:
+def _analysis(classification: str = "remote", **overrides) -> RemoteAnalysis:
     data = {
         "reasoning_trace": "ok",
         "remote_classification": classification,
@@ -96,18 +96,18 @@ def test_analysis_cache_miss_then_hit_via_jsonl_roundtrip(tmp_path):
     cache = AnalysisCache(cache_path)
     assert cache.get(**_BASE_KEY) is None
 
-    cache.put(**_BASE_KEY, analysis=_analysis("fully_remote"))
+    cache.put(**_BASE_KEY, analysis=_analysis("remote"))
 
     reopened = AnalysisCache(cache_path)
     hit = reopened.get(**_BASE_KEY)
     assert hit is not None
-    assert hit.remote_classification == "fully_remote"
+    assert hit.remote_classification == "remote"
 
 
 def test_analysis_cache_changes_key_when_any_part_changes(tmp_path):
     cache_path = tmp_path / "cache.jsonl"
     cache = AnalysisCache(cache_path)
-    cache.put(**_BASE_KEY, analysis=_analysis("fully_remote"))
+    cache.put(**_BASE_KEY, analysis=_analysis("remote"))
 
     assert cache.get(**{**_BASE_KEY, "prompt_hash": "p2"}) is None
     assert cache.get(**{**_BASE_KEY, "model": "gpt-4o"}) is None
@@ -139,7 +139,7 @@ def test_run_remote_filter_collapses_within_batch_duplicates(tmp_path):
 
     with patch(
         "agents.remote_filter.runner.analyze_remote",
-        side_effect=[_analysis("fully_remote"), _analysis("fully_remote")],
+        side_effect=[_analysis("remote"), _analysis("remote")],
     ) as mock_analyze:
         with patch(
             "agents.remote_filter.runner.build_filter_metadata",
@@ -189,12 +189,12 @@ def test_run_remote_filter_serves_across_batch_cache_hits(tmp_path):
         provider="openai",
         model="gpt-4o-mini",
         context_fp=primed_fp,
-        analysis=_analysis("fully_remote"),
+        analysis=_analysis("remote"),
     )
 
     with patch(
         "agents.remote_filter.runner.analyze_remote",
-        side_effect=[_analysis("fully_remote")],
+        side_effect=[_analysis("remote")],
     ) as mock_analyze:
         with patch(
             "agents.remote_filter.runner.build_filter_metadata",
@@ -230,7 +230,7 @@ def test_run_remote_filter_writes_miss_results_to_cache(tmp_path):
 
     with patch(
         "agents.remote_filter.runner.analyze_remote",
-        return_value=_analysis("fully_remote"),
+        return_value=_analysis("remote"),
     ):
         with patch(
             "agents.remote_filter.runner.build_filter_metadata",
@@ -270,7 +270,7 @@ def test_run_remote_filter_no_cache_disables_lookup_and_write(tmp_path):
 
     with patch(
         "agents.remote_filter.runner.analyze_remote",
-        return_value=_analysis("fully_remote"),
+        return_value=_analysis("remote"),
     ) as mock_analyze:
         with patch(
             "agents.remote_filter.runner.build_filter_metadata",
@@ -306,7 +306,7 @@ def test_run_remote_filter_user_timezone_change_misses_cache(tmp_path):
 
     with patch(
         "agents.remote_filter.runner.analyze_remote",
-        return_value=_analysis("fully_remote"),
+        return_value=_analysis("remote"),
     ) as mock_analyze:
         with patch(
             "agents.remote_filter.runner.build_filter_metadata",
@@ -387,7 +387,7 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
         provider="openai",
         model="gpt-4o-mini",
         context_fp=primed_fp,
-        analysis=_analysis("fully_remote"),
+        analysis=_analysis("remote"),
     )
 
     # Force the runner to resolve provider=ollama via env override; same model
@@ -397,7 +397,7 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
 
     with patch(
         "agents.remote_filter.runner.analyze_remote",
-        return_value=_analysis("fully_remote"),
+        return_value=_analysis("remote"),
     ) as mock_analyze:
         with patch(
             "agents.remote_filter.runner.build_filter_metadata",
