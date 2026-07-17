@@ -89,6 +89,218 @@ class _GatedUser(NamedTuple):
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
+US_STATES = {
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+    "DC",
+}
+US_STATE_NAMES = {
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "district of columbia": "DC",
+    "washington dc": "DC",
+    "washington d.c.": "DC",
+}
+_US_COUNTRY_RE = re.compile(
+    r"\b(?:u\.?s\.?a?|united states|us[-\s]?only|us[-\s]?based|"
+    r"continental united states|america)\b",
+    re.IGNORECASE,
+)
+_STATE_COMMA_RE = re.compile(r",\s*([A-Z]{2})\b", re.IGNORECASE)
+_STATE_CONTEXT_RE = re.compile(
+    r"\b(?:in|within|from|reside\s+in|residing\s+in|based\s+in|located\s+in)"
+    r"\s+([A-Z]{2})\b",
+    re.IGNORECASE,
+)
+_FOREIGN_COUNTRIES = {
+    "united kingdom": "UK",
+    "uk": "UK",
+    "canada": "CANADA",
+    "ireland": "IRELAND",
+    "australia": "AUSTRALIA",
+    "new zealand": "NEW ZEALAND",
+    "germany": "GERMANY",
+    "france": "FRANCE",
+    "spain": "SPAIN",
+    "netherlands": "NETHERLANDS",
+    "poland": "POLAND",
+    "india": "INDIA",
+    "mexico": "MEXICO",
+    "brazil": "BRAZIL",
+    "singapore": "SINGAPORE",
+    "japan": "JAPAN",
+}
+
+
+def _normalize_country(country: str) -> str:
+    token = re.sub(r"[^a-z0-9]+", " ", country.casefold()).strip()
+    if token in {"us", "u s", "usa", "u s a", "united states", "america"}:
+        return "US"
+    return _FOREIGN_COUNTRIES.get(token, country.upper())
+
+
+def _resolve_restriction(entry: str) -> tuple[str, str | None] | None:
+    """Resolve a location restriction string to ``(country, state)``.
+
+    ``None`` means wildcard/unparseable, which the user gate treats as
+    fail-open per the remote-filter taxonomy.
+    """
+    text = entry.strip()
+    if not text:
+        return None
+    folded = text.casefold()
+
+    state_match = _STATE_COMMA_RE.search(text)
+    if state_match and state_match.group(1).upper() in US_STATES:
+        return ("US", state_match.group(1).upper())
+
+    direct_state = text.upper()
+    if direct_state in US_STATES:
+        return ("US", direct_state)
+
+    # Longest name first so multi-word names win over a prefix that is itself a
+    # state name (e.g. "washington dc"/"district of columbia" must beat
+    # "washington" → DC, not WA).
+    for name, abbrev in sorted(US_STATE_NAMES.items(), key=lambda kv: -len(kv[0])):
+        if re.search(rf"\b{re.escape(name)}\b", folded):
+            return ("US", abbrev)
+
+    state_match = _STATE_CONTEXT_RE.search(text)
+    if state_match and state_match.group(1).upper() in US_STATES:
+        return ("US", state_match.group(1).upper())
+
+    if _US_COUNTRY_RE.search(text):
+        return ("US", None)
+
+    for name, normalized in _FOREIGN_COUNTRIES.items():
+        if re.search(rf"\b{re.escape(name)}\b", folded):
+            return (normalized, None)
+
+    return None
+
+
+def _passes_location_restrictions(
+    restrictions: list[str], acceptable_locations: list[Location], willing: bool
+) -> bool:
+    """True when any employer location restriction is satisfiable by the user."""
+    if not restrictions:
+        return True
+    if not acceptable_locations:
+        return True
+
+    user_countries = {_normalize_country(loc.country) for loc in acceptable_locations}
+    for entry in restrictions:
+        resolved = _resolve_restriction(entry)
+        if resolved is None:
+            return True
+        country, state = resolved
+        if willing:
+            if country in user_countries:
+                return True
+        else:
+            for loc in acceptable_locations:
+                if _normalize_country(loc.country) == country and (
+                    state is None or loc.region.upper() == state
+                ):
+                    return True
+    return False
+
 
 def _location_matches(job_location: str | None, acceptable: list[Location]) -> bool:
     """True if the scraped posting location matches any acceptable location
@@ -340,6 +552,7 @@ def _gate_user(
     survivors: list[dict[str, Any]] = []
     unclassified = 0
     travel_filtered = 0
+    location_filtered = 0
     relocation_filtered = 0
     local_presence_out_of_area = 0
     local_presence_ambiguous = 0
@@ -351,6 +564,23 @@ def _gate_user(
             continue
         if _classification_of(rec) not in acceptable:
             continue
+        analysis = rec.get("_remote_analysis") or {}
+        loc_restrictions = analysis.get("location_restrictions") or []
+        if not _passes_location_restrictions(
+            loc_restrictions,
+            relocation_policy.acceptable_locations,
+            relocation_policy.allow_required_relocation,
+        ):
+            location_filtered += 1
+            # Per-drop detail (this gate runs first, so the aggregate count
+            # alone can't say which restriction dropped a posting — log it).
+            log.debug(
+                "%s — dropped %s: location restrictions %s not satisfiable",
+                email,
+                dedup_hash,
+                loc_restrictions,
+            )
+            continue
         # Per-user travel gate (spec remote_filter_simplification.md §7). None
         # = no gate; a posting with no numeric estimate is never dropped here
         # (the classification gate above already decided remote-ness).
@@ -358,7 +588,6 @@ def _gate_user(
         if max_travel_days is not None and days is not None and days > max_travel_days:
             travel_filtered += 1
             continue
-        analysis = rec.get("_remote_analysis") or {}
         # requires_relocation stays a clean veto.
         if not relocation_policy.allow_required_relocation and analysis.get(
             "requires_relocation"
@@ -400,6 +629,12 @@ def _gate_user(
             travel_filtered,
             max_travel_days,
         )
+    if location_filtered:
+        log.info(
+            "%s — %d posting(s) dropped: location restrictions not satisfiable",
+            email,
+            location_filtered,
+        )
     if relocation_filtered:
         log.info(
             "%s — %d posting(s) dropped: relocation not allowed",
@@ -431,13 +666,15 @@ def _gate_user(
         log.info(
             "%s — no postings survived remote policy "
             "(%d requested, %d unclassified, %d travel-filtered, "
-            "%d relocation-filtered, %d local-presence-out-of-area, "
+            "%d location-filtered, %d relocation-filtered, "
+            "%d local-presence-out-of-area, "
             "%d local-presence-ambiguous, %d local-presence-no-policy); "
             "skipping skills_fit",
             email,
             len(row["dedup_hashes"]),
             unclassified,
             travel_filtered,
+            location_filtered,
             relocation_filtered,
             local_presence_out_of_area,
             local_presence_ambiguous,

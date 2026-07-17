@@ -80,16 +80,23 @@ def _materialize_profile(runs_dir: Path, email: str) -> None:
 
 
 def _classified(
-    dedup_hash: str, classification: str, *, travel_days: int | None = None
+    dedup_hash: str,
+    classification: str,
+    *,
+    travel_days: int | None = None,
+    location_restrictions: list[str] | None = None,
 ) -> dict:
+    analysis = {
+        "remote_classification": classification,
+        "estimated_travel_days_per_year": travel_days,
+    }
+    if location_restrictions is not None:
+        analysis["location_restrictions"] = location_restrictions
     return {
         "dedup_hash": dedup_hash,
         "title": "Eng",
         "description": "d",
-        "_remote_analysis": {
-            "remote_classification": classification,
-            "estimated_travel_days_per_year": travel_days,
-        },
+        "_remote_analysis": analysis,
     }
 
 
@@ -116,6 +123,7 @@ def _classified_with_relocation(
     requires_relocation: bool = False,
     requires_local_presence: bool = False,
     location: str | None = None,
+    location_restrictions: list[str] | None = None,
 ) -> dict:
     rec = {
         "dedup_hash": dedup_hash,
@@ -128,6 +136,8 @@ def _classified_with_relocation(
             "requires_local_presence": requires_local_presence,
         },
     }
+    if location_restrictions is not None:
+        rec["_remote_analysis"]["location_restrictions"] = location_restrictions
     if location is not None:
         rec["location"] = location
     return rec
@@ -1047,6 +1057,118 @@ def test_scored_records_round_trip_through_ingest(migrated_pg, tmp_path):
         ("alice@example.com", "h-shared"),
         ("bob@example.com", "h-shared"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Location restriction gate tests
+# ---------------------------------------------------------------------------
+
+
+@skip_if_no_docker
+def test_location_restrictions_willing_us_user_keeps_us_and_drops_foreign(
+    migrated_pg, tmp_path, caplog
+):
+    """willing=True uses country-level matching but foreign-only still drops."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "location-willing@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["remote"],
+            allow_required_relocation=True,
+            allow_local_presence_required=True,
+            acceptable_locations=[{"city": "Phoenix", "region": "AZ", "country": "US"}],
+        )
+        _seed_consolidated(conn, dedup_hash="h-us", requested_by=[u1])
+        _seed_consolidated(conn, dedup_hash="h-ca", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "location-willing@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-us", "remote", location_restrictions=["US-only"]),
+            _classified("h-ca", "remote", location_restrictions=["Canada"]),
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+
+    assert summary["postings_scored"] == 1
+    assert calls[0]["hashes"] == ["h-us"]
+    assert "location restrictions not satisfiable" in caplog.text
+
+
+@skip_if_no_docker
+def test_location_restrictions_unwilling_user_drops_other_state(
+    migrated_pg, tmp_path, caplog
+):
+    """willing=False requires a state/region match for state restrictions."""
+    caplog.set_level(logging.INFO, logger="pipeline.scoring")
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "location-unwilling@example.com")
+        _set_full_policy(
+            conn,
+            u1,
+            ["remote"],
+            allow_required_relocation=False,
+            allow_local_presence_required=False,
+            acceptable_locations=[{"city": "Phoenix", "region": "AZ", "country": "US"}],
+        )
+        _seed_consolidated(conn, dedup_hash="h-california", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "location-unwilling@example.com")
+    _write_classified(
+        tmp_path,
+        passed=[
+            _classified("h-california", "remote", location_restrictions=["CA"]),
+        ],
+    )
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+
+    assert summary["users_scored"] == 0
+    assert summary["users_skipped_no_postings"] == 1
+    assert calls == []
+    assert "location restrictions not satisfiable" in caplog.text
+    assert "1 location-filtered" in caplog.text
+
+
+@skip_if_no_docker
+def test_unclear_classification_survives_default_policy(migrated_pg, tmp_path):
+    """Default remote policy includes ``unclear`` so ambiguity fails open."""
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        u1 = seed_user(conn, "unclear@example.com")  # policies = {}
+        _seed_consolidated(conn, dedup_hash="h-unclear", requested_by=[u1])
+
+    _materialize_profile(tmp_path, "unclear@example.com")
+    _write_classified(tmp_path, passed=[_classified("h-unclear", "unclear")])
+    calls: list[dict] = []
+    with psycopg.connect(migrated_pg, autocommit=True) as conn:
+        summary = score_run(
+            conn,
+            run_id=RUN_ID,
+            run_date=RUN_DATE,
+            runs_dir=tmp_path,
+            score_fn=_score_factory(calls),
+        )
+
+    assert summary["postings_scored"] == 1
+    assert calls[0]["hashes"] == ["h-unclear"]
 
 
 # ---------------------------------------------------------------------------
