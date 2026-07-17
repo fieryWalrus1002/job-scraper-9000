@@ -89,6 +89,215 @@ class _GatedUser(NamedTuple):
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
+US_STATES = {
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+    "DC",
+}
+US_STATE_NAMES = {
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "district of columbia": "DC",
+    "washington dc": "DC",
+    "washington d.c.": "DC",
+}
+_US_COUNTRY_RE = re.compile(
+    r"\b(?:u\.?s\.?a?|united states|us[-\s]?only|us[-\s]?based|"
+    r"continental united states|america)\b",
+    re.IGNORECASE,
+)
+_STATE_COMMA_RE = re.compile(r",\s*([A-Z]{2})\b", re.IGNORECASE)
+_STATE_CONTEXT_RE = re.compile(
+    r"\b(?:in|within|from|reside\s+in|residing\s+in|based\s+in|located\s+in)"
+    r"\s+([A-Z]{2})\b",
+    re.IGNORECASE,
+)
+_FOREIGN_COUNTRIES = {
+    "united kingdom": "UK",
+    "uk": "UK",
+    "canada": "CANADA",
+    "ireland": "IRELAND",
+    "australia": "AUSTRALIA",
+    "new zealand": "NEW ZEALAND",
+    "germany": "GERMANY",
+    "france": "FRANCE",
+    "spain": "SPAIN",
+    "netherlands": "NETHERLANDS",
+    "poland": "POLAND",
+    "india": "INDIA",
+    "mexico": "MEXICO",
+    "brazil": "BRAZIL",
+    "singapore": "SINGAPORE",
+    "japan": "JAPAN",
+}
+
+
+def _normalize_country(country: str) -> str:
+    token = re.sub(r"[^a-z0-9]+", " ", country.casefold()).strip()
+    if token in {"us", "u s", "usa", "u s a", "united states", "america"}:
+        return "US"
+    return _FOREIGN_COUNTRIES.get(token, country.upper())
+
+
+def _resolve_restriction(entry: str) -> tuple[str, str | None] | None:
+    """Resolve a location restriction string to ``(country, state)``.
+
+    ``None`` means wildcard/unparseable, which the user gate treats as
+    fail-open per the remote-filter taxonomy.
+    """
+    text = entry.strip()
+    if not text:
+        return None
+    folded = text.casefold()
+
+    state_match = _STATE_COMMA_RE.search(text)
+    if state_match and state_match.group(1).upper() in US_STATES:
+        return ("US", state_match.group(1).upper())
+
+    direct_state = text.upper()
+    if direct_state in US_STATES:
+        return ("US", direct_state)
+
+    for name, abbrev in US_STATE_NAMES.items():
+        if re.search(rf"\b{re.escape(name)}\b", folded):
+            return ("US", abbrev)
+
+    state_match = _STATE_CONTEXT_RE.search(text)
+    if state_match and state_match.group(1).upper() in US_STATES:
+        return ("US", state_match.group(1).upper())
+
+    if _US_COUNTRY_RE.search(text):
+        return ("US", None)
+
+    for name, normalized in _FOREIGN_COUNTRIES.items():
+        if re.search(rf"\b{re.escape(name)}\b", folded):
+            return (normalized, None)
+
+    return None
+
+
+def _passes_location_restrictions(
+    restrictions: list[str], acceptable_locations: list[Location], willing: bool
+) -> bool:
+    """True when any employer location restriction is satisfiable by the user."""
+    if not restrictions:
+        return True
+    if not acceptable_locations:
+        return True
+
+    user_countries = {_normalize_country(loc.country) for loc in acceptable_locations}
+    for entry in restrictions:
+        resolved = _resolve_restriction(entry)
+        if resolved is None:
+            return True
+        country, state = resolved
+        if willing:
+            if country in user_countries:
+                return True
+        else:
+            for loc in acceptable_locations:
+                if _normalize_country(loc.country) == country and (
+                    state is None or loc.region.upper() == state
+                ):
+                    return True
+    return False
+
 
 def _location_matches(job_location: str | None, acceptable: list[Location]) -> bool:
     """True if the scraped posting location matches any acceptable location
