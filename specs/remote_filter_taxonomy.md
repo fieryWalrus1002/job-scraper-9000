@@ -22,7 +22,7 @@ are then applied as a plain deterministic filter over those extracted fields.
 
 This is the same move `remote_filter_simplification.md` made for travel in
 SCHEMA_VERSION 3.0.0 (travel stopped being a *classification bucket* and became
-a *numeric field policy thresholds*), generalized to the whole taxonomy.
+a *numeric field with policy thresholds*), generalized to the whole taxonomy.
 
 ______________________________________________________________________
 
