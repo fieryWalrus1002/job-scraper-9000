@@ -254,7 +254,10 @@ def _resolve_restriction(entry: str) -> tuple[str, str | None] | None:
     if direct_state in US_STATES:
         return ("US", direct_state)
 
-    for name, abbrev in US_STATE_NAMES.items():
+    # Longest name first so multi-word names win over a prefix that is itself a
+    # state name (e.g. "washington dc"/"district of columbia" must beat
+    # "washington" → DC, not WA).
+    for name, abbrev in sorted(US_STATE_NAMES.items(), key=lambda kv: -len(kv[0])):
         if re.search(rf"\b{re.escape(name)}\b", folded):
             return ("US", abbrev)
 
@@ -569,6 +572,14 @@ def _gate_user(
             relocation_policy.allow_required_relocation,
         ):
             location_filtered += 1
+            # Per-drop detail (this gate runs first, so the aggregate count
+            # alone can't say which restriction dropped a posting — log it).
+            log.debug(
+                "%s — dropped %s: location restrictions %s not satisfiable",
+                email,
+                dedup_hash,
+                loc_restrictions,
+            )
             continue
         # Per-user travel gate (spec remote_filter_simplification.md §7). None
         # = no gate; a posting with no numeric estimate is never dropped here

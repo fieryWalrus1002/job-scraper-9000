@@ -60,6 +60,9 @@ def test_bool_estimate_raises():
         ("California", ("US", "CA")),
         ("must reside in CA", ("US", "CA")),
         ("Seattle, WA, USA", ("US", "WA")),
+        # "washington dc" must beat the "washington" prefix → DC, not WA.
+        ("Washington DC", ("US", "DC")),
+        ("District of Columbia", ("US", "DC")),
         ("Canada", ("CANADA", None)),
         ("UK", ("UK", None)),
         ("United Kingdom", ("UK", None)),
