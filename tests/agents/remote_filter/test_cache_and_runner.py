@@ -123,8 +123,7 @@ def test_analysis_cache_changes_key_when_any_part_changes(tmp_path):
 
 def test_run_remote_filter_collapses_within_batch_duplicates(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
@@ -147,8 +146,7 @@ def test_run_remote_filter_collapses_within_batch_duplicates(tmp_path):
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=cache_path,
             )
@@ -163,8 +161,7 @@ def test_run_remote_filter_collapses_within_batch_duplicates(tmp_path):
 
 def test_run_remote_filter_serves_across_batch_cache_hits(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
@@ -202,8 +199,7 @@ def test_run_remote_filter_serves_across_batch_cache_hits(tmp_path):
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=cache_path,
             )
@@ -212,17 +208,16 @@ def test_run_remote_filter_serves_across_batch_cache_hits(tmp_path):
     assert counts["cache_hits"] == 1
     assert counts["cache_misses"] == 1
 
-    pass_records = [json.loads(line) for line in pass_path.read_text().splitlines()]
-    assert len(pass_records) == 2
-    by_title = {r["title"]: r for r in pass_records}
+    records = [json.loads(line) for line in classified_path.read_text().splitlines()]
+    assert len(records) == 2
+    by_title = {r["title"]: r for r in records}
     assert by_title["A"]["_filter_metadata"]["from_cache"] is True
     assert by_title["B"]["_filter_metadata"]["from_cache"] is False
 
 
 def test_run_remote_filter_writes_miss_results_to_cache(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
@@ -238,8 +233,7 @@ def test_run_remote_filter_writes_miss_results_to_cache(tmp_path):
         ):
             run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=cache_path,
             )
@@ -262,8 +256,7 @@ def test_run_remote_filter_writes_miss_results_to_cache(tmp_path):
 
 def test_run_remote_filter_no_cache_disables_lookup_and_write(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     _write_config(config_path)
     _write_jsonl(input_path, [_job(source_job_id="1", dedup_hash="hashA")])
@@ -278,8 +271,7 @@ def test_run_remote_filter_no_cache_disables_lookup_and_write(tmp_path):
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=None,
             )
@@ -297,8 +289,7 @@ def test_run_remote_filter_no_cache_disables_lookup_and_write(tmp_path):
 
 def test_run_remote_filter_user_timezone_change_misses_cache(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
@@ -315,8 +306,7 @@ def test_run_remote_filter_user_timezone_change_misses_cache(tmp_path):
             # First run with PST primes the cache under one fingerprint.
             run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=cache_path,
                 user_timezone="PST",
@@ -325,8 +315,7 @@ def test_run_remote_filter_user_timezone_change_misses_cache(tmp_path):
             # because user_timezone is part of the prompt input.
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=cache_path,
                 user_timezone="EST",
@@ -339,8 +328,7 @@ def test_run_remote_filter_user_timezone_change_misses_cache(tmp_path):
 
 def test_run_remote_filter_counts_miss_even_when_llm_fails(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
@@ -355,8 +343,7 @@ def test_run_remote_filter_counts_miss_even_when_llm_fails(tmp_path):
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=cache_path,
             )
@@ -371,8 +358,7 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
     from agents.remote_filter.utils import context_fingerprint
 
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
@@ -421,8 +407,7 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
             )
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=bare_config,
                 cache_path=cache_path,
             )

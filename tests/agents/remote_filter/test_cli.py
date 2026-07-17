@@ -554,10 +554,8 @@ def test_remote_filter_defaults():
             args = _cli_parse_args()
     assert args.input is None
     assert args.run_date is None
-    assert args.pass_output is None
-    assert args.trash_output is None
+    assert args.classified_output is None
     assert args.config == "config/agent/remote_agent.yml"
-    assert args.user_location == "USA"
     assert args.user_timezone is None
 
 
@@ -565,22 +563,16 @@ def test_remote_filter_custom_paths():
     args = _cli_parse_args(
         "--input",
         "raw.jsonl",
-        "--pass-output",
-        "pass.jsonl",
-        "--trash-output",
-        "trash.jsonl",
+        "--classified-output",
+        "classified.jsonl",
         "--config",
         "remote.yml",
-        "--user-location",
-        "Canada",
         "--user-timezone",
         "PST",
     )
     assert args.input == "raw.jsonl"
-    assert args.pass_output == "pass.jsonl"
-    assert args.trash_output == "trash.jsonl"
+    assert args.classified_output == "classified.jsonl"
     assert args.config == "remote.yml"
-    assert args.user_location == "Canada"
     assert args.user_timezone == "PST"
 
 
@@ -595,10 +587,8 @@ def test_remote_filter_cmd_calls_runner():
 
     args = _cli_fake_args(
         input="raw.jsonl",
-        pass_output="pass.jsonl",
-        trash_output="trash.jsonl",
+        classified_output="classified.jsonl",
         config="remote.yml",
-        user_location="USA",
         user_timezone="PST",
         cache_path=None,
         no_cache=False,
@@ -610,10 +600,8 @@ def test_remote_filter_cmd_calls_runner():
 
     mock_run.assert_called_once_with(
         input_path="raw.jsonl",
-        pass_path="pass.jsonl",
-        trash_path="trash.jsonl",
+        classified_path="classified.jsonl",
         config_path="remote.yml",
-        user_location="USA",
         user_timezone="PST",
         cache_path=DEFAULT_CACHE_PATH,
     )
@@ -625,10 +613,8 @@ def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
 
     args = _cli_fake_args(
         input=None,
-        pass_output=None,
-        trash_output=None,
+        classified_output=None,
         config="remote.yml",
-        user_location="USA",
         user_timezone=None,
         run_date=None,
         cache_path=None,
@@ -639,10 +625,8 @@ def test_remote_filter_cmd_no_run_date_uses_legacy_defaults():
 
     mock_run.assert_called_once_with(
         input_path="data/prefiltered/remote_filter_input.jsonl",
-        pass_path="data/filtered/remote_filter_pass.jsonl",
-        trash_path="data/trash/remote_filter_trash.jsonl",
+        classified_path="data/filtered/remote_filter_classified.jsonl",
         config_path="remote.yml",
-        user_location="USA",
         user_timezone=None,
         cache_path=DEFAULT_CACHE_PATH,
     )
@@ -654,10 +638,8 @@ def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
 
     args = _cli_fake_args(
         input=None,
-        pass_output=None,
-        trash_output=None,
+        classified_output=None,
         config="remote.yml",
-        user_location="USA",
         user_timezone=None,
         run_date="2026-05-16",
         cache_path=None,
@@ -668,10 +650,8 @@ def test_remote_filter_cmd_run_date_resolves_partitioned_paths():
 
     mock_run.assert_called_once_with(
         input_path="data/prefiltered/2026-05-16",
-        pass_path="data/filtered/2026-05-16/remote_filter_pass.jsonl",
-        trash_path="data/trash/2026-05-16/remote_filter_trash.jsonl",
+        classified_path="data/filtered/2026-05-16/remote_filter_classified.jsonl",
         config_path="remote.yml",
-        user_location="USA",
         user_timezone=None,
         cache_path=DEFAULT_CACHE_PATH,
     )
@@ -682,10 +662,8 @@ def test_remote_filter_cmd_no_cache_flag_disables_cache():
 
     args = _cli_fake_args(
         input="raw.jsonl",
-        pass_output="pass.jsonl",
-        trash_output="trash.jsonl",
+        classified_output="classified.jsonl",
         config="remote.yml",
-        user_location="USA",
         user_timezone=None,
         run_date=None,
         cache_path=None,
@@ -703,10 +681,8 @@ def test_remote_filter_cmd_explicit_paths_override_run_date():
 
     args = _cli_fake_args(
         input="custom/in.jsonl",
-        pass_output="custom/pass.jsonl",
-        trash_output="custom/trash.jsonl",
+        classified_output="custom/classified.jsonl",
         config="remote.yml",
-        user_location="USA",
         user_timezone=None,
         run_date="2026-05-16",
         cache_path=None,
@@ -717,10 +693,8 @@ def test_remote_filter_cmd_explicit_paths_override_run_date():
 
     mock_run.assert_called_once_with(
         input_path="custom/in.jsonl",
-        pass_path="custom/pass.jsonl",
-        trash_path="custom/trash.jsonl",
+        classified_path="custom/classified.jsonl",
         config_path="remote.yml",
-        user_location="USA",
         user_timezone=None,
         cache_path=DEFAULT_CACHE_PATH,
     )
@@ -732,10 +706,8 @@ def test_remote_filter_cmd_batch_flag_routes_to_batch_runner():
 
     args = _cli_fake_args(
         input="raw.jsonl",
-        pass_output="pass.jsonl",
-        trash_output="trash.jsonl",
+        classified_output="classified.jsonl",
         config="remote.yml",
-        user_location="USA",
         user_timezone=None,
         run_date=None,
         cache_path=None,
@@ -753,10 +725,8 @@ def test_remote_filter_cmd_batch_flag_routes_to_batch_runner():
     mock_serial.assert_not_called()
     mock_batch.assert_called_once_with(
         input_path="raw.jsonl",
-        pass_path="pass.jsonl",
-        trash_path="trash.jsonl",
+        classified_path="classified.jsonl",
         config_path="remote.yml",
-        user_location="USA",
         user_timezone=None,
         cache_path=DEFAULT_CACHE_PATH,
         poll_interval=30,
