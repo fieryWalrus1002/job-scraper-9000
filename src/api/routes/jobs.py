@@ -69,21 +69,22 @@ async def list_jobs(
     seed: Annotated[int, Query(ge=0, le=2147483647)] = 0,
     min_score: Annotated[int | None, Query(ge=1, le=5)] = None,
     max_score: Annotated[int | None, Query(ge=1, le=5)] = None,
-    # Superset filter: the remote_with_*_travel values are legacy as of
-    # remote_filter SCHEMA_VERSION 3.0.0 (no longer produced), kept here so
-    # callers can still filter historical rows that carry them. See
-    # specs/remote_filter_simplification.md §5.
+    # Superset filter: canonical 4-way taxonomy values plus legacy labels kept
+    # so callers can still filter historical rows that carry them. See
+    # specs/remote_filter_taxonomy.md.
     remote_classification: Annotated[
         list[
             Literal[
-                "fully_remote",
+                "remote",
+                "onsite",
+                "hybrid",
+                "unclear",
+                "fully_remote",  # legacy
+                "onsite_disguised",  # legacy
+                "location_restricted",  # legacy
                 "remote_with_quarterly_travel",  # legacy (pre-3.0)
                 "remote_with_monthly_travel",  # legacy
                 "remote_with_frequent_travel",  # legacy
-                "hybrid",
-                "onsite_disguised",
-                "location_restricted",
-                "unclear",
             ]
         ]
         | None,
