@@ -20,7 +20,7 @@ from agents.remote_filter.utils import (
 
 def _make_analysis(**overrides) -> RemoteAnalysis:
     defaults = dict(
-        reasoning_trace="Explicitly states fully remote.",
+        reasoning_trace="Explicitly states remote.",
         remote_classification="remote",
         estimated_travel_days_per_year=None,
         location_restrictions=[],
