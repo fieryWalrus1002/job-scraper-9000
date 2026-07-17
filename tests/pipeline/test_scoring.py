@@ -688,7 +688,7 @@ def test_two_phase_batch_summary_shape_matches_serial_path(
 @skip_if_no_docker
 def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
     """A posting classified ``remote`` reaches a user who accepts only
-    that; a ``remote_with_frequent_travel`` posting is gated out for them."""
+    that; ``remote_with_frequent_travel`` is gated by classification policy."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "strict@example.com")
         _set_policy(conn, u1, ["remote"])
@@ -717,9 +717,9 @@ def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
 
 
 @skip_if_no_docker
-def test_gates_postings_by_each_users_max_travel_days(migrated_pg, tmp_path):
-    """A remote posting whose estimated travel exceeds the user's
-    max_travel_days is dropped before skills_fit; one at/under it survives."""
+def test_travel_estimate_no_longer_gates(migrated_pg, tmp_path):
+    """max_travel_days is accepted but ignored; high-travel remote postings
+    still reach skills_fit because travel is display-only."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "lowtravel@example.com")
         _set_policy(conn, u1, ["remote"], max_travel_days=15)
@@ -733,7 +733,7 @@ def test_gates_postings_by_each_users_max_travel_days(migrated_pg, tmp_path):
         passed=[
             _classified("h-near", "remote", travel_days=15),
             _classified("h-far", "remote", travel_days=40),
-            # No numeric estimate → not dropped by the travel gate.
+            # No numeric estimate is also display-only.
             _classified("h-unknown", "remote", travel_days=None),
         ],
     )
@@ -748,8 +748,8 @@ def test_gates_postings_by_each_users_max_travel_days(migrated_pg, tmp_path):
             score_fn=_score_factory(score_calls),
         )
 
-    assert summary["postings_scored"] == 2
-    assert score_calls[0]["hashes"] == ["h-near", "h-unknown"]
+    assert summary["postings_scored"] == 3
+    assert score_calls[0]["hashes"] == ["h-near", "h-far", "h-unknown"]
 
 
 @skip_if_no_docker

@@ -209,8 +209,8 @@ def derive_policies(search: SearchConfigInput) -> UserPolicies:
     specs/remote_filter_taxonomy.md; ``unclear`` is always acceptable — silently
     dropping unclassifiable postings would be a silent filter, and permissive is
     the default posture. Title exclusions merge roles.excluded_titles with
-    keywords.excluded. ``max_travel_days`` carries the user's travel ceiling
-    straight through (None = no per-user travel gate).
+    keywords.excluded. ``max_travel_days`` is derived straight through for
+    back-compat, but travel is display-only and no longer gates.
     """
     classes: set[str] = set()
     wa = search.work_constraints.work_arrangements
