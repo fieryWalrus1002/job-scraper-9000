@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { SnackbarProvider } from '../components/ui/snackbar'
 import { JobDetailPanel } from '../components/JobDetailPanel'
+import { classificationVariant } from '../components/JobDetailPanel/shared/variants'
 import type { Application, JobDetail, JobSummary } from '../types'
 
 function makeWrapper() {
@@ -104,6 +105,16 @@ const APPLICATION: Application = {
   title: 'Example Role',
   company: 'Acme',
 }
+
+describe('classificationVariant', () => {
+  it('maps canonical and legacy remote values to stable badge variants', () => {
+    expect(classificationVariant('remote')).toBe('remote')
+    expect(classificationVariant('onsite')).toBe('muted')
+    expect(classificationVariant('fully_remote')).toBe('remote')
+    expect(classificationVariant('location_restricted')).toBe('local')
+    expect(classificationVariant('remote_with_quarterly_travel')).toBe('travel')
+  })
+})
 
 describe('JobDetailPanel triage actions', () => {
   it('uses binary Trash and Shortlist header actions for the Jobs surface', async () => {

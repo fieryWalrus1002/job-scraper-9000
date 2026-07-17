@@ -25,6 +25,7 @@ import { PostedAtCell } from './JobTable/cells/PostedAtCell'
 import { RationaleCell } from './JobTable/cells/RationaleCell'
 import { DefaultCell } from './JobTable/cells/DefaultCell'
 import { SalaryCell } from './JobTable/cells/SalaryCell'
+import { classificationVariant } from './JobDetailPanel/shared/variants'
 import { Star, Trash2 } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import { Badge } from '@/components/ui/badge'
@@ -82,15 +83,7 @@ function ScoreBadge({ score }: { score: number | null }) {
 function ClassificationBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-faint">—</span>
   const label = value.replace(/_/g, ' ')
-  const variant =
-    value === 'fully_remote'
-      ? 'remote'
-      : value === 'location_restricted'
-        ? 'local'
-        : value.startsWith('remote_with')
-          ? 'travel'
-          : 'muted'
-  return <Badge variant={variant}>{label}</Badge>
+  return <Badge variant={classificationVariant(value)}>{label}</Badge>
 }
 
 function ConfidenceBadge({ value }: { value: string | null }) {

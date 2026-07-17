@@ -7,7 +7,7 @@ export function scoreVariant(score: number | null | undefined) {
 
 export function classificationVariant(value: string | null | undefined) {
   if (!value) return 'muted' as const
-  if (value === 'fully_remote') return 'remote' as const
+  if (value === 'remote' || value === 'fully_remote') return 'remote' as const
   if (value === 'location_restricted') return 'local' as const
   if (value.startsWith('remote_with')) return 'travel' as const
   return 'muted' as const

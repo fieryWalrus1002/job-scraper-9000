@@ -142,11 +142,11 @@ export function GrabBagCard({ job, actions, onSelect, isFocused }: Props) {
 
 function RemoteBadge({ remote }: { remote: string }) {
   const label =
-    remote === 'fully_remote'
+    remote === 'remote' || remote === 'fully_remote'
       ? 'Remote'
       : remote === 'hybrid'
         ? 'Hybrid'
-        : remote === 'onsite_disguised'
+        : remote === 'onsite' || remote === 'onsite_disguised'
           ? 'Onsite'
           : remote === 'location_restricted'
             ? 'Location-only'
@@ -154,7 +154,11 @@ function RemoteBadge({ remote }: { remote: string }) {
               ? 'Unclear'
               : remote.replace(/_/g, ' ')
   const variant =
-    remote === 'fully_remote' ? 'score_high' : remote === 'hybrid' ? 'score_mid' : 'secondary'
+    remote === 'remote' || remote === 'fully_remote'
+      ? 'score_high'
+      : remote === 'hybrid'
+        ? 'score_mid'
+        : 'secondary'
   return (
     <Badge variant={variant} className="text-[10px] px-1.5 py-0">
       {label}

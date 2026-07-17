@@ -27,12 +27,14 @@ function renderJobTable(
     sort?: SortState
     onSortChange?: (next: SortState) => void
     onSelect?: (hash: string) => void
+    visibleColumns?: Set<string>
   },
 ) {
   return render(
     <JobTable
       items={overrides?.items ?? [JOB]}
       visibleColumns={
+        overrides?.visibleColumns ??
         new Set(['fit_score', 'title', 'company', 'location', 'salary_min_usd', 'posted_at'])
       }
       onSelect={overrides?.onSelect ?? vi.fn()}
@@ -197,6 +199,37 @@ describe('JobTable sorting', () => {
     const companyHeader = screen.getByText('Company').closest('th')
     expect(companyHeader).toHaveAttribute('aria-sort', 'ascending')
     expect(screen.getByText('Score').closest('th')).not.toHaveAttribute('aria-sort')
+  })
+
+  it('renders remote classification badges for canonical and legacy values', () => {
+    renderJobTable(undefined, {
+      visibleColumns: new Set(['title', 'remote_classification']),
+      items: [
+        {
+          ...JOB,
+          dedup_hash: 'hash-remote',
+          title: 'Remote Role',
+          remote_classification: 'remote',
+        },
+        {
+          ...JOB,
+          dedup_hash: 'hash-onsite',
+          title: 'Onsite Role',
+          remote_classification: 'onsite',
+        },
+        {
+          ...JOB,
+          dedup_hash: 'hash-travel',
+          title: 'Travel Role',
+          remote_classification: 'remote_with_monthly_travel',
+        },
+      ],
+      total: 3,
+    })
+
+    expect(screen.getByText('remote')).toHaveAttribute('data-variant', 'remote')
+    expect(screen.getByText('onsite')).toHaveAttribute('data-variant', 'muted')
+    expect(screen.getByText('remote with monthly travel')).toHaveAttribute('data-variant', 'travel')
   })
 
   it('renders a salary range in the Salary column', () => {

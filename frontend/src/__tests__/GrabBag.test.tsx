@@ -173,6 +173,26 @@ describe('GrabBagView — render batch', () => {
   })
 })
 
+describe('GrabBagView — remote badge labels', () => {
+  it('labels canonical remote and onsite values while keeping legacy aliases', async () => {
+    installFetch({
+      grabbag: batch([
+        { title: 'Canonical Remote', remote_classification: 'remote' },
+        { title: 'Canonical Onsite', remote_classification: 'onsite' },
+        { title: 'Legacy Remote', remote_classification: 'fully_remote' },
+        { title: 'Legacy Location', remote_classification: 'location_restricted' },
+      ]),
+    })
+
+    render(<GrabBagView onSelect={vi.fn()} />, { wrapper: makeWrapper() })
+
+    await waitFor(() => expect(screen.getByText('Canonical Remote')).toBeInTheDocument())
+    expect(screen.getAllByText('Remote')).toHaveLength(2)
+    expect(screen.getByText('Onsite')).toBeInTheDocument()
+    expect(screen.getByText('Location-only')).toBeInTheDocument()
+  })
+})
+
 describe('GrabBagView — malformed seed', () => {
   it('a non-numeric ?seed= self-heals to a valid integer (never queries seed=NaN)', async () => {
     installFetch({ grabbag: batch([{ title: 'Healed Job', company: 'HealCo', fit_score: 4 }]) })
