@@ -112,25 +112,67 @@ expensive skills_fit call, so a job a user's preferences rule out never costs
 skills_fit tokens. It applies **this user's** stored preferences to the
 extracted fields, deterministically:
 
-| User preference                         | Gates on (extracted field)                       | Status                                                       |
-| --------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
-| `acceptable_classifications`            | `remote_classification` (the 4-way axis)         | exists                                                       |
-| `acceptable_locations`                  | `location_restrictions` **+** posting `location` | **NEW — move from global policy**                            |
-| user timezone                           | `timezone_requirements`                          | **NEW — move from global policy**                            |
-| relocation policy                       | `requires_relocation`                            | exists                                                       |
-| local-presence + `acceptable_locations` | `requires_local_presence` (#465)                 | exists                                                       |
-| ~~`max_travel_days`~~                   | ~~`estimated_travel_days_per_year`~~             | **dropped (decision 2)** — travel is display-only, not gated |
+| User preference                         | Gates on (extracted field)                       | Status                                                               |
+| --------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
+| `acceptable_classifications`            | `remote_classification` (the 4-way axis)         | exists                                                               |
+| `acceptable_locations`                  | `location_restrictions` **+** posting `location` | **NEW — move from global policy**                                    |
+| ~~user timezone~~                       | ~~`timezone_requirements`~~                      | **dropped (decision 5)** — timezone is display-only, not gated (#17) |
+| relocation policy                       | `requires_relocation`                            | exists                                                               |
+| local-presence + `acceptable_locations` | `requires_local_presence` (#465)                 | exists                                                               |
+| ~~`max_travel_days`~~                   | ~~`estimated_travel_days_per_year`~~             | **dropped (decision 2)** — travel is display-only, not gated         |
 
 `unclear` is **fail-open (decision 4)**: an `unclear` classification passes
 through to skills_fit by default rather than being dropped, so ambiguous jobs
 still get scored instead of silently disappearing. (A user can still exclude it
 via `acceptable_classifications` if they want; the default is pass-through.)
 
-**The central build:** `_gate_user` gains the location-restriction and timezone
-matching that currently lives only in the dead-in-overnight global
-`passes_remote_filter`. This simultaneously closes the per-user gap from the
-eval-decoupling spec — geo/tz enforcement moves from the advisory global policy
-into the real per-user decision, driven by LLM-extracted fields + user prefs.
+**The central build:** `_gate_user` gains the location-restriction matching that
+currently lives only in the dead-in-overnight global `passes_remote_filter`.
+This closes the per-user gap from the eval-decoupling spec — location
+enforcement moves from the advisory global policy into the real per-user
+decision, driven by LLM-extracted fields + user prefs. Timezone is **not** gated
+(decision 5): `timezone_requirements` stays an extracted, display-only field; a
+genuine "must reside in ET" constraint is caught by `location_restrictions`, and
+an "EST overlap" is accommodatable, so gating on it only produced false
+negatives (#17).
+
+#### The location-restriction rule (decision 6)
+
+`location_restrictions` is an **OR-list of places the employer will accept the
+candidate residing** (`["CA","NY","TX"]` = "be in one of these"; `["US-only"]` =
+"be in the US"). The posting passes if **any** entry is satisfiable by the
+user's `acceptable_locations` (which is `home_location + locations.acceptable` —
+already relocation-aware, since willing-to-relocate destinations are listed
+there). The granularity is **switched by relocation willingness** rather than
+hardcoded:
+
+- **willing to relocate (`allow_required_relocation = True`)** → **country-level**:
+  any entry whose country the user has an acceptable location in passes (you'll
+  move anywhere domestically, so only the country matters).
+- **not willing** → **state/city-level**: an entry passes only if it matches an
+  acceptable location at region granularity (the required location must be one
+  you're already in).
+- **foreign-only → drop regardless of willingness**: domestic relocation ≠
+  international work authorization. A `Canada`-only role needs Canadian
+  authorization, which the domestic relocation flag doesn't grant. (A future
+  "international" flag could revisit this.)
+
+**Fail-open everywhere** (taxonomy philosophy — never silently drop on a signal
+we can't confidently interpret):
+
+- empty `location_restrictions` → pass (no constraint);
+- empty `acceptable_locations` → pass (no user data to gate against — mirrors the
+  local-presence "no policy" handling);
+- an entry we cannot resolve to a country (odd phrasing) → **non-blocking**, the
+  posting passes.
+
+So the gate **only drops** when *every* restriction entry resolves to a place
+the user positively cannot satisfy — in practice the pure-foreign-only postings
+(~5.5% of restriction strings in the analysis cache), while the ~95% US +
+unparseable cases pass through. Gating on the scraped posting `location` is
+**not** done for the axis (for a remote role it's usually just an HQ city);
+posting-location matching stays where it belongs, in the local-presence gate
+(`_location_matches`).
 
 ### 4. Storage: the blob stays a blob (mostly)
 
@@ -225,6 +267,15 @@ ______________________________________________________________________
    an `unclear` job passes through to skills_fit by default so ambiguous jobs get
    scored rather than silently dropped. A user may still exclude it via
    `acceptable_classifications`.
+1. **Timezone is display-only, not gated (#17).** `timezone_requirements` is
+   still extracted and displayed, but `_gate_user` does not reject on it — same
+   reasoning as travel (decision 2): the signal is too noisy to reject on. An
+   "EST overlap required" is accommodatable by an off-Eastern candidate, so
+   hard-rejecting on it only produced false negatives (the bug #17 was filed
+   for). A genuine geographic constraint ("must reside in ET") is already caught
+   by `location_restrictions` vs `acceptable_locations`. This removes the
+   `user_timezone` policy-field / settings-UI work that a timezone gate would
+   have required — no new per-user field is needed.
 
 ______________________________________________________________________
 
@@ -244,3 +295,20 @@ ______________________________________________________________________
   field; (4) `unclear` is fail-open (passes to skills_fit by default). Status →
   RATIFIED; PR-slicing updated (slice 5 = travel display-only). Issues may now be
   derived.
+- **2026-07-17 — decision 5 (post-ratification).** Resolved #17: timezone is
+  **display-only, not gated**. `timezone_requirements` stays an extracted field
+  but `_gate_user` never rejects on it (same "too noisy to reject on" reasoning
+  as travel). This drops the "user timezone → `timezone_requirements`" row from
+  the `_gate_user` table and removes the `user_timezone` policy-field / settings
+  seam that a timezone gate would have needed. Slice 3 (#481) is therefore a
+  single backend brief: `location_restrictions` vs `acceptable_locations` +
+  `unclear` fail-open, no frontend.
+- **2026-07-17 — decision 6 (post-ratification).** Defined the
+  `location_restrictions` gate rule (§3, "The location-restriction rule"):
+  OR-list satisfaction against `acceptable_locations`, granularity switched by
+  relocation willingness (willing → country-level, not-willing → state/city),
+  foreign-only dropped regardless, fail-open on empty/unparseable. Country-level
+  is the effective MVP for a willing US candidate; state-level precision falls
+  out of the not-willing branch for free (it reads the same relocation-aware
+  `acceptable_locations`). Posting-`location` gating deliberately excluded from
+  the axis gate.
