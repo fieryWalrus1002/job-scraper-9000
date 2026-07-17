@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from agents.skills_fit.models import SCHEMA_VERSION, JobMetadata
+from agents.skills_fit.models import (
+    SCHEMA_VERSION,
+    JobMetadata,
+    ScoredJobPosting,
+)
 
 
 def make_metadata(**overrides) -> JobMetadata:
@@ -67,3 +71,40 @@ def test_schema_version_defaults_without_being_passed():
 def test_invalid_input_source_raises_validation_error():
     with pytest.raises(ValidationError):
         make_metadata(input_source="wrong_value")
+
+
+# ScoredJobPosting echoes the stored remote_filter classification for display,
+# so its RemoteClassification Literal must be a superset covering both the
+# canonical 4-way taxonomy the LLM now emits (remote/hybrid/onsite/unclear) and
+# the legacy values historical rows still carry. Missing the canonical values
+# would raise at scoring time on every remote/onsite posting.
+# See specs/remote_filter_taxonomy.md.
+@pytest.mark.parametrize(
+    "classification",
+    [
+        "remote",  # canonical
+        "onsite",  # canonical
+        "hybrid",  # canonical
+        "unclear",  # canonical
+        "fully_remote",  # legacy
+        "onsite_disguised",  # legacy
+        "location_restricted",  # legacy
+        "remote_with_quarterly_travel",  # legacy
+    ],
+)
+def test_scored_posting_accepts_canonical_and_legacy_classifications(classification):
+    posting = ScoredJobPosting(
+        dedup_hash="hash-1",
+        remote_classification=classification,
+        metadata=make_metadata(),
+    )
+    assert posting.remote_classification == classification
+
+
+def test_scored_posting_rejects_unknown_classification():
+    with pytest.raises(ValidationError):
+        ScoredJobPosting(
+            dedup_hash="hash-1",
+            remote_classification="teleport",
+            metadata=make_metadata(),
+        )
