@@ -241,7 +241,13 @@ ______________________________________________________________________
 1. **Retire the global policy's role in overnight** — `passes_remote_filter`
    is removed from the overnight path (and the binary eval that scored it is
    dropped, per `remote_filter_eval_decoupling.md` decision). Coordinate with
-   `remote_filter_eval_decoupling.md`.
+   `remote_filter_eval_decoupling.md`. Because the classifier no longer judges,
+   the advisory `classified_pass.jsonl` / `classified_trash.jsonl` split (which
+   `_load_classified` already merged into one union) **collapses into a single
+   `classified.jsonl`** — one classified stream, per-user gate decides over it.
+   The `passes_remote_filter` *function* stays until the eval retires it (Phase
+   31 slice 6); the `_filter_result`/`_filter_reason` *fields* stay as constant
+   display metadata (removing them + their consumers is a deferred follow-up).
 1. **Travel → display-only (decision 2)** — drop the `max_travel_days` gate from
    `_gate_user`; keep `estimated_travel_days_per_year` as an extracted,
    display-only field. Retires the #215 travel gate.
@@ -312,3 +318,11 @@ ______________________________________________________________________
   out of the not-willing branch for free (it reads the same relocation-aware
   `acceptable_locations`). Posting-`location` gating deliberately excluded from
   the axis gate.
+- **2026-07-17 — slice 4 scope refinement.** Slices 1–3 + 5 shipped (#495/#496/
+  #497 taxonomy+DB+frontend; #499 location gate; #501 travel display-only).
+  Extended slice 4: since the classifier no longer judges, the advisory
+  `classified_pass.jsonl` / `classified_trash.jsonl` split collapses into a
+  single `classified.jsonl` (the split only recorded the removed global verdict;
+  `_load_classified` already read both as one union). The `passes_remote_filter`
+  function and the `_filter_result`/`_filter_reason` display fields are retained
+  for now (function → Phase 31 eval retirement; fields → a deferred follow-up).
