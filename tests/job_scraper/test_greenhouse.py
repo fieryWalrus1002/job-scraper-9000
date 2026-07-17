@@ -18,7 +18,10 @@ def _sample_api_response(n: int = 2) -> dict:
                 "title": f"Engineer {i}",
                 "absolute_url": f"https://boards.greenhouse.io/acme/jobs/{1000 + i}",
                 "location": {"name": "Remote"},
-                "updated_at": "2024-01-15T00:00:00Z",
+                "first_published": "2024-01-15T10:35:43-04:00",
+                # later than first_published, as it is on real evergreen reqs;
+                # posted_at must reflect the publish date, not this edit.
+                "updated_at": "2024-02-20T00:00:00Z",
                 "content": f"Job description for role {i}.",
             }
             for i in range(n)
@@ -57,6 +60,20 @@ def test_scrape_maps_fields_correctly():
     assert "boards.greenhouse.io" in job.source_url
     assert job.location == "Remote"
     assert job.description == "Job description for role 0."
+    # posted_at is the (date-only) publish date, not updated_at
+    assert job.posted_at == "2024-01-15"
+
+
+def test_scrape_missing_first_published_is_none():
+    item = _sample_api_response(1)["jobs"][0]
+    del item["first_published"]
+    scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response({"jobs": [item]})
+    ):
+        jobs = scraper.scrape()
+    # no substitute from updated_at -- None is the honest answer
+    assert jobs[0].posted_at is None
 
 
 def test_scrape_converts_html_content_to_markdown():

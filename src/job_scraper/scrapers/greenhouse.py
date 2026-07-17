@@ -71,7 +71,11 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
                 title=item.get("title", ""),
                 company=self.query.board_token,
                 location=location,
-                posted_at=item.get("updated_at"),
+                # first_published is the true publish date; updated_at moves on
+                # any edit (evergreen reqs get re-touched), which misrepresents
+                # freshness. Both ship in the list response, so this is free.
+                # __post_init__ truncates to the date-only contract.
+                posted_at=item.get("first_published"),
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,

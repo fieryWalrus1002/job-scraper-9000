@@ -85,7 +85,9 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
                 title=str(row.get("title") or ""),
                 company=str(row.get("company") or ""),
                 location=str(row.get("location") or ""),
-                posted_at=_date_str(row.get("date_posted")),
+                # JobPosting.__post_init__ normalizes this (pandas Timestamp/NaT,
+                # float NaN, datetime-ish strings) into the date-only contract.
+                posted_at=row.get("date_posted"),
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
@@ -139,16 +141,3 @@ def _salary_from_row(row) -> SalaryResult | None:
         ),
         salary_period=period,
     )
-
-
-def _date_str(value) -> str | None:
-    if value is None:
-        return None
-    # pandas yields float NaN for missing datetime columns
-    if isinstance(value, float):
-        return None if math.isnan(value) else str(value)
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    s = str(value)
-    # guard against pandas NaT stringifying to "NaT"
-    return None if s in ("nan", "NaT") else s

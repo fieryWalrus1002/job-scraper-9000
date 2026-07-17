@@ -71,7 +71,8 @@ def test_scrape_maps_fields_correctly():
     assert job.location == "Remote"
     assert job.company == "acme"
     assert job.description == "Plain description for role 0."
-    assert job.posted_at == "2024-01-15T00:00:00.000Z"
+    # normalized to the date-only pipeline contract by JobPosting.__post_init__
+    assert job.posted_at == "2024-01-15"
 
 
 def test_scrape_prefers_description_plain_over_html():
