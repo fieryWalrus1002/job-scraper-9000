@@ -1,6 +1,8 @@
 import hashlib
 from dataclasses import dataclass, field
 
+from .dates import normalize_posted_at
+
 
 @dataclass
 class JobPosting:
@@ -26,6 +28,12 @@ class JobPosting:
     # branch on it (e.g. skills_fit needs a description and should skip records
     # that never got one).
     enrichment_status: str | None = None
+
+    def __post_init__(self) -> None:
+        # Enforce the pipeline's date-only posted_at contract at the scraper
+        # boundary, so no source (current or future) can leak a datetime that
+        # fails Pydantic date validation late in skills_fit. See dates.py.
+        self.posted_at = normalize_posted_at(self.posted_at)
 
     def compute_hash(self) -> None:
         # source_job_id distinguishes legitimately distinct postings that share

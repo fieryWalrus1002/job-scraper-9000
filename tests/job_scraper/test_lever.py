@@ -99,14 +99,17 @@ def test_scrape_falls_back_to_html_description():
     assert "<p>" not in jobs[0].description
 
 
-def test_scrape_created_at_converted_to_iso():
+def test_scrape_created_at_converted_to_date_only():
     scraper = LeverScraper(LeverQuery(company="acme"))
     with patch.object(
         scraper.session, "get", return_value=_mock_response(_sample_api_response(1))
     ):
         jobs = scraper.scrape()
+    # JobPosting.__post_init__ normalizes createdAt down to the date-only
+    # pipeline contract, so no time component survives.
     assert jobs[0].posted_at is not None
-    assert "T" in jobs[0].posted_at
+    assert "T" not in jobs[0].posted_at
+    assert len(jobs[0].posted_at) == len("YYYY-MM-DD")
 
 
 def test_scrape_missing_created_at_is_none():
