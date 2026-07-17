@@ -293,8 +293,8 @@ def test_scores_each_user_against_their_own_profile(migrated_pg, tmp_path):
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-shared", "fully_remote"),
-            _classified("h-alice", "fully_remote"),
+            _classified("h-shared", "remote"),
+            _classified("h-alice", "remote"),
         ],
     )
 
@@ -340,8 +340,8 @@ def test_two_phase_batch_submits_all_then_collects_in_user_order(
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-alice", "fully_remote"),
-            _classified("h-bob", "fully_remote"),
+            _classified("h-alice", "remote"),
+            _classified("h-bob", "remote"),
         ],
     )
 
@@ -398,8 +398,8 @@ def test_two_phase_batch_isolates_submit_failure(migrated_pg, tmp_path, monkeypa
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-alice", "fully_remote"),
-            _classified("h-bob", "fully_remote"),
+            _classified("h-alice", "remote"),
+            _classified("h-bob", "remote"),
         ],
     )
 
@@ -446,8 +446,8 @@ def test_two_phase_batch_isolates_collect_failure(migrated_pg, tmp_path, monkeyp
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-alice", "fully_remote"),
-            _classified("h-bob", "fully_remote"),
+            _classified("h-alice", "remote"),
+            _classified("h-bob", "remote"),
         ],
     )
 
@@ -499,8 +499,8 @@ def test_two_phase_batch_isolates_post_collect_failure_without_reabort(
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-alice", "fully_remote"),
-            _classified("h-bob", "fully_remote"),
+            _classified("h-alice", "remote"),
+            _classified("h-bob", "remote"),
         ],
     )
 
@@ -556,8 +556,8 @@ def test_two_phase_batch_marks_pending_users_failed_when_polling_dies(
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-alice", "fully_remote"),
-            _classified("h-bob", "fully_remote"),
+            _classified("h-alice", "remote"),
+            _classified("h-bob", "remote"),
         ],
     )
 
@@ -603,8 +603,8 @@ def test_two_phase_batch_aborts_open_submissions_on_interrupt(
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-alice", "fully_remote"),
-            _classified("h-bob", "fully_remote"),
+            _classified("h-alice", "remote"),
+            _classified("h-bob", "remote"),
         ],
     )
 
@@ -645,7 +645,7 @@ def test_two_phase_batch_summary_shape_matches_serial_path(
         _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
 
     _materialize_profile(tmp_path, "alice@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-alice", "fully_remote")])
+    _write_classified(tmp_path, passed=[_classified("h-alice", "remote")])
 
     events: list[tuple[str, tuple[str, ...]]] = []
     submissions: list[_FakeBatchSubmission] = []
@@ -677,18 +677,18 @@ def test_two_phase_batch_summary_shape_matches_serial_path(
 
 @skip_if_no_docker
 def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
-    """A posting classified ``fully_remote`` reaches a user who accepts only
+    """A posting classified ``remote`` reaches a user who accepts only
     that; a ``remote_with_frequent_travel`` posting is gated out for them."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "strict@example.com")
-        _set_policy(conn, u1, ["fully_remote"])
+        _set_policy(conn, u1, ["remote"])
         _seed_consolidated(conn, dedup_hash="h-ok", requested_by=[u1])
         _seed_consolidated(conn, dedup_hash="h-travel", requested_by=[u1])
 
     _materialize_profile(tmp_path, "strict@example.com")
     _write_classified(
         tmp_path,
-        passed=[_classified("h-ok", "fully_remote")],
+        passed=[_classified("h-ok", "remote")],
         trashed=[_classified("h-travel", "remote_with_frequent_travel")],
     )
 
@@ -708,11 +708,11 @@ def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
 
 @skip_if_no_docker
 def test_gates_postings_by_each_users_max_travel_days(migrated_pg, tmp_path):
-    """A fully_remote posting whose estimated travel exceeds the user's
+    """A remote posting whose estimated travel exceeds the user's
     max_travel_days is dropped before skills_fit; one at/under it survives."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "lowtravel@example.com")
-        _set_policy(conn, u1, ["fully_remote"], max_travel_days=15)
+        _set_policy(conn, u1, ["remote"], max_travel_days=15)
         _seed_consolidated(conn, dedup_hash="h-near", requested_by=[u1])
         _seed_consolidated(conn, dedup_hash="h-far", requested_by=[u1])
         _seed_consolidated(conn, dedup_hash="h-unknown", requested_by=[u1])
@@ -721,10 +721,10 @@ def test_gates_postings_by_each_users_max_travel_days(migrated_pg, tmp_path):
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-near", "fully_remote", travel_days=15),
-            _classified("h-far", "fully_remote", travel_days=40),
+            _classified("h-near", "remote", travel_days=15),
+            _classified("h-far", "remote", travel_days=40),
             # No numeric estimate → not dropped by the travel gate.
-            _classified("h-unknown", "fully_remote", travel_days=None),
+            _classified("h-unknown", "remote", travel_days=None),
         ],
     )
 
@@ -748,12 +748,12 @@ def test_no_max_travel_days_does_not_filter_on_travel(migrated_pg, tmp_path):
     whose classification is acceptable is still scored."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "anytravel@example.com")
-        _set_policy(conn, u1, ["fully_remote"])  # no max_travel_days
+        _set_policy(conn, u1, ["remote"])  # no max_travel_days
         _seed_consolidated(conn, dedup_hash="h-far", requested_by=[u1])
 
     _materialize_profile(tmp_path, "anytravel@example.com")
     _write_classified(
-        tmp_path, passed=[_classified("h-far", "fully_remote", travel_days=200)]
+        tmp_path, passed=[_classified("h-far", "remote", travel_days=200)]
     )
 
     score_calls: list[dict] = []
@@ -781,7 +781,7 @@ def test_default_policy_accepts_all_classifications(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "permissive@example.com")
     _write_classified(
         tmp_path,
-        passed=[_classified("h1", "fully_remote")],
+        passed=[_classified("h1", "remote")],
         trashed=[_classified("h2", "remote_with_frequent_travel")],
     )
 
@@ -804,7 +804,7 @@ def test_skips_user_with_no_surviving_postings(migrated_pg, tmp_path):
     batch, no ingest — and counted in the summary."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "nomatch@example.com")
-        _set_policy(conn, u1, ["fully_remote"])
+        _set_policy(conn, u1, ["remote"])
         _seed_consolidated(conn, dedup_hash="h-travel", requested_by=[u1])
 
     _materialize_profile(tmp_path, "nomatch@example.com")
@@ -839,7 +839,7 @@ def test_counts_postings_with_no_classification(migrated_pg, tmp_path):
         _seed_consolidated(conn, dedup_hash="h-missing", requested_by=[u1])
 
     _materialize_profile(tmp_path, "gap@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-have", "fully_remote")])
+    _write_classified(tmp_path, passed=[_classified("h-have", "remote")])
 
     score_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
@@ -874,8 +874,8 @@ def test_isolates_a_failing_user_and_finishes_the_rest(migrated_pg, tmp_path):
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-bad", "fully_remote"),
-            _classified("h-ok", "fully_remote"),
+            _classified("h-bad", "remote"),
+            _classified("h-ok", "remote"),
         ],
     )
 
@@ -925,8 +925,8 @@ def test_stamps_user_email_into_scored_records(migrated_pg, tmp_path):
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-shared", "fully_remote"),
-            _classified("h-alice", "fully_remote"),
+            _classified("h-shared", "remote"),
+            _classified("h-alice", "remote"),
         ],
     )
 
@@ -957,7 +957,7 @@ def test_iter_run_user_outputs_walks_a_run(migrated_pg, tmp_path):
 
     _materialize_profile(tmp_path, "alice@example.com")
     _materialize_profile(tmp_path, "bob@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-shared", "fully_remote")])
+    _write_classified(tmp_path, passed=[_classified("h-shared", "remote")])
 
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         score_run(
@@ -1013,8 +1013,8 @@ def test_scored_records_round_trip_through_ingest(migrated_pg, tmp_path):
     _write_classified(
         tmp_path,
         passed=[
-            _classified("h-shared", "fully_remote"),
-            _classified("h-alice", "fully_remote"),
+            _classified("h-shared", "remote"),
+            _classified("h-alice", "remote"),
         ],
     )
 
@@ -1064,7 +1064,7 @@ def test_local_presence_gate_keeps_acceptable_location_when_unwilling(
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
             acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
@@ -1077,7 +1077,7 @@ def test_local_presence_gate_keeps_acceptable_location_when_unwilling(
         passed=[
             _classified_with_relocation(
                 "h-local",
-                "fully_remote",
+                "remote",
                 requires_local_presence=True,
                 location="Seattle, WA",
             )
@@ -1107,7 +1107,7 @@ def test_local_presence_gate_drops_out_of_area_when_unwilling(
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
             acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
@@ -1120,7 +1120,7 @@ def test_local_presence_gate_drops_out_of_area_when_unwilling(
         passed=[
             _classified_with_relocation(
                 "h-portland",
-                "fully_remote",
+                "remote",
                 requires_local_presence=True,
                 location="Portland, OR",
             )
@@ -1156,7 +1156,7 @@ def test_local_presence_gate_no_acceptable_locations_logs_distinct_reason(
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
             # acceptable_locations omitted → empty set (pre-backfill user)
@@ -1169,7 +1169,7 @@ def test_local_presence_gate_no_acceptable_locations_logs_distinct_reason(
         passed=[
             _classified_with_relocation(
                 "h-seattle",
-                "fully_remote",
+                "remote",
                 requires_local_presence=True,
                 location="Seattle, WA",
             )
@@ -1204,7 +1204,7 @@ def test_relocation_gate_still_drops_relocation_required_when_unwilling(
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
             acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
@@ -1216,10 +1216,8 @@ def test_relocation_gate_still_drops_relocation_required_when_unwilling(
     _write_classified(
         tmp_path,
         passed=[
-            _classified_with_relocation(
-                "h-relo", "fully_remote", requires_relocation=True
-            ),
-            _classified_with_relocation("h-ok", "fully_remote"),
+            _classified_with_relocation("h-relo", "remote", requires_relocation=True),
+            _classified_with_relocation("h-ok", "remote"),
         ],
     )
     calls: list[dict] = []
@@ -1247,7 +1245,7 @@ def test_local_presence_gate_drops_missing_location_as_ambiguous(
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
             acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
@@ -1259,7 +1257,7 @@ def test_local_presence_gate_drops_missing_location_as_ambiguous(
         tmp_path,
         passed=[
             _classified_with_relocation(
-                "h-missing", "fully_remote", requires_local_presence=True
+                "h-missing", "remote", requires_local_presence=True
             )
         ],
     )
@@ -1287,7 +1285,7 @@ def test_local_presence_gate_passes_any_location_when_willing(migrated_pg, tmp_p
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=True,
             allow_local_presence_required=True,
             acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
@@ -1300,7 +1298,7 @@ def test_local_presence_gate_passes_any_location_when_willing(migrated_pg, tmp_p
         passed=[
             _classified_with_relocation(
                 "h-local",
-                "fully_remote",
+                "remote",
                 requires_local_presence=True,
                 location="Portland, OR",
             )
@@ -1320,14 +1318,14 @@ def test_local_presence_gate_passes_any_location_when_willing(migrated_pg, tmp_p
 
 
 @skip_if_no_docker
-def test_fully_remote_jobs_do_not_use_location_gate(migrated_pg, tmp_path):
+def test_remote_jobs_do_not_use_location_gate(migrated_pg, tmp_path):
     """Location only gates jobs flagged requires_local_presence."""
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         u1 = seed_user(conn, "remote@example.com")
         _set_full_policy(
             conn,
             u1,
-            ["fully_remote"],
+            ["remote"],
             allow_required_relocation=False,
             allow_local_presence_required=False,
             acceptable_locations=[{"city": "Seattle", "region": "WA", "country": "US"}],
@@ -1338,9 +1336,7 @@ def test_fully_remote_jobs_do_not_use_location_gate(migrated_pg, tmp_path):
     _write_classified(
         tmp_path,
         passed=[
-            _classified_with_relocation(
-                "h-remote", "fully_remote", location="Portland, OR"
-            )
+            _classified_with_relocation("h-remote", "remote", location="Portland, OR")
         ],
     )
     calls: list[dict] = []

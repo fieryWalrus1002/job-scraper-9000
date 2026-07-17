@@ -16,19 +16,22 @@ FitScore = Literal[1, 2, 3, 4, 5]
 Confidence = Literal["low", "medium", "high"]
 InputSource = Literal["remote_filter_pass", "local_candidate"]
 # Echoes the stored remote_filter classification onto ScoredJobPosting for
-# display. Kept a SUPERSET: the remote_with_*_travel values are legacy as of
-# remote_filter SCHEMA_VERSION 3.0.0 (no longer produced) but historical job
-# rows still carry them and must validate here. See
-# specs/remote_filter_simplification.md §5.
+# display. Kept a SUPERSET: the canonical 4-way taxonomy is
+# remote/hybrid/onsite/unclear (specs/remote_filter_taxonomy.md); legacy labels
+# (fully_remote, onsite_disguised, location_restricted, remote_with_*_travel)
+# are no longer produced but historical job rows still carry them and must
+# validate here.
 RemoteClassification = Literal[
-    "fully_remote",
+    "remote",  # canonical (taxonomy)
+    "onsite",  # canonical (taxonomy)
+    "hybrid",  # canonical
+    "unclear",  # canonical
+    "fully_remote",  # legacy → remote
+    "onsite_disguised",  # legacy → onsite
+    "location_restricted",  # legacy → remote
     "remote_with_quarterly_travel",  # legacy (pre-3.0)
     "remote_with_monthly_travel",  # legacy
     "remote_with_frequent_travel",  # legacy
-    "hybrid",
-    "onsite_disguised",
-    "location_restricted",
-    "unclear",
 ]
 
 FIT_SCORES: list[int] = list(get_args(FitScore))

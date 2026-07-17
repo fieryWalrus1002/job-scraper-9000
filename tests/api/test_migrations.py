@@ -581,3 +581,45 @@ def test_0019_downgrade_drops_both_tables(fresh_pg):
                 f"SELECT to_regclass('{table}') IS NOT NULL"
             ).fetchone()[0]
             assert exists is False, f"{table} still present after downgrade"
+
+
+# ---------------------------------------------------------------------------
+# 0020: remote axis enum values
+# ---------------------------------------------------------------------------
+
+
+@skip_if_no_docker
+def test_0020_adds_remote_axis_enum_values_and_keeps_legacy(fresh_pg):
+    _run_alembic(
+        "0020", fresh_pg, extra_env={"BOOTSTRAP_ADMIN_EMAIL": "admin@example.com"}
+    )
+
+    with psycopg.connect(fresh_pg, autocommit=True) as conn:
+        for dedup_hash, classification in (
+            ("hash-remote", "remote"),
+            ("hash-onsite", "onsite"),
+            ("hash-legacy", "fully_remote"),
+        ):
+            conn.execute(
+                """
+                INSERT INTO raw.job_postings
+                    (dedup_hash, posted_at, remote_classification)
+                VALUES (%s, '2026-07-17', %s::raw.remote_classification)
+                """,
+                (dedup_hash, classification),
+            )
+
+        rows = conn.execute(
+            """
+            SELECT dedup_hash, remote_classification::text
+            FROM raw.job_postings
+            WHERE dedup_hash IN ('hash-remote', 'hash-onsite', 'hash-legacy')
+            ORDER BY dedup_hash
+            """
+        ).fetchall()
+
+    assert rows == [
+        ("hash-legacy", "fully_remote"),
+        ("hash-onsite", "onsite"),
+        ("hash-remote", "remote"),
+    ]

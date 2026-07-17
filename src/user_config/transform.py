@@ -205,25 +205,23 @@ def candidate_profile_to_pipeline_yaml(
 def derive_policies(search: SearchConfigInput) -> UserPolicies:
     """Per-user policy gates (spec §6) from the search config.
 
-    Acceptable remote classifications follow the work arrangements;
-    ``unclear`` is always acceptable — silently dropping unclassifiable
-    postings would be a silent filter, and permissive is the default
-    posture. Title exclusions merge roles.excluded_titles with
+    Acceptable remote classifications follow the canonical 4-way taxonomy in
+    specs/remote_filter_taxonomy.md; ``unclear`` is always acceptable — silently
+    dropping unclassifiable postings would be a silent filter, and permissive is
+    the default posture. Title exclusions merge roles.excluded_titles with
     keywords.excluded. ``max_travel_days`` carries the user's travel ceiling
     straight through (None = no per-user travel gate).
     """
     classes: set[str] = set()
     wa = search.work_constraints.work_arrangements
     if wa.remote.acceptable:
-        # Post-3.0 the agent folds travel into numeric estimated_travel_days,
-        # so a remote-with-travel role is classified fully_remote. The legacy
-        # remote_with_*_travel buckets are no longer produced and so are not
-        # added to new acceptable-sets (specs/remote_filter_simplification.md).
-        classes.add("fully_remote")
+        # Canonical taxonomy axis: travel/geographic constraints live in
+        # separate fields, not in the remote_classification value.
+        classes.add("remote")
     if wa.hybrid.acceptable:
         classes.add("hybrid")
     if wa.onsite.acceptable:
-        classes |= {"onsite_disguised", "location_restricted"}
+        classes.add("onsite")
     classes.add("unclear")
     # Preserve canonical enum order for stable output.
     ordered: list[RemoteClassification] = [

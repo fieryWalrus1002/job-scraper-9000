@@ -146,12 +146,13 @@ async def test_jobs_valid_date_filter(client: AsyncClient, fake_conn) -> None:
     assert resp.status_code == 200
 
 
+@pytest.mark.parametrize("classification", ["remote", "onsite", "fully_remote"])
 async def test_jobs_valid_remote_classification_filter(
-    client: AsyncClient, fake_conn
+    client: AsyncClient, fake_conn, classification: str
 ) -> None:
     setup_list_response(fake_conn, [FAKE_JOB_ROW])
     resp = await client.get(
-        "/api/jobs", params={"remote_classification": "fully_remote"}
+        "/api/jobs", params={"remote_classification": classification}
     )
     assert resp.status_code == 200
 

@@ -17,31 +17,34 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-# Mirrors the raw.remote_classification Postgres enum (migration 0007) and the
-# query Literal in api/routes/jobs.py. Deliberately a SUPERSET: the three
-# remote_with_*_travel values are LEGACY as of remote_filter SCHEMA_VERSION
-# 3.0.0 — the agent no longer produces them (travel is now numeric), but they
-# remain valid here so stored user policies and historical job rows still
-# validate. New intent (derive_policies) emits only canonical values; see
-# specs/remote_filter_simplification.md §5.
+# Mirrors the raw.remote_classification Postgres enum and the query Literal in
+# api/routes/jobs.py. Deliberately a SUPERSET: the canonical 4-way taxonomy is
+# remote/hybrid/onsite/unclear (specs/remote_filter_taxonomy.md), while legacy
+# labels remain valid so stored user policies and historical job rows still
+# validate. New intent (derive_policies) emits only canonical values.
 RemoteClassification = Literal[
-    "fully_remote",
-    "remote_with_quarterly_travel",  # legacy (pre-3.0): travel is now numeric
+    "remote",  # canonical (taxonomy)
+    "onsite",  # canonical (taxonomy)
+    "hybrid",  # canonical
+    "unclear",  # canonical
+    "fully_remote",  # legacy → remote
+    "onsite_disguised",  # legacy → onsite
+    "location_restricted",  # legacy → remote
+    "remote_with_quarterly_travel",  # legacy (pre-3.0)
     "remote_with_monthly_travel",  # legacy
     "remote_with_frequent_travel",  # legacy
-    "hybrid",
-    "onsite_disguised",
-    "location_restricted",
-    "unclear",
 ]
 
 REMOTE_CLASSIFICATIONS: tuple[RemoteClassification, ...] = get_args(
     RemoteClassification
 )
 
-# The values remote_filter still produces post-3.0. Legacy travel buckets are
-# excluded — derive_policies builds new acceptable-sets from these only.
+# Non-canonical remote classifications retained for stored policies and
+# historical rows, but not emitted by derive_policies for new user intent.
 LEGACY_REMOTE_CLASSIFICATIONS: tuple[RemoteClassification, ...] = (
+    "fully_remote",
+    "onsite_disguised",
+    "location_restricted",
     "remote_with_quarterly_travel",
     "remote_with_monthly_travel",
     "remote_with_frequent_travel",

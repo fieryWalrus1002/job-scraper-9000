@@ -212,10 +212,10 @@ def test_hybrid_only_user_gets_hybrid_workplace_and_no_remote():
 
 def test_remote_only_user_policies():
     policies = derive_policies(_search("search_engineer.yml"))
-    # Post-3.0 a remote-only user accepts fully_remote (travel is now numeric,
-    # not a classification bucket) plus the always-acceptable unclear.
+    # A remote-only user accepts the canonical remote class plus the
+    # always-acceptable unclear.
     assert policies.remote.acceptable_classifications == [
-        "fully_remote",
+        "remote",
         "unclear",  # always acceptable — never a silent filter
     ]
     # roles.excluded_titles + keywords.excluded, deduped
@@ -236,8 +236,8 @@ def test_everything_acceptable_is_fully_permissive():
         }
     )
     policies = derive_policies(cfg)
-    # Fully permissive accepts every canonical class; the legacy travel buckets
-    # are no longer emitted into new policies (post-3.0).
+    # Fully permissive accepts every canonical class; legacy labels are no
+    # longer emitted into new policies.
     canonical = [
         c for c in REMOTE_CLASSIFICATIONS if c not in LEGACY_REMOTE_CLASSIFICATIONS
     ]
