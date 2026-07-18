@@ -1,6 +1,15 @@
 # Remote-filter simplification: split classification from travel judgment
 
 **Status:** RATIFIED 2026-06-12. Open questions resolved in §9.
+**Superseded by:** `specs/remote_filter_taxonomy.md` (RATIFIED 2026-07-17). That
+spec replaced the 5-bucket classification with a 4-way axis
+(`remote | hybrid | onsite | unclear`), made the classifier a pure extractor, and
+moved all accept/reject judgment — travel, location, timezone — out of the global
+`passes_remote_filter` policy into the per-user `pipeline.scoring._gate_user`. In
+particular the per-user `max_travel_days` gate this doc introduced (§7, #215) is
+now retired: travel is display-only (taxonomy decision 2). Read this doc for the
+classification-vs-travel *problem framing*; read the taxonomy spec for the shipped
+model.
 
 **Related, explicitly deferred:** #97 (remote postings mis-tagged
 `location_restricted` because the body merely *mentions* a city, when the
@@ -11,6 +20,11 @@ behind this work. This spec deliberately does **not** touch that behavior.
 
 ## Changelog
 
+- **2026-07-17 — superseded by the taxonomy spec.** `remote_filter_taxonomy.md`
+  (RATIFIED 2026-07-17) shipped the 4-way axis + pure-extractor model and moved
+  all judgment into `pipeline.scoring._gate_user`. The per-user `max_travel_days`
+  gate this doc introduced (§7, #215) is retired — travel is now display-only
+  (taxonomy decision 2). See the header "Superseded by" note.
 - **2026-06-18 — #215 shipped (per-user `max_travel_days`).** The human-facing
   field lives at `work_constraints.max_travel_days` (`int | None`, `0–365`);
   `derive_policies` threads it into `policies.remote.max_travel_days`; and the
