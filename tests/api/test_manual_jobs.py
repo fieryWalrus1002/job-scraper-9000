@@ -160,7 +160,8 @@ async def test_create_manual_job_posted_at_missing_defaults_to_today(
     assert resp.status_code == 201
     call_args = fake_conn.execute.call_args_list[0]
     params = call_args[0][1]
-    # The endpoint defaults to the UTC date (``datetime.now(UTC).date()``), so
-    # assert against UTC — a bare ``date.today()`` is local-tz and goes red for
-    # the window between UTC midnight and local midnight (see #504).
-    assert params["posted_at"] == datetime.now(UTC).date()
+    # The endpoint uses a single UTC "now" and derives both posted_at (now.date())
+    # and scored_at (now). Compare against scored_at.date() to avoid a midnight
+    # boundary race between handler execution and this test's own clock (see #504).
+    score_params = fake_conn.execute.call_args_list[1][0][1]
+    assert params["posted_at"] == score_params["scored_at"].date()
