@@ -43,8 +43,20 @@ describe('filtersFromParams', () => {
   })
 
   it('collects multiple rc values into remoteClassification array', () => {
-    const p = new URLSearchParams('rc=fully_remote&rc=hybrid')
-    expect(filtersFromParams(p).remoteClassification).toEqual(['fully_remote', 'hybrid'])
+    const p = new URLSearchParams('rc=remote&rc=hybrid')
+    expect(filtersFromParams(p).remoteClassification).toEqual(['remote', 'hybrid'])
+  })
+
+  it('normalizes legacy rc values to their canonical axis equivalent (#498)', () => {
+    const p = new URLSearchParams(
+      'rc=fully_remote&rc=location_restricted&rc=onsite_disguised&rc=remote_with_monthly_travel',
+    )
+    expect(filtersFromParams(p).remoteClassification).toEqual(['remote', 'onsite'])
+  })
+
+  it('dedupes when a legacy value collapses onto an already-selected canonical one', () => {
+    const p = new URLSearchParams('rc=remote&rc=fully_remote&rc=hybrid')
+    expect(filtersFromParams(p).remoteClassification).toEqual(['remote', 'hybrid'])
   })
 
   it('defaults missing scalar params to empty string', () => {
@@ -70,8 +82,8 @@ describe('filtersToParams', () => {
   })
 
   it('appends multiple rc values', () => {
-    const f: Filters = { ...EMPTY_FILTERS, remoteClassification: ['fully_remote', 'hybrid'] }
-    expect(filtersToParams(f).getAll('rc')).toEqual(['fully_remote', 'hybrid'])
+    const f: Filters = { ...EMPTY_FILTERS, remoteClassification: ['remote', 'hybrid'] }
+    expect(filtersToParams(f).getAll('rc')).toEqual(['remote', 'hybrid'])
   })
 })
 
@@ -81,7 +93,7 @@ describe('filtersFromParams / filtersToParams round-trip', () => {
       search: 'engineer',
       minScore: '2',
       maxScore: '4',
-      remoteClassification: ['fully_remote', 'hybrid'],
+      remoteClassification: ['remote', 'hybrid'],
       minPostedAt: '2024-01-01',
       maxPostedAt: '2024-12-31',
       company: 'Acme',
