@@ -326,3 +326,12 @@ ______________________________________________________________________
   `_load_classified` already read both as one union). The `passes_remote_filter`
   function and the `_filter_result`/`_filter_reason` display fields are retained
   for now (function → Phase 31 eval retirement; fields → a deferred follow-up).
+- **2026-07-17 — slice 6 shipped (docs, #484).** Updated `remote_agent.yml`
+  comments to flag `policy_thresholds` as **eval-only** — the overnight path
+  stopped reading it at slice 4; production judgment now lives entirely in
+  `pipeline.scoring._gate_user`, and the block survives only for the global
+  `passes_remote_filter` in the eval scripts (Phase 31 retires it). Marked
+  `remote_filter_simplification.md` as superseded by this spec. All six taxonomy
+  slices (#479/#480/#481/#482/#483/#484) are now shipped; the remaining Phase 30
+  items (#494 prefilter legacy-value reconciliation, #97 DDC misclassification,
+  #498 legacy filter-chip UX) are investigations/papercuts, not taxonomy slices.
