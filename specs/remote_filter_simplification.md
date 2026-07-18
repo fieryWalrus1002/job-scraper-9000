@@ -4,10 +4,11 @@
 **Superseded by:** `specs/remote_filter_taxonomy.md` (RATIFIED 2026-07-17). That
 spec replaced the 5-bucket classification with a 4-way axis
 (`remote | hybrid | onsite | unclear`), made the classifier a pure extractor, and
-moved all accept/reject judgment — travel, location, timezone — out of the global
-`passes_remote_filter` policy into the per-user `pipeline.scoring._gate_user`. In
-particular the per-user `max_travel_days` gate this doc introduced (§7, #215) is
-now retired: travel is display-only (taxonomy decision 2). Read this doc for the
+retired the global `passes_remote_filter` policy from the overnight path. Only
+**location** judgment moved into the per-user `pipeline.scoring._gate_user`;
+**travel and timezone are not gated anywhere** — both became display-only
+(taxonomy decisions 2 and 5). In particular the per-user `max_travel_days` gate
+this doc introduced (§7, #215) is now retired. Read this doc for the
 classification-vs-travel *problem framing*; read the taxonomy spec for the shipped
 model.
 
@@ -21,11 +22,14 @@ behind this work. This spec deliberately does **not** touch that behavior.
 ## Changelog
 
 - **2026-07-17 — superseded by the taxonomy spec.** `remote_filter_taxonomy.md`
-  (RATIFIED 2026-07-17) shipped the 4-way axis + pure-extractor model and moved
-  all judgment into `pipeline.scoring._gate_user`. The per-user `max_travel_days`
-  gate this doc introduced (§7, #215) is retired — travel is now display-only
-  (taxonomy decision 2). See the header "Superseded by" note.
-- **2026-06-18 — #215 shipped (per-user `max_travel_days`).** The human-facing
+  (RATIFIED 2026-07-17) shipped the 4-way axis + pure-extractor model. Only
+  **location** gating moved into `pipeline.scoring._gate_user`; travel and
+  timezone are not gated anywhere — both are display-only (taxonomy decisions 2
+  and 5). The per-user `max_travel_days` gate this doc introduced (§7, #215) is
+  retired. See the header "Superseded by" note.
+- **2026-06-18 — #215 shipped (per-user `max_travel_days`).** *(Later retired
+  2026-07-17 — travel is display-only under the taxonomy spec; see the top entry.)*
+  The human-facing
   field lives at `work_constraints.max_travel_days` (`int | None`, `0–365`);
   `derive_policies` threads it into `policies.remote.max_travel_days`; and the
   per-user scoring phase (`pipeline.scoring.score_run`) drops postings whose
