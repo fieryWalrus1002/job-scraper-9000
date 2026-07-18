@@ -331,7 +331,12 @@ def _annotate_job(
         "_prefilter_metadata": metadata,
     }
     if decision.route == "local_candidate":
-        annotated["remote_classification"] = "location_restricted"
+        # A local_candidate matched the local-area allowlist and bypasses the
+        # remote_filter LLM, so it never gets an extracted classification. Stamp
+        # the canonical 4-way axis value that best fits a job the user physically
+        # commutes to: "onsite". (Pre-taxonomy this was the now-legacy
+        # "location_restricted"; see specs/remote_filter_taxonomy.md and #494.)
+        annotated["remote_classification"] = "onsite"
     return annotated
 
 
