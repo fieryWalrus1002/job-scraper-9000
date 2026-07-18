@@ -152,17 +152,24 @@ def test_run_remote_filter_writes_all_classified_outputs(tmp_path):
 
     records = [json.loads(line) for line in classified_path.read_text().splitlines()]
 
-    assert [r["title"] for r in records] == ["Remote Engineer", "Hybrid Engineer"]
+    # Cache-miss records are written as they complete (``imap_unordered``), so
+    # the output order is not deterministic — key by title rather than position.
+    by_title = {r["title"]: r for r in records}
+    assert set(by_title) == {"Remote Engineer", "Hybrid Engineer"}
     assert {r["_filter_result"] for r in records} == {"pass"}
     assert {r["_filter_reason"] for r in records} == {"classified"}
-    assert [r["_remote_analysis"]["remote_classification"] for r in records] == [
-        "remote",
-        "hybrid",
-    ]
-    assert records[0]["_filter_metadata"] == {
-        **FILTER_METADATA,
-        "from_cache": False,
-    }
+    assert (
+        by_title["Remote Engineer"]["_remote_analysis"]["remote_classification"]
+        == "remote"
+    )
+    assert (
+        by_title["Hybrid Engineer"]["_remote_analysis"]["remote_classification"]
+        == "hybrid"
+    )
+    assert all(
+        r["_filter_metadata"] == {**FILTER_METADATA, "from_cache": False}
+        for r in records
+    )
 
 
 def test_run_remote_filter_skips_missing_description_without_inference(tmp_path):

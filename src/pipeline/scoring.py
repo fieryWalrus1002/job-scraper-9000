@@ -425,10 +425,19 @@ def _load_classified(runs_dir: Path, run_id: str) -> dict[str, dict[str, Any]]:
     ``acceptable_classifications`` decides over it. A posting absent from the
     stream simply has no score basis and is dropped from every user's input with
     the count surfaced in the summary.
+
+    The classify phase always writes the file (``"w"`` mode), so an *empty*
+    stream is tolerated but a *missing* one means classification never ran for
+    this run — that is a pipeline breakage, so fail loud rather than silently
+    dropping every posting from every user's input.
     """
     path = consolidated_dir(runs_dir, run_id) / CLASSIFIED_NAME
     if not path.exists():
-        return {}
+        raise FileNotFoundError(
+            f"classified stream missing for run_id={run_id!r} at {path} — the "
+            "classify phase did not write its output; refusing to score every "
+            "posting as unclassified"
+        )
 
     classified: dict[str, dict[str, Any]] = {}
     with path.open(encoding="utf-8") as f:
