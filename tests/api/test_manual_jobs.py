@@ -5,7 +5,7 @@ All tests use the mock pool fixture — no live Postgres required.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
