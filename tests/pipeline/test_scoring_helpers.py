@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 
 from pipeline.scoring import (
+    _load_classified,
     _passes_location_restrictions,
     _resolve_restriction,
 )
@@ -68,3 +69,11 @@ def test_passes_location_restrictions(
     expected: bool,
 ):
     assert _passes_location_restrictions(restrictions, acceptable, willing) is expected
+
+
+def test_load_classified_missing_file_fails_loud(tmp_path):
+    """A *missing* classified stream is a pipeline breakage (classify never ran),
+    so ``_load_classified`` fails loud rather than silently scoring every posting
+    as unclassified. See CLAUDE.md "FAIL FAST, but LOG WELL"."""
+    with pytest.raises(FileNotFoundError, match="classified stream missing"):
+        _load_classified(tmp_path, "20260717_000000")

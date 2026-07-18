@@ -67,27 +67,26 @@ def _consolidated_rows(conn: psycopg.Connection, run_id: str) -> dict[str, list[
 
 
 def _fake_classify_factory(calls: list[dict], *, classification: str = "fully_remote"):
-    """Records its call and writes every input posting to ``pass_path`` tagged
-    with ``_remote_analysis.remote_classification`` — the shape the scoring
-    phase reads back."""
+    """Records its call and writes every input posting to ``classified_path``
+    tagged with ``_remote_analysis.remote_classification`` — the shape the
+    scoring phase reads back."""
 
-    def _fn(*, input_path: Path, pass_path: Path, trash_path: Path, parent_run_id: str):
+    def _fn(*, input_path: Path, classified_path: Path, parent_run_id: str):
         calls.append(
             {
                 "input_path": input_path,
-                "pass_path": pass_path,
-                "trash_path": trash_path,
+                "classified_path": classified_path,
                 "parent_run_id": parent_run_id,
             }
         )
         lines = [ln for ln in input_path.read_text().splitlines() if ln.strip()]
-        with pass_path.open("w", encoding="utf-8") as f:
+        with classified_path.open("w", encoding="utf-8") as f:
             for ln in lines:
                 rec = json.loads(ln)
                 rec["_remote_analysis"] = {"remote_classification": classification}
                 f.write(json.dumps(rec) + "\n")
         n = len(lines)
-        return {"pass": n, "trash": 0, "skipped": 0, "total": n}
+        return {"classified": n, "skipped": 0, "total": n}
 
     return _fn
 
@@ -332,11 +331,10 @@ def test_classify_consolidated_invokes_classify_fn_with_run_paths(tmp_path):
         runs_dir=tmp_path, run_id="r", classify_fn=_fake_classify_factory(calls)
     )
 
-    assert summary == {"pass": 1, "trash": 0, "skipped": 0, "total": 1}
+    assert summary == {"classified": 1, "skipped": 0, "total": 1}
     assert len(calls) == 1
     assert calls[0]["input_path"] == out_dir / "postings.jsonl"
-    assert calls[0]["pass_path"] == out_dir / "classified_pass.jsonl"
-    assert calls[0]["trash_path"] == out_dir / "classified_trash.jsonl"
+    assert calls[0]["classified_path"] == out_dir / "classified.jsonl"
     assert calls[0]["parent_run_id"] == "r"
 
 

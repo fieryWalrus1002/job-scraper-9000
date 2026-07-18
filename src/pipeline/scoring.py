@@ -51,8 +51,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from pipeline.consolidation import (
-    PASS_NAME,
-    TRASH_NAME,
+    CLASSIFIED_NAME,
     consolidated_dir,
 )
 from pipeline.worker import run_user_dir
@@ -420,30 +419,37 @@ def _first_record_user_email(scored_path: Path) -> str:
 
 
 def _load_classified(runs_dir: Path, run_id: str) -> dict[str, dict[str, Any]]:
-    """``{dedup_hash: classified_record}`` from the pass + trash JSONLs.
+    """``{dedup_hash: classified_record}`` from the classified JSONL stream.
 
-    Both files are read: the global pass/trash split the classifier applied is
-    advisory (spec §8 step 4 note); each user's own
-    ``acceptable_classifications`` decides over the *union* of the two. A
-    posting present in neither file simply has no score basis and is dropped
-    from every user's input with the count surfaced in the summary.
+    The classifier writes one profile-independent stream; each user's own
+    ``acceptable_classifications`` decides over it. A posting absent from the
+    stream simply has no score basis and is dropped from every user's input with
+    the count surfaced in the summary.
+
+    The classify phase always writes the file (``"w"`` mode), so an *empty*
+    stream is tolerated but a *missing* one means classification never ran for
+    this run — that is a pipeline breakage, so fail loud rather than silently
+    dropping every posting from every user's input.
     """
-    out_dir = consolidated_dir(runs_dir, run_id)
+    path = consolidated_dir(runs_dir, run_id) / CLASSIFIED_NAME
+    if not path.exists():
+        raise FileNotFoundError(
+            f"classified stream missing for run_id={run_id!r} at {path} — the "
+            "classify phase did not write its output; refusing to score every "
+            "posting as unclassified"
+        )
+
     classified: dict[str, dict[str, Any]] = {}
-    for name in (PASS_NAME, TRASH_NAME):
-        path = out_dir / name
-        if not path.exists():
-            continue
-        with path.open(encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                rec = json.loads(line)
-                key = rec.get("dedup_hash")
-                if key is None:
-                    continue
-                classified[key] = rec
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            key = rec.get("dedup_hash")
+            if key is None:
+                continue
+            classified[key] = rec
     return classified
 
 

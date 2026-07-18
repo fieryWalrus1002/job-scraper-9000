@@ -68,7 +68,7 @@ ______________________________________________________________________
 
 ## Running the agent
 
-The CLI reads the routed candidate JSONL from `data/prefiltered/remote_filter_input.jsonl` by default, applies the remote filter, and writes pass/trash outputs:
+The CLI reads the routed candidate JSONL from `data/prefiltered/remote_filter_input.jsonl` by default, runs the remote classifier, and writes one classified output:
 
 ```bash
 uv run job-scraper-9000 remote-filter
@@ -77,13 +77,12 @@ uv run job-scraper-9000 remote-filter
 The legacy script entry point still works:
 
 ```bash
-python scripts/run_remote_filter.py
+uv run scripts/run_remote_filter.py
 ```
 
-Outputs:
+Output:
 
-- `data/filtered/remote_filter_pass.jsonl`
-- `data/trash/remote_filter_trash.jsonl`
+- `data/filtered/remote_filter_classified.jsonl`
 
 Override `--input data/raw` if you want to run the filter directly on raw scraped jobs.
 
@@ -99,7 +98,7 @@ For large runs, `--batch` submits every cache-miss job to the [OpenAI Batch API]
 uv run job-scraper-9000 remote-filter --run-date 2026-05-16 --batch
 ```
 
-It is a single blocking command: submit → poll → write the same pass/trash outputs as the serial path. Cache hits never enter the batch (so a re-run is cheap), and outputs/telemetry are identical apart from the 50%-discounted cost estimate. `--poll-interval SECONDS` (default 60) controls the status-poll cadence. The Batch API is OpenAI-only — `--batch` with a non-OpenAI provider fails fast with a clear error; drop the flag to run the serial path against ollama.
+It is a single blocking command: submit → poll → write the same classified output as the serial path. Cache hits never enter the batch (so a re-run is cheap), and outputs/telemetry are identical apart from the 50%-discounted cost estimate. `--poll-interval SECONDS` (default 60) controls the status-poll cadence. The Batch API is OpenAI-only — `--batch` with a non-OpenAI provider fails fast with a clear error; drop the flag to run the serial path against ollama.
 
 Each enriched output record contains all original job fields plus:
 
@@ -116,7 +115,7 @@ Each enriched output record contains all original job fields plus:
     "key_phrases": ["Remote", "distributed team"]
   },
   "_filter_result": "pass",
-  "_filter_reason": "passed",
+  "_filter_reason": "classified",
   "_filter_metadata": {
     "schema_version": "3.0.0",
     "prompt_hash": "...",
@@ -141,24 +140,14 @@ As of `SCHEMA_VERSION` 3.0.0 the classification captures **remote-ness only**. T
 
 ______________________________________________________________________
 
-## Filter logic
+## Downstream gating
 
-A posting is trashed if any configured policy rule rejects it:
-
-- classification is listed under `policy_thresholds.disallowed_classifications`
-- estimated travel days exceed `policy_thresholds.travel.max_estimated_days_per_year`
-- location restrictions conflict with `USER_LOCATION`
-- hard timezone requirements match rejected timezone keywords
-- classification is `unclear` and `on_unclear_classification` is `reject`
-
-The `requires_relocation` and `requires_local_presence` flags are **not** gated
-here — this global/consolidation layer is permissive on both (see the `relocation`
-config above). They are applied **per user** in `pipeline.scoring.score_run` against
-each user's stored `UserPolicies`: `requires_relocation` is a veto unless the user is
-willing to relocate, and `requires_local_presence` is **location-aware** — a
-non-relocating user keeps such jobs when the posting location matches their acceptable
-locations, and drops them (out-of-area / ambiguous / no-policy) otherwise. See
-[`specs/relocation_policy.md`](../../../specs/relocation_policy.md) §2.1 and §8.
+The classifier is a pure extractor: it writes every successfully analyzed posting
+into the classified stream. Accept/reject decisions happen **per user** in
+`pipeline.scoring.score_run` against each user's stored `UserPolicies`, including
+`acceptable_classifications`, location restrictions, relocation, and local-presence
+policy. See [`specs/relocation_policy.md`](../../../specs/relocation_policy.md) §2.1
+and §8.
 
 ______________________________________________________________________
 

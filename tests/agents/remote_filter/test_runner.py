@@ -116,10 +116,9 @@ policy_thresholds: {}
 # ---------------------------------------------------------------------------
 
 
-def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
+def test_run_remote_filter_writes_all_classified_outputs(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     _write_config(config_path)
     _write_jsonl(
@@ -139,44 +138,43 @@ def test_run_remote_filter_writes_pass_and_trash_outputs(tmp_path):
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
-                user_location="USA",
                 cache_path=tmp_path / "cache.jsonl",
             )
 
-    assert counts["pass"] == 1
-    assert counts["trash"] == 1
+    assert counts["classified"] == 2
     assert counts["skipped"] == 0
     assert counts["total"] == 2
     assert counts["deduped"] == 0
     assert counts["cache_hits"] == 0
     assert counts["cache_misses"] == 2
 
-    pass_records = [json.loads(line) for line in pass_path.read_text().splitlines()]
-    trash_records = [json.loads(line) for line in trash_path.read_text().splitlines()]
+    records = [json.loads(line) for line in classified_path.read_text().splitlines()]
 
-    assert len(pass_records) == 1
-    assert pass_records[0]["title"] == "Remote Engineer"
-    assert pass_records[0]["_filter_result"] == "pass"
-    assert pass_records[0]["_filter_reason"] == "passed"
-    assert pass_records[0]["_remote_analysis"]["remote_classification"] == "remote"
-    assert pass_records[0]["_filter_metadata"] == {
-        **FILTER_METADATA,
-        "from_cache": False,
-    }
-
-    assert len(trash_records) == 1
-    assert trash_records[0]["title"] == "Hybrid Engineer"
-    assert trash_records[0]["_filter_result"] == "trash"
-    assert trash_records[0]["_filter_reason"] == "classification:hybrid"
+    # Cache-miss records are written as they complete (``imap_unordered``), so
+    # the output order is not deterministic — key by title rather than position.
+    by_title = {r["title"]: r for r in records}
+    assert set(by_title) == {"Remote Engineer", "Hybrid Engineer"}
+    assert {r["_filter_result"] for r in records} == {"pass"}
+    assert {r["_filter_reason"] for r in records} == {"classified"}
+    assert (
+        by_title["Remote Engineer"]["_remote_analysis"]["remote_classification"]
+        == "remote"
+    )
+    assert (
+        by_title["Hybrid Engineer"]["_remote_analysis"]["remote_classification"]
+        == "hybrid"
+    )
+    assert all(
+        r["_filter_metadata"] == {**FILTER_METADATA, "from_cache": False}
+        for r in records
+    )
 
 
 def test_run_remote_filter_skips_missing_description_without_inference(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     _write_config(config_path)
     _write_jsonl(input_path, [_job(description="")])
@@ -188,25 +186,21 @@ def test_run_remote_filter_skips_missing_description_without_inference(tmp_path)
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=None,
             )
 
-    assert counts["pass"] == 0
-    assert counts["trash"] == 0
+    assert counts["classified"] == 0
     assert counts["skipped"] == 1
     assert counts["total"] == 1
     mock_analyze.assert_not_called()
-    assert pass_path.read_text() == ""
-    assert trash_path.read_text() == ""
+    assert classified_path.read_text() == ""
 
 
 def test_run_remote_filter_skips_failed_agent_result(tmp_path):
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     _write_config(config_path)
     _write_jsonl(input_path, [_job()])
@@ -218,18 +212,15 @@ def test_run_remote_filter_skips_failed_agent_result(tmp_path):
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
                 cache_path=None,
             )
 
-    assert counts["pass"] == 0
-    assert counts["trash"] == 0
+    assert counts["classified"] == 0
     assert counts["skipped"] == 1
     assert counts["total"] == 1
-    assert pass_path.read_text() == ""
-    assert trash_path.read_text() == ""
+    assert classified_path.read_text() == ""
 
 
 def test_run_remote_filter_raises_when_no_jobs_found(tmp_path):
@@ -239,8 +230,7 @@ def test_run_remote_filter_raises_when_no_jobs_found(tmp_path):
     with pytest.raises(FileNotFoundError, match="No jobs found"):
         run_remote_filter(
             input_path=tmp_path / "empty-dir",
-            pass_path=tmp_path / "pass.jsonl",
-            trash_path=tmp_path / "trash.jsonl",
+            classified_path=tmp_path / "classified.jsonl",
             config_path=config_path,
         )
 
@@ -248,8 +238,7 @@ def test_run_remote_filter_raises_when_no_jobs_found(tmp_path):
 def test_run_remote_filter_runs_concurrently(tmp_path):
     """Assert that LLM calls are executed in parallel, not sequentially."""
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     config_path = tmp_path / "remote_agent.yml"
     cache_path = tmp_path / "cache.jsonl"
 
@@ -316,15 +305,12 @@ policy_thresholds:
         ):
             counts = run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=config_path,
-                user_location="USA",
                 cache_path=cache_path,
             )
 
-    assert counts["pass"] == 6
-    assert counts["trash"] == 0
+    assert counts["classified"] == 6
     assert counts["cache_misses"] == 6
     # With max_workers=4 and 6 jobs, we should see >1 concurrent call.
     assert max_concurrent > 1, f"Expected concurrent calls > 1, got {max_concurrent}"

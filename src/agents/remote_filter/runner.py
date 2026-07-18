@@ -16,7 +16,6 @@ from agents.remote_filter.utils import (
     build_search_context,
     context_fingerprint,
     load_raw_jobs,
-    passes_remote_filter,
     resolve_provider_and_model,
 )
 from utils.concurrent import imap_unordered
@@ -28,8 +27,7 @@ from utils.run_tracker import RunTracker
 log = logging.getLogger(__name__)
 
 DEFAULT_INPUT_DIR = Path("data/prefiltered/remote_filter_input.jsonl")
-DEFAULT_PASS_PATH = Path("data/filtered/remote_filter_pass.jsonl")
-DEFAULT_TRASH_PATH = Path("data/trash/remote_filter_trash.jsonl")
+DEFAULT_CLASSIFIED_PATH = Path("data/filtered/remote_filter_classified.jsonl")
 DEFAULT_CONFIG_PATH = Path("config/agent/remote_agent.yml")
 
 
@@ -72,24 +70,21 @@ def _infer_run_date(path: Path) -> str | None:
 def run_remote_filter(
     *,
     input_path: str | Path = DEFAULT_INPUT_DIR,
-    pass_path: str | Path = DEFAULT_PASS_PATH,
-    trash_path: str | Path = DEFAULT_TRASH_PATH,
+    classified_path: str | Path = DEFAULT_CLASSIFIED_PATH,
     config_path: str | Path = DEFAULT_CONFIG_PATH,
-    user_location: str = "USA",
     user_timezone: str | None = None,
     cache_path: str | Path | None = DEFAULT_CACHE_PATH,
     run_type: str = "production",
     parent_run_id: str | None = None,
 ) -> dict[str, int]:
-    """Run the remote-filter agent over routed candidate jobs and split pass/trash JSONL outputs.
+    """Run the remote-filter agent over routed candidate jobs into one JSONL output.
 
     Within-batch duplicates (by `dedup_hash` / `source_job_id`) are collapsed to
     a single LLM call. Pass `cache_path=None` to disable the across-batch cache.
     Telemetry is written to ``data/run_telemetry/runs.jsonl`` via ``RunTracker``.
     """
     input_path = Path(input_path)
-    pass_path = Path(pass_path)
-    trash_path = Path(trash_path)
+    classified_path = Path(classified_path)
     config = load_remote_filter_config(config_path)
     llm_config = config.get("llm") or {}
 
@@ -125,10 +120,9 @@ def run_remote_filter(
     provider, model = resolve_provider_and_model(llm_config)
     prompt_hash = filter_meta["prompt_hash"]
 
-    pass_path.parent.mkdir(parents=True, exist_ok=True)
-    trash_path.parent.mkdir(parents=True, exist_ok=True)
+    classified_path.parent.mkdir(parents=True, exist_ok=True)
 
-    passed = failed = skipped = cache_hits = cache_misses = 0
+    classified_count = skipped = cache_hits = cache_misses = 0
 
     with RunTracker(
         component="remote_filter",
@@ -160,10 +154,7 @@ def run_remote_filter(
         )
 
         try:
-            with (
-                pass_path.open("w", encoding="utf-8") as pass_f,
-                trash_path.open("w", encoding="utf-8") as trash_f,
-            ):
+            with classified_path.open("w", encoding="utf-8") as classified_f:
                 # --- Phase (a): Plan pass (main thread) ---
                 # Classify jobs into cache hits (no LLM call) and misses (need LLM).
                 # All shared-state mutations stay on the main thread.
@@ -248,34 +239,23 @@ def run_remote_filter(
                 # Process cache hits first (instant, no LLM call).
                 for hit in hits:
                     analysis = hit["analysis"]
-                    ok, reason = passes_remote_filter(analysis, config, user_location)
 
                     enriched = {
                         **hit["job"],
                         "_remote_analysis": analysis.model_dump(),
-                        "_filter_result": "pass" if ok else "trash",
-                        "_filter_reason": reason,
+                        "_filter_result": "pass",
+                        "_filter_reason": "classified",
                         "_filter_metadata": {**filter_meta, "from_cache": True},
                     }
 
-                    if ok:
-                        pass_f.write(json.dumps(enriched) + "\n")
-                        passed += 1
-                        log.info(
-                            "PASS  %s @ %s (%s) [cached]",
-                            hit["title"],
-                            hit["company"],
-                            analysis.remote_classification,
-                        )
-                    else:
-                        trash_f.write(json.dumps(enriched) + "\n")
-                        failed += 1
-                        log.info(
-                            "TRASH %s @ %s — %s [cached]",
-                            hit["title"],
-                            hit["company"],
-                            reason,
-                        )
+                    classified_f.write(json.dumps(enriched) + "\n")
+                    classified_count += 1
+                    log.info(
+                        "CLASSIFIED %s @ %s (%s) [cached]",
+                        hit["title"],
+                        hit["company"],
+                        analysis.remote_classification,
+                    )
 
                 # Process misses from the concurrent pool.
                 for miss, (analysis, usage, elapsed) in imap_unordered(
@@ -307,39 +287,30 @@ def run_remote_filter(
                             analysis=analysis,
                         )
 
-                    ok, reason = passes_remote_filter(analysis, config, user_location)
-
                     enriched = {
                         **miss["job"],
                         "_remote_analysis": analysis.model_dump(),
-                        "_filter_result": "pass" if ok else "trash",
-                        "_filter_reason": reason,
+                        "_filter_result": "pass",
+                        "_filter_reason": "classified",
                         "_filter_metadata": {**filter_meta, "from_cache": False},
                     }
 
-                    if ok:
-                        pass_f.write(json.dumps(enriched) + "\n")
-                        passed += 1
-                        log.info(
-                            "PASS  %s @ %s (%s)",
-                            miss["title"],
-                            miss["company"],
-                            analysis.remote_classification,
-                        )
-                    else:
-                        trash_f.write(json.dumps(enriched) + "\n")
-                        failed += 1
-                        log.info(
-                            "TRASH %s @ %s — %s",
-                            miss["title"],
-                            miss["company"],
-                            reason,
-                        )
+                    classified_f.write(json.dumps(enriched) + "\n")
+                    classified_count += 1
+                    log.info(
+                        "CLASSIFIED %s @ %s (%s)",
+                        miss["title"],
+                        miss["company"],
+                        analysis.remote_classification,
+                    )
         finally:
             # Roll up counts and cost even if the loop raised, so partial-run
             # records still carry as much information as possible.
-            run.add_output(label="pass", path=str(pass_path), record_count=passed)
-            run.add_output(label="trash", path=str(trash_path), record_count=failed)
+            run.add_output(
+                label="classified",
+                path=str(classified_path),
+                record_count=classified_count,
+            )
             if skipped:
                 run.add_output(label="skipped", record_count=skipped)
             if cache is not None:
@@ -360,9 +331,8 @@ def run_remote_filter(
         cache_lookups = cache_hits + cache_misses
         cache_hit_pct = (100 * cache_hits / cache_lookups) if cache_lookups else 0.0
         log.info(
-            "Done — %d pass | %d trash | %d skipped | %d deduped | cache %d/%d hits (%.1f%%) | run_id=%s",
-            passed,
-            failed,
+            "Done — %d classified | %d skipped | %d deduped | cache %d/%d hits (%.1f%%) | run_id=%s",
+            classified_count,
             skipped,
             deduped,
             cache_hits,
@@ -372,8 +342,7 @@ def run_remote_filter(
         )
 
     return {
-        "pass": passed,
-        "trash": failed,
+        "classified": classified_count,
         "skipped": skipped,
         "total": len(jobs),
         "input_total": total_loaded,

@@ -181,12 +181,11 @@ def test_parse_analysis_returns_none_on_schema_invalid_content():
 # ---------------------------------------------------------------------------
 
 
-def test_run_batch_splits_pass_and_trash(tmp_path, monkeypatch):
+def test_run_batch_writes_all_classified(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_path = tmp_path / "remote_agent.yml"
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
     _write_jsonl(
@@ -212,24 +211,20 @@ def test_run_batch_splits_pass_and_trash(tmp_path, monkeypatch):
     ):
         counts = batch.run_remote_filter_batch(
             input_path=input_path,
-            pass_path=pass_path,
-            trash_path=trash_path,
+            classified_path=classified_path,
             config_path=config_path,
             cache_path=cache_path,
         )
 
     mock_upload.assert_called_once()
-    assert counts["pass"] == 1
-    assert counts["trash"] == 1
+    assert counts["classified"] == 2
     assert counts["submitted"] == 2
     assert counts["cache_misses"] == 2
 
-    passes = _read_jsonl(pass_path)
-    trashes = _read_jsonl(trash_path)
-    assert [r["title"] for r in passes] == ["RemoteRole"]
-    assert passes[0]["_filter_result"] == "pass"
-    assert [r["title"] for r in trashes] == ["HybridRole"]
-    assert trashes[0]["_filter_reason"] == "classification:hybrid"
+    records = _read_jsonl(classified_path)
+    assert [r["title"] for r in records] == ["RemoteRole", "HybridRole"]
+    assert {r["_filter_result"] for r in records} == {"pass"}
+    assert {r["_filter_reason"] for r in records} == {"classified"}
 
     # Both analyses were written back to the cache for next time.
     assert len(_read_jsonl(cache_path)) == 2
@@ -239,8 +234,7 @@ def test_run_batch_serves_cache_hits_without_submitting(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_path = tmp_path / "remote_agent.yml"
     input_path = tmp_path / "raw.jsonl"
-    pass_path = tmp_path / "pass.jsonl"
-    trash_path = tmp_path / "trash.jsonl"
+    classified_path = tmp_path / "classified.jsonl"
     cache_path = tmp_path / "cache.jsonl"
     _write_config(config_path)
     _write_jsonl(input_path, [_job(source_job_id="1", dedup_hash="hashA")])
@@ -265,8 +259,7 @@ def test_run_batch_serves_cache_hits_without_submitting(tmp_path, monkeypatch):
     ):
         counts = batch.run_remote_filter_batch(
             input_path=input_path,
-            pass_path=pass_path,
-            trash_path=trash_path,
+            classified_path=classified_path,
             config_path=config_path,
             cache_path=cache_path,
         )
@@ -275,8 +268,8 @@ def test_run_batch_serves_cache_hits_without_submitting(tmp_path, monkeypatch):
     mock_client.assert_not_called()
     assert counts["cache_hits"] == 1
     assert counts["submitted"] == 0
-    assert counts["pass"] == 1
-    assert _read_jsonl(pass_path)[0]["_filter_metadata"]["from_cache"] is True
+    assert counts["classified"] == 1
+    assert _read_jsonl(classified_path)[0]["_filter_metadata"]["from_cache"] is True
 
 
 def test_run_batch_rejects_non_openai_provider(tmp_path):
@@ -292,8 +285,7 @@ def test_run_batch_rejects_non_openai_provider(tmp_path):
     with pytest.raises(ValueError, match="provider=openai"):
         batch.run_remote_filter_batch(
             input_path=input_path,
-            pass_path=tmp_path / "pass.jsonl",
-            trash_path=tmp_path / "trash.jsonl",
+            classified_path=tmp_path / "classified.jsonl",
             config_path=config_path,
             cache_path=None,
         )

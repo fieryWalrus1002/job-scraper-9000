@@ -26,23 +26,21 @@ def test_batch_classify_fn_forwards_hook_kwargs(monkeypatch):
 
     def fake(**kwargs):
         calls.append(kwargs)
-        return {"pass": 1}
+        return {"classified": 1}
 
     monkeypatch.setattr("agents.remote_filter.batch.run_remote_filter_batch", fake)
 
     result = batch_classify_fn(
         input_path=Path("in.jsonl"),
-        pass_path=Path("pass.jsonl"),
-        trash_path=Path("trash.jsonl"),
+        classified_path=Path("classified.jsonl"),
         parent_run_id="run-1",
     )
 
-    assert result == {"pass": 1}
+    assert result == {"classified": 1}
     assert calls == [
         {
             "input_path": Path("in.jsonl"),
-            "pass_path": Path("pass.jsonl"),
-            "trash_path": Path("trash.jsonl"),
+            "classified_path": Path("classified.jsonl"),
             "parent_run_id": "run-1",
         }
     ]

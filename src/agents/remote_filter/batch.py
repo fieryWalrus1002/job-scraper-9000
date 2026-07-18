@@ -3,7 +3,7 @@
 Production twin of the serial runner (``runner.run_remote_filter``): instead of
 one synchronous LLM call per job, it submits every cache-miss job as a single
 Batch API request, blocks until the batch reaches a terminal state, then writes
-the same pass/trash JSONL the live path produces. Cache hits never enter the
+the same classified JSONL the live path produces. Cache hits never enter the
 batch. OpenAI-only — the Batch API has no ollama equivalent, so we fail fast.
 
 Request building and result parsing live here (not imported from the eval
@@ -33,10 +33,9 @@ from utils.run_tracker import RunTracker
 from .cache import DEFAULT_CACHE_PATH, AnalysisCache
 from .models import RemoteAnalysis
 from .runner import (
+    DEFAULT_CLASSIFIED_PATH,
     DEFAULT_CONFIG_PATH,
     DEFAULT_INPUT_DIR,
-    DEFAULT_PASS_PATH,
-    DEFAULT_TRASH_PATH,
     _infer_run_date,
     build_filter_metadata,
     load_remote_filter_config,
@@ -48,7 +47,6 @@ from .utils import (
     build_search_context,
     context_fingerprint,
     load_raw_jobs,
-    passes_remote_filter,
     resolve_provider_and_model,
 )
 
@@ -190,10 +188,8 @@ def _log_batch_failure(client, batch, run_id: str) -> None:
 def run_remote_filter_batch(
     *,
     input_path: str | Path = DEFAULT_INPUT_DIR,
-    pass_path: str | Path = DEFAULT_PASS_PATH,
-    trash_path: str | Path = DEFAULT_TRASH_PATH,
+    classified_path: str | Path = DEFAULT_CLASSIFIED_PATH,
     config_path: str | Path = DEFAULT_CONFIG_PATH,
-    user_location: str = "USA",
     user_timezone: str | None = None,
     cache_path: str | Path | None = DEFAULT_CACHE_PATH,
     run_type: str = "production",
@@ -203,11 +199,10 @@ def run_remote_filter_batch(
     """Run remote-filter over routed candidates via the OpenAI Batch API.
 
     Submits all cache-miss jobs as one batch, polls until terminal, then writes
-    the same enriched pass/trash JSONL as ``run_remote_filter``. OpenAI-only.
+    the same enriched classified JSONL as ``run_remote_filter``. OpenAI-only.
     """
     input_path = Path(input_path)
-    pass_path = Path(pass_path)
-    trash_path = Path(trash_path)
+    classified_path = Path(classified_path)
     config = load_remote_filter_config(config_path)
     llm_config = config.get("llm") or {}
 
@@ -240,10 +235,9 @@ def run_remote_filter_batch(
 
     cache = AnalysisCache(cache_path) if cache_path is not None else None
 
-    pass_path.parent.mkdir(parents=True, exist_ok=True)
-    trash_path.parent.mkdir(parents=True, exist_ok=True)
+    classified_path.parent.mkdir(parents=True, exist_ok=True)
 
-    passed = failed = skipped = cache_hits = cache_misses = 0
+    classified_count = skipped = cache_hits = cache_misses = 0
 
     with RunTracker(
         component="remote_filter",
@@ -353,11 +347,8 @@ def run_remote_filter_batch(
                     "All %d jobs served from cache — no batch submitted", len(plan)
                 )
 
-            # --- Pass 2: resolve analyses, gate, write pass/trash ---
-            with (
-                pass_path.open("w", encoding="utf-8") as pass_f,
-                trash_path.open("w", encoding="utf-8") as trash_f,
-            ):
+            # --- Pass 2: resolve analyses and write classified output ---
+            with classified_path.open("w", encoding="utf-8") as classified_f:
                 for entry in plan:
                     job = entry["job"]
                     title = job.get("title", "")
@@ -395,40 +386,31 @@ def run_remote_filter_batch(
                                 analysis=analysis,
                             )
 
-                    ok, reason = passes_remote_filter(analysis, config, user_location)
                     enriched = {
                         **job,
                         "_remote_analysis": analysis.model_dump(),
-                        "_filter_result": "pass" if ok else "trash",
-                        "_filter_reason": reason,
+                        "_filter_result": "pass",
+                        "_filter_reason": "classified",
                         "_filter_metadata": {
                             **filter_meta,
                             "from_cache": entry["from_cache"],
                         },
                     }
-                    if ok:
-                        pass_f.write(json.dumps(enriched) + "\n")
-                        passed += 1
-                        log.info(
-                            "PASS  %s @ %s (%s)%s",
-                            title,
-                            company,
-                            analysis.remote_classification,
-                            " [cached]" if entry["from_cache"] else "",
-                        )
-                    else:
-                        trash_f.write(json.dumps(enriched) + "\n")
-                        failed += 1
-                        log.info(
-                            "TRASH %s @ %s — %s%s",
-                            title,
-                            company,
-                            reason,
-                            " [cached]" if entry["from_cache"] else "",
-                        )
+                    classified_f.write(json.dumps(enriched) + "\n")
+                    classified_count += 1
+                    log.info(
+                        "CLASSIFIED %s @ %s (%s)%s",
+                        title,
+                        company,
+                        analysis.remote_classification,
+                        " [cached]" if entry["from_cache"] else "",
+                    )
         finally:
-            run.add_output(label="pass", path=str(pass_path), record_count=passed)
-            run.add_output(label="trash", path=str(trash_path), record_count=failed)
+            run.add_output(
+                label="classified",
+                path=str(classified_path),
+                record_count=classified_count,
+            )
             if skipped:
                 run.add_output(label="skipped", record_count=skipped)
             if cache is not None:
@@ -448,10 +430,9 @@ def run_remote_filter_batch(
         cache_lookups = cache_hits + cache_misses
         cache_hit_pct = (100 * cache_hits / cache_lookups) if cache_lookups else 0.0
         log.info(
-            "Done (batch) — %d pass | %d trash | %d skipped | %d deduped | "
+            "Done (batch) — %d classified | %d skipped | %d deduped | "
             "%d submitted | cache %d/%d hits (%.1f%%) | run_id=%s",
-            passed,
-            failed,
+            classified_count,
             skipped,
             deduped,
             submitted,
@@ -462,8 +443,7 @@ def run_remote_filter_batch(
         )
 
     return {
-        "pass": passed,
-        "trash": failed,
+        "classified": classified_count,
         "skipped": skipped,
         "total": len(jobs),
         "input_total": total_loaded,

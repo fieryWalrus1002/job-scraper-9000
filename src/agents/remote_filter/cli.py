@@ -14,16 +14,15 @@ def _cmd_remote_filter(args) -> None:
     run_date = getattr(args, "run_date", None)
     if run_date:
         input_path = args.input or f"data/prefiltered/{run_date}"
-        pass_path = (
-            args.pass_output or f"data/filtered/{run_date}/remote_filter_pass.jsonl"
-        )
-        trash_path = (
-            args.trash_output or f"data/trash/{run_date}/remote_filter_trash.jsonl"
+        classified_path = (
+            args.classified_output
+            or f"data/filtered/{run_date}/remote_filter_classified.jsonl"
         )
     else:
         input_path = args.input or "data/prefiltered/remote_filter_input.jsonl"
-        pass_path = args.pass_output or "data/filtered/remote_filter_pass.jsonl"
-        trash_path = args.trash_output or "data/trash/remote_filter_trash.jsonl"
+        classified_path = (
+            args.classified_output or "data/filtered/remote_filter_classified.jsonl"
+        )
 
     from agents.remote_filter.cache import DEFAULT_CACHE_PATH
 
@@ -35,10 +34,8 @@ def _cmd_remote_filter(args) -> None:
 
             run_remote_filter_batch(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=args.config,
-                user_location=args.user_location,
                 user_timezone=args.user_timezone,
                 cache_path=cache_path,
                 poll_interval=getattr(args, "poll_interval", 60),
@@ -46,10 +43,8 @@ def _cmd_remote_filter(args) -> None:
         else:
             run_remote_filter(
                 input_path=input_path,
-                pass_path=pass_path,
-                trash_path=trash_path,
+                classified_path=classified_path,
                 config_path=args.config,
-                user_location=args.user_location,
                 user_timezone=args.user_timezone,
                 cache_path=cache_path,
             )
@@ -65,7 +60,7 @@ def _cmd_remote_filter(args) -> None:
 def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "remote-filter",
-        help="Run the remote-filter agent over routed candidates and split pass/trash outputs",
+        help="Run the remote-filter agent over routed candidates into one classified output",
     )
     p.add_argument(
         "--run-date",
@@ -81,24 +76,15 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
         help="JSONL file or directory to read (overrides --run-date)",
     )
     p.add_argument(
-        "--pass-output",
+        "--classified-output",
         default=None,
-        help="JSONL path for jobs that pass the filter (overrides --run-date)",
-    )
-    p.add_argument(
-        "--trash-output",
-        default=None,
-        help="JSONL path for rejected jobs (overrides --run-date)",
+        dest="classified_output",
+        help="JSONL path for classified jobs (overrides --run-date)",
     )
     p.add_argument(
         "--config",
         default="config/agent/remote_agent.yml",
         help="Remote-filter config YAML",
-    )
-    p.add_argument(
-        "--user-location",
-        default=os.environ.get("USER_LOCATION", "USA"),
-        help="Candidate location for geographic restriction checks",
     )
     p.add_argument(
         "--user-timezone",
@@ -121,7 +107,7 @@ def _add_remote_filter(sub: argparse._SubParsersAction) -> None:
         "--batch",
         action="store_true",
         help="Submit all cache-miss jobs via the OpenAI Batch API (one blocking "
-        "submit+poll), then write the same pass/trash outputs. OpenAI provider only.",
+        "submit+poll), then write the same classified output. OpenAI provider only.",
     )
     p.add_argument(
         "--poll-interval",

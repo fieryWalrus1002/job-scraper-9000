@@ -21,7 +21,7 @@ import pytest
 from psycopg.types.json import Json
 
 from ingest.core import ingest, read_jsonl
-from pipeline.consolidation import PASS_NAME, TRASH_NAME, consolidated_dir
+from pipeline.consolidation import CLASSIFIED_NAME, consolidated_dir
 from pipeline.planner import _slug
 from pipeline import scoring
 from pipeline.scoring import (
@@ -43,7 +43,7 @@ RUN_DATE = "2026-06-12"
 
 
 # ---------------------------------------------------------------------------
-# Helpers — seed consolidated_postings + the classified union on disk, and
+# Helpers — seed consolidated_postings + the classified stream on disk, and
 # materialize the per-user profile the planner would have written.
 # ---------------------------------------------------------------------------
 
@@ -62,15 +62,14 @@ def _seed_consolidated(
 
 
 def _write_classified(
-    runs_dir: Path, *, passed: list[dict], trashed: list[dict] | None = None
+    runs_dir: Path, *, classified: list[dict], trashed: list[dict] | None = None
 ) -> None:
+    records = [*classified, *(trashed or [])]
     out_dir = consolidated_dir(runs_dir, RUN_ID)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / PASS_NAME).write_text("".join(json.dumps(r) + "\n" for r in passed))
-    if trashed:
-        (out_dir / TRASH_NAME).write_text(
-            "".join(json.dumps(r) + "\n" for r in trashed)
-        )
+    (out_dir / CLASSIFIED_NAME).write_text(
+        "".join(json.dumps(r) + "\n" for r in records)
+    )
 
 
 def _materialize_profile(runs_dir: Path, email: str) -> None:
@@ -302,7 +301,7 @@ def test_scores_each_user_against_their_own_profile(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-shared", "remote"),
             _classified("h-alice", "remote"),
         ],
@@ -349,7 +348,7 @@ def test_two_phase_batch_submits_all_then_collects_in_user_order(
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-alice", "remote"),
             _classified("h-bob", "remote"),
         ],
@@ -407,7 +406,7 @@ def test_two_phase_batch_isolates_submit_failure(migrated_pg, tmp_path, monkeypa
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-alice", "remote"),
             _classified("h-bob", "remote"),
         ],
@@ -455,7 +454,7 @@ def test_two_phase_batch_isolates_collect_failure(migrated_pg, tmp_path, monkeyp
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-alice", "remote"),
             _classified("h-bob", "remote"),
         ],
@@ -508,7 +507,7 @@ def test_two_phase_batch_isolates_post_collect_failure_without_reabort(
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-alice", "remote"),
             _classified("h-bob", "remote"),
         ],
@@ -565,7 +564,7 @@ def test_two_phase_batch_marks_pending_users_failed_when_polling_dies(
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-alice", "remote"),
             _classified("h-bob", "remote"),
         ],
@@ -612,7 +611,7 @@ def test_two_phase_batch_aborts_open_submissions_on_interrupt(
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-alice", "remote"),
             _classified("h-bob", "remote"),
         ],
@@ -655,7 +654,7 @@ def test_two_phase_batch_summary_shape_matches_serial_path(
         _seed_consolidated(conn, dedup_hash="h-alice", requested_by=[u1])
 
     _materialize_profile(tmp_path, "alice@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-alice", "remote")])
+    _write_classified(tmp_path, classified=[_classified("h-alice", "remote")])
 
     events: list[tuple[str, tuple[str, ...]]] = []
     submissions: list[_FakeBatchSubmission] = []
@@ -698,7 +697,7 @@ def test_gates_postings_by_each_users_remote_policy(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "strict@example.com")
     _write_classified(
         tmp_path,
-        passed=[_classified("h-ok", "remote")],
+        classified=[_classified("h-ok", "remote")],
         trashed=[_classified("h-travel", "remote_with_frequent_travel")],
     )
 
@@ -730,7 +729,7 @@ def test_travel_estimate_no_longer_gates(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "lowtravel@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-near", "remote", travel_days=15),
             _classified("h-far", "remote", travel_days=40),
             # No numeric estimate is also display-only.
@@ -763,7 +762,7 @@ def test_no_max_travel_days_does_not_filter_on_travel(migrated_pg, tmp_path):
 
     _materialize_profile(tmp_path, "anytravel@example.com")
     _write_classified(
-        tmp_path, passed=[_classified("h-far", "remote", travel_days=200)]
+        tmp_path, classified=[_classified("h-far", "remote", travel_days=200)]
     )
 
     score_calls: list[dict] = []
@@ -791,7 +790,7 @@ def test_default_policy_accepts_all_classifications(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "permissive@example.com")
     _write_classified(
         tmp_path,
-        passed=[_classified("h1", "remote")],
+        classified=[_classified("h1", "remote")],
         trashed=[_classified("h2", "remote_with_frequent_travel")],
     )
 
@@ -819,7 +818,7 @@ def test_skips_user_with_no_surviving_postings(migrated_pg, tmp_path):
 
     _materialize_profile(tmp_path, "nomatch@example.com")
     _write_classified(
-        tmp_path, passed=[_classified("h-travel", "remote_with_frequent_travel")]
+        tmp_path, classified=[_classified("h-travel", "remote_with_frequent_travel")]
     )
 
     score_calls: list[dict] = []
@@ -849,7 +848,7 @@ def test_counts_postings_with_no_classification(migrated_pg, tmp_path):
         _seed_consolidated(conn, dedup_hash="h-missing", requested_by=[u1])
 
     _materialize_profile(tmp_path, "gap@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-have", "remote")])
+    _write_classified(tmp_path, classified=[_classified("h-have", "remote")])
 
     score_calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
@@ -883,7 +882,7 @@ def test_isolates_a_failing_user_and_finishes_the_rest(migrated_pg, tmp_path):
     # deliberately do NOT materialize noprofile@example.com's profile
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-bad", "remote"),
             _classified("h-ok", "remote"),
         ],
@@ -934,7 +933,7 @@ def test_stamps_user_email_into_scored_records(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-shared", "remote"),
             _classified("h-alice", "remote"),
         ],
@@ -967,7 +966,7 @@ def test_iter_run_user_outputs_walks_a_run(migrated_pg, tmp_path):
 
     _materialize_profile(tmp_path, "alice@example.com")
     _materialize_profile(tmp_path, "bob@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-shared", "remote")])
+    _write_classified(tmp_path, classified=[_classified("h-shared", "remote")])
 
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         score_run(
@@ -1022,7 +1021,7 @@ def test_scored_records_round_trip_through_ingest(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "bob@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-shared", "remote"),
             _classified("h-alice", "remote"),
         ],
@@ -1086,7 +1085,7 @@ def test_location_restrictions_willing_us_user_keeps_us_and_drops_foreign(
     _materialize_profile(tmp_path, "location-willing@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-us", "remote", location_restrictions=["US-only"]),
             _classified("h-ca", "remote", location_restrictions=["Canada"]),
         ],
@@ -1127,7 +1126,7 @@ def test_location_restrictions_unwilling_user_drops_other_state(
     _materialize_profile(tmp_path, "location-unwilling@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified("h-california", "remote", location_restrictions=["CA"]),
         ],
     )
@@ -1156,7 +1155,7 @@ def test_unclear_classification_survives_default_policy(migrated_pg, tmp_path):
         _seed_consolidated(conn, dedup_hash="h-unclear", requested_by=[u1])
 
     _materialize_profile(tmp_path, "unclear@example.com")
-    _write_classified(tmp_path, passed=[_classified("h-unclear", "unclear")])
+    _write_classified(tmp_path, classified=[_classified("h-unclear", "unclear")])
     calls: list[dict] = []
     with psycopg.connect(migrated_pg, autocommit=True) as conn:
         summary = score_run(
@@ -1196,7 +1195,7 @@ def test_local_presence_gate_keeps_acceptable_location_when_unwilling(
     _materialize_profile(tmp_path, "alice@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation(
                 "h-local",
                 "remote",
@@ -1239,7 +1238,7 @@ def test_local_presence_gate_drops_out_of_area_when_unwilling(
     _materialize_profile(tmp_path, "outofarea@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation(
                 "h-portland",
                 "remote",
@@ -1288,7 +1287,7 @@ def test_local_presence_gate_no_acceptable_locations_logs_distinct_reason(
     _materialize_profile(tmp_path, "nopolicy@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation(
                 "h-seattle",
                 "remote",
@@ -1337,7 +1336,7 @@ def test_relocation_gate_still_drops_relocation_required_when_unwilling(
     _materialize_profile(tmp_path, "relocation@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation("h-relo", "remote", requires_relocation=True),
             _classified_with_relocation("h-ok", "remote"),
         ],
@@ -1377,7 +1376,7 @@ def test_local_presence_gate_drops_missing_location_as_ambiguous(
     _materialize_profile(tmp_path, "ambiguous@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation(
                 "h-missing", "remote", requires_local_presence=True
             )
@@ -1417,7 +1416,7 @@ def test_local_presence_gate_passes_any_location_when_willing(migrated_pg, tmp_p
     _materialize_profile(tmp_path, "willing@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation(
                 "h-local",
                 "remote",
@@ -1457,7 +1456,7 @@ def test_remote_jobs_do_not_use_location_gate(migrated_pg, tmp_path):
     _materialize_profile(tmp_path, "remote@example.com")
     _write_classified(
         tmp_path,
-        passed=[
+        classified=[
             _classified_with_relocation("h-remote", "remote", location="Portland, OR")
         ],
     )

@@ -42,11 +42,10 @@ log = logging.getLogger(__name__)
 CONSOLIDATED_DIRNAME = "_consolidated"
 
 UNION_NAME = "postings.jsonl"
-PASS_NAME = "classified_pass.jsonl"
-TRASH_NAME = "classified_trash.jsonl"
+CLASSIFIED_NAME = "classified.jsonl"
 
 ClassifyFn = Callable[..., dict[str, Any]]
-"""``(input_path=, pass_path=, trash_path=, parent_run_id=) -> summary dict``."""
+"""``(input_path=, classified_path=, parent_run_id=) -> summary dict``."""
 
 
 def consolidated_dir(runs_dir: Path, run_id: str) -> Path:
@@ -212,25 +211,21 @@ def consolidate_run(
 def default_classify_fn(
     *,
     input_path: Path,
-    pass_path: Path,
-    trash_path: Path,
+    classified_path: Path,
     parent_run_id: str,
 ) -> dict[str, Any]:
     """Production classification: remote_filter over the union, live calls.
 
     Reuses the existing runner wholesale: shared AnalysisCache, RunTracker
-    telemetry, config from ``config/agent/remote_agent.yml``. The runner also
-    applies the *global* pass/trash policy split — Phase 13 treats that as
-    advisory at this stage, because both output files carry the full
-    ``_remote_analysis`` per posting and slice 6 applies each user's own
-    ``policies.remote.acceptable_classifications`` over the union of the two.
+    telemetry, config from ``config/agent/remote_agent.yml``. The classifier
+    writes one profile-independent classified stream; each user's own
+    ``policies.remote.acceptable_classifications`` gate decides over it later.
     """
     from agents.remote_filter.runner import run_remote_filter
 
     return run_remote_filter(
         input_path=input_path,
-        pass_path=pass_path,
-        trash_path=trash_path,
+        classified_path=classified_path,
         parent_run_id=parent_run_id,
     )
 
@@ -238,23 +233,21 @@ def default_classify_fn(
 def batch_classify_fn(
     *,
     input_path: Path,
-    pass_path: Path,
-    trash_path: Path,
+    classified_path: Path,
     parent_run_id: str,
 ) -> dict[str, Any]:
     """Batch-API twin of :func:`default_classify_fn` (``overnight --batch``).
 
-    Same cache, telemetry, and pass/trash output shape — but cache-miss jobs
-    go through the OpenAI Batch API (~50% cheaper) instead of live calls, and
-    the phase blocks polling until the batch reaches a terminal state.
+    Same cache, telemetry, and single classified output shape — but cache-miss
+    jobs go through the OpenAI Batch API (~50% cheaper) instead of live calls,
+    and the phase blocks polling until the batch reaches a terminal state.
     OpenAI-only; the batch runner fails fast on any other provider.
     """
     from agents.remote_filter.batch import run_remote_filter_batch
 
     return run_remote_filter_batch(
         input_path=input_path,
-        pass_path=pass_path,
-        trash_path=trash_path,
+        classified_path=classified_path,
         parent_run_id=parent_run_id,
     )
 
@@ -269,8 +262,7 @@ def classify_consolidated(
     out_dir = consolidated_dir(runs_dir, run_id)
     summary = classify_fn(
         input_path=out_dir / UNION_NAME,
-        pass_path=out_dir / PASS_NAME,
-        trash_path=out_dir / TRASH_NAME,
+        classified_path=out_dir / CLASSIFIED_NAME,
         parent_run_id=run_id,
     )
     log.info("Classification phase done for run_id=%s: %s", run_id, summary)
