@@ -5,7 +5,7 @@ All tests use the mock pool fixture — no live Postgres required.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -160,4 +160,7 @@ async def test_create_manual_job_posted_at_missing_defaults_to_today(
     assert resp.status_code == 201
     call_args = fake_conn.execute.call_args_list[0]
     params = call_args[0][1]
-    assert params["posted_at"] == date.today()
+    # The endpoint defaults to the UTC date (``datetime.now(UTC).date()``), so
+    # assert against UTC — a bare ``date.today()`` is local-tz and goes red for
+    # the window between UTC midnight and local midnight (see #504).
+    assert params["posted_at"] == datetime.now(UTC).date()
