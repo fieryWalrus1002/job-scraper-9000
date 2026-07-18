@@ -128,6 +128,13 @@ def test_run_prefilter_writes_combined_bucket_outputs(
         "_prefilter_metadata" in rec for rec in remote_lines + local_lines + trash_lines
     )
 
+    # local_candidates bypass the remote_filter LLM, so the router stamps a
+    # canonical 4-way axis value directly. Under the taxonomy (#494) that is
+    # "onsite" — the honest floor for a job the user physically commutes to
+    # (was the legacy "location_restricted" pre-taxonomy).
+    assert local_lines, "fixture must include at least one local_candidate"
+    assert all(rec["remote_classification"] == "onsite" for rec in local_lines)
+
 
 def test_dry_run_does_not_write_outputs(tmp_path, prefilter_setup, monkeypatch):
     # This one you got perfectly!
