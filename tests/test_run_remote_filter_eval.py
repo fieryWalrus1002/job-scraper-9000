@@ -82,7 +82,7 @@ def test_parallel_eval_preserves_input_order_and_counts(monkeypatch):
 
     assert counts == {"tp": 1, "fp": 1, "tn": 0, "fn": 1, "skipped": 0}
     assert [m.record_id for m in mismatches] == ["bbbb2222", "cccc3333"]
-    assert [h.record_id for h in prompt_hashes] == [
+    assert [h.dedup_hash for h in prompt_hashes] == [
         "aaaa1111",
         "bbbb2222",
         "cccc3333",
@@ -174,5 +174,5 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
         _build_user_message(rf_input).encode("utf-8")
     ).hexdigest()[:12]
     assert prompt_hashes[0].resolved_user_message_hash == expected_hash
-    assert prompt_hashes[0].record_id == "dddd4444eeee"
+    assert prompt_hashes[0].dedup_hash == "dddd4444eeee"
     assert mismatches[0].resolved_user_message_hash == expected_hash

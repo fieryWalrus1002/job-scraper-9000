@@ -68,7 +68,9 @@ class MismatchRecord(BaseModel):
 class ResolvedUserMessageHashRecord(BaseModel):
     run_id: str
     index: int
-    record_id: str
+    # Full provenance id (not the 8-char MismatchRecord.record_id) — named
+    # distinctly so the two schemas aren't mistaken for a joinable key.
+    dedup_hash: str
     resolved_user_message_hash: str
 
 
@@ -234,10 +236,11 @@ def _evaluate_record(
 
     mismatch = None
     if pred != human_verdict:
-        dedup_hash = job.get("dedup_hash", "")
         mismatch = MismatchRecord(
             run_id=run_id,
-            record_id=dedup_hash[:8],
+            # Short display id, derived from the same always-populated
+            # provenance helper so it's never blank when dedup_hash is missing.
+            record_id=_record_provenance_id(job, i)[:8],
             gold=human_verdict,
             pred=pred,
             human_policy=job.get("_human_policy"),
@@ -330,7 +333,7 @@ def run_eval(
                 ResolvedUserMessageHashRecord(
                     run_id=run_id,
                     index=result.index,
-                    record_id=_record_provenance_id(result.job, result.index),
+                    dedup_hash=_record_provenance_id(result.job, result.index),
                     resolved_user_message_hash=result.resolved_user_message_hash,
                 )
             )
