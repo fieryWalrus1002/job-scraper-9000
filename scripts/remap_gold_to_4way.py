@@ -124,14 +124,17 @@ def remap_records(
 
     for index, record in enumerate(records, start=1):
         policy = record.get("_human_policy")
-        if policy not in POLICY_TO_CLASSIFICATION:
-            raise ValueError(
-                f"Record {_record_id(record, index)} has unexpected _human_policy "
-                f"{policy!r}"
-            )
+        # Type-check before the dict membership test: a non-hashable policy
+        # (list/dict) would raise a bare TypeError on `in` instead of this
+        # helpful ValueError.
         if not isinstance(policy, str):
             raise ValueError(
                 f"Record {_record_id(record, index)} has non-string _human_policy "
+                f"{policy!r}"
+            )
+        if policy not in POLICY_TO_CLASSIFICATION:
+            raise ValueError(
+                f"Record {_record_id(record, index)} has unexpected _human_policy "
                 f"{policy!r}"
             )
 
