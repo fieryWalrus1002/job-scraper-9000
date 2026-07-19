@@ -6,6 +6,7 @@ import pytest
 
 from agents.remote_filter import batch
 from agents.remote_filter.cache import AnalysisCache
+from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter.models import RemoteAnalysis
 
 
@@ -241,7 +242,9 @@ def test_run_batch_serves_cache_hits_without_submitting(tmp_path, monkeypatch):
 
     from agents.remote_filter.utils import context_fingerprint
 
-    primed_fp = context_fingerprint({"workplace": "remote"})
+    primed_fp = context_fingerprint(
+        RemoteFilterInput(description="", workplace="remote")
+    )
     seed = AnalysisCache(cache_path)
     seed.put(
         dedup_hash="hashA",

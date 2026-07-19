@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import (
     _build_user_message,
@@ -304,12 +305,17 @@ def test_analyze_remote_injects_search_context():
     mock_client = MagicMock()
     mock_client.beta.chat.completions.parse.return_value = mock_response
 
-    context = {"keywords": "AI engineer", "workplace": "remote", "job_type": "fulltime"}
+    context = RemoteFilterInput(
+        description="Job description here.",
+        keywords="AI engineer",
+        workplace="remote",
+        job_type="fulltime",
+    )
     with patch(
         "agents.remote_filter.utils._get_client",
         return_value=(mock_client, "gpt-4o-mini"),
     ):
-        analyze_remote("Job description here.", search_context=context)
+        analyze_remote(context)
 
     call_messages = mock_client.beta.chat.completions.parse.call_args.kwargs["messages"]
     user_content = call_messages[1]["content"]
@@ -397,33 +403,50 @@ def test_load_raw_jobs_directory_sorted(tmp_path):
 
 
 def test_build_user_message_no_extras_returns_description_only():
-    assert _build_user_message("Just a description.", None) == "Just a description."
+    assert (
+        _build_user_message(RemoteFilterInput(description="Just a description."))
+        == "Just a description."
+    )
 
 
 def test_build_user_message_title_prepended():
-    msg = _build_user_message("Job desc.", None, title="Personal Office Assistant")
+    msg = _build_user_message(
+        RemoteFilterInput(description="Job desc.", title="Personal Office Assistant")
+    )
     assert "[Job title: Personal Office Assistant]" in msg
     assert "Job desc." in msg
 
 
 def test_build_user_message_location_prepended():
     msg = _build_user_message(
-        "Job desc.", None, location="US-Remote (35 miles+ outside an office)"
+        RemoteFilterInput(
+            description="Job desc.",
+            location="US-Remote (35 miles+ outside an office)",
+        )
     )
     assert "[Location field: US-Remote (35 miles+ outside an office)]" in msg
     assert "Job desc." in msg
 
 
 def test_build_user_message_title_before_location():
-    msg = _build_user_message("Desc.", None, title="Engineer", location="Remote")
+    msg = _build_user_message(
+        RemoteFilterInput(description="Desc.", title="Engineer", location="Remote")
+    )
     title_pos = msg.index("[Job title:")
     location_pos = msg.index("[Location field:")
     assert title_pos < location_pos
 
 
 def test_build_user_message_all_fields_combined():
-    ctx = {"keywords": "AI engineer", "workplace": "remote"}
-    msg = _build_user_message("Desc.", ctx, title="AI Engineer", location="US-Remote")
+    msg = _build_user_message(
+        RemoteFilterInput(
+            description="Desc.",
+            title="AI Engineer",
+            location="US-Remote",
+            keywords="AI engineer",
+            workplace="remote",
+        )
+    )
     assert "[Job title: AI Engineer]" in msg
     assert "[Location field: US-Remote]" in msg
     assert "[Search context:" in msg
@@ -431,35 +454,84 @@ def test_build_user_message_all_fields_combined():
 
 
 def test_build_user_message_none_title_and_location_with_context():
-    ctx = {"keywords": "data engineer"}
-    msg = _build_user_message("Desc.", ctx, title=None, location=None)
+    msg = _build_user_message(
+        RemoteFilterInput(description="Desc.", keywords="data engineer")
+    )
     assert "[Search context:" in msg
     assert "Job title" not in msg
     assert "Location field" not in msg
 
 
 def test_build_user_message_explains_remote_search_provenance_for_ddc_case():
-    ctx = {
-        "search_contexts": [
+    rf_input = RemoteFilterInput(
+        description="Ambiguous body text with no remote wording.",
+        title="Data Engineer",
+        location="Remote; Washington, DC",
+        search_contexts=[
             {
                 "source": "workday",
                 "workplace": "remote",
                 "job_type": "fulltime",
                 "source_detail_location": "Remote; Washington, DC",
             }
-        ]
-    }
-    msg = _build_user_message(
-        "Ambiguous body text with no remote wording.",
-        ctx,
-        title="Data Engineer",
-        location="Remote; Washington, DC",
+        ],
     )
+    msg = _build_user_message(rf_input)
 
     assert "returned by a remote-only search filter" in msg
     assert "weak but relevant evidence of remote eligibility" in msg
     assert "full-time search filter" in msg
     assert "Remote; Washington, DC" in msg
+
+
+def test_build_user_message_golden_ddc_remote_provenance_case():
+    rf_input = RemoteFilterInput(
+        description="Ambiguous body text with no remote wording.",
+        title="Data Engineer",
+        location="Remote; Washington, DC",
+        search_contexts=[
+            {
+                "source": "workday",
+                "workplace": "remote",
+                "job_type": "fulltime",
+                "source_detail_location": "Remote; Washington, DC",
+            }
+        ],
+    )
+
+    assert _build_user_message(rf_input) == (
+        "[Job title: Data Engineer]\n"
+        "[Location field: Remote; Washington, DC]\n"
+        "[Search provenance: workday: returned by a remote-only search filter or "
+        "source detail metadata; treat this as weak but relevant evidence of "
+        "remote eligibility unless contradicted by the posting; returned by a "
+        "full-time search filter; source_detail_location=Remote; Washington, DC]"
+        "\n\n---\n\n"
+        "Ambiguous body text with no remote wording."
+    )
+
+
+def test_build_user_message_golden_title_location_keywords_case():
+    rf_input = RemoteFilterInput(
+        description="Desc.",
+        title="AI Engineer",
+        location="US-Remote",
+        keywords="AI engineer",
+    )
+
+    assert _build_user_message(rf_input) == (
+        "[Job title: AI Engineer]\n"
+        "[Location field: US-Remote]\n"
+        '[Search context: keywords="AI engineer"]'
+        "\n\n---\n\n"
+        "Desc."
+    )
+
+
+def test_build_user_message_golden_empty_context_case():
+    assert _build_user_message(
+        RemoteFilterInput(description="Just a description.")
+    ) == ("Just a description.")
 
 
 # ---------------------------------------------------------------------------

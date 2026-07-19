@@ -2,12 +2,14 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
 
 from openai import OpenAI
 from pydantic import ValidationError
 
+from .input_models import RemoteFilterInput, SearchProvenance, normalize_search_contexts
 from .models import RemoteAnalysis
 
 log = logging.getLogger(__name__)
@@ -95,87 +97,80 @@ def _extract_usage(usage_obj: Any) -> dict[str, int]:
     }
 
 
-def build_search_context(job: dict, user_timezone: str | None = None) -> dict:
-    """Build the search/provenance context that remote_filter should read.
+def build_search_context(
+    job: dict, user_timezone: str | None = None
+) -> RemoteFilterInput:
+    """Build the validated remote-filter input contract from a raw posting.
 
     Keeps legacy ``search_params`` behavior while carrying consolidated
     ``search_contexts`` that preserve filters from duplicate postings. Contexts
     are canonicalized so semantically identical provenance produces stable
     prompts and cache keys.
     """
-    context = dict(job.get("search_params") or {})
-    if search_contexts := _normalize_search_contexts(job.get("search_contexts") or []):
-        context["search_contexts"] = search_contexts
-    if user_timezone:
-        context["user_timezone"] = user_timezone
-    return context
+    return RemoteFilterInput.from_posting(job, user_timezone)
 
 
-_SEARCH_CONTEXT_PROMPT_FIELDS = {
-    "source",
-    "workplace",
-    "job_type",
-    "source_detail_location",
-}
-
-
-def _normalize_search_contexts(search_contexts: list[dict]) -> list[dict]:
-    normalized: dict[str, dict] = {}
-    for context in search_contexts:
-        cleaned = {
-            k: v
-            for k, v in context.items()
-            if k in _SEARCH_CONTEXT_PROMPT_FIELDS and v not in (None, "", [], {})
-        }
-        if not cleaned or set(cleaned) == {"source"}:
-            continue
-        marker = json.dumps(cleaned, sort_keys=True, separators=(",", ":"))
-        normalized[marker] = cleaned
-    return [normalized[marker] for marker in sorted(normalized)]
-
-
-def _build_user_message(
+def _remote_filter_input_from_parts(
     description: str,
-    search_context: dict | None,
+    *,
+    search_context: RemoteFilterInput | Mapping[str, Any] | None = None,
     location: str | None = None,
     title: str | None = None,
-) -> str:
+) -> RemoteFilterInput:
+    if isinstance(search_context, RemoteFilterInput):
+        return search_context
+
+    context = dict(search_context or {})
+    return RemoteFilterInput(
+        description=description,
+        title=title,
+        location=location,
+        keywords=context.get("keywords") or None,
+        workplace=context.get("workplace") or None,
+        job_type=context.get("job_type") or None,
+        user_timezone=context.get("user_timezone") or None,
+        search_contexts=normalize_search_contexts(context.get("search_contexts") or []),
+    )
+
+
+def _build_user_message(rf_input: RemoteFilterInput) -> str:
     """Prepend title, location, and search context so the model can factor them into its reasoning."""
     parts = []
-    if title:
-        parts.append(f"Job title: {title}")
-    if location:
-        parts.append(f"Location field: {location}")
-    if search_context:
-        ctx = []
-        if kw := search_context.get("keywords"):
-            ctx.append(f'keywords="{kw}"')
-        if wp := search_context.get("workplace"):
-            ctx.append(f"workplace_filter={wp}")
-        if jt := search_context.get("job_type"):
-            ctx.append(f"job_type={jt}")
-        if tz := search_context.get("user_timezone"):
-            ctx.append(f"candidate_timezone={tz}")
-        if ctx:
-            parts.append(f"Search context: {', '.join(ctx)}")
+    if rf_input.title:
+        parts.append(f"Job title: {rf_input.title}")
+    if rf_input.location:
+        parts.append(f"Location field: {rf_input.location}")
 
-        provenance = _format_search_provenance(
-            _normalize_search_contexts(search_context.get("search_contexts") or [])
-        )
-        if provenance:
-            parts.append(provenance)
+    ctx = []
+    if rf_input.keywords:
+        ctx.append(f'keywords="{rf_input.keywords}"')
+    if rf_input.workplace:
+        ctx.append(f"workplace_filter={rf_input.workplace}")
+    if rf_input.job_type:
+        ctx.append(f"job_type={rf_input.job_type}")
+    if rf_input.user_timezone:
+        ctx.append(f"candidate_timezone={rf_input.user_timezone}")
+    if ctx:
+        parts.append(f"Search context: {', '.join(ctx)}")
+
+    provenance = _format_search_provenance(rf_input.search_contexts)
+    if provenance:
+        parts.append(provenance)
+
     if not parts:
-        return description
-    return "\n".join(f"[{p}]" for p in parts) + "\n\n---\n\n" + description
+        return rf_input.description
+    return "\n".join(f"[{p}]" for p in parts) + "\n\n---\n\n" + rf_input.description
 
 
-def _format_search_provenance(search_contexts: list[dict]) -> str | None:
+def _format_search_provenance(
+    search_contexts: list[SearchProvenance],
+) -> str | None:
     notes: list[str] = []
     for context in search_contexts:
-        source = context.get("source") or "source"
-        workplace = str(context.get("workplace") or "").lower()
-        job_type = str(context.get("job_type") or "").lower()
-        detail_location = context.get("source_detail_location")
+        source = context.source or "source"
+        workplace = str(context.workplace or "").lower()
+        job_type = str(context.job_type or "").lower()
+        detail_location = context.source_detail_location
 
         bits = []
         if workplace == "remote":
@@ -204,11 +199,11 @@ def _format_search_provenance(search_contexts: list[dict]) -> str | None:
 
 
 def analyze_remote(
-    job_description: str,
+    rf_input: RemoteFilterInput | str,
     *,
     title: str | None = None,
     location: str | None = None,
-    search_context: dict | None = None,
+    search_context: RemoteFilterInput | Mapping[str, Any] | None = None,
     llm_config: dict | None = None,
     max_retries: int = 2,
     usage_callback: Callable[[dict[str, int]], None] | None = None,
@@ -219,8 +214,19 @@ def analyze_remote(
     (``input_tokens``, ``cached_input_tokens``, ``output_tokens``) on each
     successful API call. Wire it to ``RunTracker.add_token_usage`` for telemetry.
     """
+    classifier_input = (
+        rf_input
+        if isinstance(rf_input, RemoteFilterInput)
+        else _remote_filter_input_from_parts(
+            rf_input,
+            search_context=search_context,
+            location=location,
+            title=title,
+        )
+    )
+
     client, model = _get_client(llm_config)
-    user_message = _build_user_message(job_description, search_context, location, title)
+    user_message = _build_user_message(classifier_input)
 
     for attempt in range(max_retries + 1):
         try:
@@ -325,34 +331,24 @@ def resolve_llm_model(llm_config: dict | None = None) -> str:
     return resolve_provider_and_model(llm_config)[1]
 
 
-# Fields of `search_context` that `_build_user_message` actually reads. Keep
-# this in sync with that function — anything that affects the LLM prompt must
-# affect the cache key, or stale analyses leak across runs.
-_CONTEXT_FIELDS = (
-    "keywords",
-    "workplace",
-    "job_type",
-    "search_contexts",
-    "user_timezone",
-)
-
-
-def context_fingerprint(search_context: dict | None) -> str:
-    """8-hex fingerprint over search-context fields that affect the LLM prompt.
+def context_fingerprint(
+    rf_input: RemoteFilterInput | Mapping[str, Any] | None,
+) -> str:
+    """8-hex fingerprint over input fields that affect the LLM prompt.
 
     Folded into the analysis cache key so a change in keywords, workplace,
     job_type, or user_timezone invalidates the cache rather than serving an
     analysis produced under different context. Returns `"none"` when no
     relevant context is present, matching `_build_user_message`'s no-op path.
     """
-    if not search_context:
+    if rf_input is None:
         return "none"
-    relevant: dict[str, object] = {}
-    for k in _CONTEXT_FIELDS:
-        v = search_context.get(k)
-        if not v:
-            continue
-        relevant[k] = _normalize_search_contexts(v) if k == "search_contexts" else v
+    classifier_input = (
+        rf_input
+        if isinstance(rf_input, RemoteFilterInput)
+        else _remote_filter_input_from_parts("", search_context=rf_input)
+    )
+    relevant = classifier_input.prompt_context_projection()
     if not relevant:
         return "none"
     canonical = json.dumps(relevant, sort_keys=True, separators=(",", ":"))
