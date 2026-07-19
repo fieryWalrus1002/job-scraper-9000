@@ -28,6 +28,104 @@ def compute_metrics(tp: int, fp: int, tn: int, fn: int, skipped: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Categorical metrics (generic labeled confusion)
+# ---------------------------------------------------------------------------
+
+
+def compute_categorical_metrics(
+    preds: list[str],
+    golds: list[str],
+    labels: list[str],
+    *,
+    skipped: int = 0,
+) -> dict:
+    """Labeled categorical confusion + per-class metrics.
+
+    The confusion matrix is indexed as ``confusion[pred_idx][gold_idx]``, where
+    indexes correspond to the caller-provided ``labels`` list. Predictions and
+    gold labels must be members of that closed label set; unknown values raise
+    ``ValueError`` instead of being dropped because they indicate upstream schema
+    drift or bad eval data.
+    """
+    if len(preds) != len(golds):
+        raise ValueError(f"preds ({len(preds)}) and golds ({len(golds)}) must align")
+
+    if len(set(labels)) != len(labels):
+        raise ValueError("labels must be unique")
+
+    n = len(preds)
+    label_indexes = {label: i for i, label in enumerate(labels)}
+    confusion = [[0] * len(labels) for _ in labels]
+
+    for row_num, (pred, gold) in enumerate(zip(preds, golds), start=1):
+        try:
+            pred_idx = label_indexes[pred]
+        except KeyError as exc:
+            raise ValueError(
+                f"pred at position {row_num} has unknown label {pred!r}"
+            ) from exc
+        try:
+            gold_idx = label_indexes[gold]
+        except KeyError as exc:
+            raise ValueError(
+                f"gold at position {row_num} has unknown label {gold!r}"
+            ) from exc
+        confusion[pred_idx][gold_idx] += 1
+
+    per_class = {}
+    for idx, label in enumerate(labels):
+        true_positive = confusion[idx][idx]
+        predicted_count = sum(confusion[idx])
+        support = sum(row[idx] for row in confusion)
+        precision = true_positive / predicted_count if predicted_count else 0.0
+        recall = true_positive / support if support else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall)
+            if (precision + recall)
+            else 0.0
+        )
+        per_class[label] = {
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+            "support": support,
+        }
+
+    label_count = len(labels)
+    macro_precision = (
+        sum(metrics["precision"] for metrics in per_class.values()) / label_count
+        if label_count
+        else 0.0
+    )
+    macro_recall = (
+        sum(metrics["recall"] for metrics in per_class.values()) / label_count
+        if label_count
+        else 0.0
+    )
+    macro_f1 = (
+        sum(metrics["f1"] for metrics in per_class.values()) / label_count
+        if label_count
+        else 0.0
+    )
+    micro_accuracy = sum(confusion[i][i] for i in range(label_count)) / n if n else 0.0
+
+    return {
+        "metrics": {
+            "labels": list(labels),
+            "evaluated": n,
+            "skipped": skipped,
+            "total": n + skipped,
+            "confusion": confusion,
+            "per_class": per_class,
+            "macro_precision": macro_precision,
+            "macro_recall": macro_recall,
+            "macro_f1": macro_f1,
+            "micro_accuracy": micro_accuracy,
+        }
+    }
+
+
+# ---------------------------------------------------------------------------
 # Ordinal metrics (skills_fit)
 # ---------------------------------------------------------------------------
 
