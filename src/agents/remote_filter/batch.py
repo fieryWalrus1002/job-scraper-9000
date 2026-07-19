@@ -70,12 +70,7 @@ def build_request(
     ``idx`` must match the request's position in the submitted file.
     """
     search_context = build_search_context(job, user_timezone)
-    user_message = _build_user_message(
-        job.get("description", ""),
-        search_context=search_context or None,
-        location=job.get("location") or None,
-        title=job.get("title") or None,
-    )
+    user_message = _build_user_message(search_context)
     return {
         "custom_id": f"job-{idx}",
         "method": "POST",

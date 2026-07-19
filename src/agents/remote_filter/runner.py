@@ -226,10 +226,7 @@ def run_remote_filter(
                     usage: dict[str, int] = {}
                     started = time.time()
                     analysis = analyze_remote(
-                        m["description"],
-                        title=m["title"],
-                        location=m["location"],
-                        search_context=m["search_context"] or None,
+                        m["search_context"],
                         llm_config=llm_config,
                         usage_callback=lambda u: usage.update(u),
                     )

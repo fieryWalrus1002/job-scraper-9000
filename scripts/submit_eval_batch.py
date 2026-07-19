@@ -29,7 +29,11 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agent_eval.provenance import generate_run_id, hash_file, hash_string
 from agents.remote_filter.models import RemoteAnalysis, SCHEMA_VERSION
-from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH, _build_user_message
+from agents.remote_filter.utils import (
+    REMOTE_FILTER_PROMPT_PATH,
+    _build_user_message,
+    _remote_filter_input_from_parts,
+)
 from scripts.run_remote_filter_eval import CONFIG_PATH, GOLD_FILE, load_gold
 from utils import batch_api
 from utils.batch_api import BATCH_ENDPOINT, COMPLETION_WINDOW
@@ -133,10 +137,12 @@ def build_request(
 ) -> dict[str, Any]:
     user_timezone = os.environ.get("USER_TIMEZONE")
     user_message = _build_user_message(
-        job.get("description", ""),
-        search_context=_search_context(job, user_timezone),
-        location=job.get("location") or None,
-        title=job.get("title") or None,
+        _remote_filter_input_from_parts(
+            job.get("description", ""),
+            search_context=_search_context(job, user_timezone),
+            location=job.get("location") or None,
+            title=job.get("title") or None,
+        )
     )
     return {
         "custom_id": f"job-{idx}",

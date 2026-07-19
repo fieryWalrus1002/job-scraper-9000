@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agents.remote_filter.cache import AnalysisCache
+from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.runner import run_remote_filter
 
@@ -178,7 +179,9 @@ def test_run_remote_filter_serves_across_batch_cache_hits(tmp_path):
     # one the runner computes for these records.
     from agents.remote_filter.utils import context_fingerprint
 
-    primed_fp = context_fingerprint({"workplace": "remote"})
+    primed_fp = context_fingerprint(
+        RemoteFilterInput(description="", workplace="remote")
+    )
     seed = AnalysisCache(cache_path)
     seed.put(
         dedup_hash="hashA",
@@ -248,7 +251,9 @@ def test_run_remote_filter_writes_miss_results_to_cache(tmp_path):
             prompt_hash=FILTER_METADATA["prompt_hash"],
             provider="openai",
             model="gpt-4o-mini",
-            context_fp=context_fingerprint({"workplace": "remote"}),
+            context_fp=context_fingerprint(
+                RemoteFilterInput(description="", workplace="remote")
+            ),
         )
         is not None
     )
@@ -365,7 +370,9 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
     _write_jsonl(input_path, [_job(source_job_id="1", dedup_hash="hashA")])
 
     # Prime the cache with an openai entry under the same model string.
-    primed_fp = context_fingerprint({"workplace": "remote"})
+    primed_fp = context_fingerprint(
+        RemoteFilterInput(description="", workplace="remote")
+    )
     seed = AnalysisCache(cache_path)
     seed.put(
         dedup_hash="hashA",
