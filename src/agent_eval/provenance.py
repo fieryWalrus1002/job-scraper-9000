@@ -11,8 +11,8 @@ from utils.git_info import get_git_metadata
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "1.0.0"
-MISMATCH_SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "2.0.0"
+MISMATCH_SCHEMA_VERSION = "2.0.0"
 
 _REPO_ROOT = Path(__file__).parents[2]
 

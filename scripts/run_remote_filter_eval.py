@@ -5,12 +5,12 @@ Writes a durable provenance record to runs.jsonl after every run (SC-2).
 CLI overrides modify config in-memory only and are reflected in the run record (SC-3).
 
 Usage:
-    python scripts/run_remote_filter_eval.py
-    python scripts/run_remote_filter_eval.py --gold data/eval/ground_truth.jsonl
-    python scripts/run_remote_filter_eval.py --model gpt-4o --temperature 0.0
-    python scripts/run_remote_filter_eval.py --provider ollama --model qwen2.5:14b
-    python scripts/run_remote_filter_eval.py --run-id my_experiment_label
-    python scripts/run_remote_filter_eval.py --no-mismatches
+    uv run scripts/run_remote_filter_eval.py
+    uv run scripts/run_remote_filter_eval.py --gold data/eval/ground_truth.jsonl
+    uv run scripts/run_remote_filter_eval.py --model gpt-4o --temperature 0.0
+    uv run scripts/run_remote_filter_eval.py --provider ollama --model qwen2.5:14b
+    uv run scripts/run_remote_filter_eval.py --run-id my_experiment_label
+    uv run scripts/run_remote_filter_eval.py --no-mismatches
 """
 
 import argparse
@@ -21,8 +21,9 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -30,16 +31,16 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
+from agents.remote_filter.models import REMOTE_CLASSIFICATIONS
 from agents.remote_filter.utils import (
     REMOTE_FILTER_PROMPT_PATH,
     _build_user_message,
     analyze_remote,
     build_search_context,
-    passes_remote_filter,
 )
-from utils.run_logger import JsonlRunLogger, RunLogger
-from agent_eval.metrics import compute_metrics
+from agent_eval.metrics import compute_categorical_metrics
 from agent_eval.provenance import build_run_record, generate_run_id
+from utils.run_logger import JsonlRunLogger, RunLogger
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -51,7 +52,6 @@ RUNS_FILE = "data/eval/runs.jsonl"
 PROMPT_PATH = REMOTE_FILTER_PROMPT_PATH
 RESOLVED_USER_MESSAGE_HASH_LENGTH = 12
 
-USER_LOCATION = os.environ.get("USER_LOCATION", "USA")
 USER_TIMEZONE = os.environ.get("USER_TIMEZONE", None)
 
 
@@ -77,9 +77,11 @@ class ResolvedUserMessageHashRecord(BaseModel):
 @dataclass(frozen=True)
 class RecordEvalResult:
     index: int
-    job: dict
-    human_verdict: str | None
-    pred: str | None
+    job: dict[str, Any]
+    gold_classification: str | None
+    pred_classification: str | None
+    gold_travel_days: int | None
+    pred_travel_days: int | None
     reason: str | None
     elapsed: float
     resolved_user_message_hash: str | None = None
@@ -87,17 +89,14 @@ class RecordEvalResult:
     skip_reason: str | None = None
     mismatch: MismatchRecord | None = None
 
-    @property
-    def counts(self) -> dict[str, int]:
-        if self.skipped:
-            return {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "skipped": 1}
-        if self.pred == "pass" and self.human_verdict == "pass":
-            return {"tp": 1, "fp": 0, "tn": 0, "fn": 0, "skipped": 0}
-        if self.pred == "pass" and self.human_verdict == "trash":
-            return {"tp": 0, "fp": 1, "tn": 0, "fn": 0, "skipped": 0}
-        if self.pred == "trash" and self.human_verdict == "trash":
-            return {"tp": 0, "fp": 0, "tn": 1, "fn": 0, "skipped": 0}
-        return {"tp": 0, "fp": 0, "tn": 0, "fn": 1, "skipped": 0}
+
+@dataclass(frozen=True)
+class EvalMetricsInput:
+    preds: list[str] = field(default_factory=list)
+    golds: list[str] = field(default_factory=list)
+    pred_travel_days: list[int] = field(default_factory=list)
+    gold_travel_days: list[int] = field(default_factory=list)
+    skipped: int = 0
 
 
 def parse_args() -> argparse.Namespace:
@@ -142,9 +141,9 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def load_gold(path: str) -> list[dict]:
+def load_gold(path: str) -> list[dict[str, Any]]:
     """Load ground truth; last entry per dedup_hash wins (re-reviews override)."""
-    seen: dict[str, dict] = {}
+    seen: dict[str, dict[str, Any]] = {}
     with open(path) as f:
         for line in f:
             line = line.strip()
@@ -156,13 +155,13 @@ def load_gold(path: str) -> list[dict]:
     return list(seen.values())
 
 
-def _resolved_user_message_hash(rf_input) -> str:
+def _resolved_user_message_hash(rf_input: Any) -> str:
     return hashlib.sha256(_build_user_message(rf_input).encode("utf-8")).hexdigest()[
         :RESOLVED_USER_MESSAGE_HASH_LENGTH
     ]
 
 
-def _record_provenance_id(job: dict, index: int) -> str:
+def _record_provenance_id(job: dict[str, Any], index: int) -> str:
     return str(job.get("dedup_hash") or job.get("source_job_id") or index)
 
 
@@ -177,31 +176,37 @@ def _aggregate_resolved_user_message_hashes(
 
 def _evaluate_record(
     i: int,
-    job: dict,
-    config: dict,
+    job: dict[str, Any],
+    config: dict[str, Any],
     run_id: str,
 ) -> RecordEvalResult:
     llm_config = config.get("llm")
-    human_verdict = job.get("_human_verdict")
-    if human_verdict not in ("pass", "trash"):
+    gold_classification = job.get("_human_classification")
+    if gold_classification not in REMOTE_CLASSIFICATIONS:
         return RecordEvalResult(
             index=i,
             job=job,
-            human_verdict=None,
-            pred=None,
+            gold_classification=None,
+            pred_classification=None,
+            gold_travel_days=None,
+            pred_travel_days=None,
             reason=None,
             elapsed=0.0,
             skipped=True,
-            skip_reason="invalid_human_verdict",
+            skip_reason="invalid_human_classification",
         )
+
+    gold_travel_days = job.get("_human_travel_days")
 
     description = job.get("description", "")
     if not description:
         return RecordEvalResult(
             index=i,
             job=job,
-            human_verdict=human_verdict,
-            pred=None,
+            gold_classification=gold_classification,
+            pred_classification=None,
+            gold_travel_days=gold_travel_days,
+            pred_travel_days=None,
             reason=None,
             elapsed=0.0,
             skipped=True,
@@ -222,8 +227,10 @@ def _evaluate_record(
         return RecordEvalResult(
             index=i,
             job=job,
-            human_verdict=human_verdict,
-            pred=None,
+            gold_classification=gold_classification,
+            pred_classification=None,
+            gold_travel_days=gold_travel_days,
+            pred_travel_days=None,
             reason=None,
             elapsed=elapsed,
             resolved_user_message_hash=resolved_user_message_hash,
@@ -231,18 +238,19 @@ def _evaluate_record(
             skip_reason="agent_failed",
         )
 
-    ok, reason = passes_remote_filter(analysis, config, USER_LOCATION)
-    pred = "pass" if ok else "trash"
+    pred_classification = analysis.remote_classification
+    pred_travel_days = analysis.estimated_travel_days_per_year
+    reason = analysis.reasoning_trace
 
     mismatch = None
-    if pred != human_verdict:
+    if pred_classification != gold_classification:
         mismatch = MismatchRecord(
             run_id=run_id,
             # Short display id, derived from the same always-populated
             # provenance helper so it's never blank when dedup_hash is missing.
             record_id=_record_provenance_id(job, i)[:8],
-            gold=human_verdict,
-            pred=pred,
+            gold=gold_classification,
+            pred=pred_classification,
             human_policy=job.get("_human_policy"),
             reason=reason,
             resolved_user_message_hash=resolved_user_message_hash,
@@ -251,8 +259,10 @@ def _evaluate_record(
     return RecordEvalResult(
         index=i,
         job=job,
-        human_verdict=human_verdict,
-        pred=pred,
+        gold_classification=gold_classification,
+        pred_classification=pred_classification,
+        gold_travel_days=gold_travel_days,
+        pred_travel_days=pred_travel_days,
         reason=reason,
         elapsed=elapsed,
         resolved_user_message_hash=resolved_user_message_hash,
@@ -263,9 +273,9 @@ def _evaluate_record(
 def _log_record_result(result: RecordEvalResult) -> None:
     job = result.job
     if result.skipped:
-        if result.skip_reason == "invalid_human_verdict":
+        if result.skip_reason == "invalid_human_classification":
             log.warning(
-                "Record %d (%s) has no valid _human_verdict — skipping",
+                "Record %d (%s) has no valid _human_classification — skipping",
                 result.index,
                 job.get("title"),
             )
@@ -285,23 +295,78 @@ def _log_record_result(result: RecordEvalResult) -> None:
         return
 
     log.info(
-        "[%3d] %-8s → %-8s  %-40s @ %-20s  %.1fs",
+        "[%3d] %-8s → %-8s  travel=%s→%s  %-40s @ %-20s  %.1fs",
         result.index,
-        result.human_verdict,
-        result.pred,
+        result.gold_classification,
+        result.pred_classification,
+        result.gold_travel_days,
+        result.pred_travel_days,
         (job.get("title") or "?")[:40],
         job.get("company", "?")[:20],
         result.elapsed,
     )
 
 
+def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsInput:
+    preds: list[str] = []
+    golds: list[str] = []
+    pred_travel_days: list[int] = []
+    gold_travel_days: list[int] = []
+    skipped = 0
+
+    for result in results:
+        if result.skipped:
+            skipped += 1
+            continue
+        if result.pred_classification is None or result.gold_classification is None:
+            raise ValueError(
+                f"record {result.index} was not skipped but lacks classification labels"
+            )
+        preds.append(result.pred_classification)
+        golds.append(result.gold_classification)
+        if result.pred_travel_days is not None and result.gold_travel_days is not None:
+            pred_travel_days.append(result.pred_travel_days)
+            gold_travel_days.append(result.gold_travel_days)
+
+    return EvalMetricsInput(
+        preds=preds,
+        golds=golds,
+        pred_travel_days=pred_travel_days,
+        gold_travel_days=gold_travel_days,
+        skipped=skipped,
+    )
+
+
+def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
+    metrics = compute_categorical_metrics(
+        metrics_input.preds,
+        metrics_input.golds,
+        REMOTE_CLASSIFICATIONS,
+        skipped=metrics_input.skipped,
+    )["metrics"]
+    travel_n = len(metrics_input.pred_travel_days)
+    travel_mae = (
+        sum(
+            abs(pred - gold)
+            for pred, gold in zip(
+                metrics_input.pred_travel_days, metrics_input.gold_travel_days
+            )
+        )
+        / travel_n
+        if travel_n
+        else None
+    )
+    metrics["travel_mae"] = travel_mae
+    metrics["travel_n"] = travel_n
+    return {"metrics": metrics}
+
+
 def run_eval(
-    records: list[dict],
-    config: dict,
+    records: list[dict[str, Any]],
+    config: dict[str, Any],
     run_id: str,
     workers: int = 1,
-) -> tuple[list[MismatchRecord], dict[str, int], list[ResolvedUserMessageHashRecord]]:
-    counts = {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "skipped": 0}
+) -> tuple[list[MismatchRecord], EvalMetricsInput, list[ResolvedUserMessageHashRecord]]:
     mismatches: list[MismatchRecord] = []
     resolved_user_message_hashes: list[ResolvedUserMessageHashRecord] = []
 
@@ -326,8 +391,6 @@ def run_eval(
 
     for result in results:
         _log_record_result(result)
-        for key, value in result.counts.items():
-            counts[key] += value
         if result.resolved_user_message_hash is not None:
             resolved_user_message_hashes.append(
                 ResolvedUserMessageHashRecord(
@@ -340,31 +403,69 @@ def run_eval(
         if result.mismatch is not None:
             mismatches.append(result.mismatch)
 
-    return mismatches, counts, resolved_user_message_hashes
+    return (
+        mismatches,
+        _metrics_input_from_results(results),
+        resolved_user_message_hashes,
+    )
 
 
-def print_report(metrics: dict, mismatches: list[MismatchRecord], run_id: str) -> None:
+def _format_float(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.4f}"
+
+
+def print_report(
+    metrics: dict[str, Any], mismatches: list[MismatchRecord], run_id: str
+) -> None:
     m = metrics["metrics"]
+    labels = m["labels"]
     print()
-    print("=" * 50)
-    print("  EVALUATION RESULTS")
-    print("=" * 50)
+    print("=" * 72)
+    print("  REMOTE FILTER CATEGORICAL EVAL RESULTS")
+    print("=" * 72)
     print(f"  Run ID            : {run_id}")
     print(f"  Records evaluated : {m['evaluated']}  (skipped: {m['skipped']})")
-    print(f"  TP / FP / TN / FN : {m['tp']} / {m['fp']} / {m['tn']} / {m['fn']}")
-    print("-" * 50)
-    print(f"  Accuracy          : {m['accuracy']:.4f}")
-    print(f"  Precision         : {m['precision']:.4f}  ← too much trash in inbox?")
-    print(f"  Recall            : {m['recall']:.4f}  ← missing good jobs?")
-    print(f"  F1                : {m['f1']:.4f}")
-    print("=" * 50)
+    print(f"  Micro accuracy    : {m['micro_accuracy']:.4f}")
+    print(f"  Macro precision   : {m['macro_precision']:.4f}")
+    print(f"  Macro recall      : {m['macro_recall']:.4f}")
+    print(f"  Macro F1          : {m['macro_f1']:.4f}")
+    print(
+        f"  Travel MAE        : {_format_float(m['travel_mae'])}  (n={m['travel_n']})"
+    )
+    print("-" * 72)
+    print("  Confusion matrix (rows=pred, columns=gold)")
+    header = "pred\\gold".ljust(14) + "".join(label.rjust(10) for label in labels)
+    print(f"  {header}")
+    for label, row in zip(labels, m["confusion"]):
+        cells = "".join(str(count).rjust(10) for count in row)
+        print(f"  {label.ljust(14)}{cells}")
+    print("-" * 72)
+    print("  Per-class metrics")
+    print(
+        "  "
+        + "class".ljust(14)
+        + "precision".rjust(11)
+        + "recall".rjust(10)
+        + "f1".rjust(10)
+        + "support".rjust(10)
+    )
+    for label in labels:
+        cls = m["per_class"][label]
+        print(
+            "  "
+            + label.ljust(14)
+            + f"{cls['precision']:>11.4f}"
+            + f"{cls['recall']:>10.4f}"
+            + f"{cls['f1']:>10.4f}"
+            + f"{cls['support']:>10}"
+        )
+    print("=" * 72)
 
     if mismatches:
-        print(f"\n  {len(mismatches)} mismatches:")
+        print(f"\n  {len(mismatches)} classification mismatches:")
         for mm in mismatches:
-            tag = "FP" if mm.pred == "pass" else "FN"
             print(
-                f"  [{tag}] record={mm.record_id}"
+                f"  record={mm.record_id}"
                 f"  gold={mm.gold}  pred={mm.pred}"
                 f"  policy={mm.human_policy}  reason={mm.reason}"
             )
@@ -397,11 +498,11 @@ def main(run_logger: RunLogger | None = None) -> None:
     records = load_gold(args.gold)
     log.info("Loaded %d gold records from %s", len(records), args.gold)
 
-    mismatches, counts, resolved_user_message_hashes = run_eval(
+    mismatches, metrics_input, resolved_user_message_hashes = run_eval(
         records, config, run_id, workers=args.workers
     )
 
-    metrics = compute_metrics(**counts)
+    metrics = assemble_metrics(metrics_input)
     print_report(metrics, mismatches, run_id)
 
     # SC-4: write mismatch file named mismatches_{run_id}.jsonl
