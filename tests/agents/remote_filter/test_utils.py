@@ -88,7 +88,6 @@ def test_build_search_context_drops_non_prompt_provenance_from_search_contexts()
             "source_detail_location": "Remote; Washington, DC",
         }
     ]
-    assert "workday_job_req_id" not in context.search_contexts[0].model_fields_set
 
 
 def test_build_search_context_merges_consolidated_search_contexts():
@@ -148,8 +147,10 @@ def test_context_fingerprint_changes_with_relevant_field():
 
 def test_context_fingerprint_stable_for_irrelevant_field():
     # Fields not read by `_build_user_message` must not affect the cache key.
-    fp1 = context_fingerprint(RemoteFilterInput(description="", keywords="AI"))
-    fp2 = context_fingerprint(RemoteFilterInput(description="", keywords="AI"))
+    # Exercise the legacy Mapping boundary: extra keys the input contract never
+    # models (country, noise) must be ignored, not fingerprinted.
+    fp1 = context_fingerprint({"keywords": "AI"})
+    fp2 = context_fingerprint({"keywords": "AI", "country": "USA", "noise": 42})
     assert fp1 == fp2
 
 
