@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -31,7 +32,9 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
 from agents.remote_filter.utils import (
     REMOTE_FILTER_PROMPT_PATH,
+    _build_user_message,
     analyze_remote,
+    build_search_context,
     passes_remote_filter,
 )
 from utils.run_logger import JsonlRunLogger, RunLogger
@@ -46,6 +49,7 @@ GOLD_FILE = "data/eval/ground_truth.jsonl"
 CONFIG_PATH = "config/agent/remote_agent.yml"
 RUNS_FILE = "data/eval/runs.jsonl"
 PROMPT_PATH = REMOTE_FILTER_PROMPT_PATH
+RESOLVED_USER_MESSAGE_HASH_LENGTH = 12
 
 USER_LOCATION = os.environ.get("USER_LOCATION", "USA")
 USER_TIMEZONE = os.environ.get("USER_TIMEZONE", None)
@@ -58,6 +62,14 @@ class MismatchRecord(BaseModel):
     pred: str
     human_policy: str | None
     reason: str
+    resolved_user_message_hash: str | None = None
+
+
+class ResolvedUserMessageHashRecord(BaseModel):
+    run_id: str
+    index: int
+    record_id: str
+    resolved_user_message_hash: str
 
 
 @dataclass(frozen=True)
@@ -68,6 +80,7 @@ class RecordEvalResult:
     pred: str | None
     reason: str | None
     elapsed: float
+    resolved_user_message_hash: str | None = None
     skipped: bool = False
     skip_reason: str | None = None
     mismatch: MismatchRecord | None = None
@@ -141,6 +154,25 @@ def load_gold(path: str) -> list[dict]:
     return list(seen.values())
 
 
+def _resolved_user_message_hash(rf_input) -> str:
+    return hashlib.sha256(_build_user_message(rf_input).encode("utf-8")).hexdigest()[
+        :RESOLVED_USER_MESSAGE_HASH_LENGTH
+    ]
+
+
+def _record_provenance_id(job: dict, index: int) -> str:
+    return str(job.get("dedup_hash") or job.get("source_job_id") or index)
+
+
+def _aggregate_resolved_user_message_hashes(
+    records: list[ResolvedUserMessageHashRecord],
+) -> str:
+    hashes = sorted(record.resolved_user_message_hash for record in records)
+    return hashlib.sha256("\n".join(hashes).encode("utf-8")).hexdigest()[
+        :RESOLVED_USER_MESSAGE_HASH_LENGTH
+    ]
+
+
 def _evaluate_record(
     i: int,
     job: dict,
@@ -174,19 +206,12 @@ def _evaluate_record(
             skip_reason="missing_description",
         )
 
-    location = job.get("location") or None
-    title = job.get("title") or None
-    search_context = {
-        **(job.get("search_params") or {}),
-        **({"user_timezone": USER_TIMEZONE} if USER_TIMEZONE else {}),
-    }
+    rf_input = build_search_context(job, USER_TIMEZONE)
+    resolved_user_message_hash = _resolved_user_message_hash(rf_input)
 
     t0 = time.monotonic()
     analysis = analyze_remote(
-        description,
-        title=title,
-        location=location,
-        search_context=search_context or None,
+        rf_input,
         llm_config=llm_config,
     )
     elapsed = time.monotonic() - t0
@@ -199,6 +224,7 @@ def _evaluate_record(
             pred=None,
             reason=None,
             elapsed=elapsed,
+            resolved_user_message_hash=resolved_user_message_hash,
             skipped=True,
             skip_reason="agent_failed",
         )
@@ -216,6 +242,7 @@ def _evaluate_record(
             pred=pred,
             human_policy=job.get("_human_policy"),
             reason=reason,
+            resolved_user_message_hash=resolved_user_message_hash,
         )
 
     return RecordEvalResult(
@@ -225,6 +252,7 @@ def _evaluate_record(
         pred=pred,
         reason=reason,
         elapsed=elapsed,
+        resolved_user_message_hash=resolved_user_message_hash,
         mismatch=mismatch,
     )
 
@@ -269,9 +297,10 @@ def run_eval(
     config: dict,
     run_id: str,
     workers: int = 1,
-) -> tuple[list[MismatchRecord], dict[str, int]]:
+) -> tuple[list[MismatchRecord], dict[str, int], list[ResolvedUserMessageHashRecord]]:
     counts = {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "skipped": 0}
     mismatches: list[MismatchRecord] = []
+    resolved_user_message_hashes: list[ResolvedUserMessageHashRecord] = []
 
     if workers == 1:
         results = [
@@ -296,10 +325,19 @@ def run_eval(
         _log_record_result(result)
         for key, value in result.counts.items():
             counts[key] += value
+        if result.resolved_user_message_hash is not None:
+            resolved_user_message_hashes.append(
+                ResolvedUserMessageHashRecord(
+                    run_id=run_id,
+                    index=result.index,
+                    record_id=_record_provenance_id(result.job, result.index),
+                    resolved_user_message_hash=result.resolved_user_message_hash,
+                )
+            )
         if result.mismatch is not None:
             mismatches.append(result.mismatch)
 
-    return mismatches, counts
+    return mismatches, counts, resolved_user_message_hashes
 
 
 def print_report(metrics: dict, mismatches: list[MismatchRecord], run_id: str) -> None:
@@ -356,7 +394,9 @@ def main(run_logger: RunLogger | None = None) -> None:
     records = load_gold(args.gold)
     log.info("Loaded %d gold records from %s", len(records), args.gold)
 
-    mismatches, counts = run_eval(records, config, run_id, workers=args.workers)
+    mismatches, counts, resolved_user_message_hashes = run_eval(
+        records, config, run_id, workers=args.workers
+    )
 
     metrics = compute_metrics(**counts)
     print_report(metrics, mismatches, run_id)
@@ -382,6 +422,15 @@ def main(run_logger: RunLogger | None = None) -> None:
         metrics=metrics["metrics"],
         mismatch_file=mismatch_path,
     )
+    run_record["resolved_user_message_hashes"] = {
+        "algorithm": "sha256",
+        "length": RESOLVED_USER_MESSAGE_HASH_LENGTH,
+        "count": len(resolved_user_message_hashes),
+        "aggregate": _aggregate_resolved_user_message_hashes(
+            resolved_user_message_hashes
+        ),
+        "records": [record.model_dump() for record in resolved_user_message_hashes],
+    }
     run_logger.log_run(run_record)
     log.info("Run record logged: %s", run_id)
 
