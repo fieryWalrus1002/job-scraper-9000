@@ -75,10 +75,9 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
     assert metrics["evaluated"] == 3
     assert metrics["skipped"] == 0
     assert metrics["confusion"] == [
-        [1, 1, 0, 0],
-        [1, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
+        [1, 1, 0],
+        [1, 0, 0],
+        [0, 0, 0],
     ]
     assert metrics["travel_mae"] == 3.0
     assert metrics["travel_n"] == 2
@@ -177,10 +176,9 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
     assert metrics_input.preds == ["remote"]
     assert metrics_input.golds == ["hybrid"]
     assert metrics["confusion"] == [
-        [0, 1, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
+        [0, 1, 0],
+        [0, 0, 0],
+        [0, 0, 0],
     ]
     assert len(captured_inputs) == 1
     rf_input = captured_inputs[0]

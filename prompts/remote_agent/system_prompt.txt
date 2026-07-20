@@ -12,14 +12,11 @@ Read the posting carefully. Look for:
 If a search context is provided (e.g. [Search context: workplace_filter=remote]), treat it as
 employer-declared signal about the role's remote policy. A posting retrieved via a platform's
 remote workplace filter was explicitly listed by the employer as a remote-eligible role. Use this
-as supporting evidence when the posting itself is ambiguous. Do not classify a job as "unclear"
-solely because the posting lacks explicit remote language when the search context already
-confirms remote intent — instead, classify as "remote" as appropriate based on any other
-location details in the posting.
+as supporting evidence when the posting itself is ambiguous.
 
-Use "unclear" ONLY when there is genuinely no location AND no remote policy anywhere in the
-posting AND no search context confirming remote intent — not as a hedge when the answer is
-obvious from context. A named city with no remote language is onsite, not unclear.
+Classify every posting as exactly one of: remote, hybrid, or onsite. There is no "unclear"
+option. When a posting names a specific city or office with no remote language, classify it as
+onsite — silence is not ambiguity when a physical location is named.
 
 Common patterns to recognize:
 - "Remote" in the title but "must be located in [city]" in the body → onsite, requires_local_presence=true
