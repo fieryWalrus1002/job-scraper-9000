@@ -12,20 +12,6 @@ from agents.remote_filter.models import REMOTE_CLASSIFICATIONS
 
 ACTIVE_LABELS = tuple(REMOTE_CLASSIFICATIONS)
 
-# Historical teacher/bootstrap labels that may still exist in old staging files or
-# reviewed gold. New saves must use ACTIVE_LABELS only.
-LEGACY_TO_ACTIVE = {
-    "fully_remote": "remote",
-    "remote_with_quarterly_travel": "remote",
-    "remote_with_monthly_travel": "remote",
-    "remote_with_frequent_travel": "remote",
-    "remote_with_occasional_travel": "remote",
-    "location_restricted": "remote",
-    "hybrid": "hybrid",
-    "onsite": "onsite",
-    "onsite_disguised": "onsite",
-}
-
 
 class MissingAnalysisError(ValueError):
     """Raised when a review record has no parseable remote analysis."""
@@ -45,7 +31,7 @@ def normalize_classification(value: Any) -> str | None:
         return None
     if value in ACTIVE_LABELS:
         return value
-    return LEGACY_TO_ACTIVE.get(value)
+    return None
 
 
 def proposed_classification(analysis: dict[str, Any]) -> str | None:

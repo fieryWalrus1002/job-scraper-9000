@@ -32,10 +32,6 @@ def test_sample_for_review_uses_production_classified_records(tmp_path):
                 "dedup_hash": "no-analysis",
                 "title": "No analysis",
             },
-            {
-                "title": "No stable key",
-                "_remote_analysis": {"remote_classification": "remote"},
-            },
         ],
     )
     write_jsonl(gold, [{"dedup_hash": "already-reviewed"}])
@@ -45,6 +41,24 @@ def test_sample_for_review_uses_production_classified_records(tmp_path):
     assert [record["dedup_hash"] for record in sample] == ["eligible"]
     written = [json.loads(line) for line in output.read_text().splitlines()]
     assert written == sample
+
+
+def test_sample_for_review_fails_on_classified_record_without_stable_key(tmp_path):
+    source = tmp_path / "classified.jsonl"
+    output = tmp_path / "to_review.jsonl"
+    gold = tmp_path / "ground_truth.jsonl"
+    write_jsonl(
+        source,
+        [
+            {
+                "title": "No stable key",
+                "_remote_analysis": {"remote_classification": "remote"},
+            }
+        ],
+    )
+
+    with pytest.raises(ValueError, match="missing a stable dedup key"):
+        create_review_sample(source, output, n=1, gold_path=gold)
 
 
 def test_sample_for_review_fails_when_no_classified_records(tmp_path):

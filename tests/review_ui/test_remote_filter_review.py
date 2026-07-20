@@ -15,14 +15,14 @@ def test_extracts_production_remote_analysis():
     assert extract_remote_analysis({"_remote_analysis": analysis}) == analysis
 
 
-def test_normalizes_legacy_label_from_production_analysis():
+def test_rejects_legacy_label_from_production_analysis():
     analysis = {
         "remote_classification": "onsite_disguised",
         "reasoning_trace": "office",
     }
 
-    assert proposed_classification(analysis) == "onsite"
-    assert suggested_verdict("onsite") == "trash"
+    assert proposed_classification(analysis) is None
+    assert suggested_verdict(None) == "unknown"
 
 
 def test_legacy_teacher_response_shape_is_not_review_input():

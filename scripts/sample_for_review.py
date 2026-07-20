@@ -81,13 +81,20 @@ def eligible_records(
     eligible: list[dict[str, Any]] = []
     seen: set[str] = set()
     for record in records:
+        has_analysis = isinstance(record.get("_remote_analysis"), dict)
         key = dedup_key(record)
         if not key:
+            if has_analysis:
+                title = record.get("title") or "<untitled>"
+                raise ValueError(
+                    f"Classified review candidate {title!r} is missing a stable "
+                    "dedup key (dedup_hash, source_job_id, or source_url)"
+                )
             continue
         if key in seen:
             continue
         seen.add(key)
-        if not isinstance(record.get("_remote_analysis"), dict):
+        if not has_analysis:
             continue
         if not include_reviewed and key in reviewed:
             continue
