@@ -70,6 +70,25 @@ def test_sample_for_review_warns_and_skips_classified_record_without_stable_key(
     assert "without a stable dedup key" in caplog.text
 
 
+def test_sample_for_review_names_missing_key_rows_when_none_are_eligible(tmp_path):
+    source = tmp_path / "classified.jsonl"
+    output = tmp_path / "to_review.jsonl"
+    gold = tmp_path / "ground_truth.jsonl"
+    write_jsonl(
+        source,
+        [
+            {
+                "title": "No stable key",
+                "company": "ExampleCo",
+                "_remote_analysis": {"remote_classification": "remote"},
+            }
+        ],
+    )
+
+    with pytest.raises(ValueError, match="No stable key @ ExampleCo"):
+        create_review_sample(source, output, n=1, gold_path=gold)
+
+
 def test_sample_for_review_fails_when_no_classified_records(tmp_path):
     source = tmp_path / "classified.jsonl"
     output = tmp_path / "to_review.jsonl"

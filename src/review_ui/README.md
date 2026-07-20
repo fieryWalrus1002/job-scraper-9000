@@ -89,7 +89,6 @@ Each record is the full classified job plus human-review fields:
     "reasoning_trace": "..."
   },
   "_human_verdict": "pass",
-  "_human_policy": "remote",
   "_human_classification": "remote",
   "_corrected": false,
   "_review_metadata": {
@@ -123,7 +122,7 @@ The correction form uses the active 3-way axis only:
 | `hybrid` | Regular in-office/local presence is expected                            |
 | `onsite` | Physical presence is the default or explicit requirement                |
 
-Legacy labels may still appear in old gold rows for historical audit (`fully_remote`, `onsite_disguised`, `location_restricted`, travel buckets, `unclear`), but new review saves always write the 3-way `_human_classification`.
+Legacy `_human_policy` labels may still appear in old gold rows for historical audit (`fully_remote`, `onsite_disguised`, `location_restricted`, travel buckets, `unclear`), but new review saves write only the 3-way `_human_classification`.
 
 ______________________________________________________________________
 

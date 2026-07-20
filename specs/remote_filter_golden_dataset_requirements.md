@@ -40,21 +40,21 @@ ______________________________________________________________________
 
 Every record must have the following fields to be usable in eval:
 
-| Field                   | Required    | Notes                                                                                                  |
-| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------ |
-| `dedup_hash`            | Yes         | Primary key used by `load_gold()` for dedup                                                            |
-| `title`                 | Yes         | Used in mismatch reporting                                                                             |
-| `company`               | Yes         | Used in mismatch reporting                                                                             |
-| `location`              | Yes         | Input to `analyze_remote()`                                                                            |
-| `description`           | Yes         | Primary input; records without this are skipped                                                        |
-| `source_url`            | Yes         | Required for traceability back to the original posting                                                 |
-| `_human_verdict`        | Yes         | `"pass"` or `"trash"` — final ground truth                                                             |
-| `_human_policy`         | Yes         | Current records mirror the 3-way `_human_classification`; legacy rows may carry historical policy tags |
-| `_human_classification` | Yes         | 3-way eval label: `remote`, `hybrid`, or `onsite`                                                      |
-| `_corrected`            | Yes         | `true` if human overrode the classifier proposal                                                       |
-| `_filter_metadata`      | Recommended | Captures production classifier prompt hash / commit when the proposal was generated                    |
-| `_review_metadata`      | Yes         | Captures reviewer prompt hash and commit at review time                                                |
-| `search_params`         | Recommended | Provides context to `analyze_remote()` for timezone reasoning                                          |
+| Field                   | Required    | Notes                                                                                           |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| `dedup_hash`            | Yes         | Primary key used by `load_gold()` for dedup                                                     |
+| `title`                 | Yes         | Used in mismatch reporting                                                                      |
+| `company`               | Yes         | Used in mismatch reporting                                                                      |
+| `location`              | Yes         | Input to `analyze_remote()`                                                                     |
+| `description`           | Yes         | Primary input; records without this are skipped                                                 |
+| `source_url`            | Yes         | Required for traceability back to the original posting                                          |
+| `_human_verdict`        | Yes         | `"pass"` or `"trash"` — final ground truth                                                      |
+| `_human_classification` | Yes         | 3-way eval label: `remote`, `hybrid`, or `onsite`                                               |
+| `_human_policy`         | Historical  | Legacy teacher/bootstrap rows may carry historical policy tags; new review rows do not write it |
+| `_corrected`            | Yes         | `true` if human overrode the classifier proposal                                                |
+| `_filter_metadata`      | Recommended | Captures production classifier prompt hash / commit when the proposal was generated             |
+| `_review_metadata`      | Yes         | Captures reviewer prompt hash and commit at review time                                         |
+| `search_params`         | Recommended | Provides context to `analyze_remote()` for timezone reasoning                                   |
 
 Records missing `description` are skipped by the eval and waste a slot in the gold set. Invalid `_human_classification` values fail fast.
 

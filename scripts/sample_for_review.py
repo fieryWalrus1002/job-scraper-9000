@@ -78,18 +78,24 @@ def reviewed_keys(gold_path: Path) -> set[str]:
     return keys
 
 
+def _record_label(record: dict[str, Any], index: int) -> str:
+    title = record.get("title") or "<untitled>"
+    company = record.get("company") or "<unknown company>"
+    return f"#{index} {title} @ {company}"
+
+
 def eligible_records(
     records: list[dict[str, Any]], reviewed: set[str], include_reviewed: bool
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[str]]:
     eligible: list[dict[str, Any]] = []
     seen: set[str] = set()
-    skipped_missing_key = 0
-    for record in records:
+    missing_key_records: list[str] = []
+    for index, record in enumerate(records, start=1):
         has_analysis = isinstance(record.get("_remote_analysis"), dict)
         key = dedup_key(record)
         if not key:
             if has_analysis:
-                skipped_missing_key += 1
+                missing_key_records.append(_record_label(record, index))
             continue
         if key in seen:
             continue
@@ -99,13 +105,14 @@ def eligible_records(
         if not include_reviewed and key in reviewed:
             continue
         eligible.append(record)
-    if skipped_missing_key:
+    if missing_key_records:
         log.warning(
             "Skipped %d classified review candidates without a stable dedup key "
-            "(dedup_hash, source_job_id, or source_url)",
-            skipped_missing_key,
+            "(dedup_hash, source_job_id, or source_url): %s",
+            len(missing_key_records),
+            "; ".join(missing_key_records[:5]),
         )
-    return eligible
+    return eligible, missing_key_records
 
 
 def sample_records(
@@ -132,11 +139,18 @@ def create_review_sample(
 ) -> list[dict[str, Any]]:
     source_records = load_jsonl(source_path)
     reviewed = reviewed_keys(gold_path) if not include_reviewed else set()
-    eligible = eligible_records(source_records, reviewed, include_reviewed)
+    eligible, missing_key_records = eligible_records(
+        source_records, reviewed, include_reviewed
+    )
     if not eligible:
+        detail = ""
+        if missing_key_records:
+            detail = "; classified rows missing stable keys: " + "; ".join(
+                missing_key_records[:5]
+            )
         raise ValueError(
             f"No eligible records in {source_path}; expected production-classified "
-            "rows with _remote_analysis"
+            f"rows with _remote_analysis{detail}"
         )
     sample = sample_records(eligible, n, seed)
     write_jsonl(target_path, sample)

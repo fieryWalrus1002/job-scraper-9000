@@ -69,7 +69,7 @@ def load_reviewed() -> dict[str, dict]:
             if h:
                 seen[h] = {
                     "verdict": r.get("_human_verdict"),
-                    "policy": r.get("_human_policy"),
+                    "policy": r.get("_human_classification") or r.get("_human_policy"),
                     "corrected": r.get("_corrected", False),
                 }
     return seen
@@ -102,8 +102,7 @@ def save_record(
         **job,
         "_human_verdict": verdict,
         # `_human_classification` is the eval-authoritative 3-way label.
-        # `_human_policy` is retained as a legacy mirror for older reports/tools.
-        "_human_policy": policy,
+        # New review rows do not write `_human_policy`; that field is legacy-only.
         "_human_classification": policy,
         "_corrected": corrected,
         "_review_metadata": build_metadata(),
