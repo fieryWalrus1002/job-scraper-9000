@@ -22,6 +22,12 @@ Evaluation scripts must not perform inline file I/O for telemetry.
 
 ### SC-2 — Durable Run Provenance
 
+> **Remote-filter note (Phase 31):** the positive-class `metrics.tp/fp/tn/fn` +
+> `precision`/`recall`/`f1` rows below describe the legacy **binary** shape. The
+> remote-filter eval now emits the **categorical** metrics defined in SC-8; those
+> binary fields are retired for remote-filter and retained here as the envelope for
+> other binary evals.
+
 Every execution must produce a single JSONL record with all of the following fields:
 
 | Field                      | Description                                                                                                                                                                        |
@@ -105,6 +111,37 @@ For scheduled regression testing where 24h turnaround is acceptable, the OpenAI 
 - OpenAI Batch API only — Ollama does not support batch submission; `submit_eval_batch.py` must exit with a clear error if `--provider ollama` is passed
 - The resulting `runs.jsonl` record is structurally identical to a synchronous eval run; downstream tools (`compare_evals.py`) require no changes
 
+### SC-8 — Categorical classifier eval + gate separation (remote-filter, Phase 31)
+
+Phase 31 (`remote_filter_eval_decoupling.md`, RATIFIED 2026-07-17) split the
+remote-filter eval into two tiers so the eval score measures what actually decides
+production outcomes. The binary pass/trash remote-filter eval (SC-2's positive-class
+`tp/fp/tn/fn` + `precision`/`recall`/`f1`, as applied to remote-filter) is
+**retired**.
+
+- **Tier 1 — LLM classifier eval (this harness).** `run_remote_filter_eval.py`
+  scores the model's *extraction* against a gold set on a **policy-independent
+  categorical axis**, via `compute_categorical_metrics` (`src/agent_eval/`):
+  per-class precision/recall/F1, macro + micro averages, and an N×N confusion
+  matrix. Travel is scored separately as **MAE** — extraction quality only, since
+  travel is not gated. The axis itself is defined in `remote_filter_taxonomy.md`.
+  The run-record `metrics` block carries these categorical fields in place of
+  `tp/fp/tn/fn`, and the eval `schema_version` was bumped accordingly.
+- **Tier 2 — deterministic policy gates (NOT this harness).** `_gate_user`
+  (`pipeline/scoring.py`) applies per-user policy over the extracted fields
+  (`acceptable_classifications`, numeric `max_travel_days`, relocation /
+  local-presence). It is covered by **deterministic unit tests**
+  (`tests/pipeline/test_gate_user.py`), not the eval harness, so the classifier
+  score stays valid under policy tuning and multi-user.
+- **Shared input contract.** Both the eval and production build the classifier
+  input through `RemoteFilterInput` / `SearchProvenance`
+  (`agents/remote_filter/input_models.py`) — one validated boundary, so the eval
+  cannot silently feed a thinner prompt than production. Per-record resolved-prompt
+  hashes are recorded in the provenance so input drift is detectable.
+
+**Axis note:** the categorical axis is currently `remote | hybrid | onsite | unclear`; Phase 32 (`remote_filter_classifier_tuning.md` §2) retires `unclear` →
+3-way (`remote | hybrid | onsite`).
+
 ______________________________________________________________________
 
 ## Examples
@@ -121,6 +158,11 @@ Example mismatch record (`mismatches_*.jsonl`):
 {"run_id":"20260514_193055_a7f3","record_id":"606ba385","gold":"pass","pred":"trash","reason":"Model rejected due to EST timezone requirement; human policy was fully_remote."}
 ```
 
+> The two examples above show the **legacy binary** record shape (`pass`/`trash`,
+> `tp/fp/tn/fn`). Post-Phase-31 remote-filter runs carry categorical `metrics`
+> (per-class + confusion matrix + travel MAE, SC-8) and categorical `gold`/`pred`
+> labels in mismatch records.
+
 ______________________________________________________________________
 
 ## Extensibility
@@ -136,3 +178,17 @@ ______________________________________________________________________
 - Fine-tuning or teacher model integration
 - Streamlit or web UI
 - CI/CD gating (e.g. fail a PR when F1 drops below threshold) — the machine-readable `runs.jsonl` format is designed to support this; implementation belongs in a CI spec
+
+______________________________________________________________________
+
+## Changelog
+
+- **2026-07-20 — Phase 31 two-tier update.** Added SC-8: the remote-filter eval is
+  now a policy-independent **categorical** classifier eval
+  (`compute_categorical_metrics` + travel MAE), with the deterministic policy gates
+  (`_gate_user`) unit-tested separately rather than in the harness. Binary
+  pass/trash remote-filter eval retired (SC-2 binary fields kept as the envelope for
+  other binary evals). Documented `RemoteFilterInput` / `SearchProvenance` as the
+  shared eval/production input boundary. See `remote_filter_eval_decoupling.md`
+  (design) and `remote_filter_taxonomy.md` (axis). Axis `unclear` retirement → 3-way
+  tracked in `remote_filter_classifier_tuning.md` (Phase 32).
