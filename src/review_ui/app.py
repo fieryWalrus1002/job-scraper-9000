@@ -240,7 +240,7 @@ if prior:
     badge = "corrected" if prior["corrected"] else "confirmed"
     st.info(
         f"{icon} Already submitted — verdict: **{prior['verdict']}** · "
-        f"policy: **{prior['policy']}** · {badge}. "
+        f"classification: **{prior['policy']}** · {badge}. "
         f"Saving again will append a correction (last entry wins in eval).",
         icon="✅",
     )
@@ -298,7 +298,7 @@ with col2:
 
     st.subheader("Correct Label")
     corrected_policy = st.selectbox(
-        "Remote policy",
+        "Classification",
         LABELS,
         index=LABELS.index(proposed_policy) if proposed_policy in LABELS else 0,
     )
