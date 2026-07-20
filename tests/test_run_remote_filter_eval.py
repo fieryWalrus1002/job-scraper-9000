@@ -2,6 +2,7 @@ import hashlib
 import time
 
 import pytest
+from pydantic import ValidationError
 
 from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter.models import RemoteAnalysis
@@ -20,6 +21,11 @@ def _analysis(classification: str, travel_days: int | None = None) -> RemoteAnal
 
 def _config() -> dict:
     return {"llm": {"provider": "fake"}}
+
+
+def test_remote_analysis_rejects_retired_unclear_label():
+    with pytest.raises(ValidationError):
+        _analysis("unclear")
 
 
 def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch):
@@ -112,7 +118,11 @@ def test_run_eval_counts_skipped_records_without_inference(monkeypatch):
     monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
 
     records = [
-        {"title": "bad label", "description": "desc", "_human_classification": "maybe"},
+        {
+            "title": "retired unclear label",
+            "description": "desc",
+            "_human_classification": "unclear",
+        },
         {
             "title": "missing description",
             "description": "",

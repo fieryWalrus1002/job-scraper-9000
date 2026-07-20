@@ -10,6 +10,8 @@ GOLD_PATH = REPO_ROOT / "data" / "eval" / "ground_truth.jsonl"
 # Phase 32 (#519 re-ratification + #520 unclear retirement): dropped the 2
 # recruiting-spam non-jobs that used to carry `unclear`. Axis is now 3-way.
 EXPECTED_RECORD_COUNT = 104
+EXPECTED_TRAVEL_RECORD_COUNT = 2
+EXPECTED_LOCATION_RESTRICTED_RECORD_COUNT = 1
 TRAVEL_POLICIES = {"remote_with_monthly_travel", "remote_with_frequent_travel"}
 
 # The gold corpus (`data/eval/ground_truth.jsonl`) is a local-only artifact —
@@ -45,8 +47,8 @@ def test_remote_filter_gold_records_have_3way_human_classification():
 def test_remote_filter_gold_travel_and_location_fields_are_filled():
     # Invariant (durable across gold re-ratification): any record still carrying a
     # legacy travel/location policy tag must have its structured field filled.
-    # Exact counts are intentionally not asserted — the fine-grained policy tags
-    # are being retired (#520 2b), so their populations shift as gold is curated.
+    # Pin counts too so accidental corpus-shape drift is visible; update these
+    # intentionally when #520 2b retires the fine-grained policy tags.
     records = load_gold_records()
     travel_records = [
         record for record in records if record.get("_human_policy") in TRAVEL_POLICIES
@@ -57,9 +59,11 @@ def test_remote_filter_gold_travel_and_location_fields_are_filled():
         if record.get("_human_policy") == "location_restricted"
     ]
 
+    assert len(travel_records) == EXPECTED_TRAVEL_RECORD_COUNT
     assert all(
         isinstance(record.get("_human_travel_days"), int) for record in travel_records
     )
+    assert len(location_restricted_records) == EXPECTED_LOCATION_RESTRICTED_RECORD_COUNT
     assert all(
         "location_restrictions" in record for record in location_restricted_records
     )
