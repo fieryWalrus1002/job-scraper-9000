@@ -142,20 +142,23 @@ def remap_records(
         record["_human_classification"] = classification
         remap_counts[(policy, classification)] += 1
 
-        if policy in TRAVEL_POLICIES and "_human_travel_days" not in record:
-            analysis = extract_remote_analysis(record, index)
-            travel_days = analysis.get("estimated_travel_days_per_year")
-            if travel_days is None:
-                record["_human_travel_days"] = None
-                travel_none_records.append(_record_id(record, index))
-            elif isinstance(travel_days, int) and not isinstance(travel_days, bool):
-                record["_human_travel_days"] = travel_days
+        if "_human_travel_days" not in record:
+            if policy in TRAVEL_POLICIES:
+                analysis = extract_remote_analysis(record, index)
+                travel_days = analysis.get("estimated_travel_days_per_year")
+                if travel_days is None:
+                    record["_human_travel_days"] = None
+                    travel_none_records.append(_record_id(record, index))
+                elif isinstance(travel_days, int) and not isinstance(travel_days, bool):
+                    record["_human_travel_days"] = travel_days
+                else:
+                    raise ValueError(
+                        f"Record {_record_id(record, index)} has invalid "
+                        "response.estimated_travel_days_per_year "
+                        f"{travel_days!r}; expected int or None"
+                    )
             else:
-                raise ValueError(
-                    f"Record {_record_id(record, index)} has invalid "
-                    "response.estimated_travel_days_per_year "
-                    f"{travel_days!r}; expected int or None"
-                )
+                record["_human_travel_days"] = None
 
         if policy == LOCATION_RESTRICTED_POLICY:
             analysis = extract_remote_analysis(record, index)

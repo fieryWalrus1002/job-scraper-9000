@@ -6,7 +6,6 @@ executing Streamlit at import time.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from agents.remote_filter.models import REMOTE_CLASSIFICATIONS
@@ -33,41 +32,11 @@ class MissingAnalysisError(ValueError):
 
 
 def extract_remote_analysis(job: dict[str, Any]) -> dict[str, Any]:
-    """Extract a RemoteAnalysis-shaped dict from current or legacy staging rows.
-
-    Current review rows come from ``remote_filter_classified.jsonl`` and store the
-    production classifier proposal under ``_remote_analysis``. Legacy teacher
-    rows stored an OpenAI Batch response under ``response``; parse that shape only
-    for backwards compatibility with old local staging files.
-    """
+    """Extract the production RemoteAnalysis proposal from a review row."""
     analysis = job.get("_remote_analysis")
     if isinstance(analysis, dict):
         return analysis
-
-    raw_content = (
-        job.get("response", {})
-        .get("body", {})
-        .get("choices", [{}])[0]
-        .get("message", {})
-        .get("content")
-    )
-    if raw_content is None:
-        raise MissingAnalysisError(
-            "review record is missing _remote_analysis (or legacy response content)"
-        )
-    if not isinstance(raw_content, str):
-        raise MissingAnalysisError(
-            f"legacy response content must be str, got {type(raw_content).__name__}"
-        )
-    try:
-        parsed = json.loads(raw_content)
-    except json.JSONDecodeError as exc:
-        raise MissingAnalysisError(f"invalid legacy response JSON: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise MissingAnalysisError(
-            f"legacy response JSON must decode to object, got {type(parsed).__name__}"
-        )
-    return parsed
+    raise MissingAnalysisError("review record is missing production _remote_analysis")
 
 
 def normalize_classification(value: Any) -> str | None:

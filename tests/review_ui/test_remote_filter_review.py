@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from review_ui.remote_filter_review import (
@@ -17,24 +15,29 @@ def test_extracts_production_remote_analysis():
     assert extract_remote_analysis({"_remote_analysis": analysis}) == analysis
 
 
-def test_extracts_and_normalizes_legacy_teacher_response():
-    content = json.dumps(
-        {"remote_classification": "onsite_disguised", "reasoning_trace": "office"}
-    )
-    job = {
-        "response": {
-            "body": {"choices": [{"message": {"content": content}}]},
-        }
+def test_normalizes_legacy_label_from_production_analysis():
+    analysis = {
+        "remote_classification": "onsite_disguised",
+        "reasoning_trace": "office",
     }
-
-    analysis = extract_remote_analysis(job)
 
     assert proposed_classification(analysis) == "onsite"
     assert suggested_verdict("onsite") == "trash"
 
 
+def test_legacy_teacher_response_shape_is_not_review_input():
+    job = {
+        "response": {
+            "body": {"choices": [{"message": {"content": "{}"}}]},
+        }
+    }
+
+    with pytest.raises(MissingAnalysisError, match="production _remote_analysis"):
+        extract_remote_analysis(job)
+
+
 def test_missing_analysis_fails_loudly():
-    with pytest.raises(MissingAnalysisError, match="missing _remote_analysis"):
+    with pytest.raises(MissingAnalysisError, match="production _remote_analysis"):
         extract_remote_analysis({"title": "No proposal"})
 
 

@@ -82,13 +82,14 @@ def eligible_records(
     seen: set[str] = set()
     for record in records:
         key = dedup_key(record)
-        if key and key in seen:
+        if not key:
             continue
-        if key:
-            seen.add(key)
+        if key in seen:
+            continue
+        seen.add(key)
         if not isinstance(record.get("_remote_analysis"), dict):
             continue
-        if not include_reviewed and key and key in reviewed:
+        if not include_reviewed and key in reviewed:
             continue
         eligible.append(record)
     return eligible

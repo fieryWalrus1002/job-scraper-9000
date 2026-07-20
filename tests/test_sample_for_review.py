@@ -32,6 +32,10 @@ def test_sample_for_review_uses_production_classified_records(tmp_path):
                 "dedup_hash": "no-analysis",
                 "title": "No analysis",
             },
+            {
+                "title": "No stable key",
+                "_remote_analysis": {"remote_classification": "remote"},
+            },
         ],
     )
     write_jsonl(gold, [{"dedup_hash": "already-reviewed"}])
