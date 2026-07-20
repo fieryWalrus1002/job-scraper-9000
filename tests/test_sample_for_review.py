@@ -70,6 +70,48 @@ def test_sample_for_review_warns_and_skips_classified_record_without_stable_key(
     assert "without a stable dedup key" in caplog.text
 
 
+def test_sample_for_review_warns_on_keyed_record_missing_analysis(tmp_path, caplog):
+    source = tmp_path / "classified.jsonl"
+    output = tmp_path / "to_review.jsonl"
+    gold = tmp_path / "ground_truth.jsonl"
+    write_jsonl(
+        source,
+        [
+            {
+                "dedup_hash": "no-analysis",
+                "title": "Keyed but no analysis",
+                "company": "ExampleCo",
+            },
+            {
+                "dedup_hash": "eligible",
+                "title": "Eligible",
+                "_remote_analysis": {"remote_classification": "remote"},
+            },
+        ],
+    )
+
+    with caplog.at_level("WARNING"):
+        sample = create_review_sample(source, output, n=10, gold_path=gold, seed=1)
+
+    # The malformed row is excluded but surfaced loudly, not dropped silently.
+    assert [record["dedup_hash"] for record in sample] == ["eligible"]
+    assert "missing _remote_analysis" in caplog.text
+    assert "Keyed but no analysis @ ExampleCo" in caplog.text
+
+
+def test_sample_for_review_names_missing_analysis_rows_when_none_are_eligible(tmp_path):
+    source = tmp_path / "classified.jsonl"
+    output = tmp_path / "to_review.jsonl"
+    gold = tmp_path / "ground_truth.jsonl"
+    write_jsonl(
+        source,
+        [{"dedup_hash": "no-analysis", "title": "No analysis", "company": "AcmeCo"}],
+    )
+
+    with pytest.raises(ValueError, match="missing _remote_analysis: #1 No analysis"):
+        create_review_sample(source, output, n=1, gold_path=gold)
+
+
 def test_sample_for_review_names_missing_key_rows_when_none_are_eligible(tmp_path):
     source = tmp_path / "classified.jsonl"
     output = tmp_path / "to_review.jsonl"

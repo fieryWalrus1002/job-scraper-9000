@@ -86,10 +86,11 @@ def _record_label(record: dict[str, Any], index: int) -> str:
 
 def eligible_records(
     records: list[dict[str, Any]], reviewed: set[str], include_reviewed: bool
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     eligible: list[dict[str, Any]] = []
     seen: set[str] = set()
     missing_key_records: list[str] = []
+    missing_analysis_records: list[str] = []
     for index, record in enumerate(records, start=1):
         has_analysis = isinstance(record.get("_remote_analysis"), dict)
         key = dedup_key(record)
@@ -101,6 +102,10 @@ def eligible_records(
             continue
         seen.add(key)
         if not has_analysis:
+            # A keyed classified row with no `_remote_analysis` is malformed
+            # upstream — the production classifier should have attached it.
+            # Surface it rather than drop it silently (fail loud, per CLAUDE.md).
+            missing_analysis_records.append(_record_label(record, index))
             continue
         if not include_reviewed and key in reviewed:
             continue
@@ -112,7 +117,14 @@ def eligible_records(
             len(missing_key_records),
             "; ".join(missing_key_records[:5]),
         )
-    return eligible, missing_key_records
+    if missing_analysis_records:
+        log.warning(
+            "Skipped %d classified review candidates missing _remote_analysis "
+            "(production classifier output is required for HITL review): %s",
+            len(missing_analysis_records),
+            "; ".join(missing_analysis_records[:5]),
+        )
+    return eligible, missing_key_records, missing_analysis_records
 
 
 def sample_records(
@@ -139,15 +151,22 @@ def create_review_sample(
 ) -> list[dict[str, Any]]:
     source_records = load_jsonl(source_path)
     reviewed = reviewed_keys(gold_path) if not include_reviewed else set()
-    eligible, missing_key_records = eligible_records(
+    eligible, missing_key_records, missing_analysis_records = eligible_records(
         source_records, reviewed, include_reviewed
     )
     if not eligible:
-        detail = ""
+        details = []
         if missing_key_records:
-            detail = "; classified rows missing stable keys: " + "; ".join(
-                missing_key_records[:5]
+            details.append(
+                "classified rows missing stable keys: "
+                + "; ".join(missing_key_records[:5])
             )
+        if missing_analysis_records:
+            details.append(
+                "classified rows missing _remote_analysis: "
+                + "; ".join(missing_analysis_records[:5])
+            )
+        detail = ("; " + "; ".join(details)) if details else ""
         raise ValueError(
             f"No eligible records in {source_path}; expected production-classified "
             f"rows with _remote_analysis{detail}"

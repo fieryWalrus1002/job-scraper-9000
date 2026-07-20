@@ -58,6 +58,16 @@ Every record must have the following fields to be usable in eval:
 
 Records missing `description` are skipped by the eval and waste a slot in the gold set. Invalid `_human_classification` values fail fast.
 
+> **`_human_policy` is a deliberate one-way migration (Phase 32).** The active
+> review UI (`src/review_ui/app.py`) writes only `_human_classification`; it does
+> **not** write `_human_policy`. Historical rows retain their legacy
+> `_human_policy` tags, and both readers tolerate the split: `load_reviewed()`
+> falls back to `_human_policy` when `_human_classification` is absent, and
+> `scripts/remap_gold_to_4way.py` remains a one-time migration that derives
+> `_human_classification` from `_human_policy` for those legacy rows. New gold is
+> `_human_classification`-only; there is no back-migration of new rows to the
+> legacy field.
+
 ______________________________________________________________________
 
 ## Edge Case Coverage
