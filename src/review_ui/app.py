@@ -101,6 +101,8 @@ def save_record(
     record = {
         **job,
         "_human_verdict": verdict,
+        # `_human_classification` is the eval-authoritative 3-way label.
+        # `_human_policy` is retained as a legacy mirror for older reports/tools.
         "_human_policy": policy,
         "_human_classification": policy,
         "_corrected": corrected,

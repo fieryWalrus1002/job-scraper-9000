@@ -43,7 +43,9 @@ def test_sample_for_review_uses_production_classified_records(tmp_path):
     assert written == sample
 
 
-def test_sample_for_review_fails_on_classified_record_without_stable_key(tmp_path):
+def test_sample_for_review_warns_and_skips_classified_record_without_stable_key(
+    tmp_path, caplog
+):
     source = tmp_path / "classified.jsonl"
     output = tmp_path / "to_review.jsonl"
     gold = tmp_path / "ground_truth.jsonl"
@@ -53,12 +55,19 @@ def test_sample_for_review_fails_on_classified_record_without_stable_key(tmp_pat
             {
                 "title": "No stable key",
                 "_remote_analysis": {"remote_classification": "remote"},
-            }
+            },
+            {
+                "dedup_hash": "eligible",
+                "title": "Eligible",
+                "_remote_analysis": {"remote_classification": "remote"},
+            },
         ],
     )
 
-    with pytest.raises(ValueError, match="missing a stable dedup key"):
-        create_review_sample(source, output, n=1, gold_path=gold)
+    sample = create_review_sample(source, output, n=1, gold_path=gold)
+
+    assert [record["dedup_hash"] for record in sample] == ["eligible"]
+    assert "without a stable dedup key" in caplog.text
 
 
 def test_sample_for_review_fails_when_no_classified_records(tmp_path):

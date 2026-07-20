@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import random
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,8 @@ from typing import Any
 DEFAULT_SOURCE = Path("data/filtered/remote_filter_classified.jsonl")
 DEFAULT_TARGET = Path("data/staging/to_review.jsonl")
 DEFAULT_GOLD = Path("data/eval/ground_truth.jsonl")
+
+log = logging.getLogger(__name__)
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -80,16 +83,13 @@ def eligible_records(
 ) -> list[dict[str, Any]]:
     eligible: list[dict[str, Any]] = []
     seen: set[str] = set()
+    skipped_missing_key = 0
     for record in records:
         has_analysis = isinstance(record.get("_remote_analysis"), dict)
         key = dedup_key(record)
         if not key:
             if has_analysis:
-                title = record.get("title") or "<untitled>"
-                raise ValueError(
-                    f"Classified review candidate {title!r} is missing a stable "
-                    "dedup key (dedup_hash, source_job_id, or source_url)"
-                )
+                skipped_missing_key += 1
             continue
         if key in seen:
             continue
@@ -99,6 +99,12 @@ def eligible_records(
         if not include_reviewed and key in reviewed:
             continue
         eligible.append(record)
+    if skipped_missing_key:
+        log.warning(
+            "Skipped %d classified review candidates without a stable dedup key "
+            "(dedup_hash, source_job_id, or source_url)",
+            skipped_missing_key,
+        )
     return eligible
 
 
@@ -153,6 +159,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     args = parse_args()
     sample = create_review_sample(
         args.source,

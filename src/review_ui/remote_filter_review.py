@@ -42,7 +42,8 @@ def suggested_verdict(classification: str | None) -> str:
     """Legacy pass/trash suggestion retained for gold compatibility.
 
     Remote-filter eval now scores ``_human_classification``. ``_human_verdict`` is
-    still written because older reports and local gold tooling expect it.
+    still written as a compatibility field for older reports/local tooling, not
+    as the authoritative eval target.
     """
     if classification == "remote":
         return "pass"
