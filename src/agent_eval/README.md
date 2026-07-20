@@ -67,7 +67,7 @@ ______________________________________________________________________
 
 ## Current baseline
 
-Remote-filter eval now reports classifier-native 4-way categorical metrics (`remote`, `hybrid`, `onsite`, `unclear`) plus travel-days MAE. Use `scripts/compare_evals.py --last 5` to inspect recent local runs.
+Remote-filter eval now reports classifier-native 3-way categorical metrics (`remote`, `hybrid`, `onsite`) plus travel-days MAE. Use `scripts/compare_evals.py --last 5` to inspect recent local runs.
 
 ______________________________________________________________________
 

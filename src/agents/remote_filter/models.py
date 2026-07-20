@@ -40,9 +40,8 @@ REMOTE_CLASSIFICATIONS: list[str] = list(get_args(RemoteClassification))
 
 # Values the LLM no longer produces. RemoteAnalysis is strict (3-way axis), so
 # these do NOT validate against RemoteAnalysis itself — they exist for
-# back-compat consumers *outside* the strict schema: UI label sets
-# (review_ui.LABELS) and reading historical eval records / DB rows that still
-# carry them.
+# back-compat consumers *outside* the strict schema: display/normalization code
+# and reading historical eval records / DB rows that still carry them.
 LEGACY_CLASSIFICATIONS: list[str] = [
     "unclear",  # retired Phase 32: no longer a classifier label (still on historical rows)
     "fully_remote",  # pre-taxonomy: renamed to "remote"

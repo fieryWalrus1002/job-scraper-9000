@@ -4,21 +4,21 @@ This repo treats `data/` as the local pipeline workspace. Most JSONL contents ar
 
 ## Summary by folder
 
-| Folder                | Writers / processes                                                                              | Default outputs                                                                                                                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data/raw/`           | `job-scraper <scraper> --save`; `job-scraper run-config --save`                                  | Flat: `data/raw/YYYY-MM-DD_HH-MM_<source>_<keywords>.jsonl`; with `run-config --run-date`: `data/raw/YYYY-MM-DD/*.jsonl`                                                                                  |
-| `data/prefiltered/`   | `job-scraper prefilter` via `src/prefilter/router.py`                                            | `data/prefiltered/remote_filter_input.jsonl` or `data/prefiltered/<date>/remote_filter_input.jsonl`; overwritten                                                                                          |
-| `data/local/`         | `job-scraper prefilter` via `src/prefilter/router.py`                                            | `data/local/local_jobs.jsonl` or `data/local/<date>/local_jobs.jsonl`; overwritten                                                                                                                        |
-| `data/trash/`         | `job-scraper prefilter`; `job-scraper remote-filter`                                             | `prefilter_trash.jsonl` and `remote_filter_trash.jsonl`; overwritten                                                                                                                                      |
-| `data/filtered/`      | `job-scraper remote-filter` via `src/agents/remote_filter/runner.py`                             | `data/filtered/remote_filter_pass.jsonl` or `data/filtered/<date>/remote_filter_pass.jsonl`; overwritten                                                                                                  |
-| `data/cache/`         | Remote filter analysis cache via `src/agents/remote_filter/cache.py`                             | `data/cache/remote_filter_analyses.jsonl`; append-only unless `--no-cache` is used                                                                                                                        |
-| `data/batch/`         | `scripts/prepare_batch.py`; `scripts/submit_batch.py`                                            | `gpt_teacher_batch.jsonl`, `gpt_teacher_jobs.jsonl`, `last_batch_id.txt`, `gpt_teacher_results.jsonl` under `data/batch/<date>/`                                                                          |
-| `data/staging/`       | `scripts/merge_batch_results.py`; skills-fit seed/review scripts; `scripts/sample_for_review.py` | `to_review.jsonl` append; `skills_fit_seed_template.jsonl` overwrite; `skills_fit_seed_proposed.jsonl` append; `skills_fit_review/*.md` write; `review_batch.jsonl` overwrite                             |
-| `data/eval/`          | Streamlit review UI; eval runners; eval batch scripts; skills-fit gold parsers/scorer            | `ground_truth.jsonl` append; `skills_fit_ground_truth.jsonl` append; `runs.jsonl` append; `mismatches_<run_id>.jsonl` overwrite; `eval_batch_<run_id>.json`; `batch/eval_requests/results/errors_*.jsonl` |
-| `data/archive/`       | No implemented repo writer found                                                                 | Current contents appear manually archived, likely from `data/staging/skills_fit_review/`                                                                                                                  |
-| `data/run_telemetry/` | `RunTracker` (`src/utils/run_tracker.py`) — wrapping every pipeline component run                | `data/run_telemetry/runs.jsonl`; append-only                                                                                                                                                              |
-| `data/pipeline_runs/` | Overnight pipeline (`planner`, `worker`, `consolidation`, `scoring`)                             | `data/pipeline_runs/<run_id>/_consolidated/*.jsonl` + `<run_id>/<slug>/{scrape,skills_fit}/*.jsonl` and the per-run config snapshot `.yml`; run-first partition, gitignored (PII)                         |
-| `data/user_configs/`  | `scripts/pull_user_configs.py` — materializes live DB configs per user                           | `data/user_configs/<slug>/{search,candidate_profile,policies}.yml`; overwritten, gitignored (PII)                                                                                                         |
+| Folder                | Writers / processes                                                                   | Default outputs                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/raw/`           | `job-scraper <scraper> --save`; `job-scraper run-config --save`                       | Flat: `data/raw/YYYY-MM-DD_HH-MM_<source>_<keywords>.jsonl`; with `run-config --run-date`: `data/raw/YYYY-MM-DD/*.jsonl`                                                                                  |
+| `data/prefiltered/`   | `job-scraper prefilter` via `src/prefilter/router.py`                                 | `data/prefiltered/remote_filter_input.jsonl` or `data/prefiltered/<date>/remote_filter_input.jsonl`; overwritten                                                                                          |
+| `data/local/`         | `job-scraper prefilter` via `src/prefilter/router.py`                                 | `data/local/local_jobs.jsonl` or `data/local/<date>/local_jobs.jsonl`; overwritten                                                                                                                        |
+| `data/trash/`         | `job-scraper prefilter`                                                               | `prefilter_trash.jsonl`; overwritten                                                                                                                                                                      |
+| `data/filtered/`      | `job-scraper remote-filter` via `src/agents/remote_filter/runner.py`                  | `data/filtered/remote_filter_classified.jsonl` or `data/filtered/<date>/remote_filter_classified.jsonl`; overwritten                                                                                      |
+| `data/cache/`         | Remote filter analysis cache via `src/agents/remote_filter/cache.py`                  | `data/cache/remote_filter_analyses.jsonl`; append-only unless `--no-cache` is used                                                                                                                        |
+| `data/batch/`         | Remote-filter and skills-fit Batch API runners                                        | `remote_filter_requests_<run_id>.jsonl`; skills-fit batch request/result/error artifacts                                                                                                                  |
+| `data/staging/`       | skills-fit seed/review scripts; `scripts/sample_for_review.py`                        | `to_review.jsonl` overwrite; `skills_fit_seed_template.jsonl` overwrite; `skills_fit_seed_proposed.jsonl` append; `skills_fit_review/*.md` write                                                          |
+| `data/eval/`          | Streamlit review UI; eval runners; eval batch scripts; skills-fit gold parsers/scorer | `ground_truth.jsonl` append; `skills_fit_ground_truth.jsonl` append; `runs.jsonl` append; `mismatches_<run_id>.jsonl` overwrite; `eval_batch_<run_id>.json`; `batch/eval_requests/results/errors_*.jsonl` |
+| `data/archive/`       | No implemented repo writer found                                                      | Current contents appear manually archived, likely from `data/staging/skills_fit_review/`                                                                                                                  |
+| `data/run_telemetry/` | `RunTracker` (`src/utils/run_tracker.py`) — wrapping every pipeline component run     | `data/run_telemetry/runs.jsonl`; append-only                                                                                                                                                              |
+| `data/pipeline_runs/` | Overnight pipeline (`planner`, `worker`, `consolidation`, `scoring`)                  | `data/pipeline_runs/<run_id>/_consolidated/*.jsonl` + `<run_id>/<slug>/{scrape,skills_fit}/*.jsonl` and the per-run config snapshot `.yml`; run-first partition, gitignored (PII)                         |
+| `data/user_configs/`  | `scripts/pull_user_configs.py` — materializes live DB configs per user                | `data/user_configs/<slug>/{search,candidate_profile,policies}.yml`; overwritten, gitignored (PII)                                                                                                         |
 
 `data/scored/` is the retired single-user output path, documented under "Retired paths" below.
 
@@ -61,24 +61,20 @@ Evidence:
 - `src/prefilter/router.py:456-458` creates output directories.
 - `src/prefilter/router.py:462-475` opens all three outputs in write mode and writes routed JSONL records.
 
-### `data/filtered/` and remote-filter `data/trash/`
+### `data/filtered/`
 
-**Purpose:** Remote-filter LLM pass/trash split for jobs routed through the remote stream. `filtered/` holds genuinely remote-flexible postings; `trash/` holds onsite-disguised, hybrid-required, US-only-mismatch, etc.
+**Purpose:** Remote-filter LLM classified stream for jobs routed through the remote stream. The classifier is a profile-independent extractor; per-user accept/reject gating happens later in scoring.
 
-The remote filter consumes routed candidates and splits them into pass/trash outputs:
+The remote filter consumes routed candidates and writes successfully analyzed postings to:
 
-- Pass → `data/filtered/.../remote_filter_pass.jsonl`
-- Trash → `data/trash/.../remote_filter_trash.jsonl`
+- `data/filtered/.../remote_filter_classified.jsonl`
 
 Default paths are flat unless `--run-date YYYY-MM-DD` is used.
 
 Evidence:
 
-- `src/job_scraper/cli.py:511-517` resolves `job-scraper remote-filter` paths.
-- `src/agents/remote_filter/runner.py:24-26` defines default input/pass/trash paths.
-- `src/agents/remote_filter/runner.py:104-111` creates parent directories and opens pass/trash outputs in write mode.
-- `src/agents/remote_filter/runner.py:182` writes passing records.
-- `src/agents/remote_filter/runner.py:192` writes rejected records.
+- `src/agents/remote_filter/cli.py` resolves `job-scraper remote-filter` input/output paths.
+- `src/agents/remote_filter/runner.py` defines default input/classified paths and writes enriched records with `_remote_analysis` plus `_filter_metadata`.
 
 ### `data/cache/`
 
@@ -95,51 +91,35 @@ Evidence:
 
 ### `data/batch/`
 
-**Purpose:** OpenAI Batch API artifacts for the teacher pipeline. Request files, batch IDs, downloaded results, and sidecar metadata — organized per-run-date.
-
-The teacher batch pipeline stores OpenAI Batch API request/sidecar/result files under a run directory, defaulting to `data/batch/<today>/`.
+**Purpose:** OpenAI Batch API artifacts for production/eval batch runners. The retired remote-filter teacher bootstrap no longer writes here.
 
 Writers:
 
-- `scripts/prepare_batch.py`
-  - Writes `gpt_teacher_batch.jsonl`.
-  - Writes `gpt_teacher_jobs.jsonl`.
-- `scripts/submit_batch.py`
-  - Writes `last_batch_id.txt` after upload.
-  - Writes `gpt_teacher_results.jsonl` after download.
-
-Evidence:
-
-- `scripts/prepare_batch.py:33-34` sets `INPUT_DIR = "data/raw"` and `DEFAULT_RUN_DIR = f"data/batch/{date.today().isoformat()}"`.
-- `scripts/prepare_batch.py:103-107` creates the run directory and opens sidecar/batch files in write mode.
-- `scripts/submit_batch.py:32` sets the same default run directory pattern.
-- `scripts/submit_batch.py:77` writes `last_batch_id.txt`.
-- `scripts/submit_batch.py:117` writes downloaded batch results.
+- `src/agents/remote_filter/batch.py`
+  - Writes `remote_filter_requests_<run_id>.jsonl` and any batch error files.
+- `src/agents/skills_fit/batch.py`
+  - Writes skills-fit request/result/error artifacts.
 
 ### `data/staging/`
 
-**Purpose:** Silver layer — teacher-annotated and review-in-progress artifacts that haven't yet become gold. Includes the skills_fit teacher proposals and per-record markdown review files awaiting human ratification.
+**Purpose:** Silver layer — review-in-progress artifacts that haven't yet become gold. Includes remote-filter classifier proposals and skills_fit teacher proposals / per-record markdown review files awaiting human ratification.
 
-Staging holds teacher-annotated review inputs and skills-fit review artifacts.
+Staging holds remote-filter review inputs and skills-fit review artifacts.
 
 Writers:
 
-- `scripts/merge_batch_results.py`
-  - Appends merged teacher results to `data/staging/to_review.jsonl`.
+- `scripts/sample_for_review.py`
+  - Overwrites `data/staging/to_review.jsonl` with sampled production remote-filter classifier proposals.
 - `scripts/prepare_skills_fit_seed.py`
   - Overwrites `data/staging/skills_fit_seed_template.jsonl`.
 - `scripts/propose_skills_fit_seed.py`
   - Appends proposals to `data/staging/skills_fit_seed_proposed.jsonl`.
 - `scripts/render_skills_fit_review_md.py`
   - Writes Markdown review files under `data/staging/skills_fit_review/`; skips existing files unless `--overwrite` is passed.
-- `scripts/sample_for_review.py`
-  - Writes `data/staging/review_batch.jsonl` in its default example path.
 
 Evidence:
 
-- `scripts/merge_batch_results.py:31-32` defines the default batch run dir and staging file.
-- `scripts/merge_batch_results.py:89` creates the staging parent.
-- `scripts/merge_batch_results.py:111` appends to staging.
+- `scripts/sample_for_review.py` defines `DEFAULT_TARGET = Path("data/staging/to_review.jsonl")` and writes sampled JSONL in write mode.
 - `scripts/prepare_skills_fit_seed.py:23` defines `DEFAULT_OUT = Path("data/staging/skills_fit_seed_template.jsonl")`.
 - `scripts/prepare_skills_fit_seed.py:76-77` creates parent and writes the template in write mode.
 - `scripts/propose_skills_fit_seed.py:36-37` defines default template/proposed paths.
@@ -147,8 +127,6 @@ Evidence:
 - `scripts/render_skills_fit_review_md.py:32-35` defines default template/proposed/gold/review-dir paths.
 - `scripts/render_skills_fit_review_md.py:232` creates the output directory.
 - `scripts/render_skills_fit_review_md.py:247` writes each Markdown review file.
-- `scripts/sample_for_review.py:19` writes sampled JSONL with `to_json(...)`.
-- `scripts/sample_for_review.py:25` uses the default example target `data/staging/review_batch.jsonl`.
 
 ### `data/eval/`
 

@@ -51,47 +51,29 @@ flowchart TD
     pfRouter -->|local_candidate| pfLocal
     pfRouter -->|reject| pfTrash
 
-    %% Teacher / HITL gold creation
-    subgraph gold[Teacher + HITL gold dataset — implemented, dataset expanding]
-        teacherPrompt[prompts/remote_agent_teacher/system_prompt.txt]
-        prepare[uv run python scripts/prepare_batch.py]
-        teacherJobs[(data/batch/YYYY-MM-DD/<br/>gpt_teacher_jobs.jsonl)]
-        teacherReq[(data/batch/YYYY-MM-DD/<br/>gpt_teacher_batch.jsonl)]
-        submitTeacher[uv run python scripts/submit_batch.py<br/>upload / poll / download]
-        teacherResults[(data/batch/YYYY-MM-DD/<br/>gpt_teacher_results.jsonl)]
-        merge[uv run python scripts/merge_batch_results.py]
-        staging[(data/staging/to_review.jsonl<br/>Silver — teacher-annotated)]
-        sample[uv run python scripts/sample_for_review.py]
-        reviewBatch[(data/staging/review_batch.jsonl)]
+    %% HITL gold creation from production classifier proposals
+    subgraph gold[Remote-filter HITL gold dataset — implemented, dataset expanding]
+        sample[uv run scripts/sample_for_review.py]
+        staging[(data/staging/to_review.jsonl<br/>Silver — classifier proposals)]
         review[streamlit run src/review_ui/app.py<br/>confirm / correct / skip]
         goldData[(data/eval/ground_truth.jsonl<br/>Gold — human-verified labels)]
     end
 
-    rawFlat & rawRun --> prepare
-    teacherPrompt --> prepare
-    prepare --> teacherJobs & teacherReq
-    teacherReq --> submitTeacher
-    openai --> submitTeacher --> teacherResults
-    teacherJobs & teacherResults --> merge --> staging
-    rawFlat & rawRun -. optional sampling .-> sample --> reviewBatch
-    staging & reviewBatch --> review --> goldData
-
     %% Runtime remote filter
     subgraph remote[Phase 2: Remote Filter — complete]
-        rfConfig[config/agent/remote_agent.yml<br/>provider, model, policy thresholds]
+        rfConfig[config/agent/remote_agent.yml<br/>provider, model]
         rfPrompt[prompts/remote_agent/system_prompt.txt]
         rfCli["uv run job-scraper remote-filter<br/>opt: --run-date YYYY-MM-DD"]
         rfAgent[src/agents/remote_filter<br/>RemoteAnalysis structured output]
-        rfPass[(data/filtered/YYYY-MM-DD/<br/>remote_filter_pass.jsonl)]
-        rfTrash[(data/trash/YYYY-MM-DD/<br/>remote_filter_trash.jsonl)]
+        rfClassified[(data/filtered/YYYY-MM-DD/<br/>remote_filter_classified.jsonl)]
     end
 
     pfRemote --> rfCli
     rfConfig & rfPrompt --> rfCli
     openai & ollama --> rfAgent
     rfCli --> rfAgent
-    rfAgent -->|PASS| rfPass
-    rfAgent -->|TRASH| rfTrash
+    rfAgent -->|classified| rfClassified
+    rfClassified --> sample --> staging --> review --> goldData
 
     %% Eval path
     subgraph eval[Remote filter eval + regression tracking — complete]
@@ -139,7 +121,7 @@ flowchart TD
         dispatch[Phase 4: Dispatch<br/>email or FastAPI web GUI]
     end
 
-    rfPass --> sfPrepare --> sfTemplate
+    rfClassified --> sfPrepare --> sfTemplate
     sfTemplate --> sfPropose
     skillsConfig & skillsProfile & skillsPrompt --> sfPropose
     openai --> sfPropose --> sfProposed
@@ -149,7 +131,7 @@ flowchart TD
     skillsConfig & skillsProfile & skillsPrompt --> sfEval
     openai & ollama --> sfEval
     sfEval --> sfRuns
-    rfPass -. Phase B .-> sfRunner
+    rfClassified -. Phase B .-> sfRunner
     pfLocal -. Phase B .-> sfRunner
     skillsConfig & skillsProfile & skillsPrompt -. Phase B .-> sfRunner
     sfRunner -. Phase B .-> scored -. planned .-> dispatch
@@ -161,8 +143,8 @@ flowchart TD
     classDef external fill:#eeeeee,stroke:#616161,color:#111;
 
     class linkedin,jobspy,greenhouse,lever,ashby,sel,openai,ollama external;
-    class runConfig,discover,pfCli,pfRouter,prepare,submitTeacher,merge,sample,review,rfCli,rfAgent,evalRun,evalSubmit,evalPoll,compare,sfPrepare,sfPropose,sfRender,sfParse,sfScoreCli,sfEval complete;
-    class rawFlat,rawRun,pfRemote,pfLocal,pfTrash,teacherJobs,teacherReq,teacherResults,staging,reviewBatch,goldData,rfPass,rfTrash,evalSidecar,evalRequests,evalResults,mismatches,runs,scored,sfTemplate,sfProposed,sfReviewMd,sfGold,sfRuns data;
+    class runConfig,discover,pfCli,pfRouter,sample,review,rfCli,rfAgent,evalRun,evalSubmit,evalPoll,compare,sfPrepare,sfPropose,sfRender,sfParse,sfScoreCli,sfEval complete;
+    class rawFlat,rawRun,pfRemote,pfLocal,pfTrash,staging,goldData,rfClassified,evalSidecar,evalRequests,evalResults,mismatches,runs,scored,sfTemplate,sfProposed,sfReviewMd,sfGold,sfRuns data;
     class skillsConfig,skillsProfile,skillsPrompt,sfRunner,dispatch future;
 ```
 
@@ -170,7 +152,7 @@ flowchart TD
 
 - PII scrubbing and deduplication (SHA-256 of company + title + location) happen inside each scraper's `.scrape()` call — they are not separate pipeline stages.
 - `--run-date YYYY-MM-DD` is optional on `run-config`, `prefilter`, and `remote-filter`. When provided, each stage reads/writes under a dated subdirectory. Without it, the legacy flat layout is used. Either way, explicit `--input`/`--output` flags override everything.
-- The teacher/HITL path (`prepare_batch` → `submit_batch` → `merge_batch_results` → Streamlit review) is separate from the eval path (`submit_eval_batch` / `poll_eval_batch`). The teacher path builds the gold dataset; the eval path measures model performance against it.
-- Phase 3 (Skills Fit) — the Phase R eval harness consumes remote-filter PASS records sampled into the seed pool. The Phase B production runner will consume both remote-filter pass records **and** local-candidate jobs from the prefilter — both are worth scoring against the candidate profile.
+- The remote-filter HITL path samples production classifier output (`remote_filter_classified.jsonl` → `sample_for_review.py` → Streamlit review) into the gold dataset. The retired teacher bootstrap path (`prepare_batch` / `submit_batch` / `merge_batch_results`) is no longer part of the implemented data flow.
+- Phase 3 (Skills Fit) — the Phase R eval harness consumes remote-filter records sampled into the seed pool. The Phase B production runner will consume both remote-filter classified records **and** local-candidate jobs from the prefilter — both are worth scoring against the candidate profile.
 - The skills-fit candidate profile (`config/profile/candidate_profile.yml`) is part of the scoring contract, not just config: every skills-fit run record carries `profile_hash` + `profile_version` so runs aren't accidentally compared across profile changes. Bump `profile_version` (currently `2026-05-21-v4-draft`, with `education` as a top-level field) on every edit.
 - Phase 4 (Dispatch) delivers the ranked shortlist from `data/scored/` via email or FastAPI web UI.

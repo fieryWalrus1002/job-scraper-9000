@@ -74,7 +74,7 @@ Each enriched output record contains all original job fields plus:
 {
   "_remote_analysis": {
     "reasoning_trace": "The posting says ...",
-    "remote_classification": "fully_remote",
+    "remote_classification": "remote",
     "estimated_travel_days_per_year": null,
     "location_restrictions": [],
     "requires_relocation": false,
@@ -85,7 +85,7 @@ Each enriched output record contains all original job fields plus:
   "_filter_result": "pass",
   "_filter_reason": "classified",
   "_filter_metadata": {
-    "schema_version": "3.0.0",
+    "schema_version": "5.0.0",
     "prompt_hash": "...",
     "commit": "..."
   }
@@ -96,15 +96,13 @@ ______________________________________________________________________
 
 ## Classification schema
 
-| Classification        | Meaning                                                 |
-| --------------------- | ------------------------------------------------------- |
-| `fully_remote`        | No physical presence ever expected                      |
-| `hybrid`              | Regular in-office days expected                         |
-| `onsite_disguised`    | Listed as remote but requires local/commuting presence  |
-| `location_restricted` | Genuinely remote but restricted to specific geographies |
-| `unclear`             | Description and context do not provide enough signal    |
+| Classification | Meaning                                                                 |
+| -------------- | ----------------------------------------------------------------------- |
+| `remote`       | No required office presence; geo/timezone gates are fields, not classes |
+| `hybrid`       | Regular in-office/local presence is expected                            |
+| `onsite`       | Physical presence is the default or explicit requirement                |
 
-As of `SCHEMA_VERSION` 3.0.0 the classification captures **remote-ness only**. Travel frequency is no longer a bucket — it lives entirely in the numeric `estimated_travel_days_per_year`, which policy code thresholds (see Filter logic). The retired `remote_with_*_travel` labels still appear in old reviewed data and historical rows (`models.LEGACY_CLASSIFICATIONS`), but the active model never emits them. See [`specs/remote_filter_simplification.md`](../../../specs/remote_filter_simplification.md).
+As of `SCHEMA_VERSION` 5.0.0 the classification captures **remote-ness only** on the 3-way axis. Travel frequency lives entirely in the numeric `estimated_travel_days_per_year`, which user-specific policy code thresholds downstream. The retired `unclear`, `fully_remote`, `onsite_disguised`, `location_restricted`, and `remote_with_*_travel` labels still appear in historical reviewed data and DB rows (`models.LEGACY_CLASSIFICATIONS`), but the active model never emits them. See [`specs/remote_filter_taxonomy.md`](../../../specs/remote_filter_taxonomy.md) and [`specs/remote_filter_classifier_tuning.md`](../../../specs/remote_filter_classifier_tuning.md).
 
 ______________________________________________________________________
 
@@ -139,15 +137,6 @@ Compare eval runs:
 uv run scripts/compare_evals.py --last 5
 ```
 
-Current 104-record `gpt-4o-mini` smoke baseline:
-
-```text
-accuracy:  0.8654
-precision: 0.7073
-recall:    0.9355
-f1:        0.8056
-```
-
-Main tuning target: reduce false positives where onsite/location-restricted jobs are predicted as pass.
+Current evals report classifier-native 3-way categorical metrics (`remote`, `hybrid`, `onsite`) plus travel-days diagnostics. Phase 32 uses micro accuracy + `remote` recall as the champion metric pair; see `scripts/run_remote_filter_eval.py` and `scripts/compare_evals.py`.
 
 See [`scripts/README.md`](../../../scripts/README.md) and [`src/agent_eval/README.md`](../../agent_eval/README.md) for full eval details.

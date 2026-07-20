@@ -1,5 +1,10 @@
 # Design Doc: Distillation for the remote_filter agent using a smarter model
 
+> **Status:** Historical. Phase 32 retired the remote-filter teacher bootstrap;
+> new remote-filter gold is proposed by the production classifier and
+> human-ratified in `src/review_ui/app.py`. This document remains as background
+> for the original distillation idea, not as an active workflow.
+
 ## 1. Executive Summary
 
 By utilizing a **Teacher-Student distillation pattern**, the system achieves the high-reasoning accuracy of flagship cloud models (GPT-5/4o) while executing final classification using high-speed, cost-effective local LLMs (Qwen3.6/Llama).
@@ -37,7 +42,7 @@ Rather than relying on expensive cloud APIs for every job, we use the cloud as a
 1. **HITL Verification:** Humans verify the reasoning in the Review UI, correcting edge cases (e.g., "Remote in title, but Hybrid in fine print").
 1. **Behavioral Cloning:** The `reasoning_trace` from the Gold dataset is used to "few-shot" or fine-tune the local Student model, effectively "cloning" GPT-5 level logic into a 7B local environment.
 
-See the active teacher prompt at [`prompts/remote_agent_teacher/system_prompt.txt`](../prompts/remote_agent_teacher/system_prompt.txt). Historical copies live under `prompts/remote_agent_teacher/versions/`.
+The remote-filter teacher prompt referenced by the original design was removed in Phase 32 when the bootstrap workflow was retired.
 
 ______________________________________________________________________
 
@@ -51,6 +56,6 @@ ______________________________________________________________________
 ## 6. Roadmap
 
 - **Phase 1:** (Complete) Multi-source scraping & v1 classification prompt.
-- **Phase 2:** (Current) Batch API Teacher integration & Streamlit HITL Review.
+- **Phase 2:** (Historical) Batch API Teacher integration & Streamlit HITL Review; retired in Phase 32.
 - **Phase 3:** Local model distillation and baseline accuracy evaluation.
 - **Phase 4:** Automated alerting (Slack/Discord) for "Pass" jobs.
