@@ -74,6 +74,26 @@ def _flatten_skills_fit(run: dict) -> dict:
     }
 
 
+def _flatten_remote_filter_categorical(run: dict) -> dict:
+    m = run.get("metrics", {})
+    cfg = run.get("config") or {}
+    per_class = m.get("per_class") or {}
+    remote = per_class.get("remote") or {}
+    return {
+        "run_id": run.get("run_id", ""),
+        "timestamp": run.get("timestamp", ""),
+        "date": run.get("timestamp", "")[:10],
+        "model": cfg.get("model", ""),
+        "temperature": cfg.get("temperature", ""),
+        "total": m.get("total", 0),
+        "skipped": m.get("skipped", 0),
+        "micro_acc": m.get("micro_accuracy", 0.0),
+        "remote_recall": remote.get("recall", 0.0),
+        "macro_f1": m.get("macro_f1", 0.0),
+        "travel_mae": m.get("travel_mae"),
+    }
+
+
 SCORER_REGISTRY: dict[str, dict] = {
     "remote_filter": {
         "detect": lambda m: "accuracy" in m and "exact_match_acc" not in m,
@@ -94,6 +114,26 @@ SCORER_REGISTRY: dict[str, dict] = {
         "diff_metrics": ["accuracy", "precision", "recall", "f1", "total", "skipped"],
         "sort_choices": ["timestamp", "accuracy", "precision", "recall", "f1"],
         "flatten": _flatten_remote_filter,
+    },
+    "remote_filter_categorical": {
+        "detect": lambda m: "micro_accuracy" in m,
+        "table_cols": [
+            "run_id",
+            "date",
+            "model",
+            "temperature",
+            "total",
+            "skipped",
+            "micro_acc",
+            "remote_recall",
+            "macro_f1",
+            "travel_mae",
+        ],
+        "metric_cols": {"micro_acc", "remote_recall", "macro_f1", "travel_mae"},
+        "int_cols": {"total", "skipped"},
+        "diff_metrics": ["micro_acc", "remote_recall", "macro_f1", "total", "skipped"],
+        "sort_choices": ["timestamp", "micro_acc", "remote_recall", "macro_f1"],
+        "flatten": _flatten_remote_filter_categorical,
     },
     "skills_fit": {
         "detect": lambda m: "exact_match_acc" in m,
@@ -197,6 +237,8 @@ def load_champions(path: str = CHAMPIONS_FILE) -> dict:
 
 def format_cell(col: str, val, spec: dict) -> str:
     if col in spec["metric_cols"]:
+        if val is None:
+            return "—"
         return f"{val:.4f}"
     if col in spec["int_cols"]:
         return str(val)
