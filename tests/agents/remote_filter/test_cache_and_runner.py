@@ -35,18 +35,6 @@ llm:
   model: gpt-4o-mini
   temperature: 0.1
 
-policy_thresholds:
-  disallowed_classifications:
-    - hybrid
-  travel:
-    max_estimated_days_per_year: 15
-  relocation:
-    allow_required_relocation: false
-    allow_local_presence_required: false
-  uncertainty:
-    on_unclear_classification: reject
-  timezone:
-    rejected_timezone_keywords: []
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -398,20 +386,7 @@ def test_run_remote_filter_provider_change_misses_cache(tmp_path, monkeypatch):
         ):
             # Use a config without an llm section so the env vars win.
             bare_config = tmp_path / "bare.yml"
-            bare_config.write_text(
-                "policy_thresholds:\n"
-                "  disallowed_classifications: []\n"
-                "  travel:\n"
-                "    max_estimated_days_per_year: 15\n"
-                "  relocation:\n"
-                "    allow_required_relocation: false\n"
-                "    allow_local_presence_required: false\n"
-                "  uncertainty:\n"
-                "    on_unclear_classification: reject\n"
-                "  timezone:\n"
-                "    rejected_timezone_keywords: []\n",
-                encoding="utf-8",
-            )
+            bare_config.write_text("{}\n", encoding="utf-8")
             counts = run_remote_filter(
                 input_path=input_path,
                 classified_path=classified_path,

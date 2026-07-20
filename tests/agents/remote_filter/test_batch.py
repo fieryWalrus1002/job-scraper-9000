@@ -28,19 +28,6 @@ llm:
   model: gpt-4o-mini
   temperature: 0.1
 
-policy_thresholds:
-  disallowed_classifications:
-    - hybrid
-    - onsite
-  travel:
-    max_estimated_days_per_year: 15
-  relocation:
-    allow_required_relocation: false
-    allow_local_presence_required: false
-  uncertainty:
-    on_unclear_classification: reject
-  timezone:
-    rejected_timezone_keywords: []
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -279,8 +266,7 @@ def test_run_batch_rejects_non_openai_provider(tmp_path):
     config_path = tmp_path / "remote_agent.yml"
     input_path = tmp_path / "raw.jsonl"
     config_path.write_text(
-        "llm:\n  provider: ollama\n  model: qwen2.5:14b\n"
-        "policy_thresholds:\n  disallowed_classifications: []\n",
+        "llm:\n  provider: ollama\n  model: qwen2.5:14b\n",
         encoding="utf-8",
     )
     _write_jsonl(input_path, [_job()])

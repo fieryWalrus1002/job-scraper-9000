@@ -99,13 +99,6 @@ uv run scripts/run_remote_filter_eval.py --workers 4
 uv run scripts/compare_evals.py --last 5
 ```
 
-**Run lower-cost OpenAI Batch eval:**
-
-```bash
-uv run python scripts/submit_eval_batch.py --run-id gpt4o_mini_batch
-uv run python scripts/poll_eval_batch.py
-```
-
 **Run the teacher batch pipeline + HITL review:**
 
 More details in [the HITL README.md](src/review_ui/README.md).

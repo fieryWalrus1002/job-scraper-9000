@@ -109,7 +109,6 @@ def build_run_record(
             "provider": config.get("llm", {}).get("provider"),
             "model": config.get("llm", {}).get("model"),
             "temperature": config.get("llm", {}).get("temperature"),
-            "policy_thresholds": config.get("policy_thresholds"),
             "config_file": str(config_file),
         },
         "env": _collect_env(repo_root),

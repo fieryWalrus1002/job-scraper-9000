@@ -17,23 +17,7 @@ def _analysis(classification: str, travel_days: int | None = None) -> RemoteAnal
 
 
 def _config() -> dict:
-    return {
-        "policy_thresholds": {
-            "disallowed_classifications": [
-                "hybrid",
-                "onsite",
-            ],
-            "travel": {
-                "max_estimated_days_per_year": 15,
-            },
-            "relocation": {
-                "allow_required_relocation": False,
-                "allow_local_presence_required": False,
-            },
-            "uncertainty": {"on_unclear_classification": "reject"},
-            "timezone": {"rejected_timezone_keywords": []},
-        }
-    }
+    return {"llm": {"provider": "fake"}}
 
 
 def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch):

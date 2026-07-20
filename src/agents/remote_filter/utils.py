@@ -253,67 +253,6 @@ def analyze_remote(
     return None
 
 
-def passes_remote_filter(
-    analysis: RemoteAnalysis, config: dict, user_location: str = "USA"
-) -> tuple[bool, str]:
-    """Returns (passes, reason)."""
-    policy = config["policy_thresholds"]
-
-    if (
-        not policy["relocation"]["allow_required_relocation"]
-        and analysis.requires_relocation
-    ):
-        return False, "requires_relocation"
-
-    if (
-        not policy["relocation"]["allow_local_presence_required"]
-        and analysis.requires_local_presence
-    ):
-        return False, "requires_local_presence"
-
-    if analysis.remote_classification in policy["disallowed_classifications"]:
-        return False, f"classification:{analysis.remote_classification}"
-
-    # Travel is gated solely on the numeric estimate now; the old per-category
-    # buckets were dropped in SCHEMA_VERSION 3.0.0. "Frequent travel" postings
-    # still fail here because frequent travel implies days > the threshold.
-    if (
-        analysis.estimated_travel_days_per_year is not None
-        and analysis.estimated_travel_days_per_year
-        > policy["travel"]["max_estimated_days_per_year"]
-    ):
-        return False, f"travel_days_exceeded:{analysis.estimated_travel_days_per_year}"
-
-    if analysis.remote_classification == "unclear":
-        if policy["uncertainty"]["on_unclear_classification"] == "reject":
-            return False, "agent_uncertain"
-
-    if analysis.location_restrictions:
-        loc = user_location.upper()
-        for r in analysis.location_restrictions:
-            r_upper = r.upper()
-            if (
-                "US-ONLY" in r_upper
-                or "UNITED STATES" in r_upper
-                or "US ONLY" in r_upper
-            ):
-                if "US" not in loc and "UNITED STATES" not in loc and "USA" not in loc:
-                    return False, "location_restrictions_mismatch"
-
-    if analysis.timezone_requirements:
-        tz_policy = policy.get("timezone", {})
-        rejected_keywords = [
-            k.upper() for k in tz_policy.get("rejected_timezone_keywords", [])
-        ]
-        if rejected_keywords:
-            for req in analysis.timezone_requirements:
-                req_upper = req.upper()
-                if any(kw in req_upper for kw in rejected_keywords):
-                    return False, f"timezone_mismatch:{req}"
-
-    return True, "passed"
-
-
 def load_raw_jobs(path: Path) -> list[dict]:
     paths = [path] if path.is_file() else sorted(path.glob("*.jsonl"))
     jobs = []

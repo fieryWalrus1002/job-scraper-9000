@@ -6,7 +6,7 @@ ______________________________________________________________________
 
 ## Configuration
 
-Runtime policy lives in [`config/agent/remote_agent.yml`](../../../config/agent/remote_agent.yml). The active system prompt lives separately at:
+LLM runtime settings live in [`config/agent/remote_agent.yml`](../../../config/agent/remote_agent.yml). The active system prompt lives separately at:
 
 ```text
 prompts/remote_agent/system_prompt.txt
@@ -28,41 +28,9 @@ llm:
   model: qwen-27b-mtp     # llama.cpp via its OpenAI-compatible API)
   temperature: 0.1
   base_url: http://localhost:8080/v1   # llama.cpp default; Ollama's is 11434
-
-policy_thresholds:
-  disallowed_classifications:
-    - "onsite_disguised"
-    - "hybrid"
-    # location_restricted is handled by the geographic/timezone checks below.
-
-  travel:
-    # Sole travel gate as of SCHEMA_VERSION 3.0.0 — the old per-category
-    # remote_with_*_travel buckets were dropped; travel is judged on the
-    # numeric estimate the model emits.
-    max_estimated_days_per_year: 15
-
-  relocation:
-    # Permissive at the global/consolidation layer. Relocation and local
-    # presence are per-user preferences, so they are gated per user in
-    # pipeline.scoring.score_run (from the stored UserPolicies), not here — the
-    # global pool stays maximally inclusive. See specs/relocation_policy.md §2.1.
-    allow_required_relocation: true
-    allow_local_presence_required: true
-
-  uncertainty:
-    on_unclear_classification: "reject"
-
-  timezone:
-    user_timezone: "PST"
-    rejected_timezone_keywords:
-      - "EST"
-      - "ET"
-      - "Eastern"
-      - "Eastern time"
-      - "Eastern Standard Time"
 ```
 
-To retune behavior, adjust `policy_thresholds` or the prompt and rerun evals.
+Accept/reject policy is not global remote-filter config anymore. The classifier writes profile-independent extraction output; per-user gating happens later in `pipeline.scoring` from stored user policies.
 
 ______________________________________________________________________
 
@@ -169,13 +137,6 @@ Compare eval runs:
 
 ```bash
 uv run scripts/compare_evals.py --last 5
-```
-
-Run lower-cost OpenAI Batch eval:
-
-```bash
-uv run python scripts/submit_eval_batch.py --run-id gpt4o_mini_batch
-uv run python scripts/poll_eval_batch.py
 ```
 
 Current 104-record `gpt-4o-mini` smoke baseline:

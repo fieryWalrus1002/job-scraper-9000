@@ -8,10 +8,9 @@ llm:
   #
   # |-- OpenAI --|
   provider: openai
-  model: gpt-4o-mini
+  model: gpt-5.4-mini
   temperature: 0.1
   api_key_env: OPENAI_API_KEY
-  # concurrent LLM calls; ~8 is safe for gpt-4o-mini at a normal usage tier
   max_workers: 8
 
   # |-- Ollama --|
@@ -25,57 +24,3 @@ llm:
   # model: qwen-27b-mtp
   # temperature: 0.1
   # base_url: http://localhost:8080/v1   # was 11434 (Ollama default); llama.cpp uses 8080
-
-# ---------------------------------------------------------------------------
-# policy_thresholds — EVAL-ONLY as of the taxonomy slices (Phase 30, #482).
-#
-# The overnight production path no longer reads this block. The classifier is
-# now a pure extractor (4-way axis: remote | hybrid | onsite | unclear) and all
-# accept/reject judgment moved to the per-user gate in
-# `pipeline.scoring._gate_user`, which applies each user's stored preferences to
-# the LLM-extracted fields. See specs/remote_filter_taxonomy.md.
-#
-# These thresholds are still consumed by the global `passes_remote_filter`
-# (src/agents/remote_filter/utils.py), which now survives only in the eval
-# scripts (run_remote_filter_eval.py, poll_eval_batch.py). Reconciling these
-# legacy values with the 4-way axis is Phase 31 eval work — until then the values
-# below are left as the pre-taxonomy superset (e.g. "onsite_disguised" no longer
-# appears in fresh output, and timezone rejection is display-only in production).
-# ---------------------------------------------------------------------------
-policy_thresholds:
-  disallowed_classifications:
-    - "onsite_disguised"
-    - "hybrid"
-    # location_restricted is intentionally excluded — geographic and timezone
-    # checks below handle it with actual user location/timezone matching.
-
-  travel:
-    # Sole travel gate as of SCHEMA_VERSION 3.0.0. The old per-category buckets
-    # (remote_with_*_travel) were dropped; travel is judged on the numeric
-    # estimate the model emits. Production no longer gates on travel at all
-    # (decision 2 — display-only); this remains for the eval scorer.
-    max_estimated_days_per_year: 15
-
-  relocation:
-    allow_required_relocation: true
-    allow_local_presence_required: true
-
-  uncertainty:
-    # Options: "reject", "pass". Production is fail-open for `unclear`
-    # (decision 4) regardless of this value; it applies only to the eval scorer.
-    on_unclear_classification: "reject"
-
-  timezone:
-    # Your local timezone — injected as context so the model can reason about overlap.
-    # Overridden at runtime by USER_TIMEZONE env var if set.
-    user_timezone: "PST"
-    # Postings that require ONLY one of these timezones will be rejected.
-    # Timezones not listed here (PST, MST, CST, or unspecified) are acceptable.
-    # Production does NOT gate on timezone (decision 5 — display-only, #17); this
-    # rejection list applies only to the eval scorer.
-    rejected_timezone_keywords:
-      - "EST"
-      - "ET"
-      - "Eastern"
-      - "Eastern time"
-      - "Eastern Standard Time"

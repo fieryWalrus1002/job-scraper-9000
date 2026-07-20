@@ -4,7 +4,7 @@ Reusable evaluation infrastructure for job-scraper-9000 agents.
 
 This package is intentionally agent-agnostic: it handles run logging, provenance, environment capture, hashing, and metric calculation. Agent-specific eval drivers live outside this package — currently `scripts/run_remote_filter_eval.py` for the remote-filter agent and `scripts/run_skills_fit_eval.py` for the skills-fit agent.
 
-Working from the spec: [`../../specs/eval_framework_requirements.md`](../../specs/eval_framework_requirements.md). Implementation status: SC-1 through SC-7 complete.
+Working from the spec: [`../../specs/eval_framework_requirements.md`](../../specs/eval_framework_requirements.md). The original remote-filter batch-eval path was retired after the eval moved to classifier-native categorical metrics.
 
 ______________________________________________________________________
 
@@ -14,7 +14,8 @@ ______________________________________________________________________
 src/agent_eval/
 ├── __init__.py        # exports provenance helpers
 ├── provenance.py      # run IDs, hashes, git/env metadata, run-record assembly
-└── metrics.py         # compute_metrics() — binary remote-filter metrics
+└── metrics.py         # compute_categorical_metrics() — labeled categorical confusion
+                       # compute_metrics() — generic legacy binary metrics
                        # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
 ```
 
@@ -23,9 +24,7 @@ Run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) lives in `utils.r
 The package is used by:
 
 ```text
-scripts/run_remote_filter_eval.py   # synchronous eval, supports --workers
-scripts/submit_eval_batch.py        # OpenAI Batch API eval submission
-scripts/poll_eval_batch.py          # batch result scoring + run logging
+scripts/run_remote_filter_eval.py   # remote-filter categorical eval, supports --workers
 scripts/compare_evals.py            # reads data/eval/runs.jsonl
 scripts/run_skills_fit_eval.py      # skills-fit eval driver (--scorer {llm,keyword})
 ```
@@ -42,8 +41,6 @@ Eval data lives under `data/eval/`:
 | `data/eval/skills_fit_ground_truth.jsonl` | Skills-fit human-verified gold from the teacher-first markdown / CLI review |
 | `data/eval/runs.jsonl`                    | Append-only eval run history (both agents)                                  |
 | `data/eval/mismatches_<run_id>.jsonl`     | Per-run mismatch records                                                    |
-| `data/eval/batch/`                        | OpenAI Batch API request/result files                                       |
-| `data/eval/eval_batch_<run_id>.json`      | Batch eval sidecar metadata                                                 |
 
 `data/**/*.jsonl` is gitignored so local eval artifacts are not committed.
 
@@ -57,10 +54,9 @@ Each eval run records:
 - git commit + dirty flag
 - gold file path + hash
 - resolved prompt hash
-- provider/model/temperature
-- policy thresholds (remote-filter) or score bands (skills-fit)
+- provider/model/temperature config
 - Python/platform/uv/lockfile metadata
-- confusion matrix + accuracy/precision/recall/F1 (remote-filter)
+- categorical confusion matrix, per-class precision/recall/F1, macro/micro metrics, and travel MAE (remote-filter)
 - ordinal metrics (exact / off-by-one / MAE / bias / Spearman) + top-k metrics + 5x5 confusion (skills-fit)
 - scorer choice (`llm` vs `keyword`) and profile metadata (`profile_hash`, `profile_version`) for skills-fit runs
 - mismatch artifact path
@@ -71,22 +67,7 @@ ______________________________________________________________________
 
 ## Current baseline
 
-Latest smoke test on the 104-record remote-filter gold dataset:
-
-```text
-run_id:      smoke_parallel_20260516_045209_a6da
-command:     uv run scripts/run_remote_filter_eval.py --workers 4 --run-id smoke_parallel
-model:       gpt-4o-mini
-temperature: 0.1
-records:     104 evaluated, 0 skipped
-TP/FP/TN/FN: 29 / 12 / 61 / 2
-accuracy:    0.8654
-precision:   0.7073
-recall:      0.9355
-f1:          0.8056
-```
-
-Primary tuning target: reduce false positives where onsite or location-restricted jobs are predicted as pass.
+Remote-filter eval now reports classifier-native 4-way categorical metrics (`remote`, `hybrid`, `onsite`, `unclear`) plus travel-days MAE. Use `scripts/compare_evals.py --last 5` to inspect recent local runs.
 
 ______________________________________________________________________
 

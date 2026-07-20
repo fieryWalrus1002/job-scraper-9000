@@ -92,7 +92,7 @@ ______________________________________________________________________
 
 ### `job-scraper-9000 remote-filter`
 
-Runs the remote-filter agent over all raw jobs and splits them into pass/trash.
+Runs the remote-filter agent over routed candidate jobs and writes profile-independent classification output.
 
 ```bash
 uv run job-scraper-9000 remote-filter
@@ -101,13 +101,13 @@ uv run job-scraper-9000 remote-filter
 The legacy script entry point still works:
 
 ```bash
-python scripts/run_remote_filter.py
+uv run scripts/run_remote_filter.py
 ```
 
-**Input:** `data/raw/` (all JSONL files)
-**Output:** `data/filtered/remote_filter_pass.jsonl`, `data/trash/remote_filter_trash.jsonl`
+**Input:** `data/prefiltered/remote_filter_input.jsonl`
+**Output:** `data/filtered/remote_filter_classified.jsonl`
 
-Agent config is read from `config/agent/remote_agent.yml`. Set `USER_LOCATION` in your `.env` to filter by geography (default: `USA`).
+Agent LLM config is read from `config/agent/remote_agent.yml`. Accept/reject policy is per-user and runs later in the scoring stage.
 
 ______________________________________________________________________
 
@@ -140,13 +140,7 @@ uv run scripts/run_remote_filter_eval.py
 
 The default provider is `openai` (model: `gpt-4o-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
-Recent smoke-test baseline on the 104-record gold set:
-
-| run_id                                | model         | workers | accuracy | precision | recall |     f1 |
-| ------------------------------------- | ------------- | ------: | -------: | --------: | -----: | -----: |
-| `smoke_parallel_20260516_045209_a6da` | `gpt-4o-mini` |       4 |   0.8654 |    0.7073 | 0.9355 | 0.8056 |
-
-The current tuning target is reducing false positives: onsite or location-restricted jobs being predicted as pass.
+The remote-filter eval reports the native 4-way classification metric (`remote`, `hybrid`, `onsite`, `unclear`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, and travel-days MAE.
 
 **Examples:**
 
@@ -167,27 +161,6 @@ uv run scripts/run_remote_filter_eval.py --workers 4 --run-id gpt4o_mini_paralle
 # Compare OpenAI vs Ollama results
 uv run scripts/compare_evals.py --diff gpt4o_mini_baseline qwen_14b
 ```
-
-______________________________________________________________________
-
-### Batch eval — `submit_eval_batch.py` + `poll_eval_batch.py`
-
-For lower-cost regression testing, submit the same gold dataset through the OpenAI Batch API and process it later. Batch eval writes the same `runs.jsonl` schema as synchronous eval, so `compare_evals.py` works unchanged.
-
-```bash
-# Submit a batch eval run
-uv run python scripts/submit_eval_batch.py --run-id gpt4o_mini_batch
-
-# Later, poll the newest sidecar; exits 0 if the batch is still running
-uv run python scripts/poll_eval_batch.py
-
-# Or poll a specific sidecar
-uv run python scripts/poll_eval_batch.py --sidecar data/eval/eval_batch_<run_id>.json
-```
-
-`submit_eval_batch.py` uses `provider=openai` only. It exits with a clear error for `--provider ollama` because Ollama does not support the OpenAI Batch API.
-
-`poll_eval_batch.py` verifies the gold-file hash before scoring, downloads completed batch results into `data/eval/batch/`, writes mismatch records if needed, and appends the normal eval run record to `data/eval/runs.jsonl`.
 
 ______________________________________________________________________
 
