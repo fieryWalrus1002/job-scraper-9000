@@ -40,9 +40,9 @@ _PROMPT = REMOTE_FILTER_PROMPT_PATH.read_text()
 def resolve_provider_and_model(llm_config: dict | None = None) -> tuple[str, str]:
     """Single source of truth for which (provider, model) a config resolves to.
 
-    Both `_get_client` (inference) and `resolve_llm_model` (cache keying) route
-    through this so a config drift can't cause the cache key to lie about which
-    model produced the analysis.
+    Both inference (`_get_client`) and cache keying route through this so a
+    config drift can't cause the cache key to lie about which model produced the
+    analysis.
     """
     cfg = llm_config or {}
     provider = cfg.get("provider", os.environ.get("LLM_PROVIDER", "openai")).lower()
@@ -263,11 +263,6 @@ def load_raw_jobs(path: Path) -> list[dict]:
                 if line:
                     jobs.append(json.loads(line))
     return jobs
-
-
-def resolve_llm_model(llm_config: dict | None = None) -> str:
-    """Return the model name that `_get_client` would use, for cache keying."""
-    return resolve_provider_and_model(llm_config)[1]
 
 
 def context_fingerprint(

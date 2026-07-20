@@ -5,7 +5,7 @@ from agents.remote_filter.utils import (
     _get_client,
     build_search_context,
     context_fingerprint,
-    resolve_llm_model,
+    resolve_provider_and_model,
 )
 
 
@@ -32,7 +32,9 @@ from agents.remote_filter.utils import (
         "env-provider-only",
     ],
 )
-def test_get_client_and_resolve_llm_model_agree(cfg, env, expected, monkeypatch):
+def test_get_client_and_resolve_provider_and_model_agree(
+    cfg, env, expected, monkeypatch
+):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "fake-key-for-client-init")
@@ -40,7 +42,7 @@ def test_get_client_and_resolve_llm_model_agree(cfg, env, expected, monkeypatch)
         monkeypatch.setenv(k, v)
 
     _, client_model = _get_client(cfg)
-    helper_model = resolve_llm_model(cfg)
+    helper_model = resolve_provider_and_model(cfg)[1]
 
     assert client_model == helper_model == expected
 
