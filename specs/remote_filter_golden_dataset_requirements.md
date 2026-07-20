@@ -94,8 +94,6 @@ The easy cases (obvious onsite, obvious fully-remote) are already well-represent
 > The gold no longer carries `unclear` records. The original guidance below is
 > historical.
 
-Records where a reasonable reader cannot determine remote status from the posting alone. Policy is `on_unclear_classification: reject`, so these should be labeled `_human_verdict: trash` with `_human_policy: unclear`. Useful to have ~5 in the set to verify the agent applies the policy consistently.
-
 ______________________________________________________________________
 
 ## Collection Strategy
