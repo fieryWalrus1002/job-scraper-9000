@@ -87,6 +87,10 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
     ]
     assert metrics["travel_mae"] == 3.0
     assert metrics["travel_n"] == 2
+    assert metrics["travel_gold_n"] == 2
+    assert metrics["travel_pred_n"] == 3
+    assert metrics["travel_coverage"] == 1.0
+    assert metrics["travel_spurious_rate"] == pytest.approx(1 / 3)
     assert [m.record_id for m in mismatches] == ["bbbb2222", "cccc3333"]
     assert [h.dedup_hash for h in prompt_hashes] == [
         "aaaa1111",
@@ -94,6 +98,53 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
         "cccc3333",
     ]
     assert all(len(h.resolved_user_message_hash) == 12 for h in prompt_hashes)
+
+
+def test_assemble_metrics_counts_asymmetric_travel_presence():
+    results = [
+        eval_script.RecordEvalResult(
+            index=0,
+            job={"title": "both-present"},
+            gold_classification="remote",
+            pred_classification="remote",
+            gold_travel_days=10,
+            pred_travel_days=12,
+            reason="both",
+            elapsed=0.0,
+        ),
+        eval_script.RecordEvalResult(
+            index=1,
+            job={"title": "gold-only"},
+            gold_classification="remote",
+            pred_classification="remote",
+            gold_travel_days=5,
+            pred_travel_days=None,
+            reason="missed travel",
+            elapsed=0.0,
+        ),
+        eval_script.RecordEvalResult(
+            index=2,
+            job={"title": "pred-only"},
+            gold_classification="remote",
+            pred_classification="remote",
+            gold_travel_days=None,
+            pred_travel_days=7,
+            reason="spurious travel",
+            elapsed=0.0,
+        ),
+    ]
+
+    metrics_input = eval_script._metrics_input_from_results(results)
+    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+
+    assert metrics_input.gold_travel_days == [10]
+    assert metrics_input.pred_travel_days == [12]
+    assert metrics["travel_mae"] == 2.0
+    assert metrics["travel_n"] == 1
+    assert metrics["travel_gold_n"] == 2
+    assert metrics["travel_pred_n"] == 2
+    assert metrics["travel_coverage"] == 0.5
+    assert metrics["travel_spurious_rate"] == 0.5
 
 
 def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
@@ -105,6 +156,18 @@ def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
     )
     with pytest.raises(ValueError, match="pred_travel_days and gold_travel_days"):
         eval_script.assemble_metrics(misaligned)
+
+
+def test_print_report_renders_empty_travel_rates_as_na(capsys):
+    metrics = eval_script.assemble_metrics(
+        eval_script.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )
+
+    eval_script.print_report(metrics, [], "test_run")
+
+    out = capsys.readouterr().out
+    assert "Travel coverage   : n/a  (0/0 gold-travel rows populated)" in out
+    assert "Travel spurious   : n/a  (0/0 model-travel rows gold-None)" in out
 
 
 def test_run_eval_fails_fast_on_retired_unclear_human_classification(monkeypatch):
@@ -209,6 +272,10 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
         [0, 0, 0],
         [0, 0, 0],
     ]
+    assert metrics["travel_gold_n"] == 0
+    assert metrics["travel_pred_n"] == 0
+    assert metrics["travel_coverage"] is None
+    assert metrics["travel_spurious_rate"] is None
     assert len(captured_inputs) == 1
     rf_input = captured_inputs[0]
     assert isinstance(rf_input, RemoteFilterInput)

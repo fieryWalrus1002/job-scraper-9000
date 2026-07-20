@@ -96,6 +96,8 @@ class EvalMetricsInput:
     golds: list[str] = field(default_factory=list)
     pred_travel_days: list[int] = field(default_factory=list)
     gold_travel_days: list[int] = field(default_factory=list)
+    gold_travel_present: int = 0
+    pred_travel_present: int = 0
     skipped: int = 0
 
 
@@ -315,6 +317,8 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
     golds: list[str] = []
     pred_travel_days: list[int] = []
     gold_travel_days: list[int] = []
+    gold_travel_present = 0
+    pred_travel_present = 0
     skipped = 0
 
     for result in results:
@@ -327,6 +331,10 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
             )
         preds.append(result.pred_classification)
         golds.append(result.gold_classification)
+        if result.gold_travel_days is not None:
+            gold_travel_present += 1
+        if result.pred_travel_days is not None:
+            pred_travel_present += 1
         if result.pred_travel_days is not None and result.gold_travel_days is not None:
             pred_travel_days.append(result.pred_travel_days)
             gold_travel_days.append(result.gold_travel_days)
@@ -336,6 +344,8 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
         golds=golds,
         pred_travel_days=pred_travel_days,
         gold_travel_days=gold_travel_days,
+        gold_travel_present=gold_travel_present,
+        pred_travel_present=pred_travel_present,
         skipped=skipped,
     )
 
@@ -369,6 +379,12 @@ def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
     )
     metrics["travel_mae"] = travel_mae
     metrics["travel_n"] = travel_n
+    gold_n = metrics_input.gold_travel_present
+    pred_n = metrics_input.pred_travel_present
+    metrics["travel_gold_n"] = gold_n
+    metrics["travel_pred_n"] = pred_n
+    metrics["travel_coverage"] = (travel_n / gold_n) if gold_n else None
+    metrics["travel_spurious_rate"] = ((pred_n - travel_n) / pred_n) if pred_n else None
     return {"metrics": metrics}
 
 
@@ -442,6 +458,17 @@ def print_report(
     print(f"  Macro F1          : {m['macro_f1']:.4f}")
     print(
         f"  Travel MAE        : {_format_float(m['travel_mae'])}  (n={m['travel_n']})"
+    )
+    print(
+        "  Travel coverage   : "
+        f"{_format_float(m['travel_coverage'])}  "
+        f"({m['travel_n']}/{m['travel_gold_n']} gold-travel rows populated)"
+    )
+    print(
+        "  Travel spurious   : "
+        f"{_format_float(m['travel_spurious_rate'])}  "
+        f"({m['travel_pred_n'] - m['travel_n']}/{m['travel_pred_n']} "
+        "model-travel rows gold-None)"
     )
     print("-" * 72)
     print("  Confusion matrix (rows=pred, columns=gold)")
