@@ -12,6 +12,15 @@ GOLD_PATH = REPO_ROOT / "data" / "eval" / "ground_truth.jsonl"
 # recruiting-spam non-jobs that used to carry `unclear`. Axis is now 3-way.
 EXPECTED_RECORD_COUNT = 104
 EXPECTED_CLASSIFICATION_COUNTS = {"onsite": 55, "remote": 35, "hybrid": 14}
+EXPECTED_POLICY_COUNTS = {
+    "onsite": 53,
+    "fully_remote": 32,
+    "hybrid": 14,
+    "onsite_disguised": 2,
+    "remote_with_monthly_travel": 1,
+    "remote_with_frequent_travel": 1,
+    "location_restricted": 1,
+}
 EXPECTED_TRAVEL_RECORD_COUNT = 2
 EXPECTED_LOCATION_RESTRICTED_RECORD_COUNT = 1
 TRAVEL_POLICIES = {"remote_with_monthly_travel", "remote_with_frequent_travel"}
@@ -43,6 +52,10 @@ def test_remote_filter_gold_records_have_3way_human_classification():
     assert (
         Counter(record.get("_human_classification") for record in records)
         == EXPECTED_CLASSIFICATION_COUNTS
+    )
+    assert (
+        Counter(record.get("_human_policy") for record in records)
+        == EXPECTED_POLICY_COUNTS
     )
     assert "unclear" not in REMOTE_CLASSIFICATIONS
     assert not any(

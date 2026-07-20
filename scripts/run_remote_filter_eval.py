@@ -184,9 +184,19 @@ def _evaluate_record(
     gold_classification = job.get("_human_classification")
     if gold_classification not in REMOTE_CLASSIFICATIONS:
         allowed = ", ".join(REMOTE_CLASSIFICATIONS)
+        record_id = _record_provenance_id(job, i)
+        log.error(
+            "Record %d (%s, id=%s) has invalid _human_classification %r; "
+            "expected one of: %s",
+            i,
+            job.get("title"),
+            record_id,
+            gold_classification,
+            allowed,
+        )
         raise ValueError(
-            f"record {i} ({job.get('title')}) has invalid _human_classification "
-            f"{gold_classification!r}; expected one of: {allowed}"
+            f"record {i} ({job.get('title')}, id={record_id}) has invalid "
+            f"_human_classification {gold_classification!r}; expected one of: {allowed}"
         )
 
     gold_travel_days = job.get("_human_travel_days")
