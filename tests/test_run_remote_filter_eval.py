@@ -2,6 +2,7 @@ import hashlib
 import time
 
 import pytest
+from pydantic import ValidationError
 
 from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter.models import RemoteAnalysis
@@ -20,6 +21,11 @@ def _analysis(classification: str, travel_days: int | None = None) -> RemoteAnal
 
 def _config() -> dict:
     return {"llm": {"provider": "fake"}}
+
+
+def test_remote_analysis_rejects_retired_unclear_label():
+    with pytest.raises(ValidationError):
+        _analysis("unclear")
 
 
 def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch):
@@ -75,10 +81,9 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
     assert metrics["evaluated"] == 3
     assert metrics["skipped"] == 0
     assert metrics["confusion"] == [
-        [1, 1, 0, 0],
-        [1, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
+        [1, 1, 0],
+        [1, 0, 0],
+        [0, 0, 0],
     ]
     assert metrics["travel_mae"] == 3.0
     assert metrics["travel_n"] == 2
@@ -102,7 +107,7 @@ def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
         eval_script.assemble_metrics(misaligned)
 
 
-def test_run_eval_counts_skipped_records_without_inference(monkeypatch):
+def test_run_eval_fails_fast_on_retired_unclear_human_classification(monkeypatch):
     calls = 0
 
     def fake_analyze_remote(*args, **kwargs):
@@ -113,7 +118,30 @@ def test_run_eval_counts_skipped_records_without_inference(monkeypatch):
     monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
 
     records = [
-        {"title": "bad label", "description": "desc", "_human_classification": "maybe"},
+        {
+            "title": "retired unclear label",
+            "description": "desc",
+            "_human_classification": "unclear",
+        },
+    ]
+
+    with pytest.raises(ValueError, match="invalid _human_classification.*unclear"):
+        eval_script.run_eval(records, _config(), "test_run", workers=2)
+
+    assert calls == 0
+
+
+def test_run_eval_counts_missing_description_as_skipped_without_inference(monkeypatch):
+    calls = 0
+
+    def fake_analyze_remote(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return _analysis("remote")
+
+    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+
+    records = [
         {
             "title": "missing description",
             "description": "",
@@ -126,7 +154,7 @@ def test_run_eval_counts_skipped_records_without_inference(monkeypatch):
     )
 
     assert mismatches == []
-    assert metrics_input == eval_script.EvalMetricsInput(skipped=2)
+    assert metrics_input == eval_script.EvalMetricsInput(skipped=1)
     assert prompt_hashes == []
     assert calls == 0
 
@@ -177,10 +205,9 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
     assert metrics_input.preds == ["remote"]
     assert metrics_input.golds == ["hybrid"]
     assert metrics["confusion"] == [
-        [0, 1, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
-        [0, 0, 0, 0],
+        [0, 1, 0],
+        [0, 0, 0],
+        [0, 0, 0],
     ]
     assert len(captured_inputs) == 1
     rf_input = captured_inputs[0]

@@ -19,26 +19,32 @@ from pydantic import BaseModel, Field
 #   - Refactoring how the Literal or constants are expressed in code
 #   - Changes to LEGACY_CLASSIFICATIONS (UI-only, never produced by the LLM)
 #   - Prompt edits (prompt identity is tracked separately via prompt_hash)
-SCHEMA_VERSION = "4.0.0"
+SCHEMA_VERSION = "5.0.0"
 
 # Remote-ness axis only. The LLM is a pure extractor: travel, geography,
 # relocation, and local-presence details live in dedicated fields instead of
 # classification buckets. See specs/remote_filter_taxonomy.md.
+#
+# 3-way as of Phase 32 (specs/remote_filter_classifier_tuning.md §2): `unclear`
+# was retired — it conflated "posting states no location" (a prefilter/data
+# concern) with model uncertainty, and its "surface borderline" role is now a
+# gate decision, not a classifier label. Zero-signal postings get an honest home
+# via the "named-city → onsite" rule (or are dropped upstream).
 RemoteClassification = Literal[
     "remote",
     "hybrid",
     "onsite",
-    "unclear",
 ]
 
 REMOTE_CLASSIFICATIONS: list[str] = list(get_args(RemoteClassification))
 
-# Values the LLM no longer produces. RemoteAnalysis is strict (4-way axis), so
+# Values the LLM no longer produces. RemoteAnalysis is strict (3-way axis), so
 # these do NOT validate against RemoteAnalysis itself — they exist for
 # back-compat consumers *outside* the strict schema: UI label sets
 # (review_ui.LABELS) and reading historical eval records / DB rows that still
 # carry them.
 LEGACY_CLASSIFICATIONS: list[str] = [
+    "unclear",  # retired Phase 32: no longer a classifier label (still on historical rows)
     "fully_remote",  # pre-taxonomy: renamed to "remote"
     "onsite_disguised",  # pre-taxonomy: collapsed into "onsite"
     "location_restricted",  # pre-taxonomy: folded into "remote" + location_restrictions

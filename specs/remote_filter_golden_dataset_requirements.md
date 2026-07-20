@@ -84,9 +84,15 @@ The easy cases (obvious onsite, obvious fully-remote) are already well-represent
 | Local presence required                       | "Must be within commuting distance of Seattle"             | Not onsite but still location-restricted     |
 | High travel remote                            | "Remote with frequent client travel (est. 30–40% of time)" | Travel days exceed threshold                 |
 
-### Ambiguous / unclear (should trash per policy)
+### Ambiguous / unclear — RETIRED (Phase 32)
 
-Records where a reasonable reader cannot determine remote status from the posting alone. Policy is `on_unclear_classification: reject`, so these should be labeled `_human_verdict: trash` with `_human_policy: unclear`. Useful to have ~5 in the set to verify the agent applies the policy consistently.
+> **Amended 2026-07-20:** `unclear` was retired to a 3-way axis
+> (`remote | hybrid | onsite`) — see `remote_filter_classifier_tuning.md` §2 and
+> the Changelog. Postings a reader can't pin down are no longer their own class:
+> a named city with no remote language is `onsite`, and genuine zero-signal
+> non-jobs (recruiting-spam pages) are dropped from the gold rather than labeled.
+> The gold no longer carries `unclear` records. The original guidance below is
+> historical.
 
 ______________________________________________________________________
 

@@ -8,6 +8,11 @@ from agent_eval.metrics import compute_categorical_metrics
 
 LABELS = REMOTE_CLASSIFICATIONS
 
+# Explicit 4-label fixture for the generic-arithmetic tests below. It exercises
+# the N-label confusion/averaging math independently of the production axis
+# (now 3-way) — compute_categorical_metrics is label-agnostic.
+FOUR_LABELS = ["remote", "hybrid", "onsite", "unclear"]
+
 
 # ---------------------------------------------------------------------------
 # Shape and edge cases
@@ -60,7 +65,7 @@ def test_categorical_perfect_classifier():
     preds = ["remote", "hybrid", "onsite", "unclear"]
     golds = ["remote", "hybrid", "onsite", "unclear"]
 
-    m = compute_categorical_metrics(preds, golds, LABELS)["metrics"]
+    m = compute_categorical_metrics(preds, golds, FOUR_LABELS)["metrics"]
 
     assert m["evaluated"] == 4
     assert m["skipped"] == 0
@@ -87,7 +92,7 @@ def test_categorical_known_confusion_arithmetic():
     preds = ["remote", "onsite", "remote", "hybrid", "onsite", "unclear"]
     golds = ["remote", "remote", "hybrid", "hybrid", "onsite", "remote"]
 
-    m = compute_categorical_metrics(preds, golds, LABELS)["metrics"]
+    m = compute_categorical_metrics(preds, golds, FOUR_LABELS)["metrics"]
 
     assert m["confusion"] == [
         [1, 1, 0, 0],

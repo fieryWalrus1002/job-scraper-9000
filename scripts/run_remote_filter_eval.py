@@ -183,17 +183,20 @@ def _evaluate_record(
     llm_config = config.get("llm")
     gold_classification = job.get("_human_classification")
     if gold_classification not in REMOTE_CLASSIFICATIONS:
-        return RecordEvalResult(
-            index=i,
-            job=job,
-            gold_classification=None,
-            pred_classification=None,
-            gold_travel_days=None,
-            pred_travel_days=None,
-            reason=None,
-            elapsed=0.0,
-            skipped=True,
-            skip_reason="invalid_human_classification",
+        allowed = ", ".join(REMOTE_CLASSIFICATIONS)
+        record_id = _record_provenance_id(job, i)
+        log.error(
+            "Record %d (%s, id=%s) has invalid _human_classification %r; "
+            "expected one of: %s",
+            i,
+            job.get("title"),
+            record_id,
+            gold_classification,
+            allowed,
+        )
+        raise ValueError(
+            f"record {i} ({job.get('title')}, id={record_id}) has invalid "
+            f"_human_classification {gold_classification!r}; expected one of: {allowed}"
         )
 
     gold_travel_days = job.get("_human_travel_days")

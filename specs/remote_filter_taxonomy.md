@@ -1,11 +1,17 @@
 # Remote-filter taxonomy: LLM as extractor, deterministic per-user gate
 
 **Date:** 2026-07-16
-**Status:** RATIFIED (2026-07-17). Issues may be derived from the PR-slicing
-section.
+**Status:** RATIFIED (2026-07-17). **AMENDED 2026-07-20 (Phase 32): the axis is
+now 3-way — `unclear` retired.** See the Changelog and
+`remote_filter_classifier_tuning.md` §2. The body below is the original 4-way
+design; every `unclear` mention is historical context — the classifier axis and
+strict `RemoteAnalysis` schema are `remote | hybrid | onsite` as of Phase 32.
+`unclear` remains a `LEGACY_CLASSIFICATIONS` value (historical rows / UI), not an
+LLM output.
 **Related specs:** `remote_filter_simplification.md` (the travel-bucket collapse
 this generalizes), `remote_filter_eval_decoupling.md` (**depends on this** — the
 gold label set + categorical metric are built on the taxonomy defined here),
+`remote_filter_classifier_tuning.md` (Phase 32 — retires `unclear`),
 `relocation_policy.md`, `multi_user_design.md`, `configs_in_db_design.md`
 
 ______________________________________________________________________
@@ -335,3 +341,18 @@ ______________________________________________________________________
   slices (#479/#480/#481/#482/#483/#484) are now shipped; the remaining Phase 30
   items (#494 prefilter legacy-value reconciliation, #97 DDC misclassification,
   #498 legacy filter-chip UX) are investigations/papercuts, not taxonomy slices.
+- **2026-07-20 — AMENDED: axis reduced to 3-way (`unclear` retired), Phase 32.**
+  The first live categorical eval showed `unclear` was a degenerate class
+  (support 1) that conflated "posting states no location" (a prefilter/data
+  concern, handled by the `named-city → onsite` rule + `banned_anywhere`) with
+  model uncertainty (a forbidden hedge); its "surface borderline / fail-open" role
+  is a gate decision, not a classifier label. `RemoteClassification` is now
+  `remote | hybrid | onsite`; `unclear` moved to `LEGACY_CLASSIFICATIONS`
+  (historical rows / UI only, not LLM-produced). `SCHEMA_VERSION` 4.0.0 → 5.0.0.
+  The 2 remaining gold `unclear` records (`e4d46ee7`, `2c713280` — recruiting-spam
+  non-jobs) were dropped. Rationale + slicing in
+  `remote_filter_classifier_tuning.md` §2 (Phase 32, #520). Config-side cleanup
+  (user settings page, stored `acceptable_classifications`, `api/routes/jobs.py`
+  query Literal, `user_config` superset) is deferred to a follow-up issue — the
+  `user_config.RemoteClassification` superset already tolerates `unclear`, so
+  narrowing the LLM axis is non-breaking there.
