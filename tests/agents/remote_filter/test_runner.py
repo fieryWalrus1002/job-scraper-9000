@@ -38,20 +38,6 @@ llm:
   model: gpt-4o-mini
   temperature: 0.1
 
-policy_thresholds:
-  disallowed_classifications:
-    - hybrid
-    - onsite
-  travel:
-    max_estimated_days_per_year: 15
-  relocation:
-    allow_required_relocation: false
-    allow_local_presence_required: false
-  uncertainty:
-    on_unclear_classification: reject
-  timezone:
-    rejected_timezone_keywords:
-      - EST
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -99,7 +85,6 @@ def test_load_remote_filter_config_expands_environment(tmp_path, monkeypatch):
 llm:
   provider: openai
   model: ${MODEL_NAME}
-policy_thresholds: {}
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -251,20 +236,6 @@ llm:
   temperature: 0.1
   max_workers: 4
 
-policy_thresholds:
-  disallowed_classifications:
-    - hybrid
-    - onsite
-  travel:
-    max_estimated_days_per_year: 15
-  relocation:
-    allow_required_relocation: false
-    allow_local_presence_required: false
-  uncertainty:
-    on_unclear_classification: reject
-  timezone:
-    rejected_timezone_keywords:
-      - EST
 """,
         encoding="utf-8",
     )

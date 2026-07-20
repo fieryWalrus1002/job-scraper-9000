@@ -17,7 +17,7 @@ data/staging/to_review.jsonl      ← app reads here
     ↓ confirm / correct
 data/eval/ground_truth.jsonl      ← app writes here
     ↓
-scripts/run_remote_filter_eval.py / scripts/submit_eval_batch.py
+scripts/run_remote_filter_eval.py
 ```
 
 See [`scripts/README.md`](../../scripts/README.md) for the full batch preparation and eval workflow.

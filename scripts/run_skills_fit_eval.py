@@ -477,9 +477,6 @@ def main(run_logger: RunLogger | None = None) -> None:
     run_record["profile_version"] = profile.get("profile_version", "unknown")
     run_record["prompt_file"] = str(prompt_path)
     run_record["skills_fit_schema_version"] = SCHEMA_VERSION
-    # The default policy_thresholds field isn't applicable here; null it out
-    # rather than misrepresenting remote-filter policy on a skills-fit run.
-    run_record["config"]["policy_thresholds"] = None
 
     run_logger.log_run(run_record)
     log.info("Run record logged: %s", run_id)
