@@ -48,7 +48,7 @@ ______________________________________________________________________
 
 **Current state:** Phases 1 and 1.5 are complete. The Phase 2 remote-filter implementation and eval framework are complete; golden dataset balancing and precision tuning are in progress (current baseline: accuracy 0.8654 / precision 0.7073 / recall 0.9355 / F1 0.8056 on 104 records). Phase 3 (Skills Fit) — Phase R baseline is closed: schema, ordinal eval harness (ordinal-agreement + top-k metrics), keyword baseline, real rubric prompt, the v5 candidate profile, and a 21-record human-ratified seed gold set are all committed. The pinned champion run is recorded in [`config/eval/champions.yml`](config/eval/champions.yml). Phase G (calibration loop, one-lever-per-PR) is the active phase. See [specs/skills_fit_agent_plan.md](specs/skills_fit_agent_plan.md) and [src/agents/skills_fit/README.md](src/agents/skills_fit/README.md).
 
-The remote filter agent is evaluated against a human-verified gold dataset built through a teacher/HITL workflow: a stronger cloud model proposes remote-policy labels, then the Streamlit review UI confirms or corrects them. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly. Future local-model distillation can build on this gold layer; see [specs/teacher-student.md](specs/teacher-student.md) for the design.
+The remote filter agent is evaluated against a human-verified gold dataset built through production-classifier proposals plus HITL review: the live remote-filter output is sampled into the Streamlit review UI, then a human confirms or corrects the 3-way label. Eval runs record dataset hashes, prompt hashes, config, git metadata, metrics, and mismatch files so prompt/model changes can be compared reproducibly.
 
 Work tracked on GitHub — `gh issue list` or <https://github.com/fieryWalrus1002/job-scraper-9000/issues>
 
@@ -99,15 +99,13 @@ uv run scripts/run_remote_filter_eval.py --workers 4
 uv run scripts/compare_evals.py --last 5
 ```
 
-**Run the teacher batch pipeline + HITL review:**
+**Sample remote-filter output for HITL review:**
 
 More details in [the HITL README.md](src/review_ui/README.md).
 
 ```bash
-python scripts/prepare_batch.py        # build OpenAI batch request file
-# upload data/raw/gpt_teacher_batch.jsonl → OpenAI, download results
-python scripts/merge_batch_results.py  # merge results into staging
-streamlit run src/review_ui/app.py     # open the review UI
+uv run scripts/sample_for_review.py --n 50
+uv run streamlit run src/review_ui/app.py
 ```
 
 **Run the skills fit agent:**
@@ -204,7 +202,7 @@ ______________________________________________________________________
 | Runtime         | Python 3.13, `uv`, Pydantic v2                                                                                    |
 | Scraping        | [python-jobspy](https://github.com/Bunsly/JobSpy), direct ATS APIs (Greenhouse, Lever, Ashby), LinkedIn guest API |
 | Local inference | llama.cpp — Qwen 3.6 27B (RTX 4090)                                                                               |
-| Cloud inference | OpenAI API (gpt-5-mini default; gpt-5.4 for teacher)                                                              |
+| Cloud inference | OpenAI API (gpt-5-mini default; production classifier can also run on OpenAI)                                     |
 | Review UI       | Streamlit (HITL Evaluation Interface)                                                                             |
 | Data            | Append-only JSONL, medallion layout (raw → prefiltered/local/trash → staging → eval)                              |
 | Orchestration   | Docker Compose, `just`, `honcho` (process stream supervisor)                                                      |
@@ -228,8 +226,8 @@ ______________________________________________________________________
 | Skills fit agent — ordinal scoring, profile contract, teacher-first HITL   | [src/agents/skills_fit/README.md](src/agents/skills_fit/README.md)               |
 | User configs in DB — per-user profile/search, settings form, push/pull     | [specs/configs_in_db_design.md](specs/configs_in_db_design.md)                   |
 | Skills fit plan — schema, calibration, sequencing (Phase R / G / B)        | [specs/skills_fit_agent_plan.md](specs/skills_fit_agent_plan.md)                 |
-| Teacher-student distillation design                                        | [specs/teacher-student.md](specs/teacher-student.md)                             |
-| Batch pipeline scripts — prepare, merge, sample                            | [scripts/README.md](scripts/README.md)                                           |
+| Legacy teacher-student distillation design                                 | [specs/teacher-student.md](specs/teacher-student.md)                             |
+| Pipeline scripts — review sampling, evals, utility scripts                 | [scripts/README.md](scripts/README.md)                                           |
 | Eval scripts — running evals, CLI flags, comparing runs                    | [scripts/README.md#eval](scripts/README.md#eval)                                 |
 | HITL review UI — how it works, input format, gold layer output             | [src/review_ui/README.md](src/review_ui/README.md)                               |
 | Containerization & Local Integration                                       | [docker/README.md](docker/README.md)                                             |

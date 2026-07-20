@@ -7,12 +7,16 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parents[2]))
 
-from agents.remote_filter.models import (
-    LEGACY_CLASSIFICATIONS,
-    REMOTE_CLASSIFICATIONS,
-    SCHEMA_VERSION,
-)
+from agents.remote_filter.models import SCHEMA_VERSION
 from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH
+from review_ui.remote_filter_review import (
+    ACTIVE_LABELS,
+    MissingAnalysisError,
+    extract_remote_analysis,
+    proposed_classification,
+    suggested_verdict,
+    validate_active_label,
+)
 from utils.git_info import get_git_metadata, get_prompt_hash
 
 _PROMPT_FILE = REMOTE_FILTER_PROMPT_PATH
@@ -20,7 +24,7 @@ _PROMPT_FILE = REMOTE_FILTER_PROMPT_PATH
 STAGING = "data/staging/to_review.jsonl"
 EVAL = "data/eval/ground_truth.jsonl"
 
-LABELS = REMOTE_CLASSIFICATIONS + LEGACY_CLASSIFICATIONS
+LABELS = list(ACTIVE_LABELS)
 
 st.set_page_config(layout="wide", page_title="HITL Reviewer")
 
@@ -92,11 +96,13 @@ def build_metadata() -> dict:
 def save_record(
     job: dict, verdict: str, policy: str, corrected: bool, note: str = ""
 ) -> None:
+    validate_active_label(policy)
     os.makedirs(os.path.dirname(EVAL), exist_ok=True)
     record = {
         **job,
         "_human_verdict": verdict,
         "_human_policy": policy,
+        "_human_classification": policy,
         "_corrected": corrected,
         "_review_metadata": build_metadata(),
     }
@@ -141,7 +147,10 @@ jobs = load_staging()
 total = len(jobs)
 
 if total == 0:
-    st.warning(f"No records found in `{STAGING}`. Run `merge_batch_results.py` first.")
+    st.warning(
+        f"No records found in `{STAGING}`. Run remote-filter, then "
+        "`uv run scripts/sample_for_review.py` first."
+    )
     st.stop()
 
 # On first load after a restart, jump to the first unreviewed record.
@@ -235,26 +244,16 @@ if prior:
         icon="✅",
     )
 
-raw_content = (
-    job.get("response", {})
-    .get("body", {})
-    .get("choices", [{}])[0]
-    .get("message", {})
-    .get("content", "{}")
-)
 try:
-    analysis = json.loads(raw_content)
-except (json.JSONDecodeError, TypeError):
+    analysis = extract_remote_analysis(job)
+except MissingAnalysisError as exc:
     analysis = {}
+    analysis_error = str(exc)
+else:
+    analysis_error = ""
 
-teacher_verdict = (
-    "pass"
-    if analysis.get("remote_classification") == "fully_remote"
-    else "trash"
-    if analysis.get("remote_classification")
-    else "unknown"
-)
-teacher_policy = analysis.get("remote_classification", "unknown")
+proposed_policy = proposed_classification(analysis)
+proposed_verdict = suggested_verdict(proposed_policy)
 
 col1, col2 = st.columns([2, 1])
 
@@ -270,22 +269,29 @@ with col1:
     st.write(job.get("description", "_No description_"))
 
 with col2:
-    st.subheader("Teacher Reasoning")
+    st.subheader("Classifier Proposal")
     if analysis:
         st.info(analysis.get("reasoning_trace", "_No reasoning trace_"))
-        st.metric("Verdict", teacher_verdict)
-        st.metric("Policy", teacher_policy)
+        st.metric("Verdict", proposed_verdict)
+        st.metric("Classification", proposed_policy or "unknown")
         if analysis.get("timezone_requirements"):
             st.caption("Timezone reqs: " + ", ".join(analysis["timezone_requirements"]))
         if analysis.get("key_phrases"):
             st.caption("Key phrases: " + " · ".join(analysis["key_phrases"]))
     else:
-        st.error("Could not parse teacher response.")
+        st.error(f"Could not parse classifier proposal: {analysis_error}")
 
     st.divider()
 
-    if st.button("Confirm Teacher ✅", use_container_width=True, type="primary"):
-        save_record(job, teacher_verdict, teacher_policy, corrected=False)
+    confirm_disabled = proposed_policy not in LABELS or proposed_verdict == "unknown"
+    if st.button(
+        "Confirm Proposal ✅",
+        use_container_width=True,
+        type="primary",
+        disabled=confirm_disabled,
+    ):
+        assert proposed_policy is not None
+        save_record(job, proposed_verdict, proposed_policy, corrected=False)
         st.session_state.idx += 1
         st.rerun()
 
@@ -293,13 +299,13 @@ with col2:
     corrected_policy = st.selectbox(
         "Remote policy",
         LABELS,
-        index=LABELS.index(teacher_policy) if teacher_policy in LABELS else 0,
+        index=LABELS.index(proposed_policy) if proposed_policy in LABELS else 0,
     )
     corrected_verdict = st.radio(
         "Pass or trash?",
         ["pass", "trash"],
         horizontal=True,
-        index=0 if teacher_verdict == "pass" else 1,
+        index=0 if proposed_verdict == "pass" else 1,
     )
     correction_note = st.text_input("Note (optional)")
 

@@ -1,18 +1,26 @@
 # scripts/
 
-One-off data pipeline scripts that move job data through the medallion stages. Run them in order to go from raw scraped jobs to a human-verified golden dataset.
+One-off data pipeline scripts that move job data through the medallion stages. Run them in order to go from live classified jobs to a human-verified golden dataset.
 
-## Full Workflow
+## Remote-filter gold workflow
 
 ```
-data/raw/*.jsonl                      ← scraped job records (Bronze)
+data/prefiltered/remote_filter_input.jsonl
     │
-    ├─ prepare_batch.py               → data/raw/gpt_teacher_batch.jsonl
-    │       [upload to OpenAI Batch API, download results]
-    ├─ merge_batch_results.py         → data/staging/to_review.jsonl     (Silver)
-    │       [run Streamlit HITL UI]
-    └─ eval/ground_truth.jsonl        ← human-verified records            (Gold)
+    ├─ job-scraper-9000 remote-filter → data/filtered/remote_filter_classified.jsonl
+    │
+    ├─ sample_for_review.py           → data/staging/to_review.jsonl      (Silver)
+    │       [sample production classifier proposals]
+    │
+    └─ streamlit run src/review_ui/app.py
+            ↓ confirm / correct
+        data/eval/ground_truth.jsonl  ← human-verified records            (Gold)
 ```
+
+The old remote-filter teacher bootstrap (`prepare_batch.py` / `submit_batch.py` /
+`merge_batch_results.py` + `prompts/remote_agent_teacher/`) was retired in Phase
+32\. New remote-filter gold is proposed by the production classifier and ratified
+in the review UI.
 
 ______________________________________________________________________
 
@@ -38,55 +46,23 @@ uv run scripts/pull_user_configs.py --user-email a@b.com
 
 ______________________________________________________________________
 
-### `prepare_batch.py`
-
-Reads raw jobs and produces an [OpenAI Batch API](https://platform.openai.com/docs/guides/batch) request file.
-
-```bash
-python scripts/prepare_batch.py
-```
-
-**Input:** `data/raw/scraped_jobs.jsonl`
-**Output:** `data/raw/gpt_teacher_batch.jsonl`
-
-After running, upload the output file to the OpenAI Batch API dashboard (or via API), wait for completion, and download the results file.
-
-______________________________________________________________________
-
-### `merge_batch_results.py`
-
-Joins the downloaded OpenAI batch results back onto the original job records and writes the merged staging file that the review UI reads.
-
-```bash
-python scripts/merge_batch_results.py \
-    --jobs    data/raw/scraped_jobs.jsonl \
-    --results data/raw/gpt_teacher_results.jsonl \
-    --output  data/staging/to_review.jsonl
-```
-
-| Flag        | Default                              | Description                                  |
-| ----------- | ------------------------------------ | -------------------------------------------- |
-| `--jobs`    | `data/raw/scraped_jobs.jsonl`        | Original jobs file fed to `prepare_batch.py` |
-| `--results` | `data/raw/gpt_teacher_results.jsonl` | Downloaded batch results from OpenAI         |
-| `--output`  | `data/staging/to_review.jsonl`       | Merged output for the review UI              |
-| `--append`  | off                                  | Append to output instead of overwriting      |
-
-Items where the batch API returned an error are logged and skipped.
-
-______________________________________________________________________
-
 ### `sample_for_review.py`
 
-Pulls a random sample of raw job records into staging. Useful for spot-checking data quality without running the full teacher pipeline.
+Pulls a random sample of production remote-filter classified records into the
+review UI staging file, skipping jobs already present in the gold set by default.
 
 ```bash
-python scripts/sample_for_review.py
+uv run scripts/sample_for_review.py --n 50
+uv run scripts/sample_for_review.py \
+    --source data/filtered/2026-06-08/remote_filter_classified.jsonl \
+    --output data/staging/to_review.jsonl \
+    --seed 32
 ```
 
-**Input:** `data/raw/pass.jsonl`
-**Output:** `data/staging/review_batch.jsonl`
+**Input:** `data/filtered/remote_filter_classified.jsonl`
+**Output:** `data/staging/to_review.jsonl`
 
-Edit `create_sample_batch()` arguments directly to change the source file or sample size (default `n=50`).
+Use `--include-reviewed` when deliberately re-reviewing existing gold rows.
 
 ______________________________________________________________________
 
@@ -140,7 +116,7 @@ uv run scripts/run_remote_filter_eval.py
 
 The default provider is `openai` (model: `gpt-4o-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
-The remote-filter eval reports the native 4-way classification metric (`remote`, `hybrid`, `onsite`, `unclear`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, and travel-days MAE.
+The remote-filter eval reports the native 3-way classification metric (`remote`, `hybrid`, `onsite`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, and travel-days MAE.
 
 **Examples:**
 
@@ -204,19 +180,19 @@ ______________________________________________________________________
 
 ## Data Directory Reference
 
-| Path                           | Stage  | Contents                                     |
-| ------------------------------ | ------ | -------------------------------------------- |
-| `data/raw/`                    | Bronze | Untouched scraped JSONL from all sources     |
-| `data/staging/to_review.jsonl` | Silver | Teacher-annotated jobs awaiting human review |
-| `data/eval/ground_truth.jsonl` | Gold   | Human-verified records from the Streamlit UI |
-| `data/filtered/`               | —      | Student agent pass results                   |
-| `data/trash/`                  | —      | Student agent trash results                  |
+| Path                           | Stage  | Contents                                              |
+| ------------------------------ | ------ | ----------------------------------------------------- |
+| `data/raw/`                    | Bronze | Untouched scraped JSONL from all sources              |
+| `data/staging/to_review.jsonl` | Silver | Production-classifier proposals awaiting human review |
+| `data/eval/ground_truth.jsonl` | Gold   | Human-verified records from the Streamlit UI          |
+| `data/filtered/`               | —      | Student agent pass results                            |
+| `data/trash/`                  | —      | Student agent trash results                           |
 
 ______________________________________________________________________
 
 ## skills_fit — seed gold + eval workflow
 
-Phase 3 (Skills Fit) scores remote-filter PASS jobs against the versioned candidate profile at `config/profile/candidate_profile.yml`. The seed gold set is built teacher-first: a frontier LLM proposes labels, a human reviews them in markdown, and the parsed result becomes `data/eval/skills_fit_ground_truth.jsonl`.
+Phase 3 (Skills Fit) scores remote-filter classified jobs against the versioned candidate profile at `config/profile/candidate_profile.yml`. The seed gold set is built teacher-first: a frontier LLM proposes labels, a human reviews them in markdown, and the parsed result becomes `data/eval/skills_fit_ground_truth.jsonl`.
 
 See [src/agents/skills_fit/README.md](../src/agents/skills_fit/README.md) for the agent overview and [specs/skills_fit_agent_plan.md](../specs/skills_fit_agent_plan.md) for the full Phase R / G / B plan.
 

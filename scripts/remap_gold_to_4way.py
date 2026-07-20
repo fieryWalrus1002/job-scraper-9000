@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Remap remote-filter gold labels to the canonical 4-way axis.
+"""Legacy-remap remote-filter gold labels to the canonical 3-way axis.
 
-Reads ``data/eval/ground_truth.jsonl`` in place, derives
-``_human_classification`` from the legacy ``_human_policy`` field, and fills the
-mechanical travel/location fields that are already present in the teacher
-analysis stored on each record.
+This is a one-time migration helper for historical gold records that still carry
+legacy fine-grained ``_human_policy`` values from the retired teacher bootstrap.
+It derives ``_human_classification`` from ``_human_policy`` and backfills
+structured fields when legacy teacher analysis is present.
 
 Usage:
     uv run scripts/remap_gold_to_4way.py
@@ -22,10 +22,10 @@ DEFAULT_GOLD = Path("data/eval/ground_truth.jsonl")
 
 POLICY_TO_CLASSIFICATION = {
     "fully_remote": "remote",
+    "remote": "remote",
     "onsite": "onsite",
     "hybrid": "hybrid",
     "onsite_disguised": "onsite",
-    "unclear": "unclear",
     "location_restricted": "remote",
     "remote_with_monthly_travel": "remote",
     "remote_with_frequent_travel": "remote",
@@ -72,7 +72,7 @@ def _record_id(record: dict[str, Any], index: int) -> str:
 
 
 def extract_remote_analysis(record: dict[str, Any], index: int) -> dict[str, Any]:
-    """Return the teacher RemoteAnalysis dict from supported response shapes."""
+    """Return the legacy teacher/production RemoteAnalysis dict when present."""
     response = record.get("response")
     if not isinstance(response, dict):
         raise ValueError(
@@ -142,7 +142,7 @@ def remap_records(
         record["_human_classification"] = classification
         remap_counts[(policy, classification)] += 1
 
-        if policy in TRAVEL_POLICIES:
+        if policy in TRAVEL_POLICIES and "_human_travel_days" not in record:
             analysis = extract_remote_analysis(record, index)
             travel_days = analysis.get("estimated_travel_days_per_year")
             if travel_days is None:
@@ -156,8 +156,6 @@ def remap_records(
                     "response.estimated_travel_days_per_year "
                     f"{travel_days!r}; expected int or None"
                 )
-        else:
-            record["_human_travel_days"] = None
 
         if policy == LOCATION_RESTRICTED_POLICY:
             analysis = extract_remote_analysis(record, index)

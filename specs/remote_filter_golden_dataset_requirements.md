@@ -13,12 +13,12 @@ ______________________________________________________________________
 
 ## Current State
 
-| Metric        | Value                                                                     |
-| ------------- | ------------------------------------------------------------------------- |
-| Total records | 50                                                                        |
-| Pass          | 8 (16%)                                                                   |
-| Trash         | 42 (84%)                                                                  |
-| Source        | Scraped May 2026, labeled via GPT-4o teacher, human-reviewed in Streamlit |
+| Metric        | Value                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| Total records | 50                                                                                                     |
+| Pass          | 8 (16%)                                                                                                |
+| Trash         | 42 (84%)                                                                                               |
+| Source        | Scraped May 2026, legacy teacher/bootstrap + current production proposals, human-reviewed in Streamlit |
 
 **Problem:** 8 positive examples gives a ~±30-point 95% CI on recall. A single FN moves the metric by 12.5 percentage points. Regression detection is not meaningful at this sample size.
 
@@ -40,28 +40,29 @@ ______________________________________________________________________
 
 Every record must have the following fields to be usable in eval:
 
-| Field              | Required    | Notes                                                                     |
-| ------------------ | ----------- | ------------------------------------------------------------------------- |
-| `dedup_hash`       | Yes         | Primary key used by `load_gold()` for dedup                               |
-| `title`            | Yes         | Used in mismatch reporting                                                |
-| `company`          | Yes         | Used in mismatch reporting                                                |
-| `location`         | Yes         | Input to `analyze_remote()`                                               |
-| `description`      | Yes         | Primary input; records without this are skipped                           |
-| `source_url`       | Yes         | Required for traceability back to the original posting                    |
-| `_human_verdict`   | Yes         | `"pass"` or `"trash"` — final ground truth                                |
-| `_human_policy`    | Yes         | Classification that drove the verdict (e.g. `"onsite"`, `"fully_remote"`) |
-| `_corrected`       | Yes         | `true` if human overrode the teacher label                                |
-| `_batch_metadata`  | Yes         | Captures teacher prompt hash and commit at labeling time                  |
-| `_review_metadata` | Yes         | Captures reviewer prompt hash and commit at review time                   |
-| `search_params`    | Recommended | Provides context to `analyze_remote()` for timezone reasoning             |
+| Field                   | Required    | Notes                                                                                                  |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `dedup_hash`            | Yes         | Primary key used by `load_gold()` for dedup                                                            |
+| `title`                 | Yes         | Used in mismatch reporting                                                                             |
+| `company`               | Yes         | Used in mismatch reporting                                                                             |
+| `location`              | Yes         | Input to `analyze_remote()`                                                                            |
+| `description`           | Yes         | Primary input; records without this are skipped                                                        |
+| `source_url`            | Yes         | Required for traceability back to the original posting                                                 |
+| `_human_verdict`        | Yes         | `"pass"` or `"trash"` — final ground truth                                                             |
+| `_human_policy`         | Yes         | Current records mirror the 3-way `_human_classification`; legacy rows may carry historical policy tags |
+| `_human_classification` | Yes         | 3-way eval label: `remote`, `hybrid`, or `onsite`                                                      |
+| `_corrected`            | Yes         | `true` if human overrode the classifier proposal                                                       |
+| `_filter_metadata`      | Recommended | Captures production classifier prompt hash / commit when the proposal was generated                    |
+| `_review_metadata`      | Yes         | Captures reviewer prompt hash and commit at review time                                                |
+| `search_params`         | Recommended | Provides context to `analyze_remote()` for timezone reasoning                                          |
 
-Records missing `description` or `_human_verdict` are silently skipped by the eval; they count toward `metrics.skipped` and waste a slot in the gold set.
+Records missing `description` are skipped by the eval and waste a slot in the gold set. Invalid `_human_classification` values fail fast.
 
 ______________________________________________________________________
 
 ## Edge Case Coverage
 
-The easy cases (obvious onsite, obvious fully-remote) are already well-represented. New records should prioritize the cases where the agent is most likely to err.
+The easy cases (obvious onsite, obvious remote) are already well-represented. New records should prioritize the cases where the agent is most likely to err.
 
 ### Pass edge cases (agent may incorrectly trash)
 
@@ -91,8 +92,7 @@ The easy cases (obvious onsite, obvious fully-remote) are already well-represent
 > the Changelog. Postings a reader can't pin down are no longer their own class:
 > a named city with no remote language is `onsite`, and genuine zero-signal
 > non-jobs (recruiting-spam pages) are dropped from the gold rather than labeled.
-> The gold no longer carries `unclear` records. The original guidance below is
-> historical.
+> The gold no longer carries `unclear` records.
 
 ______________________________________________________________________
 
@@ -100,7 +100,7 @@ ______________________________________________________________________
 
 1. **Prioritize edge cases over volume.** A new pass record from an easy "fully remote, no requirements" posting adds little. A record from the edge case categories above is worth 5× as much.
 1. **Source from the existing scraping pipeline.** Do not construct synthetic records — they won't reflect real job posting language patterns.
-1. **Review flow is unchanged.** All new records go through the Streamlit reviewer before being added to `ground_truth.jsonl`. The `_corrected` flag should be set when the human verdict differs from the teacher label.
+1. **Review flow uses production proposals.** Run the production remote filter, sample `remote_filter_classified.jsonl` with `scripts/sample_for_review.py`, then review in Streamlit before adding to `ground_truth.jsonl`. The `_corrected` flag should be set when the human label differs from the classifier proposal.
 1. **No re-review of existing records without cause.** If a human review was already done and `_corrected: false`, do not re-litigate it. Only re-review if the policy changes.
 
 ______________________________________________________________________
