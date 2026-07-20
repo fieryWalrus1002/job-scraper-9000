@@ -344,6 +344,14 @@ def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
         REMOTE_CLASSIFICATIONS,
         skipped=metrics_input.skipped,
     )["metrics"]
+    if len(metrics_input.pred_travel_days) != len(metrics_input.gold_travel_days):
+        # Built in lockstep by _metrics_input_from_results today, but guard the
+        # invariant: a silent zip-truncation would divide by the wrong denominator.
+        raise ValueError(
+            "pred_travel_days and gold_travel_days must align "
+            f"({len(metrics_input.pred_travel_days)} != "
+            f"{len(metrics_input.gold_travel_days)})"
+        )
     travel_n = len(metrics_input.pred_travel_days)
     travel_mae = (
         sum(

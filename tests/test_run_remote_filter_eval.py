@@ -1,6 +1,8 @@
 import hashlib
 import time
 
+import pytest
+
 from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import _build_user_message
@@ -87,6 +89,17 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
         "cccc3333",
     ]
     assert all(len(h.resolved_user_message_hash) == 12 for h in prompt_hashes)
+
+
+def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
+    misaligned = eval_script.EvalMetricsInput(
+        preds=["remote"],
+        golds=["remote"],
+        pred_travel_days=[10, 20],
+        gold_travel_days=[10],
+    )
+    with pytest.raises(ValueError, match="pred_travel_days and gold_travel_days"):
+        eval_script.assemble_metrics(misaligned)
 
 
 def test_run_eval_counts_skipped_records_without_inference(monkeypatch):
