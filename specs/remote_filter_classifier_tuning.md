@@ -180,12 +180,19 @@ sampling; `remap_gold_to_4way.py` as a **one-time legacy-migration tool** only
   recruiting post) — either to its real 3-way class or **out of the remote-filter
   gold** if it's a non-job (preferred; see prerequisite).
 
-**Prerequisite — verify the prefilter catches zero-signal non-jobs.** The
-justification for 3-way-everywhere is that spam/stub postings (the only genuine
-`unclear` residual) are handled *upstream*. Before removing the class, confirm
-`src/agents/prefilter/` actually drops the SynergisticIT archetype; if it doesn't,
-that gap is a prefilter issue to file, not a reason to keep `unclear` in the
-classifier. **This check gates the slice.**
+**Prerequisite — checked 2026-07-20.** The concern was that zero-signal non-jobs
+would have no honest home once `unclear` is gone. Finding: `src/prefilter/`
+(deterministic rules router, *not* `src/agents/prefilter/` — CLAUDE.md path is
+stale) does **not** drop them — it rejects non-US / banned-term / then routes
+"remote or **ambiguous**" to `remote_filter_candidate`, so signal-less US posts are
+*forwarded* to the classifier by design. **That's acceptable:** the real safety net
+is the taxonomy's **named-city → onsite** rule — most zero-signal posts still carry
+a location (`2c713280` = "New York, NY" → `onsite`), which is an honest 3-way home.
+The genuinely locationless residual is rare and handled by the `banned_anywhere`
+blocklist in `config/agent/prefilter.yml` (existing pattern; add specific
+staffing/recruiting mills as they surface). So retiring `unclear` is viable without
+a prefilter change; the gate is "does a zero-signal post get an honest 3-way label"
+(yes), not "does the prefilter drop it" (no, by design).
 
 - **Travel labels (populated on 3/104 rows):** hand-fill `_human_travel_days` on
   the rows with travel language in the body — the 8 "gold-None → pred-number" rows
