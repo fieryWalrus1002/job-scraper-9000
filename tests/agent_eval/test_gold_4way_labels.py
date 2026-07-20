@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ GOLD_PATH = REPO_ROOT / "data" / "eval" / "ground_truth.jsonl"
 # Phase 32 (#519 re-ratification + #520 unclear retirement): dropped the 2
 # recruiting-spam non-jobs that used to carry `unclear`. Axis is now 3-way.
 EXPECTED_RECORD_COUNT = 104
+EXPECTED_CLASSIFICATION_COUNTS = {"onsite": 55, "remote": 35, "hybrid": 14}
 EXPECTED_TRAVEL_RECORD_COUNT = 2
 EXPECTED_LOCATION_RESTRICTED_RECORD_COUNT = 1
 TRAVEL_POLICIES = {"remote_with_monthly_travel", "remote_with_frequent_travel"}
@@ -37,6 +39,10 @@ def test_remote_filter_gold_records_have_3way_human_classification():
     assert all(
         record.get("_human_classification") in REMOTE_CLASSIFICATIONS
         for record in records
+    )
+    assert (
+        Counter(record.get("_human_classification") for record in records)
+        == EXPECTED_CLASSIFICATION_COUNTS
     )
     assert "unclear" not in REMOTE_CLASSIFICATIONS
     assert not any(
