@@ -17,8 +17,10 @@ section.
 in spirit by this), `remote_filter_golden_dataset_requirements.md`,
 `eval_framework_requirements.md`, `relocation_policy.md`.
 
-**Source:** `notes/remote_filter_eval_2/2026-07-20_eval_findings.md` (first live
-categorical run, `20260720_155630_14cf`).
+**Source:** first live categorical eval run `20260720_155630_14cf`. Detailed
+analysis lives in **local-only working notes** (`notes/` is gitignored; the gold set
+and eval artifacts are kept local per the gold-locality decision) — not a committed
+path. The durable anchor is the run_id, reproducible from `data/eval/runs.jsonl`.
 
 ______________________________________________________________________
 
@@ -103,8 +105,9 @@ layer (HITL), not the mapping layer.
 
 **Action:** re-read each body, correct `_human_policy`, let the existing remap
 re-derive `_human_classification`. `62ae121f`/`e4d46ee7` are genuine boundary
-calls — ratify or annotate why gold stands. Record pre/post label diffs in
-`notes/remote_filter_eval_2/`.
+calls — ratify or annotate why gold stands. Record pre/post label diffs alongside
+the gold (local-only, since the gold set is local; promote to a committed doc such
+as `data/eval/edge-cases.md` if/when the gold is genericized and committed).
 
 These 3 legacy mislabels still need a one-time HITL fix (they are already in gold),
 but the *recurrence* is prevented at source by retiring the teacher bootstrap (§2b):
@@ -210,7 +213,8 @@ contradicted."* The model promotes body-silence to a confident `remote`: 3 of th
 (`2c713280` is the retired-`unclear` record from §2 — once it's retagged/removed,
 this reduces to the `07209122`/`e4d46ee7` pattern, but the lever is the same.)
 
-**Action:** revise `prompts/remote_agent/system_prompt.txt` so `workplace_filter= remote` cannot by itself promote a policy-silent body to `remote` — require a
+**Action:** revise `prompts/remote_agent/system_prompt.txt` so `workplace_filter=remote`
+cannot by itself promote a policy-silent body to `remote` — require a
 corroborating body signal, or down-rank the provenance note explicitly. Measure
 the before/after delta **against re-ratified gold** (§1) so the change isn't
 scored on dirty labels. This is the precision lever for **#16**.
@@ -244,8 +248,8 @@ accuracy is the headline (robust to the remaining `hybrid`/`onsite` class
 imbalance); `remote` recall is the guard on the costly "silently drop a good job"
 error; the full 3×3 confusion matrix is tracked alongside. Macro F1 is a **secondary
 watch** only — interpretable now that `unclear` is gone, but still weight-sensitive
-to the smaller `hybrid` class, so not the headline scalar. See
-`notes/remote_filter_eval_2/micro_vs_macro_note.md`.
+to the smaller `hybrid` class, so not the headline scalar. (Rationale in local-only
+working notes; `notes/` is gitignored.)
 
 ## 6. Multi-model comparison tooling
 
