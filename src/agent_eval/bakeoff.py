@@ -42,8 +42,8 @@ def sort_bakeoff_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         key=lambda r: (
             r.get("cost_per_correct") is None,
             r.get("cost_per_correct") if r.get("cost_per_correct") is not None else 0,
-            r.get("remote_recall", 0),
-            r.get("micro_acc", 0),
+            -(r.get("remote_recall") or 0),
+            -(r.get("micro_acc") or 0),
         ),
     )
 

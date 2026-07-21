@@ -14,9 +14,11 @@ def _categorical_run(
     micro_accuracy: float = 0.75,
     remote_recall: float = 0.8,
     macro_f1: float = 0.7,
+    skipped: int = 1,
     travel_mae: float | None = None,
     estimated_cost_usd: float | None = None,
     estimated_cost_per_correct_usd: float | None = None,
+    agent_failed: int = 0,
 ) -> dict:
     return {
         "run_id": run_id,
@@ -31,7 +33,8 @@ def _categorical_run(
         "metrics": {
             "labels": ["remote", "hybrid", "onsite", "unclear"],
             "evaluated": 10,
-            "skipped": 1,
+            "skipped": skipped,
+            "agent_failed": agent_failed,
             "total": 11,
             "confusion": [
                 [4, 1, 0, 0],
@@ -109,8 +112,18 @@ def test_flatten_remote_filter_categorical_extracts_headline_metrics() -> None:
     assert row["remote_fp"] == 1
     assert row["macro_f1"] == 0.7
     assert row["travel_mae"] is None
+    assert row["agent_failed"] == 0
+    assert row["skipped_failed"] == "1/0"
     assert row["est_cost"] is None
     assert row["cost_per_correct"] is None
+
+
+def test_bakeoff_comparable_guard_fails_fast_on_mixed_gold_hash() -> None:
+    runs = [_categorical_run("a"), _categorical_run("b")]
+    runs[1]["gold_hash"] = "different-gold"
+
+    with pytest.raises(ValueError, match="mixed gold_hash"):
+        bakeoff.ensure_bakeoff_comparable(runs)
 
 
 def test_bakeoff_comparable_guard_fails_fast_on_mixed_prompt_hash() -> None:
@@ -143,6 +156,10 @@ def test_bakeoff_render_rows_are_sorted_and_champion_marked() -> None:
 
     assert [row["run_id"] for row in rendered] == ["cheap", "expensive"]
     assert rendered[1]["champion"] == "*"
+    assert rendered[0]["remote_fn"] == "1"
+    assert rendered[0]["remote_fp"] == "1"
+    assert rendered[0]["skipped_failed"] == "1/0"
+    assert rendered[0]["est_cost"] == "$0.050000"
     assert rendered[0]["cost_per_correct"] == "$0.002000"
 
 
@@ -157,6 +174,8 @@ def test_bakeoff_renders_cost_table_sorted_by_cost_per_correct(
             model="gpt-5.6-luna",
             estimated_cost_usd=0.20,
             estimated_cost_per_correct_usd=0.01,
+            skipped=3,
+            agent_failed=2,
         ),
         _categorical_run(
             "cheap",
@@ -181,6 +200,7 @@ def test_bakeoff_renders_cost_table_sorted_by_cost_per_correct(
     assert "[remote_filter_bakeoff]" in out
     assert "$0.002000" in out
     assert "$0.010000" in out
+    assert "3/2" in out
     assert out.index("cheap") < out.index("expensive")
     assert "*" in out
 

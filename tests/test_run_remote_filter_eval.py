@@ -264,6 +264,75 @@ def test_build_cost_summary_reports_missing_openai_pricing_without_crashing():
     assert cost["pricing_note"] == "missing_openai_pricing_entry"
 
 
+def test_eval_main_persists_top_level_cost_tokens_and_timing(monkeypatch, tmp_path):
+    class CapturingRunLogger:
+        def __init__(self):
+            self.records = []
+
+        def log_run(self, record):
+            self.records.append(record)
+
+    gold_file = tmp_path / "gold.jsonl"
+    gold_file.write_text(
+        '{"title":"A","description":"desc","_human_classification":"remote"}\n'
+    )
+    config_file = tmp_path / "remote_agent.yml"
+    config_file.write_text(
+        "llm:\n  provider: openai\n  model: gpt-5.4-mini\n  temperature: 0.0\n"
+    )
+    logger = CapturingRunLogger()
+
+    def fake_run_eval(records, config, run_id, workers=1):
+        return (
+            [],
+            eval_core.EvalMetricsInput(
+                preds=["remote"],
+                golds=["remote"],
+                elapsed_seconds=[0.25, 0.50],
+                token_totals={
+                    "input_tokens": 1000,
+                    "cached_input_tokens": 0,
+                    "output_tokens": 200,
+                },
+            ),
+            [],
+        )
+
+    monkeypatch.setattr(eval_script, "run_eval", fake_run_eval)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+            "--runs-file",
+            str(tmp_path / "runs.jsonl"),
+            "--model",
+            "gpt-4o-mini",
+            "--run-id",
+            "record-test",
+            "--no-mismatches",
+        ],
+    )
+
+    eval_script.main(run_logger=logger)
+
+    record = logger.records[0]
+    assert record["run_id"].startswith("record-test_")
+    assert record["token_totals"] == {
+        "input_tokens": 1000,
+        "cached_input_tokens": 0,
+        "output_tokens": 200,
+    }
+    assert record["cost"]["estimated_cost_usd"] == pytest.approx(0.00027)
+    assert record["cost"]["estimated_cost_per_correct_usd"] == pytest.approx(0.00027)
+    assert record["cost"]["pricing_note"] == "openai_list_price_estimate"
+    assert record["metrics"]["latency_avg_s"] == pytest.approx(0.375)
+    assert record["metrics"]["latency_p95_s"] == 0.50
+
+
 def test_print_report_renders_empty_travel_rates_as_na(capsys):
     metrics = eval_core.assemble_metrics(
         eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
