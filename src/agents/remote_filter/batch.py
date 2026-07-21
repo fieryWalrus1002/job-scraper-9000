@@ -393,7 +393,10 @@ def run_remote_filter_batch(
                     }
                     classified_f.write(json.dumps(enriched) + "\n")
                     classified_count += 1
-                    log.info(
+                    # Per-job line is DEBUG: at INFO it's one line per posting
+                    # (~4k on a full run) that duplicates the persisted
+                    # classified.jsonl and the "Done (batch)" summary below.
+                    log.debug(
                         "CLASSIFIED %s @ %s (%s)%s",
                         title,
                         company,
