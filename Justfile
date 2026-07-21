@@ -18,11 +18,11 @@ ingest-run RUN_ID:
 # NOT write job_scores. To land scores, follow with `just upload-blob <run-id>`
 # (cloud → ACA ingest) or `just ingest-run <run-id>` (local DB). run_id is in
 # the run summary. Reads the Azure DB for planning/queue only.
-run-overnight:
+run-overnight *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
-        uv run job-scraper-9000 overnight --run-date "$(date +%F)"
+        uv run job-scraper-9000 overnight --run-date "$(date +%F)" {{ARGS}}
 
 # Local-only email pipeline: enrich ZR alert emails (via your Chrome profile) and
 # run them through the SAME stages as run-overnight, producing a per-user
@@ -204,6 +204,15 @@ pull-user-configs-az *ARGS:
     set -euo pipefail
     DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
         uv run scripts/pull_user_configs.py {{ARGS}}
+
+# Re-derive stored user policies to the Phase 32 3-way axis in the AZURE DB (#524).
+# Dry-run by default; pass --apply to persist.
+#   just migrate-policies-az            |   just migrate-policies-az --apply
+migrate-policies-az *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    DATABASE_URL="host=${AZURE_POSTGRES_SERVER} port=5432 dbname=${AZURE_POSTGRES_DB} user=${AZURE_POSTGRES_USER} password=${AZURE_POSTGRES_PASSWORD} sslmode=require" \
+        uv run scripts/migrate_policies_to_3way.py {{ARGS}}
 
 watch-az-ingest:
     watch -n 15 'az containerapp job execution list \
