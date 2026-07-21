@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
+from pydantic import ValidationError
 
 from utils.openai_pricing import PricingConfig, load_prices
 
@@ -36,6 +38,17 @@ def test_pricing_config_is_valid() -> None:
     # rate, missing field) rather than at first estimate_cost() call in a run.
     raw = yaml.safe_load((REPO_ROOT / "config/pricing/openai.yml").read_text())
     PricingConfig.model_validate(raw)
+
+
+def test_prices_are_immutable_and_copied() -> None:
+    # The table is lru_cached; a caller must not be able to corrupt it. Rates are
+    # frozen, and load_prices() hands back an independent dict each call.
+    prices = load_prices()
+    model = next(iter(prices))
+    with pytest.raises(ValidationError):
+        prices[model].input = 999.0  # frozen model
+    del prices[model]
+    assert model in load_prices()  # deletion didn't touch the cached table
 
 
 def test_every_configured_openai_model_is_priced() -> None:

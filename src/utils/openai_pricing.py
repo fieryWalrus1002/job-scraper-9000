@@ -26,7 +26,9 @@ BATCH_DISCOUNT = 0.5  # 50% off both sides when using OpenAI Batch API
 class ModelPrice(BaseModel):
     """Per-model list rates, USD per 1M tokens (standard, non-batch tier)."""
 
-    model_config = ConfigDict(extra="forbid")
+    # frozen: the table is process-cached (lru_cache); immutable rates keep a
+    # caller from accidentally mutating shared pricing mid-run.
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     input: float = Field(ge=0)
     cached_input: float = Field(ge=0)
@@ -51,8 +53,13 @@ def _load_pricing() -> PricingConfig:
 
 
 def load_prices() -> dict[str, ModelPrice]:
-    """All known model prices, keyed by model id (as used in config/agent/*.yml)."""
-    return _load_pricing().models
+    """All known model prices, keyed by model id (as used in config/agent/*.yml).
+
+    Returns a fresh dict each call so a caller mutating the mapping (e.g. deleting
+    a key) can't corrupt the process-cached table; the ModelPrice values are
+    frozen, so the shallow copy is fully safe.
+    """
+    return dict(_load_pricing().models)
 
 
 def estimate_cost(
