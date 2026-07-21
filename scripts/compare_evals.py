@@ -74,6 +74,39 @@ def _flatten_skills_fit(run: dict) -> dict:
     }
 
 
+def _flatten_remote_filter_categorical(run: dict) -> dict:
+    m = run.get("metrics", {})
+    cfg = run.get("config") or {}
+    run_id = run.get("run_id", "")
+
+    def require(mapping: object, key: str, path: str):
+        # Headline metrics are load-bearing for champion/challenger decisions —
+        # a missing field is schema drift, not a legitimate 0.0. Fail loud.
+        if not isinstance(mapping, dict) or key not in mapping:
+            raise ValueError(
+                f"categorical run {run_id!r} is missing required metric {path!r}"
+            )
+        return mapping[key]
+
+    per_class = m.get("per_class")
+    remote = require(
+        per_class if isinstance(per_class, dict) else {}, "remote", "per_class.remote"
+    )
+    return {
+        "run_id": run_id,
+        "timestamp": run.get("timestamp", ""),
+        "date": run.get("timestamp", "")[:10],
+        "model": cfg.get("model", ""),
+        "temperature": cfg.get("temperature", ""),
+        "total": require(m, "total", "total"),
+        "skipped": require(m, "skipped", "skipped"),
+        "micro_acc": require(m, "micro_accuracy", "micro_accuracy"),
+        "remote_recall": require(remote, "recall", "per_class.remote.recall"),
+        "macro_f1": require(m, "macro_f1", "macro_f1"),
+        "travel_mae": m.get("travel_mae"),  # intentional nullable
+    }
+
+
 SCORER_REGISTRY: dict[str, dict] = {
     "remote_filter": {
         "detect": lambda m: "accuracy" in m and "exact_match_acc" not in m,
@@ -94,6 +127,33 @@ SCORER_REGISTRY: dict[str, dict] = {
         "diff_metrics": ["accuracy", "precision", "recall", "f1", "total", "skipped"],
         "sort_choices": ["timestamp", "accuracy", "precision", "recall", "f1"],
         "flatten": _flatten_remote_filter,
+    },
+    "remote_filter_categorical": {
+        "detect": lambda m: "micro_accuracy" in m,
+        "table_cols": [
+            "run_id",
+            "date",
+            "model",
+            "temperature",
+            "total",
+            "skipped",
+            "micro_acc",
+            "remote_recall",
+            "macro_f1",
+            "travel_mae",
+        ],
+        "metric_cols": {"micro_acc", "remote_recall", "macro_f1", "travel_mae"},
+        "int_cols": {"total", "skipped"},
+        "diff_metrics": [
+            "micro_acc",
+            "remote_recall",
+            "macro_f1",
+            "travel_mae",
+            "total",
+            "skipped",
+        ],
+        "sort_choices": ["timestamp", "micro_acc", "remote_recall", "macro_f1"],
+        "flatten": _flatten_remote_filter_categorical,
     },
     "skills_fit": {
         "detect": lambda m: "exact_match_acc" in m,
@@ -154,10 +214,14 @@ def warn(message: str) -> None:
 
 
 def detect_eval_type(run: dict) -> str:
+    # Return the family only when exactly one detector matches. Zero matches or an
+    # ambiguous multi-match (e.g. a drifted record carrying both `accuracy` and
+    # `micro_accuracy`) resolves to "unknown" rather than silently letting registry
+    # order pick a winner.
     m = run.get("metrics", {})
-    for name, spec in SCORER_REGISTRY.items():
-        if spec["detect"](m):
-            return name
+    matches = [name for name, spec in SCORER_REGISTRY.items() if spec["detect"](m)]
+    if len(matches) == 1:
+        return matches[0]
     return "unknown"
 
 
@@ -197,6 +261,8 @@ def load_champions(path: str = CHAMPIONS_FILE) -> dict:
 
 def format_cell(col: str, val, spec: dict) -> str:
     if col in spec["metric_cols"]:
+        if val is None:
+            return "—"
         return f"{val:.4f}"
     if col in spec["int_cols"]:
         return str(val)
