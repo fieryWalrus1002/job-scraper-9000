@@ -240,6 +240,18 @@ def _log_record_result(result: RecordEvalResult) -> None:
         job.get("company", "?")[:20],
         result.elapsed,
     )
+    # Per-call cost signal: reasoning models inflate completion tokens, and grammar-
+    # constrained decoding is slower per token — surfacing both makes a slow local
+    # run diagnosable instead of just "the eval is taking forever".
+    tokens = result.token_totals
+    log.debug(
+        "[%3d] latency=%.2fs prompt_tokens=%d completion_tokens=%d cached_tokens=%d",
+        result.index,
+        result.elapsed,
+        tokens.get("input_tokens", 0),
+        tokens.get("output_tokens", 0),
+        tokens.get("cached_input_tokens", 0),
+    )
 
 
 def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsInput:
