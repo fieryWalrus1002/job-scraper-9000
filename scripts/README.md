@@ -116,7 +116,7 @@ uv run scripts/run_remote_filter_eval.py
 
 The default provider is `openai` (model: `gpt-5.4-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
-The remote-filter eval reports the native 3-way classification metric (`remote`, `hybrid`, `onsite`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, travel-days MAE, observed token totals, and estimated OpenAI list-price cost (`$/record`, `$/correct`). Local/Ollama-compatible runs are reported as zero API cost.
+The remote-filter eval reports the native 3-way classification metric (`remote`, `hybrid`, `onsite`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, travel-days MAE, latency summary, and estimated OpenAI list-price cost (`$/record`, `$/correct`). Local/Ollama-compatible runs are reported as zero API cost. Observed token totals are persisted in the run record (`data/eval/runs.jsonl`) and feed the cost estimate; they are not printed to the console report.
 
 **Examples:**
 

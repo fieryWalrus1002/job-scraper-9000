@@ -1,3 +1,4 @@
+import argparse
 import json
 
 import pytest
@@ -19,6 +20,8 @@ def _categorical_run(
     estimated_cost_usd: float | None = None,
     estimated_cost_per_correct_usd: float | None = None,
     agent_failed: int = 0,
+    resolved_aggregate: str = "rumh-agg-123",
+    resolved_count: int = 11,
 ) -> dict:
     return {
         "run_id": run_id,
@@ -26,6 +29,10 @@ def _categorical_run(
         "config": {"model": model, "temperature": 0.0},
         "gold_hash": "gold-123",
         "prompt_hash": "prompt-123",
+        "resolved_user_message_hashes": {
+            "aggregate": resolved_aggregate,
+            "count": resolved_count,
+        },
         "cost": {
             "estimated_cost_usd": estimated_cost_usd,
             "estimated_cost_per_correct_usd": estimated_cost_per_correct_usd,
@@ -132,6 +139,38 @@ def test_bakeoff_comparable_guard_fails_fast_on_mixed_prompt_hash() -> None:
 
     with pytest.raises(ValueError, match="mixed prompt_hash"):
         bakeoff.ensure_bakeoff_comparable(runs)
+
+
+def test_bakeoff_comparable_guard_fails_fast_on_mixed_resolved_user_messages() -> None:
+    # Same gold + prompt, but the runs scored different resolved user messages
+    # (e.g. different search context / USER_TIMEZONE) — not comparable.
+    runs = [_categorical_run("a"), _categorical_run("b", resolved_aggregate="other")]
+
+    with pytest.raises(ValueError, match="resolved_user_message_hashes aggregate"):
+        bakeoff.ensure_bakeoff_comparable(runs)
+
+
+def test_bakeoff_comparable_guard_fails_fast_on_legacy_run_without_hashes() -> None:
+    runs = [_categorical_run("a"), _categorical_run("legacy")]
+    del runs[1]["resolved_user_message_hashes"]
+
+    with pytest.raises(ValueError, match="requires resolved_user_message_hashes"):
+        bakeoff.ensure_bakeoff_comparable(runs)
+
+
+def test_against_champion_resolves_categorical_alias_to_remote_filter_key(
+    monkeypatch,
+) -> None:
+    # config/eval/champions.yml stores the key as `remote_filter`; the CLI choice
+    # `remote_filter_categorical` must alias to it for pairwise diff too.
+    monkeypatch.setattr(
+        compare_evals, "load_champions", lambda: {"remote_filter": "champ-run"}
+    )
+    args = argparse.Namespace(
+        diff=["challenger-run"], against_champion="remote_filter_categorical"
+    )
+
+    assert compare_evals.resolve_diff_ids(args) == ("champ-run", "challenger-run")
 
 
 def test_bakeoff_render_rows_are_sorted_and_champion_marked() -> None:

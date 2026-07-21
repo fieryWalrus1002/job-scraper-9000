@@ -9,6 +9,7 @@ Usage:
     uv run scripts/compare_evals.py --diff <run_id_a> <run_id_b>
     uv run scripts/compare_evals.py --against-champion skills_fit --diff <run_id_b>
     uv run scripts/compare_evals.py --against-champion skills_fit --diff <run_id_b> --per-record
+    uv run scripts/compare_evals.py --bakeoff --last 7
     uv run scripts/compare_evals.py --runs-file path/to/runs.jsonl
 """
 
@@ -180,8 +181,9 @@ def resolve_diff_ids(args: argparse.Namespace) -> tuple[str, str]:
         die("Internal error: resolve_diff_ids called without --diff")
 
     if args.against_champion:
-        champions = load_champions()
-        champion_run_id = champions.get(args.against_champion)
+        # Route through the alias helper so `remote_filter_categorical` resolves
+        # to the `remote_filter` champion key, matching --bakeoff's behavior.
+        champion_run_id = _champion_run_id_for_eval_type(args.against_champion)
         if not champion_run_id:
             die(
                 f"No champion configured for {args.against_champion!r} in {CHAMPIONS_FILE}"

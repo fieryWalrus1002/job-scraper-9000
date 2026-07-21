@@ -20,7 +20,13 @@ BAKEOFF_COLUMNS = [
 
 
 def ensure_bakeoff_comparable(runs: list[dict[str, Any]]) -> None:
-    """Fail if selected bake-off runs do not share required provenance hashes."""
+    """Fail if selected bake-off runs do not share required provenance hashes.
+
+    Beyond gold + system prompt, runs must share the *resolved user messages* the
+    LLM actually saw: search context and ``USER_TIMEZONE`` are folded into each
+    user message, so two runs can share ``gold_hash``/``prompt_hash`` yet have
+    scored different inputs. Comparing them on quality × cost would be misleading.
+    """
     for field in ("gold_hash", "prompt_hash"):
         missing = [run.get("run_id", "") for run in runs if not run.get(field)]
         if missing:
@@ -32,6 +38,28 @@ def ensure_bakeoff_comparable(runs: list[dict[str, Any]]) -> None:
         if len(values) > 1:
             raise ValueError(
                 f"--bakeoff selected runs with mixed {field}; not comparable"
+            )
+
+    # resolved_user_message_hashes is a nested provenance block: {aggregate, count}.
+    # Legacy runs predating it lack the block — fail with a clear message rather
+    # than silently comparing across differing inputs.
+    legacy = [
+        run.get("run_id", "")
+        for run in runs
+        if not isinstance(run.get("resolved_user_message_hashes"), dict)
+    ]
+    if legacy:
+        raise ValueError(
+            "--bakeoff requires resolved_user_message_hashes on every selected "
+            f"run; missing for: {', '.join(legacy)} (legacy runs predate this "
+            "provenance — re-run them to include in a bake-off)"
+        )
+    for key in ("aggregate", "count"):
+        values = {run["resolved_user_message_hashes"].get(key) for run in runs}
+        if len(values) > 1:
+            raise ValueError(
+                f"--bakeoff selected runs with mixed resolved_user_message_hashes "
+                f"{key}; they scored different inputs and are not comparable"
             )
 
 

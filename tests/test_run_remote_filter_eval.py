@@ -217,7 +217,8 @@ def test_build_cost_summary_reports_cost_per_correct_for_openai():
     )["metrics"]
 
     cost = build_cost_summary(
-        {"llm": {"provider": "openai", "model": "gpt-4o-mini"}},
+        "openai",
+        "gpt-4o-mini",
         metrics,
         {"input_tokens": 1000, "cached_input_tokens": 0, "output_tokens": 200},
     )
@@ -235,7 +236,8 @@ def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
     )["metrics"]
 
     cost = build_cost_summary(
-        {"llm": {"provider": "ollama", "model": "qwen-27b-mtp"}},
+        "ollama",
+        "qwen-27b-mtp",
         metrics,
         {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
     )
@@ -252,7 +254,8 @@ def test_build_cost_summary_reports_missing_openai_pricing_without_crashing():
     )["metrics"]
 
     cost = build_cost_summary(
-        {"llm": {"provider": "openai", "model": "gpt-imaginary"}},
+        "openai",
+        "gpt-imaginary",
         metrics,
         {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
     )
@@ -331,6 +334,50 @@ def test_eval_main_persists_top_level_cost_tokens_and_timing(monkeypatch, tmp_pa
     assert record["cost"]["pricing_note"] == "openai_list_price_estimate"
     assert record["metrics"]["latency_avg_s"] == pytest.approx(0.375)
     assert record["metrics"]["latency_p95_s"] == 0.50
+
+
+def test_cost_summary_prices_openai_despite_provider_case():
+    # Resolver normalizes provider case; costing must too, or a real OpenAI run
+    # with provider "OpenAI" would be mislabeled local zero-cost.
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "OpenAI",
+        "gpt-4o-mini",
+        metrics,
+        {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
+    )
+
+    assert cost["pricing_note"] == "openai_list_price_estimate"
+    assert cost["estimated_cost_usd"] is not None
+
+
+def test_provider_override_without_model_fails_fast(monkeypatch, tmp_path):
+    gold_file = tmp_path / "gold.jsonl"
+    gold_file.write_text(
+        '{"title":"A","description":"desc","_human_classification":"remote"}\n'
+    )
+    config_file = tmp_path / "remote_agent.yml"
+    config_file.write_text("llm:\n  provider: openai\n  model: gpt-5.4-mini\n")
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+            "--provider",
+            "ollama",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        eval_script.main()
+    assert exc.value.code == 1
 
 
 def test_print_report_renders_empty_travel_rates_as_na(capsys):

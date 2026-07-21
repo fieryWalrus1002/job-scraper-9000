@@ -62,6 +62,9 @@ Each eval run records:
 - Python/platform/uv/lockfile metadata
 - categorical confusion matrix, per-class precision/recall/F1, macro/micro metrics, and travel MAE (remote-filter)
 - ordinal metrics (exact / off-by-one / MAE / bias / Spearman) + top-k metrics + 5x5 confusion (skills-fit)
+- latency summary (`latency_n`, `latency_avg_s`, `latency_p95_s`)
+- observed `token_totals` (input / cached / output) and a `cost` block (estimated list-price cost, `$/record`, `$/correct`, pricing note)
+- `resolved_user_message_hashes` — aggregate + per-record hashes of the user messages the LLM actually saw (search context + timezone), used to guard bake-off comparability (remote-filter)
 - scorer choice (`llm` vs `keyword`) and profile metadata (`profile_hash`, `profile_version`) for skills-fit runs
 - mismatch artifact path
 

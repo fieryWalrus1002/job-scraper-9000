@@ -45,12 +45,19 @@ def correct_count(metrics: dict[str, Any]) -> int:
 
 
 def build_cost_summary(
-    config: dict[str, Any], metrics: dict[str, Any], token_totals: dict[str, int]
+    provider: str | None,
+    model: str | None,
+    metrics: dict[str, Any],
+    token_totals: dict[str, int],
 ) -> dict[str, Any]:
-    """Build an eval cost block from observed token usage and list pricing."""
-    llm_config = config.get("llm") or {}
-    provider = llm_config.get("provider")
-    model = llm_config.get("model")
+    """Build an eval cost block from observed token usage and list pricing.
+
+    ``provider``/``model`` must be the *resolved* values the run actually used
+    (case-normalized here defensively), not raw config — otherwise a run that
+    resolved provider/model from env or a default could be priced against the
+    wrong string, or a real OpenAI run mislabeled as local zero-cost.
+    """
+    provider = (provider or "").lower()
     evaluated = int(metrics.get("evaluated") or 0)
     correct = correct_count(metrics)
     canonical_token_totals = aggregate_token_totals([token_totals])

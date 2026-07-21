@@ -8,7 +8,7 @@ Usage:
     uv run scripts/run_remote_filter_eval.py
     uv run scripts/run_remote_filter_eval.py --gold data/eval/ground_truth.jsonl
     uv run scripts/run_remote_filter_eval.py --model gpt-4o --temperature 0.0
-    uv run scripts/run_remote_filter_eval.py --provider ollama --model qwen2.5:14b
+    uv run scripts/run_remote_filter_eval.py --provider ollama --model qwen-27b-mtp
     uv run scripts/run_remote_filter_eval.py --run-id my_experiment_label
     uv run scripts/run_remote_filter_eval.py --no-mismatches
 """
@@ -33,7 +33,10 @@ from agents.remote_filter.eval import (
     assemble_metrics,
     run_eval,
 )
-from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH
+from agents.remote_filter.utils import (
+    REMOTE_FILTER_PROMPT_PATH,
+    resolve_provider_and_model,
+)
 from agent_eval.costing import build_cost_summary
 from agent_eval.provenance import build_run_record, generate_run_id
 from utils.run_logger import JsonlRunLogger, RunLogger
@@ -212,7 +215,23 @@ def main(run_logger: RunLogger | None = None) -> None:
     if args.temperature is not None:
         config.setdefault("llm", {})["temperature"] = args.temperature
     if args.provider:
-        config.setdefault("llm", {})["provider"] = args.provider
+        llm = config.setdefault("llm", {})
+        # Fail fast: overriding provider alone leaves the config's model (authored
+        # for the original provider) pointed at the new endpoint — e.g.
+        # `--provider ollama` sending `gpt-5.4-mini` to llama.cpp and recording a
+        # bogus zero-cost run. Require an explicit --model on a provider switch.
+        if not args.model and args.provider != llm.get("provider"):
+            log.error(
+                "--provider overrides provider to %r but model is still %r from "
+                "config %s. Pass --model <%s-model> (e.g. qwen-27b-mtp) so the run "
+                "uses a model that exists on that provider.",
+                args.provider,
+                llm.get("model"),
+                args.config,
+                args.provider,
+            )
+            sys.exit(1)
+        llm["provider"] = args.provider
 
     run_id = generate_run_id(args.run_id)
 
@@ -227,7 +246,13 @@ def main(run_logger: RunLogger | None = None) -> None:
     )
 
     metrics = assemble_metrics(metrics_input)
-    cost = build_cost_summary(config, metrics["metrics"], metrics_input.token_totals)
+    # Price against the *resolved* provider/model (same resolver inference uses),
+    # not raw config — so an env/default-resolved OpenAI run can't be mislabeled
+    # local zero-cost.
+    provider, model = resolve_provider_and_model(config.get("llm"))
+    cost = build_cost_summary(
+        provider, model, metrics["metrics"], metrics_input.token_totals
+    )
     print_report(metrics, mismatches, run_id, cost)
 
     # SC-4: write mismatch file named mismatches_{run_id}.jsonl
