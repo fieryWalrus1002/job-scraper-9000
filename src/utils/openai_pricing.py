@@ -1,29 +1,65 @@
 """OpenAI per-model list pricing in USD per 1M tokens.
 
-Used to estimate cost from observed token counts at the time of a run.
-Update as OpenAI pricing changes. Authoritative source:
-https://openai.com/api/pricing/
+Used to estimate cost from observed token counts at the time of a run. Pricing is
+non-secret reference data that changes on OpenAI's cadence, not ours, so it lives
+in ``config/pricing/openai.yml`` (per CLAUDE.md: non-secret config in YAML) rather
+than hardcoded here. Update the YAML when pricing changes; authoritative source:
+https://developers.openai.com/api/docs/pricing
 
-Note: Batch API gets 50% off both input and output. Pricing here is the
-standard non-batch rate; callers pass ``batch=True`` to apply the discount.
+Note: Batch API gets 50% off both input and output. The YAML holds the standard
+non-batch rate; callers pass ``batch=True`` to apply the discount.
 """
 
 from __future__ import annotations
 
-# (input_per_1m, cached_input_per_1m, output_per_1m)
-PRICING_USD_PER_1M: dict[str, tuple[float, float, float]] = {
-    # gpt-4o family
-    "gpt-4o": (2.50, 1.25, 10.00),
-    "gpt-4o-mini": (0.15, 0.075, 0.60),
-    "gpt-4o-2024-08-06": (2.50, 1.25, 10.00),
-    # gpt-5.4 family — primary scoring model (config/agent/skills_fit.yml,
-    # remote_agent.yml). Standard tier; batch rates are exactly 50% so the
-    # BATCH_DISCOUNT path stays correct without a batch-specific entry.
-    "gpt-5.4-mini": (0.75, 0.075, 4.50),
-}
+from functools import lru_cache
+from pathlib import Path
 
+import yaml
+from pydantic import BaseModel, ConfigDict, Field
+
+_PRICING_PATH = Path(__file__).parents[2] / "config" / "pricing" / "openai.yml"
 
 BATCH_DISCOUNT = 0.5  # 50% off both sides when using OpenAI Batch API
+
+
+class ModelPrice(BaseModel):
+    """Per-model list rates, USD per 1M tokens (standard, non-batch tier)."""
+
+    # frozen: the table is process-cached (lru_cache); immutable rates keep a
+    # caller from accidentally mutating shared pricing mid-run.
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input: float = Field(ge=0)
+    cached_input: float = Field(ge=0)
+    output: float = Field(ge=0)
+
+
+class PricingConfig(BaseModel):
+    """Validated shape of config/pricing/openai.yml."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    fetched_at: str
+    models: dict[str, ModelPrice]
+
+
+@lru_cache(maxsize=1)
+def _load_pricing() -> PricingConfig:
+    """Load + validate the pricing table once. Fail fast on malformed config."""
+    raw = yaml.safe_load(_PRICING_PATH.read_text())
+    return PricingConfig.model_validate(raw)
+
+
+def load_prices() -> dict[str, ModelPrice]:
+    """All known model prices, keyed by model id (as used in config/agent/*.yml).
+
+    Returns a fresh dict each call so a caller mutating the mapping (e.g. deleting
+    a key) can't corrupt the process-cached table; the ModelPrice values are
+    frozen, so the shallow copy is fully safe.
+    """
+    return dict(_load_pricing().models)
 
 
 def estimate_cost(
@@ -38,11 +74,15 @@ def estimate_cost(
 
     Returns a dict with keys ``input_uncached``, ``input_cached``, ``output``,
     and ``total``. Returns ``None`` if the model is not in the pricing table —
-    callers should treat that as "estimated cost unknown" rather than $0.
+    callers should treat that as "estimated cost unknown" rather than $0. (The
+    pricing guard test keeps configured OpenAI models from reaching this path
+    unpriced; runtime stays fail-safe so a pricing gap never crashes a run.)
     """
-    if model not in PRICING_USD_PER_1M:
+    prices = load_prices()
+    if model not in prices:
         return None
-    in_rate, in_cached_rate, out_rate = PRICING_USD_PER_1M[model]
+    price = prices[model]
+    in_rate, in_cached_rate, out_rate = price.input, price.cached_input, price.output
     if batch:
         in_rate *= BATCH_DISCOUNT
         in_cached_rate *= BATCH_DISCOUNT

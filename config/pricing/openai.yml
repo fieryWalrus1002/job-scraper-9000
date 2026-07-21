@@ -1,0 +1,45 @@
+# OpenAI model pricing — USD per 1M tokens (standard, non-batch tier).
+#
+# Single source of truth for cost ESTIMATES. `estimate_cost()` in
+# src/utils/openai_pricing.py looks up a model here by the same `model:` string
+# used in config/agent/*.yml and config/ci/*.yml — so a model swap and its price
+# live in the same config layer (the drift that caused #475).
+#
+# This is an ESTIMATE (observed tokens x list price), not a billed figure — the
+# OpenAI dashboard is the source of truth for actual spend. Batch API is a flat
+# 50% off both sides, applied in code via `batch=True` (BATCH_DISCOUNT); do NOT
+# add batch-discounted entries here.
+#
+# Only OpenAI-provider models belong here. Local/ollama models (e.g. qwen) have
+# no list price and are intentionally absent; the pricing guard test skips any
+# agent whose provider is not `openai`.
+#
+# TO UPDATE (prices change on OpenAI's cadence, not ours):
+#   1. Check https://developers.openai.com/api/docs/pricing
+#   2. Edit the rates below and bump `fetched_at`.
+#   3. CI guard (tests/utils/test_pricing_config.py) fails red if any configured
+#      OpenAI model is missing an entry — a model swap without a price won't ship.
+
+source: https://developers.openai.com/api/docs/pricing
+fetched_at: "2026-07-21"
+
+# rates: input / cached_input / output, USD per 1M tokens
+models:
+  # gpt-4o family
+  gpt-4o:
+    input: 2.50
+    cached_input: 1.25
+    output: 10.00
+  gpt-4o-mini:
+    input: 0.15
+    cached_input: 0.075
+    output: 0.60
+  gpt-4o-2024-08-06:
+    input: 2.50
+    cached_input: 1.25
+    output: 10.00
+  # gpt-5.4 family — primary scoring model (skills_fit, remote_agent, ai_review)
+  gpt-5.4-mini:
+    input: 0.75
+    cached_input: 0.075
+    output: 4.50
