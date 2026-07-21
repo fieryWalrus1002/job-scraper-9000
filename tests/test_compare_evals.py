@@ -14,11 +14,17 @@ def _categorical_run(
     remote_recall: float = 0.8,
     macro_f1: float = 0.7,
     travel_mae: float | None = None,
+    estimated_cost_usd: float | None = None,
+    estimated_cost_per_correct_usd: float | None = None,
 ) -> dict:
     return {
         "run_id": run_id,
         "timestamp": timestamp,
         "config": {"model": model, "temperature": 0.0},
+        "cost": {
+            "estimated_cost_usd": estimated_cost_usd,
+            "estimated_cost_per_correct_usd": estimated_cost_per_correct_usd,
+        },
         "metrics": {
             "labels": ["remote", "hybrid", "onsite", "unclear"],
             "evaluated": 10,
@@ -93,6 +99,47 @@ def test_flatten_remote_filter_categorical_extracts_headline_metrics() -> None:
     assert row["remote_recall"] == 0.8
     assert row["macro_f1"] == 0.7
     assert row["travel_mae"] is None
+    assert row["est_cost"] is None
+    assert row["cost_per_correct"] is None
+
+
+def test_bakeoff_renders_cost_table_sorted_by_cost_per_correct(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    runs_file = tmp_path / "runs.jsonl"
+    runs = [
+        _categorical_run(
+            "expensive",
+            timestamp="2025-01-02T03:04:05Z",
+            model="gpt-5.6-luna",
+            estimated_cost_usd=0.20,
+            estimated_cost_per_correct_usd=0.01,
+        ),
+        _categorical_run(
+            "cheap",
+            timestamp="2025-01-03T03:04:05Z",
+            model="gpt-5.4-nano",
+            estimated_cost_usd=0.05,
+            estimated_cost_per_correct_usd=0.002,
+        ),
+    ]
+    runs_file.write_text("\n".join(json.dumps(run) for run in runs) + "\n")
+    monkeypatch.setattr(
+        compare_evals, "load_champions", lambda: {"remote_filter": "expensive"}
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["compare_evals.py", "--runs-file", str(runs_file), "--bakeoff", "--last", "2"],
+    )
+
+    compare_evals.main()
+
+    out = capsys.readouterr().out
+    assert "[remote_filter_bakeoff]" in out
+    assert "$0.002000" in out
+    assert "$0.010000" in out
+    assert out.index("cheap") < out.index("expensive")
+    assert "*" in out
 
 
 def test_categorical_last_and_diff_render_against_runs_fixture(

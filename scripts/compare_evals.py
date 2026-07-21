@@ -77,6 +77,7 @@ def _flatten_skills_fit(run: dict) -> dict:
 def _flatten_remote_filter_categorical(run: dict) -> dict:
     m = run.get("metrics", {})
     cfg = run.get("config") or {}
+    cost = run.get("cost") or {}
     run_id = run.get("run_id", "")
 
     def require(mapping: object, key: str, path: str):
@@ -88,10 +89,34 @@ def _flatten_remote_filter_categorical(run: dict) -> dict:
             )
         return mapping[key]
 
+    def remote_error_counts() -> tuple[int, int]:
+        labels = require(m, "labels", "labels")
+        confusion = require(m, "confusion", "confusion")
+        if not isinstance(labels, list) or "remote" not in labels:
+            raise ValueError(f"categorical run {run_id!r} has invalid labels")
+        if not isinstance(confusion, list):
+            raise ValueError(f"categorical run {run_id!r} has invalid confusion")
+        remote_idx = labels.index("remote")
+        remote_fn = sum(
+            int(row[remote_idx])
+            for i, row in enumerate(confusion)
+            if i != remote_idx and isinstance(row, list) and remote_idx < len(row)
+        )
+        remote_row = confusion[remote_idx]
+        if not isinstance(remote_row, list):
+            raise ValueError(f"categorical run {run_id!r} has invalid remote row")
+        remote_fp = sum(
+            int(count) for i, count in enumerate(remote_row) if i != remote_idx
+        )
+        return remote_fn, remote_fp
+
     per_class = m.get("per_class")
     remote = require(
         per_class if isinstance(per_class, dict) else {}, "remote", "per_class.remote"
     )
+    remote_fn, remote_fp = remote_error_counts()
+    skipped = require(m, "skipped", "skipped")
+    agent_failed = int(m.get("agent_failed", 0) or 0)
     return {
         "run_id": run_id,
         "timestamp": run.get("timestamp", ""),
@@ -99,11 +124,17 @@ def _flatten_remote_filter_categorical(run: dict) -> dict:
         "model": cfg.get("model", ""),
         "temperature": cfg.get("temperature", ""),
         "total": require(m, "total", "total"),
-        "skipped": require(m, "skipped", "skipped"),
+        "skipped": skipped,
         "micro_acc": require(m, "micro_accuracy", "micro_accuracy"),
         "remote_recall": require(remote, "recall", "per_class.remote.recall"),
+        "remote_fn": remote_fn,
+        "remote_fp": remote_fp,
         "macro_f1": require(m, "macro_f1", "macro_f1"),
         "travel_mae": m.get("travel_mae"),  # intentional nullable
+        "agent_failed": agent_failed,
+        "skipped_failed": f"{skipped}/{agent_failed}",
+        "est_cost": cost.get("estimated_cost_usd"),
+        "cost_per_correct": cost.get("estimated_cost_per_correct_usd"),
     }
 
 
@@ -139,18 +170,30 @@ SCORER_REGISTRY: dict[str, dict] = {
             "skipped",
             "micro_acc",
             "remote_recall",
+            "remote_fn",
+            "remote_fp",
             "macro_f1",
             "travel_mae",
         ],
-        "metric_cols": {"micro_acc", "remote_recall", "macro_f1", "travel_mae"},
-        "int_cols": {"total", "skipped"},
-        "diff_metrics": [
+        "metric_cols": {
             "micro_acc",
             "remote_recall",
             "macro_f1",
             "travel_mae",
+            "est_cost",
+            "cost_per_correct",
+        },
+        "int_cols": {"total", "skipped", "remote_fn", "remote_fp", "agent_failed"},
+        "diff_metrics": [
+            "micro_acc",
+            "remote_recall",
+            "remote_fn",
+            "remote_fp",
+            "macro_f1",
+            "travel_mae",
             "total",
             "skipped",
+            "agent_failed",
         ],
         "sort_choices": ["timestamp", "micro_acc", "remote_recall", "macro_f1"],
         "flatten": _flatten_remote_filter_categorical,
@@ -289,6 +332,93 @@ def print_table(rows: list[dict], spec: dict, label: str) -> None:
     print(divider)
     for c in cells:
         print(sep.join(c[col].ljust(col_widths[col]) for col in cols))
+
+
+def _format_money(value) -> str:
+    if value is None:
+        return "—"
+    return f"${value:.6f}"
+
+
+def _champion_run_id_for_eval_type(eval_type: str) -> str | None:
+    champion_key = (
+        "remote_filter" if eval_type == "remote_filter_categorical" else eval_type
+    )
+    champions = load_champions()
+    return champions.get(champion_key)
+
+
+def ensure_bakeoff_comparable(runs: list[dict]) -> None:
+    for field in ("gold_hash", "prompt_hash"):
+        missing = [run.get("run_id", "") for run in runs if not run.get(field)]
+        if missing:
+            die(
+                f"--bakeoff requires {field} on every selected run; "
+                f"missing for: {', '.join(missing)}"
+            )
+        values = {run[field] for run in runs}
+        if len(values) > 1:
+            die(f"--bakeoff selected runs with mixed {field}; not comparable")
+
+
+def print_bakeoff(rows: list[dict], champion_run_id: str | None) -> None:
+    if not rows:
+        print("No remote_filter categorical runs found for bake-off.")
+        return
+
+    rows = sorted(
+        rows,
+        key=lambda r: (
+            r.get("cost_per_correct") is None,
+            r.get("cost_per_correct") if r.get("cost_per_correct") is not None else 0,
+            r.get("remote_recall", 0),
+            r.get("micro_acc", 0),
+        ),
+    )
+    cols = [
+        "champion",
+        "run_id",
+        "model",
+        "micro_acc",
+        "remote_recall",
+        "remote_fn",
+        "remote_fp",
+        "macro_f1",
+        "skipped_failed",
+        "est_cost",
+        "cost_per_correct",
+    ]
+    rendered_rows = []
+    spec = SCORER_REGISTRY["remote_filter_categorical"]
+    for row in rows:
+        rendered_rows.append(
+            {
+                "champion": "*" if row.get("run_id") == champion_run_id else "",
+                "run_id": row.get("run_id", ""),
+                "model": row.get("model", ""),
+                "micro_acc": format_cell("micro_acc", row.get("micro_acc"), spec),
+                "remote_recall": format_cell(
+                    "remote_recall", row.get("remote_recall"), spec
+                ),
+                "remote_fn": format_cell("remote_fn", row.get("remote_fn"), spec),
+                "remote_fp": format_cell("remote_fp", row.get("remote_fp"), spec),
+                "macro_f1": format_cell("macro_f1", row.get("macro_f1"), spec),
+                "skipped_failed": row.get("skipped_failed", ""),
+                "est_cost": _format_money(row.get("est_cost")),
+                "cost_per_correct": _format_money(row.get("cost_per_correct")),
+            }
+        )
+
+    col_widths = {
+        col: max(len(col), *(len(str(row[col])) for row in rendered_rows))
+        for col in cols
+    }
+    sep = "  "
+    print("\n[remote_filter_bakeoff]")
+    print(sep.join(col.ljust(col_widths[col]) for col in cols))
+    print(sep.join("-" * col_widths[col] for col in cols))
+    for row in rendered_rows:
+        print(sep.join(str(row[col]).ljust(col_widths[col]) for col in cols))
 
 
 def print_diff(a: dict, b: dict, spec: dict) -> None:
@@ -533,6 +663,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--bakeoff",
+        action="store_true",
+        help=(
+            "Print an N-way remote_filter categorical quality x cost table. "
+            "Combine with --last N to select candidate runs."
+        ),
+    )
+    p.add_argument(
         "--against-champion",
         choices=list(SCORER_REGISTRY),
         help=f"Resolve the left-hand diff run from {CHAMPIONS_FILE}",
@@ -544,6 +682,8 @@ def parse_args() -> argparse.Namespace:
     )
     args = p.parse_args()
 
+    if args.bakeoff and args.diff:
+        p.error("--bakeoff cannot be combined with --diff")
     if args.per_record and not args.diff:
         p.error("--per-record requires --diff")
     if args.against_champion and not args.diff:
@@ -562,7 +702,7 @@ def main() -> None:
     raw_runs = load_runs(args.runs_file)
 
     # Tag every run with its eval type and flatten it.
-    tagged: list[tuple[str, dict]] = []
+    tagged: list[tuple[str, dict, dict]] = []
     by_id: dict[str, tuple[str, dict, dict]] = {}
     for run in raw_runs:
         etype = detect_eval_type(run)
@@ -570,7 +710,7 @@ def main() -> None:
             continue
         spec = SCORER_REGISTRY[etype]
         flat = spec["flatten"](run)
-        tagged.append((etype, flat))
+        tagged.append((etype, run, flat))
         by_id[flat["run_id"]] = (etype, run, flat)
 
     if args.diff:
@@ -590,9 +730,27 @@ def main() -> None:
             print_skills_fit_per_record_diff(rows)
         return
 
+    if args.bakeoff:
+        if args.eval_type and args.eval_type != "remote_filter_categorical":
+            die("--bakeoff is only supported for remote_filter_categorical runs")
+        candidate_runs = [
+            (raw, row)
+            for etype, raw, row in tagged
+            if etype == "remote_filter_categorical"
+        ]
+        candidate_runs.sort(key=lambda pair: pair[1].get("timestamp", ""))
+        if args.last:
+            candidate_runs = candidate_runs[-args.last :]
+        ensure_bakeoff_comparable([raw for raw, _row in candidate_runs])
+        print_bakeoff(
+            [row for _raw, row in candidate_runs],
+            _champion_run_id_for_eval_type("remote_filter_categorical"),
+        )
+        return
+
     # Group by type, optionally filter.
     groups: dict[str, list[dict]] = {}
-    for etype, row in tagged:
+    for etype, _raw, row in tagged:
         if args.eval_type and etype != args.eval_type:
             continue
         groups.setdefault(etype, []).append(row)

@@ -40,6 +40,7 @@ from agents.remote_filter.utils import (
 )
 from agent_eval.metrics import compute_categorical_metrics
 from agent_eval.provenance import build_run_record, generate_run_id
+from utils.openai_pricing import estimate_cost
 from utils.run_logger import JsonlRunLogger, RunLogger
 
 load_dotenv()
@@ -85,6 +86,7 @@ class RecordEvalResult:
     reason: str | None
     elapsed: float
     resolved_user_message_hash: str | None = None
+    token_totals: dict[str, int] = field(default_factory=dict)
     skipped: bool = False
     skip_reason: str | None = None
     mismatch: MismatchRecord | None = None
@@ -96,9 +98,12 @@ class EvalMetricsInput:
     golds: list[str] = field(default_factory=list)
     pred_travel_days: list[int] = field(default_factory=list)
     gold_travel_days: list[int] = field(default_factory=list)
+    elapsed_seconds: list[float] = field(default_factory=list)
     gold_travel_present: int = 0
     pred_travel_present: int = 0
     skipped: int = 0
+    skip_reasons: dict[str, int] = field(default_factory=dict)
+    token_totals: dict[str, int] = field(default_factory=dict)
 
 
 def parse_args() -> argparse.Namespace:
@@ -141,6 +146,15 @@ def parse_args() -> argparse.Namespace:
     if args.workers < 1:
         p.error("--workers must be >= 1")
     return args
+
+
+def _empty_token_totals() -> dict[str, int]:
+    return {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
+
+
+def _add_token_totals(target: dict[str, int], usage: dict[str, int]) -> None:
+    for key in _empty_token_totals():
+        target[key] = target.get(key, 0) + int(usage.get(key, 0) or 0)
 
 
 def load_gold(path: str) -> list[dict[str, Any]]:
@@ -221,10 +235,16 @@ def _evaluate_record(
     rf_input = build_search_context(job, USER_TIMEZONE)
     resolved_user_message_hash = _resolved_user_message_hash(rf_input)
 
+    token_totals = _empty_token_totals()
+
+    def usage_callback(usage: dict[str, int]) -> None:
+        _add_token_totals(token_totals, usage)
+
     t0 = time.monotonic()
     analysis = analyze_remote(
         rf_input,
         llm_config=llm_config,
+        usage_callback=usage_callback,
     )
     elapsed = time.monotonic() - t0
 
@@ -239,6 +259,7 @@ def _evaluate_record(
             reason=None,
             elapsed=elapsed,
             resolved_user_message_hash=resolved_user_message_hash,
+            token_totals=token_totals,
             skipped=True,
             skip_reason="agent_failed",
         )
@@ -271,6 +292,7 @@ def _evaluate_record(
         reason=reason,
         elapsed=elapsed,
         resolved_user_message_hash=resolved_user_message_hash,
+        token_totals=token_totals,
         mismatch=mismatch,
     )
 
@@ -319,11 +341,19 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
     gold_travel_days: list[int] = []
     gold_travel_present = 0
     pred_travel_present = 0
+    elapsed_seconds: list[float] = []
     skipped = 0
+    skip_reasons: dict[str, int] = {}
+    token_totals = _empty_token_totals()
 
     for result in results:
+        _add_token_totals(token_totals, result.token_totals)
+        if result.elapsed > 0:
+            elapsed_seconds.append(result.elapsed)
         if result.skipped:
             skipped += 1
+            reason = result.skip_reason or "unknown"
+            skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
             continue
         if result.pred_classification is None or result.gold_classification is None:
             raise ValueError(
@@ -344,10 +374,23 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
         golds=golds,
         pred_travel_days=pred_travel_days,
         gold_travel_days=gold_travel_days,
+        elapsed_seconds=elapsed_seconds,
         gold_travel_present=gold_travel_present,
         pred_travel_present=pred_travel_present,
         skipped=skipped,
+        skip_reasons=skip_reasons,
+        token_totals=token_totals,
     )
+
+
+def _percentile(values: list[float], percentile: float) -> float | None:
+    if not values:
+        return None
+    if not 0 <= percentile <= 100:
+        raise ValueError(f"percentile must be between 0 and 100: {percentile}")
+    sorted_values = sorted(values)
+    index = round((percentile / 100) * (len(sorted_values) - 1))
+    return sorted_values[index]
 
 
 def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
@@ -385,6 +428,14 @@ def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
     metrics["travel_pred_n"] = pred_n
     metrics["travel_coverage"] = (travel_n / gold_n) if gold_n else None
     metrics["travel_spurious_rate"] = ((pred_n - travel_n) / pred_n) if pred_n else None
+    metrics["skip_reasons"] = dict(metrics_input.skip_reasons)
+    metrics["agent_failed"] = metrics_input.skip_reasons.get("agent_failed", 0)
+    latency_n = len(metrics_input.elapsed_seconds)
+    metrics["latency_n"] = latency_n
+    metrics["latency_avg_s"] = (
+        sum(metrics_input.elapsed_seconds) / latency_n if latency_n else None
+    )
+    metrics["latency_p95_s"] = _percentile(metrics_input.elapsed_seconds, 95)
     return {"metrics": metrics}
 
 
@@ -437,12 +488,77 @@ def run_eval(
     )
 
 
+def _correct_count(metrics: dict[str, Any]) -> int:
+    confusion = metrics.get("confusion") or []
+    if not isinstance(confusion, list):
+        return int((metrics.get("micro_accuracy") or 0.0) * metrics.get("evaluated", 0))
+    return sum(
+        int(row[i])
+        for i, row in enumerate(confusion)
+        if isinstance(row, list) and i < len(row)
+    )
+
+
+def build_cost_summary(
+    config: dict[str, Any], metrics: dict[str, Any], token_totals: dict[str, int]
+) -> dict[str, Any]:
+    """Build the eval cost block from observed token usage and list pricing."""
+    llm_config = config.get("llm") or {}
+    provider = llm_config.get("provider")
+    model = llm_config.get("model")
+    evaluated = int(metrics.get("evaluated") or 0)
+    correct = _correct_count(metrics)
+
+    estimated_total: float | None
+    breakdown: dict[str, float] | None
+    pricing_note: str
+    if provider == "openai" and model:
+        breakdown = estimate_cost(model, batch=False, **token_totals)
+        if breakdown is None:
+            estimated_total = None
+            pricing_note = "missing_openai_pricing_entry"
+        else:
+            estimated_total = breakdown["total"]
+            pricing_note = "openai_list_price_estimate"
+    else:
+        # Local/ollama-compatible runs have no API invoice. Tokens may still be
+        # present for observability, but estimated dollar cost is intentionally $0.
+        breakdown = None
+        estimated_total = 0.0
+        pricing_note = "local_provider_zero_api_cost"
+
+    return {
+        "token_totals": dict(token_totals),
+        "estimated_cost_usd": estimated_total,
+        "estimated_cost_per_record_usd": (
+            estimated_total / evaluated
+            if estimated_total is not None and evaluated
+            else None
+        ),
+        "estimated_cost_per_correct_usd": (
+            estimated_total / correct
+            if estimated_total is not None and correct
+            else None
+        ),
+        "correct": correct,
+        "breakdown": breakdown,
+        "pricing_note": pricing_note,
+    }
+
+
 def _format_float(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.4f}"
 
 
+def _format_money(value: float | None) -> str:
+    return "n/a" if value is None else f"${value:.6f}"
+
+
 def print_report(
-    metrics: dict[str, Any], mismatches: list[MismatchRecord], run_id: str
+    metrics: dict[str, Any],
+    mismatches: list[MismatchRecord],
+    run_id: str,
+    cost: dict[str, Any] | None = None,
 ) -> None:
     m = metrics["metrics"]
     labels = m["labels"]
@@ -456,6 +572,18 @@ def print_report(
     print(f"  Macro precision   : {m['macro_precision']:.4f}")
     print(f"  Macro recall      : {m['macro_recall']:.4f}")
     print(f"  Macro F1          : {m['macro_f1']:.4f}")
+    if cost is not None:
+        print(
+            "  Est. cost         : "
+            f"{_format_money(cost['estimated_cost_usd'])}  "
+            f"({_format_money(cost['estimated_cost_per_record_usd'])}/record, "
+            f"{_format_money(cost['estimated_cost_per_correct_usd'])}/correct)"
+        )
+    print(
+        "  Latency           : "
+        f"avg={_format_float(m['latency_avg_s'])}s  "
+        f"p95={_format_float(m['latency_p95_s'])}s  (n={m['latency_n']})"
+    )
     print(
         f"  Travel MAE        : {_format_float(m['travel_mae'])}  (n={m['travel_n']})"
     )
@@ -541,7 +669,8 @@ def main(run_logger: RunLogger | None = None) -> None:
     )
 
     metrics = assemble_metrics(metrics_input)
-    print_report(metrics, mismatches, run_id)
+    cost = build_cost_summary(config, metrics["metrics"], metrics_input.token_totals)
+    print_report(metrics, mismatches, run_id, cost)
 
     # SC-4: write mismatch file named mismatches_{run_id}.jsonl
     mismatch_path: Path | None = None
@@ -564,6 +693,8 @@ def main(run_logger: RunLogger | None = None) -> None:
         metrics=metrics["metrics"],
         mismatch_file=mismatch_path,
     )
+    run_record["token_totals"] = dict(metrics_input.token_totals)
+    run_record["cost"] = cost
     run_record["resolved_user_message_hashes"] = {
         "algorithm": "sha256",
         "length": RESOLVED_USER_MESSAGE_HASH_LENGTH,

@@ -59,7 +59,10 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
 
     def fake_analyze_remote(rf_input, **kwargs):
         assert isinstance(rf_input, RemoteFilterInput)
-        assert set(kwargs) == {"llm_config"}
+        assert set(kwargs) == {"llm_config", "usage_callback"}
+        kwargs["usage_callback"](
+            {"input_tokens": 100, "cached_input_tokens": 25, "output_tokens": 10}
+        )
         delays = {"slow-pass": 0.03, "fast-fn": 0.0, "medium-fp": 0.01}
         time.sleep(delays[rf_input.title])
         if rf_input.title == "fast-fn":
@@ -78,6 +81,11 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
 
     assert metrics_input.preds == ["remote", "hybrid", "remote"]
     assert metrics_input.golds == ["remote", "remote", "hybrid"]
+    assert metrics_input.token_totals == {
+        "input_tokens": 300,
+        "cached_input_tokens": 75,
+        "output_tokens": 30,
+    }
     assert metrics["evaluated"] == 3
     assert metrics["skipped"] == 0
     assert metrics["confusion"] == [
@@ -158,6 +166,49 @@ def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
         eval_script.assemble_metrics(misaligned)
 
 
+def test_build_cost_summary_reports_cost_per_correct_for_openai():
+    metrics = eval_script.assemble_metrics(
+        eval_script.EvalMetricsInput(
+            preds=["remote", "remote"],
+            golds=["remote", "hybrid"],
+            token_totals={
+                "input_tokens": 1000,
+                "cached_input_tokens": 0,
+                "output_tokens": 200,
+            },
+        )
+    )["metrics"]
+
+    cost = eval_script.build_cost_summary(
+        {"llm": {"provider": "openai", "model": "gpt-4o-mini"}},
+        metrics,
+        {"input_tokens": 1000, "cached_input_tokens": 0, "output_tokens": 200},
+    )
+
+    assert cost["correct"] == 1
+    assert cost["estimated_cost_usd"] == pytest.approx(0.00027)
+    assert cost["estimated_cost_per_record_usd"] == pytest.approx(0.000135)
+    assert cost["estimated_cost_per_correct_usd"] == pytest.approx(0.00027)
+    assert cost["pricing_note"] == "openai_list_price_estimate"
+
+
+def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
+    metrics = eval_script.assemble_metrics(
+        eval_script.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = eval_script.build_cost_summary(
+        {"llm": {"provider": "ollama", "model": "qwen-27b-mtp"}},
+        metrics,
+        {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
+    )
+
+    assert cost["estimated_cost_usd"] == 0.0
+    assert cost["estimated_cost_per_correct_usd"] == 0.0
+    assert cost["breakdown"] is None
+    assert cost["pricing_note"] == "local_provider_zero_api_cost"
+
+
 def test_print_report_renders_empty_travel_rates_as_na(capsys):
     metrics = eval_script.assemble_metrics(
         eval_script.EvalMetricsInput(preds=["remote"], golds=["remote"])
@@ -228,7 +279,10 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
 
     def fake_analyze_remote(rf_input, **kwargs):
         captured_inputs.append(rf_input)
-        assert set(kwargs) == {"llm_config"}
+        assert set(kwargs) == {"llm_config", "usage_callback"}
+        kwargs["usage_callback"](
+            {"input_tokens": 123, "cached_input_tokens": 23, "output_tokens": 45}
+        )
         return _analysis("remote")
 
     monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
