@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from scripts import compare_evals
 
 
@@ -59,6 +61,25 @@ def test_detect_eval_type_disambiguates_supported_metric_families() -> None:
     assert compare_evals.detect_eval_type(ordinal) == "skills_fit"
 
 
+def test_detect_eval_type_returns_unknown_for_ambiguous_metrics() -> None:
+    # A drifted record carrying both `accuracy` and `micro_accuracy` matches two
+    # detectors — resolve to "unknown" instead of letting registry order decide.
+    ambiguous = {"metrics": {"total": 3, "accuracy": 0.5, "micro_accuracy": 0.8}}
+    assert compare_evals.detect_eval_type(ambiguous) == "unknown"
+
+
+def test_flatten_remote_filter_categorical_fails_fast_on_missing_headline() -> None:
+    missing_macro = _categorical_run()
+    del missing_macro["metrics"]["macro_f1"]
+    with pytest.raises(ValueError, match="macro_f1"):
+        compare_evals._flatten_remote_filter_categorical(missing_macro)
+
+    missing_recall = _categorical_run()
+    del missing_recall["metrics"]["per_class"]["remote"]["recall"]
+    with pytest.raises(ValueError, match=r"per_class\.remote\.recall"):
+        compare_evals._flatten_remote_filter_categorical(missing_recall)
+
+
 def test_flatten_remote_filter_categorical_extracts_headline_metrics() -> None:
     row = compare_evals._flatten_remote_filter_categorical(_categorical_run())
 
@@ -111,4 +132,8 @@ def test_categorical_last_and_diff_render_against_runs_fixture(
     assert "micro_acc" in diff
     assert "remote_recall" in diff
     assert "macro_f1" in diff
+    # travel_mae is a displayed metric — it must also be diffable, incl. the
+    # None→"—" case (cat-a travel_mae=None, cat-b=1.25).
+    assert "travel_mae" in diff
+    assert "—" in diff
     assert "↑ +0.1000" in diff
