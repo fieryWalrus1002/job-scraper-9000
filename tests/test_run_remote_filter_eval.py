@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from agents.remote_filter.input_models import RemoteFilterInput
+from agents.remote_filter import eval as eval_core
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import _build_user_message
 from scripts import run_remote_filter_eval as eval_script
@@ -69,15 +70,15 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
             return _analysis("hybrid", travel_days=5)
         return _analysis("remote", travel_days=5)
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
-    mismatches, metrics_input, prompt_hashes = eval_script.run_eval(
+    mismatches, metrics_input, prompt_hashes = eval_core.run_eval(
         records,
         _config(),
         run_id="test_run",
         workers=3,
     )
-    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+    metrics = eval_core.assemble_metrics(metrics_input)["metrics"]
 
     assert metrics_input.preds == ["remote", "hybrid", "remote"]
     assert metrics_input.golds == ["remote", "remote", "hybrid"]
@@ -110,7 +111,7 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
 
 def test_assemble_metrics_counts_asymmetric_travel_presence():
     results = [
-        eval_script.RecordEvalResult(
+        eval_core.RecordEvalResult(
             index=0,
             job={"title": "both-present"},
             gold_classification="remote",
@@ -120,7 +121,7 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
             reason="both",
             elapsed=0.0,
         ),
-        eval_script.RecordEvalResult(
+        eval_core.RecordEvalResult(
             index=1,
             job={"title": "gold-only"},
             gold_classification="remote",
@@ -130,7 +131,7 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
             reason="missed travel",
             elapsed=0.0,
         ),
-        eval_script.RecordEvalResult(
+        eval_core.RecordEvalResult(
             index=2,
             job={"title": "pred-only"},
             gold_classification="remote",
@@ -142,8 +143,8 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
         ),
     ]
 
-    metrics_input = eval_script._metrics_input_from_results(results)
-    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+    metrics_input = eval_core._metrics_input_from_results(results)
+    metrics = eval_core.assemble_metrics(metrics_input)["metrics"]
 
     assert metrics_input.gold_travel_days == [10]
     assert metrics_input.pred_travel_days == [12]
@@ -156,19 +157,19 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
 
 
 def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
-    misaligned = eval_script.EvalMetricsInput(
+    misaligned = eval_core.EvalMetricsInput(
         preds=["remote"],
         golds=["remote"],
         pred_travel_days=[10, 20],
         gold_travel_days=[10],
     )
     with pytest.raises(ValueError, match="pred_travel_days and gold_travel_days"):
-        eval_script.assemble_metrics(misaligned)
+        eval_core.assemble_metrics(misaligned)
 
 
 def test_build_cost_summary_reports_cost_per_correct_for_openai():
-    metrics = eval_script.assemble_metrics(
-        eval_script.EvalMetricsInput(
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(
             preds=["remote", "remote"],
             golds=["remote", "hybrid"],
             token_totals={
@@ -193,8 +194,8 @@ def test_build_cost_summary_reports_cost_per_correct_for_openai():
 
 
 def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
-    metrics = eval_script.assemble_metrics(
-        eval_script.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
     )["metrics"]
 
     cost = eval_script.build_cost_summary(
@@ -210,8 +211,8 @@ def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
 
 
 def test_print_report_renders_empty_travel_rates_as_na(capsys):
-    metrics = eval_script.assemble_metrics(
-        eval_script.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
     )
 
     eval_script.print_report(metrics, [], "test_run")
@@ -229,7 +230,7 @@ def test_run_eval_fails_fast_on_retired_unclear_human_classification(monkeypatch
         calls += 1
         return _analysis("remote")
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
     records = [
         {
@@ -240,7 +241,7 @@ def test_run_eval_fails_fast_on_retired_unclear_human_classification(monkeypatch
     ]
 
     with pytest.raises(ValueError, match="invalid _human_classification.*unclear"):
-        eval_script.run_eval(records, _config(), "test_run", workers=2)
+        eval_core.run_eval(records, _config(), "test_run", workers=2)
 
     assert calls == 0
 
@@ -253,7 +254,7 @@ def test_run_eval_counts_missing_description_as_skipped_without_inference(monkey
         calls += 1
         return _analysis("remote")
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
     records = [
         {
@@ -263,18 +264,26 @@ def test_run_eval_counts_missing_description_as_skipped_without_inference(monkey
         },
     ]
 
-    mismatches, metrics_input, prompt_hashes = eval_script.run_eval(
+    mismatches, metrics_input, prompt_hashes = eval_core.run_eval(
         records, _config(), "test_run", workers=2
     )
 
     assert mismatches == []
-    assert metrics_input == eval_script.EvalMetricsInput(skipped=1)
+    assert metrics_input == eval_core.EvalMetricsInput(
+        skipped=1,
+        skip_reasons={"missing_description": 1},
+        token_totals={
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+        },
+    )
     assert prompt_hashes == []
     assert calls == 0
 
 
 def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypatch):
-    monkeypatch.setattr(eval_script, "USER_TIMEZONE", "Europe/Oslo")
+    monkeypatch.setattr(eval_core, "USER_TIMEZONE", "Europe/Oslo")
     captured_inputs = []
 
     def fake_analyze_remote(rf_input, **kwargs):
@@ -285,7 +294,7 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
         )
         return _analysis("remote")
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
     records = [
         {
@@ -312,12 +321,12 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
         }
     ]
 
-    mismatches, metrics_input, prompt_hashes = eval_script.run_eval(
+    mismatches, metrics_input, prompt_hashes = eval_core.run_eval(
         records,
         _config(),
         run_id="test_run",
     )
-    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+    metrics = eval_core.assemble_metrics(metrics_input)["metrics"]
 
     assert metrics_input.preds == ["remote"]
     assert metrics_input.golds == ["hybrid"]
