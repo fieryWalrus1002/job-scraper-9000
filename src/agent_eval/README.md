@@ -18,7 +18,9 @@ src/agent_eval/
 │                      # compute_metrics() — generic legacy binary metrics
 │                      # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
 ├── costing.py         # token totals, correct-count, and cost-summary helpers
-└── stats.py           # percentile and latency-summary helpers
+├── stats.py           # percentile and latency-summary helpers
+├── run_compare.py     # eval-type detection + per-type flatten/format helpers for compare_evals
+└── bakeoff.py         # comparable-run guard (gold_hash/prompt_hash), row sort, table render
 ```
 
 Run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) lives in `utils.run_logger`.
@@ -76,3 +78,5 @@ ______________________________________________________________________
 ## Design note
 
 Generic eval utilities belong in `src/agent_eval/`. Generic run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) belongs in `utils.run_logger`. Agent-specific schemas, prompts, and scoring logic should live with their agent package under `src/agents/*` or in that agent's eval driver script.
+
+The boundary is enforced by imports: nothing in `src/agent_eval/` imports `agents.*`. `run_compare.py` and `bakeoff.py` reshape run-record dicts by field name only. The bake-off table (`bakeoff.py`) currently renders remote-filter columns (`remote_recall`, `remote_fn`, `remote_fp`); generalizing it to a skills-fit ordinal column set (MAE / kappa) is a deliberate follow-up tracked in issue #542, reusing the same cost/stats/comparable-run helpers.
