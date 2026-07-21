@@ -9,12 +9,14 @@ from agents.remote_filter.models import REMOTE_CLASSIFICATIONS
 REPO_ROOT = Path(__file__).parents[2]
 GOLD_PATH = REPO_ROOT / "data" / "eval" / "ground_truth.jsonl"
 # Phase 32 (#519 re-ratification + #520 unclear retirement): dropped the 2
-# recruiting-spam non-jobs that used to carry `unclear`. Axis is now 3-way.
-EXPECTED_RECORD_COUNT = 104
-EXPECTED_CLASSIFICATION_COUNTS = {"onsite": 55, "remote": 35, "hybrid": 14}
+# recruiting-spam non-jobs that used to carry `unclear` (106 -> 104), then a
+# further dedup pass removed 2 duplicate postings (1 onsite, 1 remote) → 102.
+# Axis is now 3-way.
+EXPECTED_RECORD_COUNT = 102
+EXPECTED_CLASSIFICATION_COUNTS = {"onsite": 54, "remote": 34, "hybrid": 14}
 EXPECTED_POLICY_COUNTS = {
-    "onsite": 53,
-    "fully_remote": 32,
+    "onsite": 52,
+    "fully_remote": 31,
     "hybrid": 14,
     "onsite_disguised": 2,
     "remote_with_monthly_travel": 1,
