@@ -21,15 +21,20 @@ REPO_ROOT = Path(__file__).parents[2]
 _CONFIG_GLOBS = ("config/agent/*.yml", "config/ci/*.yml")
 
 
-def _configured_openai_models() -> dict[str, Path]:
-    """Map each OpenAI model referenced in config -> the file that declares it."""
-    found: dict[str, Path] = {}
+def _configured_openai_models() -> dict[str, list[str]]:
+    """Map each OpenAI model referenced in config -> every file that declares it.
+
+    A model can appear in several configs (gpt-5.4-mini is in skills_fit,
+    remote_agent, and ai_code_review today), so collect all paths — a missing
+    price should report every affected file, not just the last one seen.
+    """
+    found: dict[str, list[str]] = {}
     for pattern in _CONFIG_GLOBS:
         for path in sorted(REPO_ROOT.glob(pattern)):
             raw = yaml.safe_load(path.read_text()) or {}
             llm = raw.get("llm") or {}
             if llm.get("provider") == "openai" and (model := llm.get("model")):
-                found[model] = path
+                found.setdefault(model, []).append(str(path.relative_to(REPO_ROOT)))
     return found
 
 
@@ -57,9 +62,7 @@ def test_every_configured_openai_model_is_priced() -> None:
     assert configured, "expected at least one OpenAI-provider agent config"
 
     missing = {
-        model: str(path.relative_to(REPO_ROOT))
-        for model, path in configured.items()
-        if model not in priced
+        model: paths for model, paths in configured.items() if model not in priced
     }
     assert not missing, (
         "OpenAI models referenced in config but missing from "
