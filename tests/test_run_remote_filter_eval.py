@@ -4,6 +4,12 @@ import time
 import pytest
 from pydantic import ValidationError
 
+from agent_eval.costing import (
+    aggregate_token_totals,
+    build_cost_summary,
+    empty_token_totals,
+)
+from agent_eval.stats import latency_summary, percentile
 from agents.remote_filter.input_models import RemoteFilterInput
 from agents.remote_filter import eval as eval_core
 from agents.remote_filter.models import RemoteAnalysis
@@ -167,6 +173,36 @@ def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
         eval_core.assemble_metrics(misaligned)
 
 
+def test_token_total_helpers_default_and_aggregate_shape():
+    assert empty_token_totals() == {
+        "input_tokens": 0,
+        "cached_input_tokens": 0,
+        "output_tokens": 0,
+    }
+    assert aggregate_token_totals(
+        [
+            {"input_tokens": 100, "cached_input_tokens": 25, "output_tokens": 10},
+            {"input_tokens": 7, "output_tokens": 3},
+        ]
+    ) == {
+        "input_tokens": 107,
+        "cached_input_tokens": 25,
+        "output_tokens": 13,
+    }
+
+
+def test_percentile_and_latency_summary_helpers():
+    assert percentile([], 95) is None
+    assert percentile([3.0, 1.0, 2.0], 50) == 2.0
+    assert latency_summary([0.1, 0.2, 0.3]) == {
+        "latency_n": 3,
+        "latency_avg_s": pytest.approx(0.2),
+        "latency_p95_s": 0.3,
+    }
+    with pytest.raises(ValueError, match="percentile must be between 0 and 100"):
+        percentile([1.0], 101)
+
+
 def test_build_cost_summary_reports_cost_per_correct_for_openai():
     metrics = eval_core.assemble_metrics(
         eval_core.EvalMetricsInput(
@@ -180,7 +216,7 @@ def test_build_cost_summary_reports_cost_per_correct_for_openai():
         )
     )["metrics"]
 
-    cost = eval_script.build_cost_summary(
+    cost = build_cost_summary(
         {"llm": {"provider": "openai", "model": "gpt-4o-mini"}},
         metrics,
         {"input_tokens": 1000, "cached_input_tokens": 0, "output_tokens": 200},
@@ -198,7 +234,7 @@ def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
         eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
     )["metrics"]
 
-    cost = eval_script.build_cost_summary(
+    cost = build_cost_summary(
         {"llm": {"provider": "ollama", "model": "qwen-27b-mtp"}},
         metrics,
         {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
@@ -208,6 +244,24 @@ def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
     assert cost["estimated_cost_per_correct_usd"] == 0.0
     assert cost["breakdown"] is None
     assert cost["pricing_note"] == "local_provider_zero_api_cost"
+
+
+def test_build_cost_summary_reports_missing_openai_pricing_without_crashing():
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        {"llm": {"provider": "openai", "model": "gpt-imaginary"}},
+        metrics,
+        {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
+    )
+
+    assert cost["estimated_cost_usd"] is None
+    assert cost["estimated_cost_per_record_usd"] is None
+    assert cost["estimated_cost_per_correct_usd"] is None
+    assert cost["breakdown"] is None
+    assert cost["pricing_note"] == "missing_openai_pricing_entry"
 
 
 def test_print_report_renders_empty_travel_rates_as_na(capsys):

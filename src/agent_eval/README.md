@@ -14,9 +14,11 @@ ______________________________________________________________________
 src/agent_eval/
 ├── __init__.py        # exports provenance helpers
 ├── provenance.py      # run IDs, hashes, git/env metadata, run-record assembly
-└── metrics.py         # compute_categorical_metrics() — labeled categorical confusion
-                       # compute_metrics() — generic legacy binary metrics
-                       # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
+├── metrics.py         # compute_categorical_metrics() — labeled categorical confusion
+│                      # compute_metrics() — generic legacy binary metrics
+│                      # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
+├── costing.py         # token totals, correct-count, and cost-summary helpers
+└── stats.py           # percentile and latency-summary helpers
 ```
 
 Run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) lives in `utils.run_logger`.

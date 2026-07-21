@@ -34,8 +34,8 @@ from agents.remote_filter.eval import (
     run_eval,
 )
 from agents.remote_filter.utils import REMOTE_FILTER_PROMPT_PATH
+from agent_eval.costing import build_cost_summary
 from agent_eval.provenance import build_run_record, generate_run_id
-from utils.openai_pricing import estimate_cost
 from utils.run_logger import JsonlRunLogger, RunLogger
 
 load_dotenv()
@@ -102,64 +102,6 @@ def load_gold(path: str) -> list[dict[str, Any]]:
             key = r.get("dedup_hash") or r.get("source_url") or str(id(r))
             seen[key] = r
     return list(seen.values())
-
-
-def _correct_count(metrics: dict[str, Any]) -> int:
-    confusion = metrics.get("confusion") or []
-    if not isinstance(confusion, list):
-        return int((metrics.get("micro_accuracy") or 0.0) * metrics.get("evaluated", 0))
-    return sum(
-        int(row[i])
-        for i, row in enumerate(confusion)
-        if isinstance(row, list) and i < len(row)
-    )
-
-
-def build_cost_summary(
-    config: dict[str, Any], metrics: dict[str, Any], token_totals: dict[str, int]
-) -> dict[str, Any]:
-    """Build the eval cost block from observed token usage and list pricing."""
-    llm_config = config.get("llm") or {}
-    provider = llm_config.get("provider")
-    model = llm_config.get("model")
-    evaluated = int(metrics.get("evaluated") or 0)
-    correct = _correct_count(metrics)
-
-    estimated_total: float | None
-    breakdown: dict[str, float] | None
-    pricing_note: str
-    if provider == "openai" and model:
-        breakdown = estimate_cost(model, batch=False, **token_totals)
-        if breakdown is None:
-            estimated_total = None
-            pricing_note = "missing_openai_pricing_entry"
-        else:
-            estimated_total = breakdown["total"]
-            pricing_note = "openai_list_price_estimate"
-    else:
-        # Local/ollama-compatible runs have no API invoice. Tokens may still be
-        # present for observability, but estimated dollar cost is intentionally $0.
-        breakdown = None
-        estimated_total = 0.0
-        pricing_note = "local_provider_zero_api_cost"
-
-    return {
-        "token_totals": dict(token_totals),
-        "estimated_cost_usd": estimated_total,
-        "estimated_cost_per_record_usd": (
-            estimated_total / evaluated
-            if estimated_total is not None and evaluated
-            else None
-        ),
-        "estimated_cost_per_correct_usd": (
-            estimated_total / correct
-            if estimated_total is not None and correct
-            else None
-        ),
-        "correct": correct,
-        "breakdown": breakdown,
-        "pricing_note": pricing_note,
-    }
 
 
 def _format_float(value: float | None) -> str:

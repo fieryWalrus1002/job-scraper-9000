@@ -10,7 +10,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from agent_eval.costing import add_token_totals, empty_token_totals
 from agent_eval.metrics import compute_categorical_metrics
+from agent_eval.stats import latency_summary
 
 from .models import REMOTE_CLASSIFICATIONS
 from .utils import _build_user_message, analyze_remote, build_search_context
@@ -77,15 +79,6 @@ class EvalMetricsInput:
     token_totals: dict[str, int] = field(default_factory=dict)
 
 
-def _empty_token_totals() -> dict[str, int]:
-    return {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0}
-
-
-def _add_token_totals(target: dict[str, int], usage: dict[str, int]) -> None:
-    for key in _empty_token_totals():
-        target[key] = target.get(key, 0) + int(usage.get(key, 0) or 0)
-
-
 def _resolved_user_message_hash(rf_input: Any) -> str:
     return hashlib.sha256(_build_user_message(rf_input).encode("utf-8")).hexdigest()[
         :RESOLVED_USER_MESSAGE_HASH_LENGTH
@@ -150,10 +143,10 @@ def _evaluate_record(
     rf_input = build_search_context(job, _user_timezone())
     resolved_user_message_hash = _resolved_user_message_hash(rf_input)
 
-    token_totals = _empty_token_totals()
+    token_totals = empty_token_totals()
 
     def usage_callback(usage: dict[str, int]) -> None:
-        _add_token_totals(token_totals, usage)
+        add_token_totals(token_totals, usage)
 
     t0 = time.monotonic()
     analysis = analyze_remote(
@@ -259,10 +252,10 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
     elapsed_seconds: list[float] = []
     skipped = 0
     skip_reasons: dict[str, int] = {}
-    token_totals = _empty_token_totals()
+    token_totals = empty_token_totals()
 
     for result in results:
-        _add_token_totals(token_totals, result.token_totals)
+        add_token_totals(token_totals, result.token_totals)
         if result.elapsed > 0:
             elapsed_seconds.append(result.elapsed)
         if result.skipped:
@@ -296,16 +289,6 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
         skip_reasons=skip_reasons,
         token_totals=token_totals,
     )
-
-
-def _percentile(values: list[float], percentile: float) -> float | None:
-    if not values:
-        return None
-    if not 0 <= percentile <= 100:
-        raise ValueError(f"percentile must be between 0 and 100: {percentile}")
-    sorted_values = sorted(values)
-    index = round((percentile / 100) * (len(sorted_values) - 1))
-    return sorted_values[index]
 
 
 def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
@@ -345,12 +328,7 @@ def assemble_metrics(metrics_input: EvalMetricsInput) -> dict[str, Any]:
     metrics["travel_spurious_rate"] = ((pred_n - travel_n) / pred_n) if pred_n else None
     metrics["skip_reasons"] = dict(metrics_input.skip_reasons)
     metrics["agent_failed"] = metrics_input.skip_reasons.get("agent_failed", 0)
-    latency_n = len(metrics_input.elapsed_seconds)
-    metrics["latency_n"] = latency_n
-    metrics["latency_avg_s"] = (
-        sum(metrics_input.elapsed_seconds) / latency_n if latency_n else None
-    )
-    metrics["latency_p95_s"] = _percentile(metrics_input.elapsed_seconds, 95)
+    metrics.update(latency_summary(metrics_input.elapsed_seconds))
     return {"metrics": metrics}
 
 
