@@ -52,6 +52,45 @@ def test_batch_applies_50_percent_discount() -> None:
     assert batch["total"] == pytest.approx(standard["total"] * 0.5, rel=1e-4)
 
 
+def test_gpt_5_4_mini_priced() -> None:
+    # Primary scoring model (#475): a null estimate is the bug — assert a
+    # concrete non-null breakdown at the documented standard rates.
+    # 1000 uncached input @ $0.75/M = $0.00075
+    # 500 cached input   @ $0.075/M = $0.0000375
+    # 200 output         @ $4.50/M  = $0.0009
+    result = estimate_cost(
+        "gpt-5.4-mini",
+        input_tokens=1500,
+        cached_input_tokens=500,
+        output_tokens=200,
+    )
+    assert result is not None
+    assert result["input_uncached"] == pytest.approx(0.00075, rel=1e-4)
+    assert result["input_cached"] == pytest.approx(0.0000375, rel=1e-4)
+    assert result["output"] == pytest.approx(0.0009, rel=1e-4)
+    assert result["total"] == pytest.approx(0.0016875, rel=1e-4)
+
+
+def test_gpt_5_4_mini_batch_is_half_standard() -> None:
+    # The issue relies on batch == 50% of standard (no batch-specific entry).
+    standard = estimate_cost(
+        "gpt-5.4-mini",
+        input_tokens=1000,
+        cached_input_tokens=0,
+        output_tokens=200,
+        batch=False,
+    )
+    batch = estimate_cost(
+        "gpt-5.4-mini",
+        input_tokens=1000,
+        cached_input_tokens=0,
+        output_tokens=200,
+        batch=True,
+    )
+    assert standard is not None and batch is not None
+    assert batch["total"] == pytest.approx(standard["total"] * 0.5, rel=1e-4)
+
+
 def test_unknown_model_returns_none() -> None:
     assert (
         estimate_cost(
