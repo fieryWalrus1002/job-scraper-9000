@@ -182,8 +182,13 @@ async def test_put_search_derives_policies(
     resp = await client.put("/api/settings/search", json=VALID_SEARCH)
     assert resp.status_code == 200
     policies = resp.json()["policies"]
-    # Permissive search config → all remote classes acceptable, no exclusions.
-    assert "unclear" in policies["remote"]["acceptable_classifications"]
+    # Permissive search config → the 3-way canonical axis is acceptable, no
+    # exclusions. Phase 32 (#524) retired `unclear` from the emitted policy set.
+    assert set(policies["remote"]["acceptable_classifications"]) == {
+        "remote",
+        "hybrid",
+        "onsite",
+    }
     assert policies["prefilter"]["excluded_title_terms"] == []
 
 
