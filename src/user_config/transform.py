@@ -205,12 +205,13 @@ def candidate_profile_to_pipeline_yaml(
 def derive_policies(search: SearchConfigInput) -> UserPolicies:
     """Per-user policy gates (spec §6) from the search config.
 
-    Acceptable remote classifications follow the canonical 4-way taxonomy in
-    specs/remote_filter_taxonomy.md; ``unclear`` is always acceptable — silently
-    dropping unclassifiable postings would be a silent filter, and permissive is
-    the default posture. Title exclusions merge roles.excluded_titles with
-    keywords.excluded. ``max_travel_days`` is derived straight through for
-    back-compat, but travel is display-only and no longer gates.
+    Acceptable remote classifications follow the canonical 3-way taxonomy in
+    specs/remote_filter_taxonomy.md (``remote`` / ``hybrid`` / ``onsite``). Phase
+    32 (#520/#524) retired ``unclear`` from the classifier axis, so it is no longer
+    emitted as an acceptable class — the classifier always commits to one of the
+    three. Title exclusions merge roles.excluded_titles with keywords.excluded.
+    ``max_travel_days`` is derived straight through for back-compat, but travel is
+    display-only and no longer gates.
     """
     classes: set[str] = set()
     wa = search.work_constraints.work_arrangements
@@ -222,7 +223,6 @@ def derive_policies(search: SearchConfigInput) -> UserPolicies:
         classes.add("hybrid")
     if wa.onsite.acceptable:
         classes.add("onsite")
-    classes.add("unclear")
     # Preserve canonical enum order for stable output.
     ordered: list[RemoteClassification] = [
         c for c in REMOTE_CLASSIFICATIONS if c in classes

@@ -212,12 +212,10 @@ def test_hybrid_only_user_gets_hybrid_workplace_and_no_remote():
 
 def test_remote_only_user_policies():
     policies = derive_policies(_search("search_engineer.yml"))
-    # A remote-only user accepts the canonical remote class plus the
-    # always-acceptable unclear.
-    assert policies.remote.acceptable_classifications == [
-        "remote",
-        "unclear",  # always acceptable — never a silent filter
-    ]
+    # A remote-only user accepts exactly the canonical remote class. Phase 32
+    # (#524) retired `unclear` from the policy axis — the classifier always
+    # commits to remote/hybrid/onsite, so there is no unclassifiable bucket.
+    assert policies.remote.acceptable_classifications == ["remote"]
     # roles.excluded_titles + keywords.excluded, deduped
     assert policies.prefilter.excluded_title_terms == [
         "Sales Engineer",

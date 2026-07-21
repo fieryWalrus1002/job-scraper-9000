@@ -18,15 +18,16 @@ from typing import Literal, get_args
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Mirrors the raw.remote_classification Postgres enum and the query Literal in
-# api/routes/jobs.py. Deliberately a SUPERSET: the canonical 4-way taxonomy is
-# remote/hybrid/onsite/unclear (specs/remote_filter_taxonomy.md), while legacy
+# api/routes/jobs.py. Deliberately a SUPERSET: the canonical taxonomy is the
+# 3-way axis remote/hybrid/onsite (specs/remote_filter_taxonomy.md), while legacy
 # labels remain valid so stored user policies and historical job rows still
-# validate. New intent (derive_policies) emits only canonical values.
+# validate. Phase 32 (#524) retired ``unclear`` from the classifier axis, so it
+# is legacy here too. New intent (derive_policies) emits only canonical values.
 RemoteClassification = Literal[
     "remote",  # canonical (taxonomy)
     "onsite",  # canonical (taxonomy)
     "hybrid",  # canonical
-    "unclear",  # canonical
+    "unclear",  # legacy (Phase 32) — retired from classifier axis
     "fully_remote",  # legacy → remote
     "onsite_disguised",  # legacy → onsite
     "location_restricted",  # legacy → remote
@@ -42,6 +43,7 @@ REMOTE_CLASSIFICATIONS: tuple[RemoteClassification, ...] = get_args(
 # Non-canonical remote classifications retained for stored policies and
 # historical rows, but not emitted by derive_policies for new user intent.
 LEGACY_REMOTE_CLASSIFICATIONS: tuple[RemoteClassification, ...] = (
+    "unclear",
     "fully_remote",
     "onsite_disguised",
     "location_restricted",
