@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from agent_eval import bakeoff, run_compare
 from scripts import compare_evals
 
 
@@ -21,6 +22,8 @@ def _categorical_run(
         "run_id": run_id,
         "timestamp": timestamp,
         "config": {"model": model, "temperature": 0.0},
+        "gold_hash": "gold-123",
+        "prompt_hash": "prompt-123",
         "cost": {
             "estimated_cost_usd": estimated_cost_usd,
             "estimated_cost_per_correct_usd": estimated_cost_per_correct_usd,
@@ -30,7 +33,12 @@ def _categorical_run(
             "evaluated": 10,
             "skipped": 1,
             "total": 11,
-            "confusion": {"remote": {"remote": 4, "hybrid": 1}},
+            "confusion": [
+                [4, 1, 0, 0],
+                [1, 2, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
+            ],
             "per_class": {
                 "remote": {
                     "precision": 0.9,
@@ -62,32 +70,32 @@ def test_detect_eval_type_disambiguates_supported_metric_families() -> None:
     }
     ordinal = {"metrics": {"total": 3, "exact_match_acc": 0.5}}
 
-    assert compare_evals.detect_eval_type(categorical) == "remote_filter_categorical"
-    assert compare_evals.detect_eval_type(legacy_binary) == "remote_filter"
-    assert compare_evals.detect_eval_type(ordinal) == "skills_fit"
+    assert run_compare.detect_eval_type(categorical) == "remote_filter_categorical"
+    assert run_compare.detect_eval_type(legacy_binary) == "remote_filter"
+    assert run_compare.detect_eval_type(ordinal) == "skills_fit"
 
 
 def test_detect_eval_type_returns_unknown_for_ambiguous_metrics() -> None:
     # A drifted record carrying both `accuracy` and `micro_accuracy` matches two
     # detectors — resolve to "unknown" instead of letting registry order decide.
     ambiguous = {"metrics": {"total": 3, "accuracy": 0.5, "micro_accuracy": 0.8}}
-    assert compare_evals.detect_eval_type(ambiguous) == "unknown"
+    assert run_compare.detect_eval_type(ambiguous) == "unknown"
 
 
 def test_flatten_remote_filter_categorical_fails_fast_on_missing_headline() -> None:
     missing_macro = _categorical_run()
     del missing_macro["metrics"]["macro_f1"]
     with pytest.raises(ValueError, match="macro_f1"):
-        compare_evals._flatten_remote_filter_categorical(missing_macro)
+        run_compare.flatten_remote_filter_categorical(missing_macro)
 
     missing_recall = _categorical_run()
     del missing_recall["metrics"]["per_class"]["remote"]["recall"]
     with pytest.raises(ValueError, match=r"per_class\.remote\.recall"):
-        compare_evals._flatten_remote_filter_categorical(missing_recall)
+        run_compare.flatten_remote_filter_categorical(missing_recall)
 
 
 def test_flatten_remote_filter_categorical_extracts_headline_metrics() -> None:
-    row = compare_evals._flatten_remote_filter_categorical(_categorical_run())
+    row = run_compare.flatten_remote_filter_categorical(_categorical_run())
 
     assert row["run_id"] == "cat-a"
     assert row["date"] == "2025-01-02"
@@ -97,10 +105,45 @@ def test_flatten_remote_filter_categorical_extracts_headline_metrics() -> None:
     assert row["skipped"] == 1
     assert row["micro_acc"] == 0.75
     assert row["remote_recall"] == 0.8
+    assert row["remote_fn"] == 1
+    assert row["remote_fp"] == 1
     assert row["macro_f1"] == 0.7
     assert row["travel_mae"] is None
     assert row["est_cost"] is None
     assert row["cost_per_correct"] is None
+
+
+def test_bakeoff_comparable_guard_fails_fast_on_mixed_prompt_hash() -> None:
+    runs = [_categorical_run("a"), _categorical_run("b")]
+    runs[1]["prompt_hash"] = "different-prompt"
+
+    with pytest.raises(ValueError, match="mixed prompt_hash"):
+        bakeoff.ensure_bakeoff_comparable(runs)
+
+
+def test_bakeoff_render_rows_are_sorted_and_champion_marked() -> None:
+    rows = [
+        run_compare.flatten_remote_filter_categorical(
+            _categorical_run(
+                "expensive",
+                estimated_cost_usd=0.20,
+                estimated_cost_per_correct_usd=0.01,
+            )
+        ),
+        run_compare.flatten_remote_filter_categorical(
+            _categorical_run(
+                "cheap",
+                estimated_cost_usd=0.05,
+                estimated_cost_per_correct_usd=0.002,
+            )
+        ),
+    ]
+
+    rendered = bakeoff.build_bakeoff_render_rows(rows, champion_run_id="expensive")
+
+    assert [row["run_id"] for row in rendered] == ["cheap", "expensive"]
+    assert rendered[1]["champion"] == "*"
+    assert rendered[0]["cost_per_correct"] == "$0.002000"
 
 
 def test_bakeoff_renders_cost_table_sorted_by_cost_per_correct(

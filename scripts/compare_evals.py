@@ -16,8 +16,21 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
+
+from agent_eval.bakeoff import (
+    BAKEOFF_COLUMNS,
+    build_bakeoff_render_rows,
+    ensure_bakeoff_comparable,
+)
+from agent_eval.run_compare import (
+    ALL_SORT_CHOICES,
+    SCORER_REGISTRY,
+    detect_eval_type,
+    format_cell,
+)
 
 RUNS_FILE = "data/eval/runs.jsonl"
 CHAMPIONS_FILE = "config/eval/champions.yml"
@@ -25,225 +38,7 @@ TITLE_WIDTH = 28
 
 
 # ---------------------------------------------------------------------------
-# Scorer registry
-# Each entry owns one eval type.  Keys:
-#   detect(metrics_dict) -> bool   True if this type owns the run
-#   table_cols                     ordered column list for the summary table
-#   metric_cols                    set of float columns (4-decimal formatting)
-#   int_cols                       set of int columns
-#   diff_metrics                   ordered list for --diff view
-#   sort_choices                   valid --sort-by values
-#   flatten(run) -> dict           extract flat row from raw run record
-# ---------------------------------------------------------------------------
-
-
-def _flatten_remote_filter(run: dict) -> dict:
-    m = run.get("metrics", {})
-    cfg = run.get("config") or {}
-    return {
-        "run_id": run.get("run_id", ""),
-        "timestamp": run.get("timestamp", ""),
-        "date": run.get("timestamp", "")[:10],
-        "model": cfg.get("model", ""),
-        "temperature": cfg.get("temperature", ""),
-        "total": m.get("total", 0),
-        "skipped": m.get("skipped", 0),
-        "accuracy": m.get("accuracy", 0.0),
-        "precision": m.get("precision", 0.0),
-        "recall": m.get("recall", 0.0),
-        "f1": m.get("f1", 0.0),
-    }
-
-
-def _flatten_skills_fit(run: dict) -> dict:
-    m = run.get("metrics", {})
-    cfg = run.get("config") or {}
-    return {
-        "run_id": run.get("run_id", ""),
-        "timestamp": run.get("timestamp", ""),
-        "date": run.get("timestamp", "")[:10],
-        "scorer": run.get("scorer", ""),
-        "model": cfg.get("model", ""),
-        "total": m.get("total", 0),
-        "exact_match": m.get("exact_match_acc", 0.0),
-        "off_by_one": m.get("off_by_one_acc", 0.0),
-        "mae": m.get("mae", 0.0),
-        "bias": m.get("bias", 0.0),
-        "spearman": m.get("spearman_rho", 0.0),
-        "p5": m.get("precision_at_5", 0.0),
-    }
-
-
-def _flatten_remote_filter_categorical(run: dict) -> dict:
-    m = run.get("metrics", {})
-    cfg = run.get("config") or {}
-    cost = run.get("cost") or {}
-    run_id = run.get("run_id", "")
-
-    def require(mapping: object, key: str, path: str):
-        # Headline metrics are load-bearing for champion/challenger decisions —
-        # a missing field is schema drift, not a legitimate 0.0. Fail loud.
-        if not isinstance(mapping, dict) or key not in mapping:
-            raise ValueError(
-                f"categorical run {run_id!r} is missing required metric {path!r}"
-            )
-        return mapping[key]
-
-    def remote_error_counts() -> tuple[int, int]:
-        labels = require(m, "labels", "labels")
-        confusion = require(m, "confusion", "confusion")
-        if not isinstance(labels, list) or "remote" not in labels:
-            raise ValueError(f"categorical run {run_id!r} has invalid labels")
-        if not isinstance(confusion, list):
-            raise ValueError(f"categorical run {run_id!r} has invalid confusion")
-        remote_idx = labels.index("remote")
-        remote_fn = sum(
-            int(row[remote_idx])
-            for i, row in enumerate(confusion)
-            if i != remote_idx and isinstance(row, list) and remote_idx < len(row)
-        )
-        remote_row = confusion[remote_idx]
-        if not isinstance(remote_row, list):
-            raise ValueError(f"categorical run {run_id!r} has invalid remote row")
-        remote_fp = sum(
-            int(count) for i, count in enumerate(remote_row) if i != remote_idx
-        )
-        return remote_fn, remote_fp
-
-    per_class = m.get("per_class")
-    remote = require(
-        per_class if isinstance(per_class, dict) else {}, "remote", "per_class.remote"
-    )
-    remote_fn, remote_fp = remote_error_counts()
-    skipped = require(m, "skipped", "skipped")
-    agent_failed = int(m.get("agent_failed", 0) or 0)
-    return {
-        "run_id": run_id,
-        "timestamp": run.get("timestamp", ""),
-        "date": run.get("timestamp", "")[:10],
-        "model": cfg.get("model", ""),
-        "temperature": cfg.get("temperature", ""),
-        "total": require(m, "total", "total"),
-        "skipped": skipped,
-        "micro_acc": require(m, "micro_accuracy", "micro_accuracy"),
-        "remote_recall": require(remote, "recall", "per_class.remote.recall"),
-        "remote_fn": remote_fn,
-        "remote_fp": remote_fp,
-        "macro_f1": require(m, "macro_f1", "macro_f1"),
-        "travel_mae": m.get("travel_mae"),  # intentional nullable
-        "agent_failed": agent_failed,
-        "skipped_failed": f"{skipped}/{agent_failed}",
-        "est_cost": cost.get("estimated_cost_usd"),
-        "cost_per_correct": cost.get("estimated_cost_per_correct_usd"),
-    }
-
-
-SCORER_REGISTRY: dict[str, dict] = {
-    "remote_filter": {
-        "detect": lambda m: "accuracy" in m and "exact_match_acc" not in m,
-        "table_cols": [
-            "run_id",
-            "date",
-            "model",
-            "temperature",
-            "total",
-            "skipped",
-            "accuracy",
-            "precision",
-            "recall",
-            "f1",
-        ],
-        "metric_cols": {"accuracy", "precision", "recall", "f1"},
-        "int_cols": {"total", "skipped"},
-        "diff_metrics": ["accuracy", "precision", "recall", "f1", "total", "skipped"],
-        "sort_choices": ["timestamp", "accuracy", "precision", "recall", "f1"],
-        "flatten": _flatten_remote_filter,
-    },
-    "remote_filter_categorical": {
-        "detect": lambda m: "micro_accuracy" in m,
-        "table_cols": [
-            "run_id",
-            "date",
-            "model",
-            "temperature",
-            "total",
-            "skipped",
-            "micro_acc",
-            "remote_recall",
-            "remote_fn",
-            "remote_fp",
-            "macro_f1",
-            "travel_mae",
-        ],
-        "metric_cols": {
-            "micro_acc",
-            "remote_recall",
-            "macro_f1",
-            "travel_mae",
-            "est_cost",
-            "cost_per_correct",
-        },
-        "int_cols": {"total", "skipped", "remote_fn", "remote_fp", "agent_failed"},
-        "diff_metrics": [
-            "micro_acc",
-            "remote_recall",
-            "remote_fn",
-            "remote_fp",
-            "macro_f1",
-            "travel_mae",
-            "total",
-            "skipped",
-            "agent_failed",
-        ],
-        "sort_choices": ["timestamp", "micro_acc", "remote_recall", "macro_f1"],
-        "flatten": _flatten_remote_filter_categorical,
-    },
-    "skills_fit": {
-        "detect": lambda m: "exact_match_acc" in m,
-        "table_cols": [
-            "run_id",
-            "date",
-            "scorer",
-            "model",
-            "total",
-            "exact_match",
-            "off_by_one",
-            "mae",
-            "bias",
-            "spearman",
-            "p5",
-        ],
-        "metric_cols": {"exact_match", "off_by_one", "mae", "bias", "spearman", "p5"},
-        "int_cols": {"total"},
-        "diff_metrics": [
-            "exact_match",
-            "off_by_one",
-            "mae",
-            "bias",
-            "spearman",
-            "p5",
-            "total",
-        ],
-        "sort_choices": [
-            "timestamp",
-            "exact_match",
-            "off_by_one",
-            "mae",
-            "bias",
-            "spearman",
-            "p5",
-        ],
-        "flatten": _flatten_skills_fit,
-    },
-}
-
-ALL_SORT_CHOICES = sorted(
-    {c for spec in SCORER_REGISTRY.values() for c in spec["sort_choices"]}
-)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
+# CLI / I/O helpers
 # ---------------------------------------------------------------------------
 
 
@@ -256,19 +51,7 @@ def warn(message: str) -> None:
     print(f"Warning: {message}", file=sys.stderr)
 
 
-def detect_eval_type(run: dict) -> str:
-    # Return the family only when exactly one detector matches. Zero matches or an
-    # ambiguous multi-match (e.g. a drifted record carrying both `accuracy` and
-    # `micro_accuracy`) resolves to "unknown" rather than silently letting registry
-    # order pick a winner.
-    m = run.get("metrics", {})
-    matches = [name for name, spec in SCORER_REGISTRY.items() if spec["detect"](m)]
-    if len(matches) == 1:
-        return matches[0]
-    return "unknown"
-
-
-def load_jsonl(path: str | Path) -> list[dict]:
+def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(str(p))
@@ -280,7 +63,7 @@ def load_jsonl(path: str | Path) -> list[dict]:
     return rows
 
 
-def load_runs(path: str) -> list[dict]:
+def load_runs(path: str) -> list[dict[str, Any]]:
     p = Path(path)
     if not p.exists():
         print(f"No runs file found at {path}. Run the eval first.")
@@ -292,7 +75,7 @@ def load_runs(path: str) -> list[dict]:
     return runs
 
 
-def load_champions(path: str = CHAMPIONS_FILE) -> dict:
+def load_champions(path: str = CHAMPIONS_FILE) -> dict[str, Any]:
     p = Path(path)
     if not p.exists():
         die(f"Champions file not found: {path}")
@@ -302,22 +85,17 @@ def load_champions(path: str = CHAMPIONS_FILE) -> dict:
     return data
 
 
-def format_cell(col: str, val, spec: dict) -> str:
-    if col in spec["metric_cols"]:
-        if val is None:
-            return "—"
-        return f"{val:.4f}"
-    if col in spec["int_cols"]:
-        return str(val)
-    return str(val)
+# ---------------------------------------------------------------------------
+# Rendering helpers
+# ---------------------------------------------------------------------------
 
 
-def print_table(rows: list[dict], spec: dict, label: str) -> None:
+def print_table(rows: list[dict[str, Any]], spec: dict[str, Any], label: str) -> None:
     if not rows:
         return
     cols = spec["table_cols"]
     col_widths = {col: len(col) for col in cols}
-    cells: list[dict] = []
+    cells: list[dict[str, str]] = []
     for row in rows:
         c = {col: format_cell(col, row.get(col, ""), spec) for col in cols}
         cells.append(c)
@@ -334,12 +112,6 @@ def print_table(rows: list[dict], spec: dict, label: str) -> None:
         print(sep.join(c[col].ljust(col_widths[col]) for col in cols))
 
 
-def _format_money(value) -> str:
-    if value is None:
-        return "—"
-    return f"${value:.6f}"
-
-
 def _champion_run_id_for_eval_type(eval_type: str) -> str | None:
     champion_key = (
         "remote_filter" if eval_type == "remote_filter_categorical" else eval_type
@@ -348,80 +120,25 @@ def _champion_run_id_for_eval_type(eval_type: str) -> str | None:
     return champions.get(champion_key)
 
 
-def ensure_bakeoff_comparable(runs: list[dict]) -> None:
-    for field in ("gold_hash", "prompt_hash"):
-        missing = [run.get("run_id", "") for run in runs if not run.get(field)]
-        if missing:
-            die(
-                f"--bakeoff requires {field} on every selected run; "
-                f"missing for: {', '.join(missing)}"
-            )
-        values = {run[field] for run in runs}
-        if len(values) > 1:
-            die(f"--bakeoff selected runs with mixed {field}; not comparable")
-
-
-def print_bakeoff(rows: list[dict], champion_run_id: str | None) -> None:
+def print_bakeoff(rows: list[dict[str, Any]], champion_run_id: str | None) -> None:
     if not rows:
         print("No remote_filter categorical runs found for bake-off.")
         return
 
-    rows = sorted(
-        rows,
-        key=lambda r: (
-            r.get("cost_per_correct") is None,
-            r.get("cost_per_correct") if r.get("cost_per_correct") is not None else 0,
-            r.get("remote_recall", 0),
-            r.get("micro_acc", 0),
-        ),
-    )
-    cols = [
-        "champion",
-        "run_id",
-        "model",
-        "micro_acc",
-        "remote_recall",
-        "remote_fn",
-        "remote_fp",
-        "macro_f1",
-        "skipped_failed",
-        "est_cost",
-        "cost_per_correct",
-    ]
-    rendered_rows = []
-    spec = SCORER_REGISTRY["remote_filter_categorical"]
-    for row in rows:
-        rendered_rows.append(
-            {
-                "champion": "*" if row.get("run_id") == champion_run_id else "",
-                "run_id": row.get("run_id", ""),
-                "model": row.get("model", ""),
-                "micro_acc": format_cell("micro_acc", row.get("micro_acc"), spec),
-                "remote_recall": format_cell(
-                    "remote_recall", row.get("remote_recall"), spec
-                ),
-                "remote_fn": format_cell("remote_fn", row.get("remote_fn"), spec),
-                "remote_fp": format_cell("remote_fp", row.get("remote_fp"), spec),
-                "macro_f1": format_cell("macro_f1", row.get("macro_f1"), spec),
-                "skipped_failed": row.get("skipped_failed", ""),
-                "est_cost": _format_money(row.get("est_cost")),
-                "cost_per_correct": _format_money(row.get("cost_per_correct")),
-            }
-        )
-
+    rendered_rows = build_bakeoff_render_rows(rows, champion_run_id)
     col_widths = {
         col: max(len(col), *(len(str(row[col])) for row in rendered_rows))
-        for col in cols
+        for col in BAKEOFF_COLUMNS
     }
     sep = "  "
     print("\n[remote_filter_bakeoff]")
-    print(sep.join(col.ljust(col_widths[col]) for col in cols))
-    print(sep.join("-" * col_widths[col] for col in cols))
+    print(sep.join(col.ljust(col_widths[col]) for col in BAKEOFF_COLUMNS))
+    print(sep.join("-" * col_widths[col] for col in BAKEOFF_COLUMNS))
     for row in rendered_rows:
-        print(sep.join(str(row[col]).ljust(col_widths[col]) for col in cols))
+        print(sep.join(str(row[col]).ljust(col_widths[col]) for col in BAKEOFF_COLUMNS))
 
 
-def print_diff(a: dict, b: dict, spec: dict) -> None:
+def print_diff(a: dict[str, Any], b: dict[str, Any], spec: dict[str, Any]) -> None:
     id_a, id_b = a["run_id"], b["run_id"]
     col_w = max(len(id_a), len(id_b), 20)
     print(f"\n  {'Metric':<14}  {id_a:<{col_w}}  {id_b:<{col_w}}  {'Δ':>10}")
@@ -440,6 +157,11 @@ def print_diff(a: dict, b: dict, spec: dict) -> None:
             diff_str = "=" if va == vb else f"{vb} (was {va})"
         print(f"  {metric:<14}  {fa:<{col_w}}  {fb:<{col_w}}  {diff_str:>10}")
     print()
+
+
+# ---------------------------------------------------------------------------
+# Skills-fit per-record diff helpers
+# ---------------------------------------------------------------------------
 
 
 def truncate_text(text: str, width: int = TITLE_WIDTH) -> str:
@@ -469,7 +191,9 @@ def resolve_diff_ids(args: argparse.Namespace) -> tuple[str, str]:
     return args.diff[0], args.diff[1]
 
 
-def ensure_same_gold(run_a: dict, run_b: dict, id_a: str, id_b: str) -> None:
+def ensure_same_gold(
+    run_a: dict[str, Any], run_b: dict[str, Any], id_a: str, id_b: str
+) -> None:
     hash_a = run_a.get("gold_hash")
     hash_b = run_b.get("gold_hash")
     same_gold = bool(hash_a and hash_b and hash_a == hash_b)
@@ -481,7 +205,7 @@ def ensure_same_gold(run_a: dict, run_b: dict, id_a: str, id_b: str) -> None:
             )
 
 
-def ensure_no_skips(run: dict, run_id: str) -> None:
+def ensure_no_skips(run: dict[str, Any], run_id: str) -> None:
     skipped = (run.get("metrics") or {}).get("skipped", 0)
     if skipped > 0:
         die(
@@ -491,7 +215,7 @@ def ensure_no_skips(run: dict, run_id: str) -> None:
 
 
 def reconstruct_skills_fit_predictions(
-    run_record: dict,
+    run_record: dict[str, Any],
 ) -> tuple[dict[str, int], dict[str, int], dict[str, str]]:
     gold_rows = load_jsonl(run_record["gold_file"])
     gold: dict[str, int] = {}
@@ -548,8 +272,8 @@ def reconstruct_skills_fit_predictions(
 
 
 def build_skills_fit_per_record_rows(
-    run_a: dict, run_b: dict, id_a: str, id_b: str
-) -> list[dict]:
+    run_a: dict[str, Any], run_b: dict[str, Any], id_a: str, id_b: str
+) -> list[dict[str, Any]]:
     ensure_same_gold(run_a, run_b, id_a, id_b)
     ensure_no_skips(run_a, id_a)
     ensure_no_skips(run_b, id_b)
@@ -560,7 +284,7 @@ def build_skills_fit_per_record_rows(
     if set(gold_a) != set(gold_b):
         die("Gold record sets differ between runs — not comparable")
 
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for full_id in gold_a:
         gold_score_a = gold_a[full_id]
         gold_score_b = gold_b[full_id]
@@ -590,7 +314,7 @@ def build_skills_fit_per_record_rows(
     return rows
 
 
-def print_skills_fit_per_record_diff(rows: list[dict]) -> None:
+def print_skills_fit_per_record_diff(rows: list[dict[str, Any]]) -> None:
     print(f"  Per-record diff (n={len(rows)}, sorted by |Δ_A| + |Δ_B| desc)")
     print()
     print("| record_id | title | gold | A.pred | B.pred | Δ_A | Δ_B | flipped |")
@@ -697,13 +421,14 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def main() -> None:
-    args = parse_args()
-    raw_runs = load_runs(args.runs_file)
-
-    # Tag every run with its eval type and flatten it.
-    tagged: list[tuple[str, dict, dict]] = []
-    by_id: dict[str, tuple[str, dict, dict]] = {}
+def _tag_runs(
+    raw_runs: list[dict[str, Any]],
+) -> tuple[
+    list[tuple[str, dict[str, Any], dict[str, Any]]],
+    dict[str, tuple[str, dict[str, Any], dict[str, Any]]],
+]:
+    tagged: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    by_id: dict[str, tuple[str, dict[str, Any], dict[str, Any]]] = {}
     for run in raw_runs:
         etype = detect_eval_type(run)
         if etype == "unknown":
@@ -712,6 +437,13 @@ def main() -> None:
         flat = spec["flatten"](run)
         tagged.append((etype, run, flat))
         by_id[flat["run_id"]] = (etype, run, flat)
+    return tagged, by_id
+
+
+def main() -> None:
+    args = parse_args()
+    raw_runs = load_runs(args.runs_file)
+    tagged, by_id = _tag_runs(raw_runs)
 
     if args.diff:
         id_a, id_b = resolve_diff_ids(args)
@@ -741,15 +473,17 @@ def main() -> None:
         candidate_runs.sort(key=lambda pair: pair[1].get("timestamp", ""))
         if args.last:
             candidate_runs = candidate_runs[-args.last :]
-        ensure_bakeoff_comparable([raw for raw, _row in candidate_runs])
+        try:
+            ensure_bakeoff_comparable([raw for raw, _row in candidate_runs])
+        except ValueError as exc:
+            die(str(exc))
         print_bakeoff(
             [row for _raw, row in candidate_runs],
             _champion_run_id_for_eval_type("remote_filter_categorical"),
         )
         return
 
-    # Group by type, optionally filter.
-    groups: dict[str, list[dict]] = {}
+    groups: dict[str, list[dict[str, Any]]] = {}
     for etype, _raw, row in tagged:
         if args.eval_type and etype != args.eval_type:
             continue
