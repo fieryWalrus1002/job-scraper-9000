@@ -30,6 +30,7 @@ _REPO_ROOT = Path(__file__).parents[2]
 DEFAULT_COST_MATRIX_PATH = (
     _REPO_ROOT / "config" / "eval" / "remote_filter_error_costs.yml"
 )
+DEFAULT_EXPECTED_LABELS = ("remote", "hybrid", "onsite")
 
 
 class CostMatrix:
@@ -57,15 +58,16 @@ class CostMatrix:
 def load_cost_matrix(
     path: Path = DEFAULT_COST_MATRIX_PATH,
     *,
-    expected_labels: Iterable[str] | None = None,
+    expected_labels: Iterable[str] | None = DEFAULT_EXPECTED_LABELS,
 ) -> CostMatrix:
     """Load and validate the weighted-error cost matrix from YAML.
 
     Fails loud (per CLAUDE.md) on a missing file, missing ``costs`` block, a
     non-square matrix, or non-numeric cells — a silent default would let a broken
-    config quietly produce a meaningless scalar. When ``expected_labels`` is given
-    (the fixed remote_filter axis at the call site), the matrix must price exactly
-    that label set, so a mislabeled-but-square matrix fails at load rather than
+    config quietly produce a meaningless scalar. By default the loader pins the
+    fixed remote_filter 3-way axis; pass ``expected_labels=None`` only for an
+    intentionally generic matrix. The matrix must price exactly the expected
+    label set, so a mislabeled-but-square config fails at load rather than
     surfacing later as an unpriced-run-label error.
     """
     if not path.exists():

@@ -34,7 +34,6 @@ from agent_eval.run_compare import (
     format_cell,
 )
 from agent_eval.weighted_error import load_cost_matrix, weighted_error_for_run
-from agents.remote_filter.models import REMOTE_CLASSIFICATIONS
 
 RUNS_FILE = "data/eval/runs.jsonl"
 CHAMPIONS_FILE = "config/eval/champions.yml"
@@ -145,6 +144,8 @@ def print_bakeoff(
     # surface the hash the numbers were computed under (mirrors gold/prompt hash).
     if weights_hash:
         print(f"ranked by: {rank_by}  ·  weighted_error cost matrix: {weights_hash}")
+    else:
+        print(f"ranked by: {rank_by}")
     print(sep.join(col.ljust(col_widths[col]) for col in BAKEOFF_COLUMNS))
     print(sep.join("-" * col_widths[col] for col in BAKEOFF_COLUMNS))
     for row in rendered_rows:
@@ -505,7 +506,7 @@ def main() -> None:
         # Compute weighted_error at compare-time from each run's stored confusion
         # under the current cost matrix — no re-run needed to re-weight history.
         try:
-            matrix = load_cost_matrix(expected_labels=REMOTE_CLASSIFICATIONS)
+            matrix = load_cost_matrix()
         except (FileNotFoundError, ValueError) as exc:
             die(f"weighted_error cost matrix: {exc}")
         weights_hash = matrix.hash
