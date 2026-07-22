@@ -89,6 +89,27 @@ cost.
 current priced nano entry in that area of the table is `gpt-4.1-nano`. Do not add
 or run `gpt-4o-nano` unless an API/model-list check proves it exists.
 
+## Operational finding: the local model is a quality/cost anchor, not a pipeline engine
+
+Measured on the 2026-07-21 smoke run (`qwen-27b-mtp`, 102-record gold, `--workers 1`):
+
+- **Quality/cost:** 99.0% micro accuracy, 1.00 `remote` recall, `$0` API cost. A
+  local 27B reasoning model *can* match API-tier quality at zero marginal dollar
+  cost — a useful upper bound and a $0 floor for the cost axis.
+- **Throughput:** ~28s/call (it emits a ~2,700-token reasoning trace per job),
+  ≈ **2.1 jobs/min**, GPU-bound. Wall-clock equalled the summed per-call latency
+  (0% idle), so the single llama.cpp slot was saturated the whole time. Extra
+  eval `--workers` or parallel slots do **not** help — they split the same
+  ~90 tok/s aggregate. A 1,000-job cold run ≈ **8 hours at 100% GPU**.
+
+**Decision:** the local model is an **eval-time quality-and-cost anchor**, not the
+pipeline classifier. The `AnalysisCache` means steady-state runs only re-analyze
+new/unseen jobs (and the cache is shared across users), so the 8-hour figure is a
+cold-start / backfill / model-swap cost rather than a per-run tax — but it still
+can't be bursted on one GPU, so it's unusable as production throughput. The
+pipeline champion stays an API model (sub-second, horizontally scalable); the
+local run exists to tell us exactly what quality/$ we trade for that throughput.
+
 ## Procedure (the repeatable runbook)
 
 ```bash
@@ -197,3 +218,6 @@ current cheap 4.x nano reference instead. If a future API/model-list check prove
   visibility.
 - 2026-07-21 — verified current saved OpenAI pricing page: no `gpt-4o-nano` row;
   use `gpt-4.1-nano` as the current priced nano reference.
+- 2026-07-22 — recorded operational finding from the local smoke run: `qwen-27b-mtp`
+  hits 99% micro / 1.0 remote recall at $0 but only ~2.1 jobs/min (GPU-bound),
+  so the local model is an eval-time quality/cost anchor, not the pipeline classifier.
