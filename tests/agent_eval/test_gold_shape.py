@@ -21,24 +21,27 @@ pytestmark = pytest.mark.skipif(
 
 
 def load_gold_records() -> list[dict]:
-    """Deduped last-wins by the same key as ``run_remote_filter_eval.load_gold``.
+    """Deduped last-wins per ``dedup_hash``, matching the modern eval corpus.
 
     Gold is append-only: an HITL correction re-appends a row for an existing
-    ``dedup_hash`` (or legacy ``source_url``) and the later entry wins at eval
-    time. Validating raw lines would double-count corrections, so dedup exactly
-    as the eval loader does.
+    ``dedup_hash`` and the later entry wins at eval time. Validating raw lines
+    would double-count corrections, so dedup the same modern identity field the
+    eval loader uses before its legacy fallbacks. Missing ``dedup_hash`` is a
+    corpus-shape failure, not a row to merge by URL or skip silently.
     Deliberately no pinned record/label *counts*: gold legitimately grows via
     corrections, HITL additions, and dedup passes, and hard-coding magnitudes of
     an untracked local file guarantees false failures on every sanctioned change.
     We assert count-free shape invariants instead.
     """
     last: dict[str, dict] = {}
-    for line in GOLD_PATH.read_text().splitlines():
+    for line_no, line in enumerate(GOLD_PATH.read_text().splitlines(), start=1):
         line = line.strip()
         if not line:
             continue
         record = json.loads(line)
-        key = record.get("dedup_hash") or record.get("source_url") or str(id(record))
+        key = record.get("dedup_hash")
+        if not key:
+            raise AssertionError(f"gold row {line_no} missing dedup_hash")
         last[key] = record
     return list(last.values())
 
@@ -47,9 +50,7 @@ def test_remote_filter_gold_is_three_way_and_verdicted():
     records = load_gold_records()
 
     assert records, "gold corpus is present but empty"
-    assert all(
-        record.get("dedup_hash") or record.get("source_url") for record in records
-    )
+    assert all(record.get("dedup_hash") for record in records)
     assert all(record.get("_human_verdict") is not None for record in records)
     # Every gold label is on the active 3-way axis, and `unclear` is fully retired.
     assert "unclear" not in REMOTE_CLASSIFICATIONS
