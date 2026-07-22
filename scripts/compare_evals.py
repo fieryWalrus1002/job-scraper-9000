@@ -23,6 +23,7 @@ import yaml
 
 from agent_eval.bakeoff import (
     BAKEOFF_COLUMNS,
+    RANK_KEYS,
     build_bakeoff_render_rows,
     ensure_bakeoff_comparable,
 )
@@ -31,6 +32,11 @@ from agent_eval.run_compare import (
     SCORER_REGISTRY,
     detect_eval_type,
     format_cell,
+)
+from agent_eval.weighted_error import (
+    DEFAULT_COST_MATRIX_PATH,
+    load_cost_matrix,
+    weighted_error_for_run,
 )
 
 RUNS_FILE = "data/eval/runs.jsonl"
@@ -121,18 +127,32 @@ def _champion_run_id_for_eval_type(eval_type: str) -> str | None:
     return champions.get(champion_key)
 
 
-def print_bakeoff(rows: list[dict[str, Any]], champion_run_id: str | None) -> None:
+def print_bakeoff(
+    rows: list[dict[str, Any]],
+    champion_run_id: str | None,
+    rank_by: str = "cost_per_correct",
+    weights_hash: str | None = None,
+) -> None:
     if not rows:
         print("No remote_filter categorical runs found for bake-off.")
         return
 
-    rendered_rows = build_bakeoff_render_rows(rows, champion_run_id)
+    if not weights_hash and any(row.get("weighted_error") is not None for row in rows):
+        raise ValueError("weighted_error values require a cost matrix hash")
+
+    rendered_rows = build_bakeoff_render_rows(rows, champion_run_id, rank_by)
     col_widths = {
         col: max(len(col), *(len(str(row[col])) for row in rendered_rows))
         for col in BAKEOFF_COLUMNS
     }
     sep = "  "
     print("\n[remote_filter_bakeoff]")
+    # weighted_error is only comparable across rows sharing one cost matrix, so
+    # surface the hash the numbers were computed under (mirrors gold/prompt hash).
+    if weights_hash:
+        print(f"ranked by: {rank_by}  ·  weighted_error cost matrix: {weights_hash}")
+    else:
+        print(f"ranked by: {rank_by}")
     print(sep.join(col.ljust(col_widths[col]) for col in BAKEOFF_COLUMNS))
     print(sep.join("-" * col_widths[col] for col in BAKEOFF_COLUMNS))
     for row in rendered_rows:
@@ -397,6 +417,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--rank",
+        choices=list(RANK_KEYS),
+        default="cost_per_correct",
+        help=(
+            "Bake-off ranking axis (default: cost_per_correct). 'weighted_error' "
+            "ranks by the cost-asymmetry lens (#545); both are ascending."
+        ),
+    )
+    p.add_argument(
         "--against-champion",
         choices=list(SCORER_REGISTRY),
         help=f"Resolve the left-hand diff run from {CHAMPIONS_FILE}",
@@ -410,6 +439,8 @@ def parse_args() -> argparse.Namespace:
 
     if args.bakeoff and args.diff:
         p.error("--bakeoff cannot be combined with --diff")
+    if args.rank != "cost_per_correct" and not args.bakeoff:
+        p.error("--rank only applies to --bakeoff")
     if args.per_record and not args.diff:
         p.error("--per-record requires --diff")
     if args.against_champion and not args.diff:
@@ -479,9 +510,26 @@ def main() -> None:
             ensure_bakeoff_comparable([raw for raw, _row in candidate_runs])
         except ValueError as exc:
             die(str(exc))
+        # Compute weighted_error at compare-time from each run's stored confusion
+        # under the current cost matrix — no re-run needed to re-weight history.
+        try:
+            matrix = load_cost_matrix()
+        except (FileNotFoundError, ValueError) as exc:
+            die(
+                "failed to load weighted_error cost matrix config "
+                f"{DEFAULT_COST_MATRIX_PATH}: {exc}"
+            )
+        weights_hash = matrix.hash
+        for raw, row in candidate_runs:
+            try:
+                row["weighted_error"] = weighted_error_for_run(raw, matrix)
+            except ValueError as exc:
+                die(f"weighted_error for run {raw.get('run_id', '?')!r}: {exc}")
         print_bakeoff(
             [row for _raw, row in candidate_runs],
             _champion_run_id_for_eval_type("remote_filter_categorical"),
+            rank_by=args.rank,
+            weights_hash=weights_hash,
         )
         return
 

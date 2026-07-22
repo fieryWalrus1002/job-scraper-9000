@@ -1,0 +1,28 @@
+# Cost matrix for the remote_filter weighted-error metric (#545).
+#
+# weighted_error = Σ confusion[pred][gold] * cost[gold][pred]  (lower = better)
+#
+# The metric exists because micro/macro treat every misclassification equally,
+# but for a remote-focused search the error costs are strongly asymmetric:
+#   - remote -> onsite/hybrid  (remote_fn): lose a good remote job, unrecoverable. Worst.
+#   - onsite/hybrid -> remote  (remote_fp): surface a non-remote job; self-correcting. Cheap.
+#   - hybrid <-> onsite:       both involve office presence; near-zero cost.
+#
+# THESE WEIGHTS ARE A VALUE JUDGMENT, not a measured quantity. Tuning the actual
+# numbers is out of scope for #545 (that's a separate calibration once the
+# mechanism exists). The matrix is hashed into the bake-off output so a weighted
+# comparison is only read as valid across rows sharing the same cost matrix
+# (mirrors the gold_hash / prompt_hash comparable-run guard).
+#
+# weighted_error is an ADDITIVE lens. It does not replace the champion metric
+# pair (micro accuracy + remote recall); raw remote_fn / remote_fp stay visible
+# alongside the scalar so it remains auditable.
+
+version: 1
+
+# Row = gold (truth); column = predicted label. Diagonal is 0 (correct).
+# Labels must cover the remote_filter 3-way axis.
+costs:
+  remote: { remote: 0, hybrid: 2, onsite: 3 } # losing a remote job; onsite-miss worst
+  hybrid: { remote: 1, hybrid: 0, onsite: 0.1 }
+  onsite: { remote: 1, hybrid: 0.1, onsite: 0 }

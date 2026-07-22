@@ -13,10 +13,15 @@ BAKEOFF_COLUMNS = [
     "remote_fn",
     "remote_fp",
     "macro_f1",
+    "weighted_error",
     "skipped_failed",
     "est_cost",
     "cost_per_correct",
 ]
+
+# Bake-off ranking keys. `cost_per_correct` is the default decision axis (spec
+# §Decision metric); `weighted_error` is the additive cost-asymmetry lens (#545).
+RANK_KEYS = ("cost_per_correct", "weighted_error")
 
 
 def ensure_bakeoff_comparable(runs: list[dict[str, Any]]) -> None:
@@ -63,13 +68,23 @@ def ensure_bakeoff_comparable(runs: list[dict[str, Any]]) -> None:
             )
 
 
-def sort_bakeoff_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return bake-off rows sorted by cost per correct, then quality guardrails."""
+def sort_bakeoff_rows(
+    rows: list[dict[str, Any]], rank_by: str = "cost_per_correct"
+) -> list[dict[str, Any]]:
+    """Return bake-off rows sorted by the ranking key, then quality guardrails.
+
+    ``rank_by`` defaults to ``cost_per_correct`` (the spec decision axis). Passing
+    ``weighted_error`` ranks by the cost-asymmetry lens instead (#545); both keys
+    are ascending (lower is better), nulls sort last, and ``remote_recall`` /
+    ``micro_acc`` break ties so the recall guardrail still shows through.
+    """
+    if rank_by not in RANK_KEYS:
+        raise ValueError(f"rank_by must be one of {RANK_KEYS}; got {rank_by!r}")
     return sorted(
         rows,
         key=lambda r: (
-            r.get("cost_per_correct") is None,
-            r.get("cost_per_correct") if r.get("cost_per_correct") is not None else 0,
+            r.get(rank_by) is None,
+            r.get(rank_by) if r.get(rank_by) is not None else 0,
             -(r.get("remote_recall") or 0),
             -(r.get("micro_acc") or 0),
         ),
@@ -83,13 +98,22 @@ def format_money(value: Any) -> str:
     return f"${value:.6f}"
 
 
+def format_weighted_error(value: Any) -> str:
+    """Format a nullable weighted_error scalar for bake-off table display."""
+    if value is None:
+        return "—"
+    return f"{value:.2f}"
+
+
 def build_bakeoff_render_rows(
-    rows: list[dict[str, Any]], champion_run_id: str | None
+    rows: list[dict[str, Any]],
+    champion_run_id: str | None,
+    rank_by: str = "cost_per_correct",
 ) -> list[dict[str, str]]:
     """Build formatted, print-ready remote-filter bake-off table rows."""
     spec = SCORER_REGISTRY["remote_filter_categorical"]
     rendered_rows = []
-    for row in sort_bakeoff_rows(rows):
+    for row in sort_bakeoff_rows(rows, rank_by):
         rendered_rows.append(
             {
                 "champion": "*" if row.get("run_id") == champion_run_id else "",
@@ -102,6 +126,7 @@ def build_bakeoff_render_rows(
                 "remote_fn": format_cell("remote_fn", row.get("remote_fn"), spec),
                 "remote_fp": format_cell("remote_fp", row.get("remote_fp"), spec),
                 "macro_f1": format_cell("macro_f1", row.get("macro_f1"), spec),
+                "weighted_error": format_weighted_error(row.get("weighted_error")),
                 "skipped_failed": str(row.get("skipped_failed", "")),
                 "est_cost": format_money(row.get("est_cost")),
                 "cost_per_correct": format_money(row.get("cost_per_correct")),
