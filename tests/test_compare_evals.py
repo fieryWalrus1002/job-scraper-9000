@@ -38,16 +38,15 @@ def _categorical_run(
             "estimated_cost_per_correct_usd": estimated_cost_per_correct_usd,
         },
         "metrics": {
-            "labels": ["remote", "hybrid", "onsite", "unclear"],
+            "labels": ["remote", "hybrid", "onsite"],
             "evaluated": 10,
             "skipped": skipped,
             "agent_failed": agent_failed,
             "total": 11,
             "confusion": [
-                [4, 1, 0, 0],
-                [1, 2, 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
+                [4, 1, 0],
+                [1, 2, 0],
+                [0, 0, 3],
             ],
             "per_class": {
                 "remote": {
@@ -297,3 +296,111 @@ def test_categorical_last_and_diff_render_against_runs_fixture(
     assert "travel_mae" in diff
     assert "—" in diff
     assert "↑ +0.1000" in diff
+
+
+def _run_3way(
+    run_id: str,
+    confusion: list[list[int]],
+    *,
+    timestamp: str,
+    estimated_cost_usd: float,
+    estimated_cost_per_correct_usd: float,
+) -> dict:
+    """A 3-way (remote/hybrid/onsite) categorical run the cost matrix can price."""
+    return {
+        "run_id": run_id,
+        "timestamp": timestamp,
+        "config": {"model": run_id, "temperature": 0.0},
+        "gold_hash": "gold-123",
+        "prompt_hash": "prompt-123",
+        "resolved_user_message_hashes": {"aggregate": "agg-1", "count": 10},
+        "cost": {
+            "estimated_cost_usd": estimated_cost_usd,
+            "estimated_cost_per_correct_usd": estimated_cost_per_correct_usd,
+        },
+        "metrics": {
+            "labels": ["remote", "hybrid", "onsite"],
+            "evaluated": sum(sum(row) for row in confusion),
+            "skipped": 0,
+            "agent_failed": 0,
+            "total": sum(sum(row) for row in confusion),
+            "confusion": confusion,
+            "per_class": {"remote": {"recall": 0.9, "f1": 0.9, "support": 5}},
+            "macro_f1": 0.9,
+            "micro_accuracy": 0.9,
+            "travel_mae": None,
+        },
+    }
+
+
+def test_bakeoff_computes_weighted_error_column_and_matrix_hash(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    runs_file = tmp_path / "runs.jsonl"
+    # Sole error is 1 remote-gold predicted onsite -> cost[remote][onsite] = 3.0.
+    clean = _run_3way(
+        "clean",
+        [[5, 0, 0], [0, 3, 0], [1, 0, 2]],
+        timestamp="2025-01-02T00:00:00Z",
+        estimated_cost_usd=0.20,
+        estimated_cost_per_correct_usd=0.01,
+    )
+    runs_file.write_text(json.dumps(clean) + "\n")
+    monkeypatch.setattr(
+        compare_evals, "load_champions", lambda: {"remote_filter": "clean"}
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["compare_evals.py", "--runs-file", str(runs_file), "--bakeoff", "--last", "1"],
+    )
+
+    compare_evals.main()
+
+    out = capsys.readouterr().out
+    assert "weighted_error" in out
+    assert "3.00" in out
+    assert "cost matrix: sha256:" in out
+
+
+def test_bakeoff_rank_by_weighted_error_reorders_rows(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    runs_file = tmp_path / "runs.jsonl"
+    # `cheap` is cheaper but drops 2 remote jobs (weighted_error 6.0);
+    # `pricey` is costlier but perfect (weighted_error 0.0).
+    pricey = _run_3way(
+        "pricey",
+        [[5, 0, 0], [0, 3, 0], [0, 0, 2]],
+        timestamp="2025-01-02T00:00:00Z",
+        estimated_cost_usd=0.20,
+        estimated_cost_per_correct_usd=0.01,
+    )
+    cheap = _run_3way(
+        "cheap",
+        [[3, 0, 0], [0, 3, 0], [2, 0, 2]],
+        timestamp="2025-01-03T00:00:00Z",
+        estimated_cost_usd=0.05,
+        estimated_cost_per_correct_usd=0.002,
+    )
+    runs_file.write_text("\n".join(json.dumps(r) for r in (pricey, cheap)) + "\n")
+    monkeypatch.setattr(
+        compare_evals, "load_champions", lambda: {"remote_filter": "pricey"}
+    )
+
+    base_argv = [
+        "compare_evals.py",
+        "--runs-file",
+        str(runs_file),
+        "--bakeoff",
+        "--last",
+        "2",
+    ]
+    monkeypatch.setattr("sys.argv", base_argv)
+    compare_evals.main()
+    by_cost = capsys.readouterr().out
+    assert by_cost.index("cheap") < by_cost.index("pricey")
+
+    monkeypatch.setattr("sys.argv", base_argv + ["--rank", "weighted_error"])
+    compare_evals.main()
+    by_weighted = capsys.readouterr().out
+    assert by_weighted.index("pricey") < by_weighted.index("cheap")

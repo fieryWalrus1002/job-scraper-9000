@@ -204,9 +204,13 @@ current cheap 4.x nano reference instead. If a future API/model-list check prove
 - `skills_fit` bake-off — same mechanics, separate effort (ordinal metrics + kappa).
 - LLM-as-judge scoring for this bake-off. Human gold labels are primary; judges
   are allowed only as supplementary analysis outside the scored benchmark.
-- Weighted-error metric automation. Remote FN/FP counts are reported now; a
-  future spec can add `weighted_error = fp * cost_fp + fn * cost_fn` if a simple
-  scalar becomes useful.
+- ~~Weighted-error metric automation.~~ **Shipped (#545):** `--bakeoff` now
+  reports a `weighted_error` scalar from a per-confusion-cell cost matrix
+  (`config/eval/remote_filter_error_costs.yml`), computed at compare-time from
+  each run's stored confusion, with `--rank weighted_error` and the matrix hash
+  surfaced for auditability. Raw `remote_fn`/`remote_fp` stay visible; it is an
+  additive lens, not a replacement for the champion metric pair. Tuning the
+  weight values remains out of scope (a separate calibration).
 - Automated champion promotion — stays a human PR decision.
 
 ## Changelog
@@ -218,6 +222,9 @@ current cheap 4.x nano reference instead. If a future API/model-list check prove
   visibility.
 - 2026-07-21 — verified current saved OpenAI pricing page: no `gpt-4o-nano` row;
   use `gpt-4.1-nano` as the current priced nano reference.
+- 2026-07-22 — shipped the weighted-error lens (#545): compare-time
+  `weighted_error` from a config cost matrix, `--rank weighted_error`, matrix hash
+  in the bake-off output. Moved from Out-of-scope to done.
 - 2026-07-22 — recorded operational finding from the local smoke run: `qwen-27b-mtp`
   hits 99% micro / 1.0 remote recall at $0 but only ~2.1 jobs/min (GPU-bound),
   so the local model is an eval-time quality/cost anchor, not the pipeline classifier.
