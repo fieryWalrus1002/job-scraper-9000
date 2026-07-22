@@ -34,6 +34,7 @@ from agent_eval.run_compare import (
     format_cell,
 )
 from agent_eval.weighted_error import load_cost_matrix, weighted_error_for_run
+from agents.remote_filter.models import REMOTE_CLASSIFICATIONS
 
 RUNS_FILE = "data/eval/runs.jsonl"
 CHAMPIONS_FILE = "config/eval/champions.yml"
@@ -430,6 +431,8 @@ def parse_args() -> argparse.Namespace:
 
     if args.bakeoff and args.diff:
         p.error("--bakeoff cannot be combined with --diff")
+    if args.rank != "cost_per_correct" and not args.bakeoff:
+        p.error("--rank only applies to --bakeoff")
     if args.per_record and not args.diff:
         p.error("--per-record requires --diff")
     if args.against_champion and not args.diff:
@@ -501,14 +504,16 @@ def main() -> None:
             die(str(exc))
         # Compute weighted_error at compare-time from each run's stored confusion
         # under the current cost matrix — no re-run needed to re-weight history.
-        weights_hash: str | None = None
         try:
-            matrix = load_cost_matrix()
-            weights_hash = matrix.hash
-            for raw, row in candidate_runs:
-                row["weighted_error"] = weighted_error_for_run(raw, matrix)
+            matrix = load_cost_matrix(expected_labels=REMOTE_CLASSIFICATIONS)
         except (FileNotFoundError, ValueError) as exc:
-            die(f"weighted_error: {exc}")
+            die(f"weighted_error cost matrix: {exc}")
+        weights_hash = matrix.hash
+        for raw, row in candidate_runs:
+            try:
+                row["weighted_error"] = weighted_error_for_run(raw, matrix)
+            except ValueError as exc:
+                die(f"weighted_error for run {raw.get('run_id', '?')!r}: {exc}")
         print_bakeoff(
             [row for _raw, row in candidate_runs],
             _champion_run_id_for_eval_type("remote_filter_categorical"),

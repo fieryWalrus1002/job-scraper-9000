@@ -92,6 +92,20 @@ def test_load_rejects_non_square_matrix(tmp_path) -> None:
         load_cost_matrix(path)
 
 
+def test_load_rejects_matrix_off_the_active_axis(tmp_path) -> None:
+    # Square but mislabeled: must fail at load when the active axis is pinned,
+    # not silently later as an unpriced-run-label error.
+    path = tmp_path / "costs.yml"
+    path.write_text(
+        "costs:\n"
+        "  remote: {remote: 0, hybrid: 1, wfh: 1}\n"
+        "  hybrid: {remote: 1, hybrid: 0, wfh: 1}\n"
+        "  wfh: {remote: 1, hybrid: 1, wfh: 0}\n"
+    )
+    with pytest.raises(ValueError, match="must match the active axis"):
+        load_cost_matrix(path, expected_labels=LABELS)
+
+
 def test_load_rejects_non_numeric_cell(tmp_path) -> None:
     path = tmp_path / "costs.yml"
     path.write_text("costs:\n  remote: {remote: free}\n")

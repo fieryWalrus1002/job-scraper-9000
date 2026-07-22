@@ -18,6 +18,7 @@ and hashed so a weighted comparison is only valid across rows sharing one matrix
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -53,12 +54,19 @@ class CostMatrix:
         return self.costs[gold][pred]
 
 
-def load_cost_matrix(path: Path = DEFAULT_COST_MATRIX_PATH) -> CostMatrix:
+def load_cost_matrix(
+    path: Path = DEFAULT_COST_MATRIX_PATH,
+    *,
+    expected_labels: Iterable[str] | None = None,
+) -> CostMatrix:
     """Load and validate the weighted-error cost matrix from YAML.
 
     Fails loud (per CLAUDE.md) on a missing file, missing ``costs`` block, a
     non-square matrix, or non-numeric cells — a silent default would let a broken
-    config quietly produce a meaningless scalar.
+    config quietly produce a meaningless scalar. When ``expected_labels`` is given
+    (the fixed remote_filter axis at the call site), the matrix must price exactly
+    that label set, so a mislabeled-but-square matrix fails at load rather than
+    surfacing later as an unpriced-run-label error.
     """
     if not path.exists():
         raise FileNotFoundError(f"cost matrix config not found: {path}")
@@ -87,6 +95,14 @@ def load_cost_matrix(path: Path = DEFAULT_COST_MATRIX_PATH) -> CostMatrix:
                 )
             parsed_row[pred] = float(value)
         costs[gold] = parsed_row
+
+    if expected_labels is not None:
+        expected = set(expected_labels)
+        if set(costs) != expected:
+            raise ValueError(
+                f"{path}: cost matrix labels {sorted(costs)} must match the active "
+                f"axis {sorted(expected)}"
+            )
 
     version = data.get("version", 0)
     if not isinstance(version, int):
