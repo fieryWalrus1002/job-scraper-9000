@@ -8,6 +8,11 @@ from utils.openai_pricing import estimate_cost
 
 TOKEN_TOTAL_KEYS = ("input_tokens", "cached_input_tokens", "output_tokens")
 
+# Providers with no API invoice (local llama.cpp is routed via the `ollama`
+# provider value — see CLAUDE.md). Only these are reported as zero API cost; any
+# other non-openai string is surfaced loudly rather than silently priced at $0.
+LOCAL_ZERO_COST_PROVIDERS = frozenset({"ollama"})
+
 
 def empty_token_totals() -> dict[str, int]:
     """Return the canonical zero/default token totals shape."""
@@ -73,12 +78,18 @@ def build_cost_summary(
         else:
             estimated_total = breakdown["total"]
             pricing_note = "openai_list_price_estimate"
-    else:
+    elif provider in LOCAL_ZERO_COST_PROVIDERS:
         # Local/ollama-compatible runs have no API invoice. Tokens may still be
         # present for observability, but estimated dollar cost is intentionally $0.
         breakdown = None
         estimated_total = 0.0
         pricing_note = "local_provider_zero_api_cost"
+    else:
+        # Unknown/unsupported provider: don't silently claim $0 (that would distort
+        # a bake-off table). Surface it as unpriced, like a missing OpenAI entry.
+        breakdown = None
+        estimated_total = None
+        pricing_note = "unsupported_provider"
 
     return {
         "token_totals": canonical_token_totals,

@@ -208,13 +208,10 @@ def _evaluate_record(
 def _log_record_result(result: RecordEvalResult) -> None:
     job = result.job
     if result.skipped:
-        if result.skip_reason == "invalid_human_classification":
-            log.warning(
-                "Record %d (%s) has no valid _human_classification — skipping",
-                result.index,
-                job.get("title"),
-            )
-        elif result.skip_reason == "missing_description":
+        # Invalid _human_classification is not a skip — _evaluate_record raises on
+        # it (fail fast on bad gold), so only missing_description / agent_failed
+        # reach here.
+        if result.skip_reason == "missing_description":
             log.warning(
                 "Record %d (%s) has no description — skipping",
                 result.index,
@@ -268,6 +265,10 @@ def _metrics_input_from_results(results: list[RecordEvalResult]) -> EvalMetricsI
 
     for result in results:
         add_token_totals(token_totals, result.token_totals)
+        # elapsed == 0.0 marks a record that never called the model (e.g. a
+        # missing_description skip returns before timing); a real call is always
+        # > 0. agent_failed records DID call and carry real elapsed, so this keeps
+        # them in the latency summary while excluding pre-call skips.
         if result.elapsed > 0:
             elapsed_seconds.append(result.elapsed)
         if result.skipped:
@@ -358,19 +359,20 @@ def run_eval(
             _evaluate_record(i, job, config, run_id) for i, job in enumerate(records)
         ]
     else:
-        executor = ThreadPoolExecutor(max_workers=workers)
-        try:
-            results = list(
-                executor.map(
-                    lambda item: _evaluate_record(item[0], item[1], config, run_id),
-                    enumerate(records),
+        # Context manager guarantees shutdown on ANY exception (e.g. a ValueError
+        # from invalid gold), not just the success/KeyboardInterrupt paths —
+        # otherwise a mid-map failure would leak worker threads.
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            try:
+                results = list(
+                    executor.map(
+                        lambda item: _evaluate_record(item[0], item[1], config, run_id),
+                        enumerate(records),
+                    )
                 )
-            )
-        except KeyboardInterrupt:
-            executor.shutdown(wait=False, cancel_futures=True)
-            raise
-        else:
-            executor.shutdown()
+            except KeyboardInterrupt:
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise
 
     for result in results:
         _log_record_result(result)

@@ -7,7 +7,13 @@ P95_PERCENTILE = 95
 
 
 def percentile(values: list[float], percentile_value: float) -> float | None:
-    """Return the nearest-rank percentile value used by eval summaries."""
+    """Return the percentile value at the rounded zero-based rank.
+
+    Uses the index ``round((p/100) * (n-1))`` into the sorted values — i.e. the
+    nearest observed value to the linear-interpolation position, not the ceil-based
+    "nearest-rank" definition. Adequate for the eval latency summaries; may differ
+    from other percentile conventions on very small samples.
+    """
     if not values:
         return None
     if not 0 <= percentile_value <= 100:

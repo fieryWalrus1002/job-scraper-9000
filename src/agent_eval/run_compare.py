@@ -68,6 +68,15 @@ def extract_remote_error_counts(
         raise ValueError(f"categorical run {run_id!r} has invalid labels")
     if not isinstance(confusion, list):
         raise ValueError(f"categorical run {run_id!r} has invalid confusion")
+    # Fail loud on a non-square matrix rather than IndexError-ing while indexing
+    # confusion[remote_idx] / row[remote_idx] below.
+    if len(confusion) != len(labels) or any(
+        not isinstance(row, list) or len(row) != len(labels) for row in confusion
+    ):
+        raise ValueError(
+            f"categorical run {run_id!r} confusion is not a {len(labels)}x"
+            f"{len(labels)} matrix matching labels"
+        )
 
     remote_idx = labels.index("remote")
     remote_fn = sum(

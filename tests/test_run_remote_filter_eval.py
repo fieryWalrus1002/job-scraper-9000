@@ -354,6 +354,24 @@ def test_cost_summary_prices_openai_despite_provider_case():
     assert cost["estimated_cost_usd"] is not None
 
 
+def test_cost_summary_marks_unknown_provider_unpriced():
+    # An unrecognized provider string must not silently report $0 (which would
+    # distort a bake-off); it should surface as unpriced.
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "mystery-provider",
+        "some-model",
+        metrics,
+        {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 5},
+    )
+
+    assert cost["estimated_cost_usd"] is None
+    assert cost["pricing_note"] == "unsupported_provider"
+
+
 def test_provider_override_without_model_fails_fast(monkeypatch, tmp_path):
     gold_file = tmp_path / "gold.jsonl"
     gold_file.write_text(

@@ -125,6 +125,17 @@ def test_flatten_remote_filter_categorical_extracts_headline_metrics() -> None:
     assert row["cost_per_correct"] is None
 
 
+def test_extract_remote_error_counts_fails_loud_on_non_square_confusion() -> None:
+    # Malformed-but-parseable confusion must raise a clear ValueError, not an
+    # IndexError from indexing confusion[remote_idx].
+    metrics = {
+        "labels": ["remote", "hybrid", "onsite"],
+        "confusion": [[1, 2, 3], [4, 5, 6]],  # 2 rows for 3 labels
+    }
+    with pytest.raises(ValueError, match="not a 3x3 matrix"):
+        run_compare.extract_remote_error_counts(metrics, "badrun")
+
+
 def test_bakeoff_comparable_guard_fails_fast_on_mixed_gold_hash() -> None:
     runs = [_categorical_run("a"), _categorical_run("b")]
     runs[1]["gold_hash"] = "different-gold"
