@@ -98,8 +98,8 @@ time on a stored description cleans it — the second pass sees real tags.) Veri
 bypass** — conversion runs; escaped input defeats it. Impact: every greenhouse posting,
 every run (1,961 SpaceX in the 2026-07-20 run alone).
 
-Because the fix is a one-liner and the bug is live, it ships as its own small PR (see
-slice 3 / the standalone issue), not gated on the rest of this phase.
+Because the fix is a one-liner and the bug is live, it ships as its own small PR
+(slice 0 / #551), not gated on the rest of this phase.
 
 The **22 escaped-HTML gold records** are the *same mechanism, older*: scraped 2026-05-13,
 before #389 — the old path stored the API's escaped HTML directly. Handled as gold repair
@@ -213,3 +213,5 @@ independently of 3–5.
 - 2026-07-22 — **RATIFIED.** Milestone #26 created; greenhouse fix filed as #551 (slice 0).
   Dropped the abandoned `html_scrub`-split framing from the PR slices and the
   `scrub_counts` note (the design is `clean_description` composing the existing pieces).
+- 2026-07-22 — Fixed a stale §2 cross-reference: the greenhouse fix is slice 0 / #551
+  (was mislabeled "slice 3 / the standalone issue"). Post-merge follow-up to #552.
