@@ -94,6 +94,7 @@ def test_gpt_5_4_mini_batch_is_half_standard() -> None:
 @pytest.mark.parametrize(
     ("model", "expected_total"),
     [
+        ("gpt-4.1-mini", 0.00057),
         ("gpt-4.1-nano", 0.0001425),
         ("gpt-5.4-nano", 0.00036),
         ("gpt-5.6-luna", 0.00175),

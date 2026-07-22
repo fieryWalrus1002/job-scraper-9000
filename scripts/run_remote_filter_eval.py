@@ -38,6 +38,7 @@ from agents.remote_filter.utils import (
     resolve_provider_and_model,
 )
 from agent_eval.costing import build_cost_summary
+from utils.openai_pricing import estimate_cost
 from agent_eval.provenance import build_run_record, generate_run_id
 from utils.run_logger import JsonlRunLogger, RunLogger
 
@@ -80,6 +81,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--no-mismatches", action="store_true", help="Skip writing mismatch file"
+    )
+    p.add_argument(
+        "--allow-unpriced",
+        action="store_true",
+        help="Run even if the OpenAI model has no pricing entry (quality-only, null cost)",
     )
     p.add_argument(
         "--workers",
@@ -233,6 +239,28 @@ def main(run_logger: RunLogger | None = None) -> None:
             sys.exit(1)
         llm["provider"] = args.provider
 
+    # Resolve the provider/model the run will actually use (same resolver as
+    # inference and costing) so we can price-check before spending anything.
+    provider, model = resolve_provider_and_model(config.get("llm"))
+
+    # Pre-flight: fail fast BEFORE any paid API call if an OpenAI model has no
+    # pricing entry. Otherwise a typo'd/new --model runs the full gold set, costs
+    # real money, and only whispers `missing_openai_pricing_entry` into the run
+    # record afterward. --allow-unpriced opts into a quality-only (uncosted) run.
+    if (
+        provider == "openai"
+        and not args.allow_unpriced
+        and estimate_cost(model, input_tokens=1, cached_input_tokens=0, output_tokens=0)
+        is None
+    ):
+        log.error(
+            "OpenAI model %r has no pricing entry in config/pricing/openai.yml, so "
+            "this run would record null cost. Add verified rates for it, or pass "
+            "--allow-unpriced for a quality-only run.",
+            model,
+        )
+        sys.exit(1)
+
     run_id = generate_run_id(args.run_id)
 
     if run_logger is None:
@@ -246,10 +274,7 @@ def main(run_logger: RunLogger | None = None) -> None:
     )
 
     metrics = assemble_metrics(metrics_input)
-    # Price against the *resolved* provider/model (same resolver inference uses),
-    # not raw config — so an env/default-resolved OpenAI run can't be mislabeled
-    # local zero-cost.
-    provider, model = resolve_provider_and_model(config.get("llm"))
+    # Price against the resolved provider/model (computed at pre-flight above).
     cost = build_cost_summary(
         provider, model, metrics["metrics"], metrics_input.token_totals
     )

@@ -102,17 +102,18 @@ uv run scripts/run_remote_filter_eval.py
 **Input:** `data/eval/ground_truth.jsonl`
 **Output:** `data/eval/runs.jsonl` (appended), `data/eval/mismatches_{run_id}.jsonl` (if any mismatches)
 
-| Flag              | Default                         | Description                                                                                                                      |
-| ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `--gold`          | `data/eval/ground_truth.jsonl`  | Gold JSONL to evaluate against                                                                                                   |
-| `--config`        | `config/agent/remote_agent.yml` | Agent config YAML                                                                                                                |
-| `--runs-file`     | `data/eval/runs.jsonl`          | Run log to append to                                                                                                             |
-| `--model`         | _(from config)_                 | Override `llm.model` in-memory — does not modify the YAML                                                                        |
-| `--temperature`   | _(from config)_                 | Override `llm.temperature` in-memory                                                                                             |
-| `--provider`      | _(from config)_                 | Override `llm.provider` in-memory (`openai` or `ollama`)                                                                         |
-| `--run-id`        | _(auto-generated)_              | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique.                             |
-| `--no-mismatches` | off                             | Skip writing the mismatch file                                                                                                   |
-| `--workers`       | `1`                             | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
+| Flag               | Default                         | Description                                                                                                                                                    |
+| ------------------ | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--gold`           | `data/eval/ground_truth.jsonl`  | Gold JSONL to evaluate against                                                                                                                                 |
+| `--config`         | `config/agent/remote_agent.yml` | Agent config YAML                                                                                                                                              |
+| `--runs-file`      | `data/eval/runs.jsonl`          | Run log to append to                                                                                                                                           |
+| `--model`          | _(from config)_                 | Override `llm.model` in-memory — does not modify the YAML                                                                                                      |
+| `--temperature`    | _(from config)_                 | Override `llm.temperature` in-memory                                                                                                                           |
+| `--provider`       | _(from config)_                 | Override `llm.provider` in-memory (`openai` or `ollama`)                                                                                                       |
+| `--run-id`         | _(auto-generated)_              | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique.                                                           |
+| `--no-mismatches`  | off                             | Skip writing the mismatch file                                                                                                                                 |
+| `--allow-unpriced` | off                             | Run even if the OpenAI model has no pricing entry. Without it, an unpriced OpenAI model fails fast **before** any API call (no accidental paid, uncosted run). |
+| `--workers`        | `1`                             | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance.                               |
 
 The default provider is `openai` (model: `gpt-5.4-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 

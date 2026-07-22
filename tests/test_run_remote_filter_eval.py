@@ -380,6 +380,70 @@ def test_provider_override_without_model_fails_fast(monkeypatch, tmp_path):
     assert exc.value.code == 1
 
 
+def _write_gold_and_config(tmp_path, provider, model):
+    gold_file = tmp_path / "gold.jsonl"
+    gold_file.write_text(
+        '{"title":"A","description":"desc","_human_classification":"remote"}\n'
+    )
+    config_file = tmp_path / "remote_agent.yml"
+    config_file.write_text(f"llm:\n  provider: {provider}\n  model: {model}\n")
+    return gold_file, config_file
+
+
+def test_unpriced_openai_model_fails_fast_before_any_api_call(monkeypatch, tmp_path):
+    gold_file, config_file = _write_gold_and_config(tmp_path, "openai", "gpt-imaginary")
+
+    def exploding_run_eval(*a, **k):
+        raise AssertionError("run_eval must not be reached for an unpriced model")
+
+    monkeypatch.setattr(eval_script, "run_eval", exploding_run_eval)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        eval_script.main()
+    assert exc.value.code == 1
+
+
+def test_allow_unpriced_lets_openai_model_run(monkeypatch, tmp_path):
+    gold_file, config_file = _write_gold_and_config(tmp_path, "openai", "gpt-imaginary")
+    logger_records = []
+
+    class CapturingRunLogger:
+        def log_run(self, record):
+            logger_records.append(record)
+
+    def fake_run_eval(records, config, run_id, workers=1):
+        return ([], eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"]), [])
+
+    monkeypatch.setattr(eval_script, "run_eval", fake_run_eval)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+            "--runs-file",
+            str(tmp_path / "runs.jsonl"),
+            "--allow-unpriced",
+            "--no-mismatches",
+        ],
+    )
+
+    eval_script.main(run_logger=CapturingRunLogger())
+    assert logger_records[0]["cost"]["pricing_note"] == "missing_openai_pricing_entry"
+
+
 def test_print_report_renders_empty_travel_rates_as_na(capsys):
     metrics = eval_core.assemble_metrics(
         eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])

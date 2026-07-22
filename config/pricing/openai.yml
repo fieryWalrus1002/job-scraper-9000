@@ -43,7 +43,11 @@ models:
     cached_input: 1.25
     output: 10.00
 
-  # gpt-4.1 family — current cheap non-reasoning reference for bake-offs
+  # gpt-4.1 family — current cheap non-reasoning references for bake-offs
+  gpt-4.1-mini:
+    input: 0.40
+    cached_input: 0.10
+    output: 1.60
   gpt-4.1-nano:
     input: 0.10
     cached_input: 0.025
