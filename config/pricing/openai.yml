@@ -24,6 +24,10 @@ source: https://developers.openai.com/api/docs/pricing
 fetched_at: "2026-07-21"
 
 # rates: input / cached_input / output, USD per 1M tokens
+# GPT-5.6 also has a separately listed cache-write rate, but Chat Completions
+# usage does not expose cache-write tokens. Estimates therefore treat non-cached
+# input at the standard input rate; use src/utils/openai_costs.py for invoice
+# actuals if the exact 5.6 billed cost matters for a decision.
 models:
   # gpt-4o family
   gpt-4o:
@@ -38,8 +42,34 @@ models:
     input: 2.50
     cached_input: 1.25
     output: 10.00
+
+  # gpt-4.1 family — current cheap non-reasoning references for bake-offs
+  gpt-4.1-mini:
+    input: 0.40
+    cached_input: 0.10
+    output: 1.60
+  gpt-4.1-nano:
+    input: 0.10
+    cached_input: 0.025
+    output: 0.40
+
   # gpt-5.4 family — primary scoring model (skills_fit, remote_agent, ai_review)
   gpt-5.4-mini:
     input: 0.75
     cached_input: 0.075
     output: 4.50
+  gpt-5.4-nano:
+    input: 0.20
+    cached_input: 0.02
+    output: 1.25
+
+  # gpt-5.6 family — standard short-context rates. Cache-write has a separate
+  # listed rate; see the file header caveat and src/utils/openai_costs.py.
+  gpt-5.6-luna:
+    input: 1.00
+    cached_input: 0.10
+    output: 6.00
+  gpt-5.6-terra:
+    input: 2.50
+    cached_input: 0.25
+    output: 15.00

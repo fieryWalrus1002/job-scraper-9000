@@ -4,7 +4,14 @@ import time
 import pytest
 from pydantic import ValidationError
 
+from agent_eval.costing import (
+    aggregate_token_totals,
+    build_cost_summary,
+    empty_token_totals,
+)
+from agent_eval.stats import latency_summary, percentile
 from agents.remote_filter.input_models import RemoteFilterInput
+from agents.remote_filter import eval as eval_core
 from agents.remote_filter.models import RemoteAnalysis
 from agents.remote_filter.utils import _build_user_message
 from scripts import run_remote_filter_eval as eval_script
@@ -59,25 +66,33 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
 
     def fake_analyze_remote(rf_input, **kwargs):
         assert isinstance(rf_input, RemoteFilterInput)
-        assert set(kwargs) == {"llm_config"}
+        assert set(kwargs) == {"llm_config", "usage_callback"}
+        kwargs["usage_callback"](
+            {"input_tokens": 100, "cached_input_tokens": 25, "output_tokens": 10}
+        )
         delays = {"slow-pass": 0.03, "fast-fn": 0.0, "medium-fp": 0.01}
         time.sleep(delays[rf_input.title])
         if rf_input.title == "fast-fn":
             return _analysis("hybrid", travel_days=5)
         return _analysis("remote", travel_days=5)
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
-    mismatches, metrics_input, prompt_hashes = eval_script.run_eval(
+    mismatches, metrics_input, prompt_hashes = eval_core.run_eval(
         records,
         _config(),
         run_id="test_run",
         workers=3,
     )
-    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+    metrics = eval_core.assemble_metrics(metrics_input)["metrics"]
 
     assert metrics_input.preds == ["remote", "hybrid", "remote"]
     assert metrics_input.golds == ["remote", "remote", "hybrid"]
+    assert metrics_input.token_totals == {
+        "input_tokens": 300,
+        "cached_input_tokens": 75,
+        "output_tokens": 30,
+    }
     assert metrics["evaluated"] == 3
     assert metrics["skipped"] == 0
     assert metrics["confusion"] == [
@@ -102,7 +117,7 @@ def test_parallel_eval_preserves_input_order_and_categorical_metrics(monkeypatch
 
 def test_assemble_metrics_counts_asymmetric_travel_presence():
     results = [
-        eval_script.RecordEvalResult(
+        eval_core.RecordEvalResult(
             index=0,
             job={"title": "both-present"},
             gold_classification="remote",
@@ -112,7 +127,7 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
             reason="both",
             elapsed=0.0,
         ),
-        eval_script.RecordEvalResult(
+        eval_core.RecordEvalResult(
             index=1,
             job={"title": "gold-only"},
             gold_classification="remote",
@@ -122,7 +137,7 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
             reason="missed travel",
             elapsed=0.0,
         ),
-        eval_script.RecordEvalResult(
+        eval_core.RecordEvalResult(
             index=2,
             job={"title": "pred-only"},
             gold_classification="remote",
@@ -134,8 +149,8 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
         ),
     ]
 
-    metrics_input = eval_script._metrics_input_from_results(results)
-    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+    metrics_input = eval_core._metrics_input_from_results(results)
+    metrics = eval_core.assemble_metrics(metrics_input)["metrics"]
 
     assert metrics_input.gold_travel_days == [10]
     assert metrics_input.pred_travel_days == [12]
@@ -148,19 +163,308 @@ def test_assemble_metrics_counts_asymmetric_travel_presence():
 
 
 def test_assemble_metrics_fails_fast_on_misaligned_travel_lists():
-    misaligned = eval_script.EvalMetricsInput(
+    misaligned = eval_core.EvalMetricsInput(
         preds=["remote"],
         golds=["remote"],
         pred_travel_days=[10, 20],
         gold_travel_days=[10],
     )
     with pytest.raises(ValueError, match="pred_travel_days and gold_travel_days"):
-        eval_script.assemble_metrics(misaligned)
+        eval_core.assemble_metrics(misaligned)
+
+
+def test_token_total_helpers_default_and_aggregate_shape():
+    assert empty_token_totals() == {
+        "input_tokens": 0,
+        "cached_input_tokens": 0,
+        "output_tokens": 0,
+    }
+    assert aggregate_token_totals(
+        [
+            {"input_tokens": 100, "cached_input_tokens": 25, "output_tokens": 10},
+            {"input_tokens": 7, "output_tokens": 3},
+        ]
+    ) == {
+        "input_tokens": 107,
+        "cached_input_tokens": 25,
+        "output_tokens": 13,
+    }
+
+
+def test_percentile_and_latency_summary_helpers():
+    assert percentile([], 95) is None
+    assert percentile([3.0, 1.0, 2.0], 50) == 2.0
+    assert latency_summary([0.1, 0.2, 0.3]) == {
+        "latency_n": 3,
+        "latency_avg_s": pytest.approx(0.2),
+        "latency_p95_s": 0.3,
+    }
+    with pytest.raises(ValueError, match="percentile must be between 0 and 100"):
+        percentile([1.0], 101)
+
+
+def test_build_cost_summary_reports_cost_per_correct_for_openai():
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(
+            preds=["remote", "remote"],
+            golds=["remote", "hybrid"],
+            token_totals={
+                "input_tokens": 1000,
+                "cached_input_tokens": 0,
+                "output_tokens": 200,
+            },
+        )
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "openai",
+        "gpt-4o-mini",
+        metrics,
+        {"input_tokens": 1000, "cached_input_tokens": 0, "output_tokens": 200},
+    )
+
+    assert cost["correct"] == 1
+    assert cost["estimated_cost_usd"] == pytest.approx(0.00027)
+    assert cost["estimated_cost_per_record_usd"] == pytest.approx(0.000135)
+    assert cost["estimated_cost_per_correct_usd"] == pytest.approx(0.00027)
+    assert cost["pricing_note"] == "openai_list_price_estimate"
+
+
+def test_build_cost_summary_treats_local_provider_as_zero_api_cost():
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "ollama",
+        "qwen-27b-mtp",
+        metrics,
+        {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
+    )
+
+    assert cost["estimated_cost_usd"] == 0.0
+    assert cost["estimated_cost_per_correct_usd"] == 0.0
+    assert cost["breakdown"] is None
+    assert cost["pricing_note"] == "local_provider_zero_api_cost"
+
+
+def test_build_cost_summary_reports_missing_openai_pricing_without_crashing():
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "openai",
+        "gpt-imaginary",
+        metrics,
+        {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
+    )
+
+    assert cost["estimated_cost_usd"] is None
+    assert cost["estimated_cost_per_record_usd"] is None
+    assert cost["estimated_cost_per_correct_usd"] is None
+    assert cost["breakdown"] is None
+    assert cost["pricing_note"] == "missing_openai_pricing_entry"
+
+
+def test_eval_main_persists_top_level_cost_tokens_and_timing(monkeypatch, tmp_path):
+    class CapturingRunLogger:
+        def __init__(self):
+            self.records = []
+
+        def log_run(self, record):
+            self.records.append(record)
+
+    gold_file = tmp_path / "gold.jsonl"
+    gold_file.write_text(
+        '{"title":"A","description":"desc","_human_classification":"remote"}\n'
+    )
+    config_file = tmp_path / "remote_agent.yml"
+    config_file.write_text(
+        "llm:\n  provider: openai\n  model: gpt-5.4-mini\n  temperature: 0.0\n"
+    )
+    logger = CapturingRunLogger()
+
+    def fake_run_eval(records, config, run_id, workers=1):
+        return (
+            [],
+            eval_core.EvalMetricsInput(
+                preds=["remote"],
+                golds=["remote"],
+                elapsed_seconds=[0.25, 0.50],
+                token_totals={
+                    "input_tokens": 1000,
+                    "cached_input_tokens": 0,
+                    "output_tokens": 200,
+                },
+            ),
+            [],
+        )
+
+    monkeypatch.setattr(eval_script, "run_eval", fake_run_eval)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+            "--runs-file",
+            str(tmp_path / "runs.jsonl"),
+            "--model",
+            "gpt-4o-mini",
+            "--run-id",
+            "record-test",
+            "--no-mismatches",
+        ],
+    )
+
+    eval_script.main(run_logger=logger)
+
+    record = logger.records[0]
+    assert record["run_id"].startswith("record-test_")
+    assert record["token_totals"] == {
+        "input_tokens": 1000,
+        "cached_input_tokens": 0,
+        "output_tokens": 200,
+    }
+    assert record["cost"]["estimated_cost_usd"] == pytest.approx(0.00027)
+    assert record["cost"]["estimated_cost_per_correct_usd"] == pytest.approx(0.00027)
+    assert record["cost"]["pricing_note"] == "openai_list_price_estimate"
+    assert record["metrics"]["latency_avg_s"] == pytest.approx(0.375)
+    assert record["metrics"]["latency_p95_s"] == 0.50
+
+
+def test_cost_summary_prices_openai_despite_provider_case():
+    # Resolver normalizes provider case; costing must too, or a real OpenAI run
+    # with provider "OpenAI" would be mislabeled local zero-cost.
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "OpenAI",
+        "gpt-4o-mini",
+        metrics,
+        {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 20},
+    )
+
+    assert cost["pricing_note"] == "openai_list_price_estimate"
+    assert cost["estimated_cost_usd"] is not None
+
+
+def test_cost_summary_marks_unknown_provider_unpriced():
+    # An unrecognized provider string must not silently report $0 (which would
+    # distort a bake-off); it should surface as unpriced.
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    )["metrics"]
+
+    cost = build_cost_summary(
+        "mystery-provider",
+        "some-model",
+        metrics,
+        {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 5},
+    )
+
+    assert cost["estimated_cost_usd"] is None
+    assert cost["pricing_note"] == "unsupported_provider"
+
+
+def test_provider_override_without_model_fails_fast(monkeypatch, tmp_path):
+    gold_file = tmp_path / "gold.jsonl"
+    gold_file.write_text(
+        '{"title":"A","description":"desc","_human_classification":"remote"}\n'
+    )
+    config_file = tmp_path / "remote_agent.yml"
+    config_file.write_text("llm:\n  provider: openai\n  model: gpt-5.4-mini\n")
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+            "--provider",
+            "ollama",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        eval_script.main()
+    assert exc.value.code == 1
+
+
+def _write_gold_and_config(tmp_path, provider, model):
+    gold_file = tmp_path / "gold.jsonl"
+    gold_file.write_text(
+        '{"title":"A","description":"desc","_human_classification":"remote"}\n'
+    )
+    config_file = tmp_path / "remote_agent.yml"
+    config_file.write_text(f"llm:\n  provider: {provider}\n  model: {model}\n")
+    return gold_file, config_file
+
+
+def test_unpriced_openai_model_fails_fast_before_any_api_call(monkeypatch, tmp_path):
+    gold_file, config_file = _write_gold_and_config(tmp_path, "openai", "gpt-imaginary")
+
+    def exploding_run_eval(*a, **k):
+        raise AssertionError("run_eval must not be reached for an unpriced model")
+
+    monkeypatch.setattr(eval_script, "run_eval", exploding_run_eval)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        eval_script.main()
+    assert exc.value.code == 1
+
+
+def test_allow_unpriced_lets_openai_model_run(monkeypatch, tmp_path):
+    gold_file, config_file = _write_gold_and_config(tmp_path, "openai", "gpt-imaginary")
+    logger_records = []
+
+    class CapturingRunLogger:
+        def log_run(self, record):
+            logger_records.append(record)
+
+    def fake_run_eval(records, config, run_id, workers=1):
+        return ([], eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"]), [])
+
+    monkeypatch.setattr(eval_script, "run_eval", fake_run_eval)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_remote_filter_eval.py",
+            "--gold",
+            str(gold_file),
+            "--config",
+            str(config_file),
+            "--runs-file",
+            str(tmp_path / "runs.jsonl"),
+            "--allow-unpriced",
+            "--no-mismatches",
+        ],
+    )
+
+    eval_script.main(run_logger=CapturingRunLogger())
+    assert logger_records[0]["cost"]["pricing_note"] == "missing_openai_pricing_entry"
 
 
 def test_print_report_renders_empty_travel_rates_as_na(capsys):
-    metrics = eval_script.assemble_metrics(
-        eval_script.EvalMetricsInput(preds=["remote"], golds=["remote"])
+    metrics = eval_core.assemble_metrics(
+        eval_core.EvalMetricsInput(preds=["remote"], golds=["remote"])
     )
 
     eval_script.print_report(metrics, [], "test_run")
@@ -178,7 +482,7 @@ def test_run_eval_fails_fast_on_retired_unclear_human_classification(monkeypatch
         calls += 1
         return _analysis("remote")
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
     records = [
         {
@@ -189,7 +493,7 @@ def test_run_eval_fails_fast_on_retired_unclear_human_classification(monkeypatch
     ]
 
     with pytest.raises(ValueError, match="invalid _human_classification.*unclear"):
-        eval_script.run_eval(records, _config(), "test_run", workers=2)
+        eval_core.run_eval(records, _config(), "test_run", workers=2)
 
     assert calls == 0
 
@@ -202,7 +506,7 @@ def test_run_eval_counts_missing_description_as_skipped_without_inference(monkey
         calls += 1
         return _analysis("remote")
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
     records = [
         {
@@ -212,26 +516,37 @@ def test_run_eval_counts_missing_description_as_skipped_without_inference(monkey
         },
     ]
 
-    mismatches, metrics_input, prompt_hashes = eval_script.run_eval(
+    mismatches, metrics_input, prompt_hashes = eval_core.run_eval(
         records, _config(), "test_run", workers=2
     )
 
     assert mismatches == []
-    assert metrics_input == eval_script.EvalMetricsInput(skipped=1)
+    assert metrics_input == eval_core.EvalMetricsInput(
+        skipped=1,
+        skip_reasons={"missing_description": 1},
+        token_totals={
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+        },
+    )
     assert prompt_hashes == []
     assert calls == 0
 
 
 def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypatch):
-    monkeypatch.setattr(eval_script, "USER_TIMEZONE", "Europe/Oslo")
+    monkeypatch.setattr(eval_core, "USER_TIMEZONE", "Europe/Oslo")
     captured_inputs = []
 
     def fake_analyze_remote(rf_input, **kwargs):
         captured_inputs.append(rf_input)
-        assert set(kwargs) == {"llm_config"}
+        assert set(kwargs) == {"llm_config", "usage_callback"}
+        kwargs["usage_callback"](
+            {"input_tokens": 123, "cached_input_tokens": 23, "output_tokens": 45}
+        )
         return _analysis("remote")
 
-    monkeypatch.setattr(eval_script, "analyze_remote", fake_analyze_remote)
+    monkeypatch.setattr(eval_core, "analyze_remote", fake_analyze_remote)
 
     records = [
         {
@@ -258,12 +573,12 @@ def test_eval_uses_remote_filter_input_and_records_resolved_prompt_hash(monkeypa
         }
     ]
 
-    mismatches, metrics_input, prompt_hashes = eval_script.run_eval(
+    mismatches, metrics_input, prompt_hashes = eval_core.run_eval(
         records,
         _config(),
         run_id="test_run",
     )
-    metrics = eval_script.assemble_metrics(metrics_input)["metrics"]
+    metrics = eval_core.assemble_metrics(metrics_input)["metrics"]
 
     assert metrics_input.preds == ["remote"]
     assert metrics_input.golds == ["hybrid"]

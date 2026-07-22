@@ -91,6 +91,28 @@ def test_gpt_5_4_mini_batch_is_half_standard() -> None:
     assert batch["total"] == pytest.approx(standard["total"] * 0.5, rel=1e-4)
 
 
+@pytest.mark.parametrize(
+    ("model", "expected_total"),
+    [
+        ("gpt-4.1-mini", 0.00057),
+        ("gpt-4.1-nano", 0.0001425),
+        ("gpt-5.4-nano", 0.00036),
+        ("gpt-5.6-luna", 0.00175),
+        ("gpt-5.6-terra", 0.004375),
+    ],
+)
+def test_bakeoff_candidate_models_are_priced(model: str, expected_total: float) -> None:
+    # 1000 input with 500 cached + 200 output at standard short-context rates.
+    result = estimate_cost(
+        model,
+        input_tokens=1000,
+        cached_input_tokens=500,
+        output_tokens=200,
+    )
+    assert result is not None
+    assert result["total"] == pytest.approx(expected_total, rel=1e-4)
+
+
 def test_unknown_model_returns_none() -> None:
     assert (
         estimate_cost(

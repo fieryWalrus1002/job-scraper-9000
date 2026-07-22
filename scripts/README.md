@@ -102,40 +102,46 @@ uv run scripts/run_remote_filter_eval.py
 **Input:** `data/eval/ground_truth.jsonl`
 **Output:** `data/eval/runs.jsonl` (appended), `data/eval/mismatches_{run_id}.jsonl` (if any mismatches)
 
-| Flag              | Default                         | Description                                                                                                                      |
-| ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `--gold`          | `data/eval/ground_truth.jsonl`  | Gold JSONL to evaluate against                                                                                                   |
-| `--config`        | `config/agent/remote_agent.yml` | Agent config YAML                                                                                                                |
-| `--runs-file`     | `data/eval/runs.jsonl`          | Run log to append to                                                                                                             |
-| `--model`         | _(from config)_                 | Override `llm.model` in-memory — does not modify the YAML                                                                        |
-| `--temperature`   | _(from config)_                 | Override `llm.temperature` in-memory                                                                                             |
-| `--provider`      | _(from config)_                 | Override `llm.provider` in-memory (`openai` or `ollama`)                                                                         |
-| `--run-id`        | _(auto-generated)_              | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique.                             |
-| `--no-mismatches` | off                             | Skip writing the mismatch file                                                                                                   |
-| `--workers`       | `1`                             | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance. |
+| Flag               | Default                         | Description                                                                                                                                                    |
+| ------------------ | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--gold`           | `data/eval/ground_truth.jsonl`  | Gold JSONL to evaluate against                                                                                                                                 |
+| `--config`         | `config/agent/remote_agent.yml` | Agent config YAML                                                                                                                                              |
+| `--runs-file`      | `data/eval/runs.jsonl`          | Run log to append to                                                                                                                                           |
+| `--model`          | _(from config)_                 | Override `llm.model` in-memory — does not modify the YAML                                                                                                      |
+| `--temperature`    | _(from config)_                 | Override `llm.temperature` in-memory                                                                                                                           |
+| `--provider`       | _(from config)_                 | Override `llm.provider` in-memory (`openai` or `ollama`)                                                                                                       |
+| `--run-id`         | _(auto-generated)_              | Human-readable label prefix; a timestamp + random suffix are always appended to keep run IDs unique.                                                           |
+| `--no-mismatches`  | off                             | Skip writing the mismatch file                                                                                                                                 |
+| `--allow-unpriced` | off                             | Run even if the OpenAI model has no pricing entry. Without it, an unpriced OpenAI model fails fast **before** any API call (no accidental paid, uncosted run). |
+| `--workers`        | `1`                             | Concurrent inference workers. Results are collected in gold-record order and this performance knob is not written to provenance.                               |
 
-The default provider is `openai` (model: `gpt-4o-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
+The default provider is `openai` (model: `gpt-5.4-mini`) as set in `config/agent/remote_agent.yml`. Use `--provider ollama` to run against a local model instead — no YAML edits needed.
 
-The remote-filter eval reports the native 3-way classification metric (`remote`, `hybrid`, `onsite`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, and travel-days MAE.
+The remote-filter eval reports the native 3-way classification metric (`remote`, `hybrid`, `onsite`) with confusion matrix, per-class precision/recall/F1, macro/micro scores, travel-days MAE, latency summary, and estimated OpenAI list-price cost (`$/record`, `$/correct`). Local/Ollama-compatible runs are reported as zero API cost. Observed token totals are persisted in the run record (`data/eval/runs.jsonl`) and feed the cost estimate; they are not printed to the console report.
 
 **Examples:**
 
 ```bash
-# Default run — hits OpenAI API (gpt-4o-mini)
+# Default run — hits OpenAI API (gpt-5.4-mini)
 uv run scripts/run_remote_filter_eval.py
 
-# Run against local Ollama instead
-# uv run scripts/run_remote_filter_eval.py --provider ollama --model qwen2.5:14b --run-id qwen_14b
-uv run scripts/run_remote_filter_eval.py --provider ollama --model qwen25-14b --run-id qwen25_14b_v1
+# Run against local llama.cpp instead (OpenAI-compatible endpoint)
+OLLAMA_BASE_URL=http://localhost:8080/v1 \
+uv run scripts/run_remote_filter_eval.py \
+  --provider ollama --model qwen-27b-mtp --run-id qwen27b_mtp
 
-# Try a stronger OpenAI model without editing the YAML
-uv run scripts/run_remote_filter_eval.py --model gpt-4o --temperature 0.0 --run-id gpt4o_baseline
+# Try a cheaper OpenAI model without editing the YAML
+uv run scripts/run_remote_filter_eval.py \
+  --model gpt-5.4-nano --temperature 0.0 --run-id gpt54nano_baseline
 
 # Run synchronous eval with four concurrent workers
-uv run scripts/run_remote_filter_eval.py --workers 4 --run-id gpt4o_mini_parallel
+uv run scripts/run_remote_filter_eval.py --workers 4 --run-id gpt54mini_parallel
 
-# Compare OpenAI vs Ollama results
-uv run scripts/compare_evals.py --diff gpt4o_mini_baseline qwen_14b
+# Compare two runs
+uv run scripts/compare_evals.py --diff gpt54mini_baseline qwen27b_mtp
+
+# Render the remote_filter quality × cost bake-off table
+uv run scripts/compare_evals.py --bakeoff --last 7
 ```
 
 ______________________________________________________________________
@@ -156,6 +162,7 @@ uv run scripts/compare_evals.py
 | `--diff <id_a> <id_b>`        | —                      | Side-by-side metric comparison with `↑`/`↓`/`=` indicators                  |
 | `--against-champion <scorer>` | —                      | Resolve the left-hand diff run from `config/eval/champions.yml`             |
 | `--per-record`                | `false`                | After aggregate diff, print a per-record markdown table (`skills_fit` only) |
+| `--bakeoff`                   | `false`                | Print a remote_filter N-way quality × estimated-cost table                  |
 
 **Examples:**
 
@@ -174,6 +181,9 @@ uv run scripts/compare_evals.py \
   --against-champion skills_fit \
   --diff phase_g_pr1_llm_reframe_v5_20260523_182056_fbf3 \
   --per-record
+
+# Compare recent remote_filter candidate models on quality × cost
+uv run scripts/compare_evals.py --bakeoff --last 7
 ```
 
 ______________________________________________________________________

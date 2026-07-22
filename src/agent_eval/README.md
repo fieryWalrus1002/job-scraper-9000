@@ -14,9 +14,13 @@ ______________________________________________________________________
 src/agent_eval/
 ├── __init__.py        # exports provenance helpers
 ├── provenance.py      # run IDs, hashes, git/env metadata, run-record assembly
-└── metrics.py         # compute_categorical_metrics() — labeled categorical confusion
-                       # compute_metrics() — generic legacy binary metrics
-                       # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
+├── metrics.py         # compute_categorical_metrics() — labeled categorical confusion
+│                      # compute_metrics() — generic legacy binary metrics
+│                      # compute_ordinal_metrics() — skills-fit ordinal + top-k metrics
+├── costing.py         # token totals, correct-count, and cost-summary helpers
+├── stats.py           # percentile and latency-summary helpers
+├── run_compare.py     # eval-type detection + per-type flatten/format helpers for compare_evals
+└── bakeoff.py         # comparable-run guard (gold_hash/prompt_hash), row sort, table render
 ```
 
 Run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) lives in `utils.run_logger`.
@@ -58,6 +62,9 @@ Each eval run records:
 - Python/platform/uv/lockfile metadata
 - categorical confusion matrix, per-class precision/recall/F1, macro/micro metrics, and travel MAE (remote-filter)
 - ordinal metrics (exact / off-by-one / MAE / bias / Spearman) + top-k metrics + 5x5 confusion (skills-fit)
+- latency summary (`latency_n`, `latency_avg_s`, `latency_p95_s`)
+- observed `token_totals` (input / cached / output) and a `cost` block (estimated list-price cost, `$/record`, `$/correct`, pricing note)
+- `resolved_user_message_hashes` — aggregate + per-record hashes of the user messages the LLM actually saw (search context + timezone), used to guard bake-off comparability (remote-filter)
 - scorer choice (`llm` vs `keyword`) and profile metadata (`profile_hash`, `profile_version`) for skills-fit runs
 - mismatch artifact path
 
@@ -74,3 +81,5 @@ ______________________________________________________________________
 ## Design note
 
 Generic eval utilities belong in `src/agent_eval/`. Generic run logging (`RunLogger`, `JsonlRunLogger`, `MLFlowRunLogger`) belongs in `utils.run_logger`. Agent-specific schemas, prompts, and scoring logic should live with their agent package under `src/agents/*` or in that agent's eval driver script.
+
+The boundary is enforced by imports: nothing in `src/agent_eval/` imports `agents.*`. `run_compare.py` and `bakeoff.py` reshape run-record dicts by field name only. The bake-off table (`bakeoff.py`) currently renders remote-filter columns (`remote_recall`, `remote_fn`, `remote_fp`); generalizing it to a skills-fit ordinal column set (MAE / kappa) is a deliberate follow-up tracked in issue #542, reusing the same cost/stats/comparable-run helpers.

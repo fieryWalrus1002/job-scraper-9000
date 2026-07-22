@@ -137,6 +137,14 @@ Compare eval runs:
 uv run scripts/compare_evals.py --last 5
 ```
 
-Current evals report classifier-native 3-way categorical metrics (`remote`, `hybrid`, `onsite`) plus travel-days diagnostics. Phase 32 uses micro accuracy + `remote` recall as the champion metric pair; see `scripts/run_remote_filter_eval.py` and `scripts/compare_evals.py`.
+For model bake-offs, run each candidate with `--model`/`--provider`, then render the quality × estimated-cost table:
+
+```bash
+uv run scripts/compare_evals.py --bakeoff --last 7
+```
+
+Current evals report classifier-native 3-way categorical metrics (`remote`, `hybrid`, `onsite`) plus travel-days diagnostics and estimated list-price cost. Phase 32 uses micro accuracy + `remote` recall as the champion metric pair; the bake-off adds `$ / correct` as the cost tie-breaker. See [`specs/remote_filter_model_bakeoff.md`](../../../specs/remote_filter_model_bakeoff.md), `scripts/run_remote_filter_eval.py`, and `scripts/compare_evals.py`.
+
+Note: the local llama.cpp model (`qwen-27b-mtp`) is an **eval-time quality/cost anchor**, not a pipeline classifier — it matches API-tier quality at $0 but runs at ~2.1 jobs/min (GPU-bound), too slow for production throughput. See the "Operational finding" section in the bake-off spec.
 
 See [`scripts/README.md`](../../../scripts/README.md) and [`src/agent_eval/README.md`](../../agent_eval/README.md) for full eval details.
