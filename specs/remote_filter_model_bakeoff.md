@@ -202,8 +202,9 @@ candidates themselves (#544): Confluent `07209122` "Senior Software Engineer II"
 flipped `onsite → remote` (remote-first company; scraped body omitted the policy;
 `search_params.workplace=remote` was correct). Mistral `cb17b1f2` confirmed
 `onsite`; AppSierra `17f3a913` and Ringside `d36d6dcd` re-affirmed `remote`. The
-correction flipped the gold set hash to `sha256:6fb27099…` (was `2b188b5d…`), so
-all candidates were re-run against the corrected gold for a comparable table.
+correction flipped the gold set hash (abbreviated prefixes: `sha256:6fb27099…`,
+was `sha256:2b188b5d…`), so all candidates were re-run against the corrected gold
+for a comparable table.
 
 API candidates (`--temperature 0.0`, 102-record corrected gold):
 
@@ -220,12 +221,12 @@ classifier; it does not affect the API champion pick).
 
 **Decision: champion stays `gpt-5.4-mini`.** Under the ratified guardrail (remote
 recall first; "a cheaper model that drops real remote jobs is disqualified
-regardless of price"), it is the only candidate holding recall — it misses **1**
-remote job where every cheaper challenger misses **2**. All models are clean on
-false-remotes (`remote_fp = 0`). The two remaining remote misses (`1b07e146`
-Mistral/Paris monthly-travel, `17f3a913` AppSierra thin JD) are the
-input-sufficiency cases #544 tracks — the JD body doesn't state the remote
-policy — not a defect a champion swap fixes. `gpt-4.1-mini` is strictly dominated
+regardless of price"), it is the only candidate holding recall — it misses a
+single remote job (`1b07e146` Mistral/Paris monthly-travel), where every cheaper
+challenger misses **2** (that same Paris role *plus* `17f3a913` AppSierra thin
+JD). All models are clean on false-remotes (`remote_fp = 0`). Both remote-miss
+cases across the field are the input-sufficiency cases #544 tracks — the JD body
+doesn't state the remote policy — not a defect a champion swap fixes. `gpt-4.1-mini` is strictly dominated
 (worse quality than `gpt-5.4-nano` *and* more expensive). The gold fix erased the
 pre-correction case for `gpt-4.1-nano`: on the old gold it looked like a
 recall-strong cheap champion, but corrected it drops to 0.943 recall / 0.827
