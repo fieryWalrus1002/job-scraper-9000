@@ -18,7 +18,6 @@ and hashed so a weighted comparison is only valid across rows sharing one matrix
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +29,7 @@ _REPO_ROOT = Path(__file__).parents[2]
 DEFAULT_COST_MATRIX_PATH = (
     _REPO_ROOT / "config" / "eval" / "remote_filter_error_costs.yml"
 )
-DEFAULT_EXPECTED_LABELS = ("remote", "hybrid", "onsite")
+_EXPECTED_LABELS = {"remote", "hybrid", "onsite"}
 
 
 class CostMatrix:
@@ -55,19 +54,14 @@ class CostMatrix:
         return self.costs[gold][pred]
 
 
-def load_cost_matrix(
-    path: Path = DEFAULT_COST_MATRIX_PATH,
-    *,
-    expected_labels: Iterable[str] | None = DEFAULT_EXPECTED_LABELS,
-) -> CostMatrix:
+def load_cost_matrix(path: Path = DEFAULT_COST_MATRIX_PATH) -> CostMatrix:
     """Load and validate the weighted-error cost matrix from YAML.
 
     Fails loud (per CLAUDE.md) on a missing file, missing ``costs`` block, a
     non-square matrix, or non-numeric cells — a silent default would let a broken
-    config quietly produce a meaningless scalar. By default the loader pins the
-    fixed remote_filter 3-way axis; pass ``expected_labels=None`` only for an
-    intentionally generic matrix. The matrix must price exactly the expected
-    label set, so a mislabeled-but-square config fails at load rather than
+    config quietly produce a meaningless scalar. The loader pins the fixed
+    remote_filter 3-way axis at the API boundary: the matrix must price exactly
+    that label set, so a mislabeled-but-square config fails at load rather than
     surfacing later as an unpriced-run-label error.
     """
     if not path.exists():
@@ -98,13 +92,11 @@ def load_cost_matrix(
             parsed_row[pred] = float(value)
         costs[gold] = parsed_row
 
-    if expected_labels is not None:
-        expected = set(expected_labels)
-        if set(costs) != expected:
-            raise ValueError(
-                f"{path}: cost matrix labels {sorted(costs)} must match the active "
-                f"axis {sorted(expected)}"
-            )
+    if set(costs) != _EXPECTED_LABELS:
+        raise ValueError(
+            f"{path}: cost matrix labels {sorted(costs)} must match the active "
+            f"axis {sorted(_EXPECTED_LABELS)}"
+        )
 
     version = data.get("version", 0)
     if not isinstance(version, int):

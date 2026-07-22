@@ -362,6 +362,15 @@ def test_bakeoff_computes_weighted_error_column_and_matrix_hash(
     assert "cost matrix: sha256:" in out
 
 
+def test_bakeoff_weighted_error_rank_requires_matrix_hash() -> None:
+    with pytest.raises(ValueError, match="cost matrix hash"):
+        compare_evals.print_bakeoff(
+            [{"run_id": "r", "weighted_error": 0.0}],
+            champion_run_id=None,
+            rank_by="weighted_error",
+        )
+
+
 def test_bakeoff_rank_by_weighted_error_reorders_rows(
     tmp_path, monkeypatch, capsys
 ) -> None:

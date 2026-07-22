@@ -133,6 +133,9 @@ def print_bakeoff(
         print("No remote_filter categorical runs found for bake-off.")
         return
 
+    if rank_by == "weighted_error" and not weights_hash:
+        raise ValueError("weighted_error ranking requires a cost matrix hash")
+
     rendered_rows = build_bakeoff_render_rows(rows, champion_run_id, rank_by)
     col_widths = {
         col: max(len(col), *(len(str(row[col])) for row in rendered_rows))
