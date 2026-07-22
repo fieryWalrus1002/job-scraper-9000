@@ -1,4 +1,6 @@
+from dataclasses import asdict
 from unittest.mock import MagicMock, patch
+
 from job_scraper.scrapers.greenhouse import GreenhouseScraper, GreenhouseQuery
 
 
@@ -60,6 +62,7 @@ def test_scrape_maps_fields_correctly():
     assert "boards.greenhouse.io" in job.source_url
     assert job.location == "Remote"
     assert job.description == "Job description for role 0."
+    assert asdict(job)["search_params"] == {"board_token": "acme"}
     # posted_at is the (date-only) publish date, not updated_at
     assert job.posted_at == "2024-01-15"
 

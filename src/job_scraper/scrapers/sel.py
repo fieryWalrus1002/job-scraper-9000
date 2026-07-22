@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import requests
 
@@ -10,6 +11,7 @@ from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
 from ..query import SELSearchQuery
+from ..search_provenance import build_search_params
 from .base import BaseScraper
 
 log = logging.getLogger(__name__)
@@ -34,7 +36,7 @@ def _workday_detail_search_params(detail: dict) -> dict:
     ``timeType=Full time`` outside ``jobDescription``. Preserve them so the
     remote filter does not have to infer from the description alone.
     """
-    context: dict[str, object] = {}
+    context: dict[str, Any] = {}
 
     locations = _workday_detail_locations(detail)
     if locations:
@@ -49,7 +51,7 @@ def _workday_detail_search_params(detail: dict) -> dict:
     if job_req_id := detail.get("jobReqId"):
         context["workday_job_req_id"] = job_req_id
 
-    return context
+    return build_search_params(**context)
 
 
 def _workday_detail_locations(detail: dict) -> list[str]:

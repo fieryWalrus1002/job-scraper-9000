@@ -9,6 +9,7 @@ from utils.salary import extract_salary
 from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
+from ..search_provenance import build_search_params
 from .base import BaseScraper
 
 log = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class LeverScraper(BaseScraper["LeverQuery"]):
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
-                search_params={"company": self.query.company},
+                search_params=build_search_params(company=self.query.company),
                 salary_min_usd=salary.salary_min_usd if salary else None,
                 salary_max_usd=salary.salary_max_usd if salary else None,
                 salary_period=salary.salary_period if salary else None,
