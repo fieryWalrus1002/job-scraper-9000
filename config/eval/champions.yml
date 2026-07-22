@@ -10,4 +10,4 @@
 # Run-IDs reference rows in data/eval/runs.jsonl.
 
 skills_fit: phase_g_v6_gold_expand_20260527_20260527_222343_83f6
-remote_filter: champion_gpt54mini_20260721_003328_f763  # gpt-5.4-mini, 3-way gold (#63)
+remote_filter: bakeoff2_gpt-54-mini_20260722_182830_c800  # gpt-5.4-mini, corrected gold post-#544 (Confluent onsite->remote); held recall guardrail in Phase 33 bake-off
