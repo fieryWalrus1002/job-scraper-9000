@@ -1,3 +1,4 @@
+import html
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -50,7 +51,7 @@ class GreenhouseScraper(BaseScraper["GreenhouseQuery"]):
         jobs: list[JobPosting] = []
         for item in data.get("jobs", []):
             raw_desc = (
-                html_to_markdown(item.get("content") or "")
+                html_to_markdown(html.unescape(item.get("content") or ""))
                 if self.query.fetch_descriptions
                 else ""
             )

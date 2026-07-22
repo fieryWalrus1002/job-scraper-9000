@@ -95,6 +95,27 @@ def test_scrape_converts_html_content_to_markdown():
     assert "<li>" not in jobs[0].description
 
 
+def test_scrape_converts_entity_escaped_html_content_to_markdown():
+    item = _sample_api_response(1)["jobs"][0]
+    item["content"] = (
+        "&lt;p&gt;&lt;strong&gt;About the team&lt;/strong&gt;&lt;/p&gt;"
+        "&lt;ul&gt;&lt;li&gt;Build APIs&lt;/li&gt;&lt;/ul&gt;"
+    )
+    scraper = GreenhouseScraper(GreenhouseQuery(board_token="acme"))
+
+    with patch.object(
+        scraper.session, "get", return_value=_mock_response({"jobs": [item]})
+    ):
+        jobs = scraper.scrape()
+
+    assert "**About the team**" in jobs[0].description
+    assert "- Build APIs" in jobs[0].description
+    assert "<li>" not in jobs[0].description
+    assert "<p>" not in jobs[0].description
+    assert "&lt;" not in jobs[0].description
+    assert "&gt;" not in jobs[0].description
+
+
 def test_scrape_no_descriptions_keeps_description_empty_even_if_content_present():
     scraper = GreenhouseScraper(
         GreenhouseQuery(board_token="acme", fetch_descriptions=False)
