@@ -33,7 +33,11 @@ from agent_eval.run_compare import (
     detect_eval_type,
     format_cell,
 )
-from agent_eval.weighted_error import load_cost_matrix, weighted_error_for_run
+from agent_eval.weighted_error import (
+    DEFAULT_COST_MATRIX_PATH,
+    load_cost_matrix,
+    weighted_error_for_run,
+)
 
 RUNS_FILE = "data/eval/runs.jsonl"
 CHAMPIONS_FILE = "config/eval/champions.yml"
@@ -133,8 +137,8 @@ def print_bakeoff(
         print("No remote_filter categorical runs found for bake-off.")
         return
 
-    if rank_by == "weighted_error" and not weights_hash:
-        raise ValueError("weighted_error ranking requires a cost matrix hash")
+    if not weights_hash and any(row.get("weighted_error") is not None for row in rows):
+        raise ValueError("weighted_error values require a cost matrix hash")
 
     rendered_rows = build_bakeoff_render_rows(rows, champion_run_id, rank_by)
     col_widths = {
@@ -511,7 +515,10 @@ def main() -> None:
         try:
             matrix = load_cost_matrix()
         except (FileNotFoundError, ValueError) as exc:
-            die(f"weighted_error cost matrix: {exc}")
+            die(
+                "failed to load weighted_error cost matrix config "
+                f"{DEFAULT_COST_MATRIX_PATH}: {exc}"
+            )
         weights_hash = matrix.hash
         for raw, row in candidate_runs:
             try:
