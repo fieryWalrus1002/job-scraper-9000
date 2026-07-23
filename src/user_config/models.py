@@ -306,6 +306,11 @@ class RemotePolicy(_Strict):
 
 class PrefilterPolicy(_Strict):
     excluded_title_terms: list[str] = Field(default_factory=list)
+    # System defaults live in config/agent/companies_prefilter.yml. These are
+    # deliberately optional so a user only overrides that system policy when
+    # they need a hand-tuned companies-pool veto.
+    embedding_veto_depth: float | None = Field(default=None, ge=0, le=1)
+    embedding_veto_enabled: bool | None = None
 
 
 class RelocationPolicy(_Strict):

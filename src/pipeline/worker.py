@@ -29,18 +29,77 @@ import json
 import logging
 import re
 import traceback
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Literal
 
 import psycopg
 import yaml
+from openai import OpenAI
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipeline.queue import claim_next, mark_failed, mark_succeeded
+from prefilter.embedding import (
+    Posting,
+    SCHEMAS_BY_PREFIX_SCHEME,
+    _cache_entry,
+    apply_prefix_scheme,
+    build_keywords_reference_text,
+    build_per_keyword_reference_texts,
+    build_reference_text,
+    build_skills_reference_text,
+    cache_identity,
+    endpoint_identity,
+    fetch_missing_embeddings,
+    parse_cache_jsonl,
+    pool_scores,
+    rank_by_scores,
+    validate_profile,
+)
 from user_config import UserPolicies
 
 log = logging.getLogger(__name__)
 
 ScrapeFn = Callable[[str, dict[str, Any], "psycopg.Connection | None"], Iterable[Any]]
+ReferenceMode = Literal[
+    "blend", "keywords", "keyword-max", "keyword-mean", "skills-max"
+]
+_COMPANIES_PREFILTER_CONFIG_PATH = (
+    Path(__file__).resolve().parents[2] / "config" / "agent" / "companies_prefilter.yml"
+)
+
+
+@dataclass(frozen=True)
+class EmbeddingVetoConfig:
+    """Resolved system and optional per-user companies-veto policy."""
+
+    enabled: bool
+    cut_depth: float
+    reference_mode: ReferenceMode
+    provider: Literal["ollama"]
+    base_url: str
+    model: str
+    prefix_scheme: Literal["none", "nomic"]
+    cache_path: Path
+    embedding_batch_size: int
+
+
+class _EmbeddingVetoConfigFile(BaseModel):
+    """Strict on-disk schema so a malformed enabled veto cannot degrade silently."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    cut_depth: float = Field(default=0.33, ge=0, le=1)
+    reference_mode: ReferenceMode = "blend"
+    provider: Literal["ollama"] = "ollama"
+    base_url: str = "http://localhost:8080/v1"
+    model: str = "nomic-embed-text-v1.5"
+    prefix_scheme: Literal["none", "nomic"] = "nomic"
+    cache_path: Path = Path("data/cache/companies_prefilter_embeddings.jsonl")
+    embedding_batch_size: int = Field(default=100, ge=1)
+
+
 """``(source, query_payload, conn) -> iterable of scraped postings`` (either
 dataclass instances or already-dict). The worker calls ``asdict`` on any
 dataclass, then JSON-serializes; non-dataclass dict inputs pass through.
@@ -134,6 +193,231 @@ def _apply_title_filter(
         return not any(term in title for term in lowered)
 
     return [j for j in jobs if _keep(j)]
+
+
+def _load_embedding_veto_config(policies: UserPolicies) -> EmbeddingVetoConfig:
+    """Load the system veto config and apply a user's explicit policy overrides."""
+    try:
+        raw = yaml.safe_load(_COMPANIES_PREFILTER_CONFIG_PATH.read_text())
+    except OSError as exc:
+        raise OSError(
+            f"Could not load companies embedding-veto config "
+            f"{_COMPANIES_PREFILTER_CONFIG_PATH}: {exc}"
+        ) from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            f"Could not parse companies embedding-veto config "
+            f"{_COMPANIES_PREFILTER_CONFIG_PATH}: {exc}"
+        ) from exc
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"Companies embedding-veto config {_COMPANIES_PREFILTER_CONFIG_PATH} "
+            "must be a YAML mapping"
+        )
+    loaded = _EmbeddingVetoConfigFile.model_validate(raw)
+    config = EmbeddingVetoConfig(
+        enabled=loaded.enabled,
+        cut_depth=loaded.cut_depth,
+        reference_mode=loaded.reference_mode,
+        provider=loaded.provider,
+        base_url=loaded.base_url,
+        model=loaded.model,
+        prefix_scheme=loaded.prefix_scheme,
+        cache_path=loaded.cache_path,
+        embedding_batch_size=loaded.embedding_batch_size,
+    )
+    if policies.prefilter.embedding_veto_enabled is not None:
+        config = replace(config, enabled=policies.prefilter.embedding_veto_enabled)
+    if policies.prefilter.embedding_veto_depth is not None:
+        config = replace(config, cut_depth=policies.prefilter.embedding_veto_depth)
+    return config
+
+
+def _load_reference_texts(run_dir: Path, reference_mode: ReferenceMode) -> list[str]:
+    """Build canonical reference inputs from this user's run artifacts."""
+    profile_path = run_dir / "candidate_profile.yml"
+    search_path = run_dir / "search.yml"
+    try:
+        profile_raw = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"Could not load profile {profile_path}: {exc}") from exc
+    profile = validate_profile(profile_raw, profile_path)
+
+    try:
+        search_raw = yaml.safe_load(search_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"Could not load search config {search_path}: {exc}") from exc
+    if not isinstance(search_raw, dict):
+        raise ValueError(
+            f"Malformed search config {search_path}: expected a YAML mapping"
+        )
+    roles = search_raw.get("roles")
+    target_titles = roles.get("target_titles") if isinstance(roles, dict) else None
+    if not isinstance(target_titles, dict):
+        raise ValueError(
+            f"Malformed search config {search_path}: roles.target_titles is required "
+            "for the enabled embedding veto"
+        )
+    preferred = target_titles.get("preferred")
+    exploratory = target_titles.get("exploratory", [])
+    if (
+        not isinstance(preferred, list)
+        or not isinstance(exploratory, list)
+        or not all(isinstance(title, str) for title in [*preferred, *exploratory])
+    ):
+        raise ValueError(
+            f"Malformed search config {search_path}: target title lists must contain strings"
+        )
+    search_profile = search_raw.get("search_profile", {})
+    if not isinstance(search_profile, dict):
+        raise ValueError(
+            f"Malformed search config {search_path}: search_profile must be a mapping"
+        )
+    goal_summary = search_profile.get("goal_summary", "")
+    if not isinstance(goal_summary, str):
+        raise ValueError(
+            f"Malformed search config {search_path}: search_profile.goal_summary "
+            "must be a string"
+        )
+    titles = [*preferred, *exploratory]
+    if reference_mode == "blend":
+        return [build_reference_text(profile, titles, goal_summary)]
+    if reference_mode == "keywords":
+        return [build_keywords_reference_text(titles)]
+    if reference_mode in {"keyword-max", "keyword-mean"}:
+        return build_per_keyword_reference_texts(titles)
+    if reference_mode == "skills-max":
+        return build_per_keyword_reference_texts(titles) + [
+            build_skills_reference_text(profile)
+        ]
+    raise ValueError(f"Unknown reference mode: {reference_mode!r}")
+
+
+def _load_embedding_cache(cache_path: Path) -> dict[str, tuple[float, ...]]:
+    try:
+        return parse_cache_jsonl(cache_path.read_text(encoding="utf-8"), cache_path)
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        raise OSError(f"Could not read embedding cache {cache_path}: {exc}") from exc
+
+
+def _embedding_client(config: EmbeddingVetoConfig) -> OpenAI:
+    """Construct the OpenAI-compatible local nomic client only on a cache miss."""
+    return OpenAI(base_url=config.base_url, api_key="ollama")
+
+
+def _posting_for_embedding(job: dict[str, Any], index: int) -> Posting:
+    title = job.get("title")
+    company = job.get("company")
+    dedup_hash = job.get("dedup_hash")
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError(f"Companies posting {index}: title must be a non-empty string")
+    if not isinstance(company, str) or not company.strip():
+        raise ValueError(
+            f"Companies posting {index}: company must be a non-empty string"
+        )
+    if not isinstance(dedup_hash, str) or not dedup_hash.strip():
+        raise ValueError(
+            f"Companies posting {index}: dedup_hash must be a non-empty string"
+        )
+    return Posting(
+        title=" ".join(title.split()),
+        company=" ".join(company.split()),
+        dedup_hash=dedup_hash.strip(),
+        description="",
+        source_url="",
+        description_fallback=True,
+    )
+
+
+def _apply_embedding_veto(
+    jobs: list[dict[str, Any]],
+    *,
+    reference_text: str | list[str],
+    config: EmbeddingVetoConfig,
+    cache: dict[str, tuple[float, ...]],
+) -> list[dict[str, Any]]:
+    """Drop the globally lowest-ranked configured fraction of a companies pool.
+
+    The cache is content-addressed by the shared embedding core. Cache misses are
+    appended only after the provider returns a complete, validated response.
+    """
+    if not jobs or config.cut_depth == 0:
+        return jobs
+    schemas = SCHEMAS_BY_PREFIX_SCHEME[config.prefix_scheme]
+    endpoint = endpoint_identity(config.provider, config.base_url)
+    postings = [_posting_for_embedding(job, index) for index, job in enumerate(jobs)]
+
+    reference_texts = (
+        [reference_text] if isinstance(reference_text, str) else reference_text
+    )
+    if not reference_texts:
+        raise ValueError("Embedding veto requires at least one reference text")
+    reference_identities = []
+    requested = {}
+    for text in reference_texts:
+        reference_input = apply_prefix_scheme(
+            text, role="reference", prefix_scheme=config.prefix_scheme
+        )
+        identity = cache_identity(
+            schema_version=schemas["reference"],
+            provider=config.provider,
+            endpoint=endpoint,
+            model=config.model,
+            text=reference_input,
+        )
+        reference_identities.append(identity)
+        requested[identity] = reference_input
+    job_identities = []
+    for posting in postings:
+        job_input = apply_prefix_scheme(
+            posting.title, role="job", prefix_scheme=config.prefix_scheme
+        )
+        identity = cache_identity(
+            schema_version=schemas["title"],
+            provider=config.provider,
+            endpoint=endpoint,
+            model=config.model,
+            text=job_input,
+        )
+        job_identities.append(identity)
+        requested[identity] = job_input
+
+    misses = {
+        identity: text
+        for identity, text in requested.items()
+        if identity.key not in cache
+    }
+    if misses:
+        fetched, _, _ = fetch_missing_embeddings(
+            _embedding_client(config),
+            config.model,
+            misses,
+            batch_size=config.embedding_batch_size,
+        )
+        cache.update(fetched)
+        config.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with config.cache_path.open("a", encoding="utf-8") as cache_file:
+            for identity in misses:
+                cache_file.write(
+                    json.dumps(_cache_entry(identity, fetched[identity.key])) + "\n"
+                )
+
+    scores = pool_scores(
+        [cache[identity.key] for identity in job_identities],
+        [cache[identity.key] for identity in reference_identities],
+        "mean" if config.reference_mode == "keyword-mean" else "max",
+    )
+    ranked = rank_by_scores(postings, scores, {})
+    drop_count = int(config.cut_depth * len(jobs))
+    posting_indices = {id(posting): index for index, posting in enumerate(postings)}
+    dropped_indices = (
+        {posting_indices[id(item.posting)] for item in ranked[-drop_count:]}
+        if drop_count
+        else set()
+    )
+    return [job for index, job in enumerate(jobs) if index not in dropped_indices]
 
 
 def _load_policies(run_dir: Path) -> UserPolicies:
