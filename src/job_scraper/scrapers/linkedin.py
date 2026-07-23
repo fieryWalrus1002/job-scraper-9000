@@ -9,9 +9,8 @@ from bs4 import BeautifulSoup
 
 from utils.salary import extract_salary
 
-from ..description_formatting import html_to_markdown
+from ..description_formatting import clean_description
 from ..models import JobPosting
-from ..pii import scrub
 from ..query import LinkedInSearchQuery
 from ..search_provenance import build_search_params
 from .base import BaseScraper
@@ -88,7 +87,7 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
             return ""
         soup = BeautifulSoup(resp.text, "html.parser")
         desc = soup.find("div", class_="show-more-less-html__markup")
-        return html_to_markdown(desc) if desc else ""
+        return str(desc) if desc else ""
 
     def scrape(self) -> list[JobPosting]:
         all_jobs: list[JobPosting] = []
@@ -107,12 +106,11 @@ class LinkedInJobScraper(BaseScraper["LinkedInSearchQuery"]):
                 seen_ids.add(stub["source_job_id"])
                 new_count += 1
 
-                description = ""
-                scrub_counts: dict = {"email": 0, "phone": 0}
+                raw_description = ""
                 if self.query.fetch_descriptions:
-                    raw = self.fetch_description(stub["source_job_id"])
-                    description, scrub_counts = scrub(raw)
+                    raw_description = self.fetch_description(stub["source_job_id"])
                     self._sleep()
+                description, scrub_counts = clean_description(raw_description)
 
                 salary = extract_salary(description)
                 job = JobPosting(

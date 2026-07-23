@@ -139,7 +139,7 @@ def test_fetch_description_returns_text():
     assert "Great role with Python." in desc
 
 
-def test_fetch_description_returns_markdown_for_structured_html():
+def test_fetch_description_returns_raw_structured_html():
     scraper = LinkedInJobScraper(_make_query())
     html = """
     <div class="show-more-less-html__markup">
@@ -155,11 +155,40 @@ def test_fetch_description_returns_markdown_for_structured_html():
     with patch.object(scraper.session, "get", return_value=_mock_response(html)):
         desc = scraper.fetch_description("999")
 
-    assert "**Key Responsibilities**" in desc
-    assert "- Build Python services" in desc
-    assert "- Support production systems" in desc
+    assert "Key Responsibilities" in desc
+    assert "Build Python services" in desc
     assert "555-867-5309" in desc
-    assert "<li>" not in desc
+    assert "<li>" in desc
+
+
+def test_scrape_cleans_linkedin_description_to_markdown_and_scrubs_pii():
+    scraper = LinkedInJobScraper(_make_query(fetch_descriptions=True, max_results=1))
+    stub = {
+        "source_job_id": "999",
+        "source_url": "https://linkedin.com/jobs/view/eng-999",
+        "title": "Dev",
+        "company": "Acme",
+        "location": "Remote",
+        "posted_at": "2024-01-15",
+    }
+    raw_description = """
+    <div class="show-more-less-html__markup">
+      <p><strong>Key Responsibilities</strong></p>
+      <ul><li>Build Python services</li></ul>
+      <p>Contact hiring@example.com or 555-867-5309.</p>
+    </div>
+    """
+
+    with patch.object(scraper, "fetch_search_page", return_value=[stub]):
+        with patch.object(scraper, "fetch_description", return_value=raw_description):
+            with patch.object(scraper, "_sleep"):
+                [job] = scraper.scrape()
+
+    assert "**Key Responsibilities**" in job.description
+    assert "- Build Python services" in job.description
+    assert "hiring@example.com" not in job.description
+    assert "555-867-5309" not in job.description
+    assert job.scrub_counts == {"email": 1, "phone": 1}
 
 
 def test_fetch_description_bad_status_returns_empty():
