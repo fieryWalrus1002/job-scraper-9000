@@ -306,6 +306,22 @@ class RemotePolicy(_Strict):
 
 class PrefilterPolicy(_Strict):
     excluded_title_terms: list[str] = Field(default_factory=list)
+    # System defaults live in config/agent/companies_prefilter.yml. These are
+    # deliberately optional so a user only overrides that system policy when
+    # they need a hand-tuned companies-pool veto.
+    embedding_veto_depth: float | None = Field(default=None, ge=0, le=1)
+    embedding_veto_enabled: bool | None = None
+
+    @field_validator("embedding_veto_depth", mode="before")
+    @classmethod
+    def _reject_bool_veto_depth(cls, value: object) -> object:
+        # Pydantic would coerce YAML `true`/`false` to 1.0/0.0, silently turning
+        # a fat-fingered depth into a full-pool (or no-op) veto. Fail fast.
+        if isinstance(value, bool):
+            raise ValueError(
+                "embedding_veto_depth must be a number in [0, 1], not a boolean"
+            )
+        return value
 
 
 class RelocationPolicy(_Strict):

@@ -1,0 +1,71 @@
+"""Shared pure core for embedding-based prefilter ranking."""
+
+from .cache import (
+    _cache_entry,
+    cache_identity,
+    endpoint_identity,
+    fetch_missing_embeddings,
+    parse_cache_jsonl,
+    sha256_text,
+)
+from .loaders import (
+    _mean_or_none,
+    parse_postings_jsonl,
+    parse_skills_fit_jsonl,
+)
+from .models import CacheIdentity, Posting, RankedPosting
+from .reference import (
+    ALL_SCHEMA_VERSIONS,
+    NOMIC_REFERENCE_SCHEMA,
+    NOMIC_TITLE_DESCRIPTION_SCHEMA,
+    NOMIC_TITLE_SCHEMA,
+    REFERENCE_SCHEMA,
+    SCHEMAS_BY_PREFIX_SCHEME,
+    TITLE_DESCRIPTION_SCHEMA,
+    TITLE_SCHEMA,
+    VARIANT_SCHEMAS,
+    apply_prefix_scheme,
+    build_job_text,
+    build_keywords_reference_text,
+    build_per_keyword_reference_texts,
+    build_reference_text,
+    build_skills_reference_text,
+    normalize_text,
+    validate_profile,
+)
+from .scoring import cosine_similarity, pool_scores, rank_by_scores
+
+__all__ = [
+    "ALL_SCHEMA_VERSIONS",
+    "CacheIdentity",
+    "NOMIC_REFERENCE_SCHEMA",
+    "NOMIC_TITLE_DESCRIPTION_SCHEMA",
+    "NOMIC_TITLE_SCHEMA",
+    "Posting",
+    "REFERENCE_SCHEMA",
+    "RankedPosting",
+    "SCHEMAS_BY_PREFIX_SCHEME",
+    "TITLE_DESCRIPTION_SCHEMA",
+    "TITLE_SCHEMA",
+    "VARIANT_SCHEMAS",
+    "_cache_entry",
+    "_mean_or_none",
+    "apply_prefix_scheme",
+    "build_job_text",
+    "build_keywords_reference_text",
+    "build_per_keyword_reference_texts",
+    "build_reference_text",
+    "build_skills_reference_text",
+    "cache_identity",
+    "cosine_similarity",
+    "endpoint_identity",
+    "fetch_missing_embeddings",
+    "normalize_text",
+    "parse_cache_jsonl",
+    "parse_postings_jsonl",
+    "parse_skills_fit_jsonl",
+    "pool_scores",
+    "rank_by_scores",
+    "sha256_text",
+    "validate_profile",
+]

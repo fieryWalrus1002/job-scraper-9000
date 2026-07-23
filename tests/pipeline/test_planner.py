@@ -54,6 +54,10 @@ def test_plan_run_materializes_yaml_and_enqueues_rows(migrated_pg, tmp_path):
         or "jobspy" in search_yaml
         or "companies" in search_yaml
     )
+    assert search_yaml["roles"]["target_titles"]["preferred"] == [
+        "ML Engineer",
+        "ML Ops",
+    ]
 
     # Each enqueued row is pending, has a non-empty source, and a payload
     # that contains the named source key.

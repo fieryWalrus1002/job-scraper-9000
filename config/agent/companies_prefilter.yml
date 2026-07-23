@@ -1,0 +1,16 @@
+# Companies-board embedding bottom-veto. This runs only for the queue source
+# named "companies"; linkedin and jobspy are deliberately never eligible.
+#
+# Disabled by default: the spec requires a shadow-mode / calibration gate before
+# live routing (a live veto stops producing tail labels and corrupts its own
+# validation data). Do not flip this to `true` until the cut_depth is HITL-ratified
+# (#573) and the reference_mode is chosen from the cohort audit (§10.3).
+enabled: false
+cut_depth: 0.33
+reference_mode: blend
+provider: ollama
+base_url: http://localhost:8080/v1
+model: nomic-embed-text-v1.5
+prefix_scheme: nomic
+cache_path: data/cache/companies_prefilter_embeddings.jsonl
+embedding_batch_size: 100
