@@ -1,0 +1,42 @@
+# Post-scrape quality gate thresholds.
+#
+# Defaults are intentionally lenient: this gate should catch obvious scraper drift
+# (silent zeroes, empty/truncated descriptions, missing provenance) without making
+# normal portfolio runs brittle. Source names match either the scraper family
+# (e.g. jobspy, greenhouse) or an exact source_name (e.g. greenhouse:acme).
+#
+# Zero-jobs policy: when a source returns 0 jobs, only the min_jobs check fires
+# (percentage checks are skipped as meaningless). If a source legitimately returns
+# zero for a narrow query, set min_jobs: 0 under that source to opt out.
+global:
+  enabled: true
+  min_jobs: 1
+  min_desc_chars: 100
+  min_complete_pct: 0.5
+  min_posted_at_pct: 0.25
+  check_workplace: false
+  min_workplace_pct: 0.9
+
+sources:
+  linkedin:
+    check_workplace: true
+    min_workplace_pct: 0.9
+
+  jobspy:
+    check_workplace: true
+    min_workplace_pct: 0.9
+
+  # SEL only emits workplace when Workday detail metadata identifies a remote
+  # posting. Keep the default off for local/on-site SEL searches; raise it for a
+  # remote-only SEL slice if/when that query exists.
+  sel:
+    check_workplace: false
+
+  greenhouse:
+    check_workplace: false
+
+  ashby:
+    check_workplace: false
+
+  lever:
+    check_workplace: false
