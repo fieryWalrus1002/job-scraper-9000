@@ -7,6 +7,8 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+from job_scraper.pii import pii_redaction_total
+
 log = logging.getLogger(__name__)
 
 DATA_DIR = Path("data/raw")
@@ -61,9 +63,7 @@ def _output(jobs, dest: Path | None) -> None:
 
 
 def _summary(jobs) -> None:
-    scrubbed = sum(
-        j.scrub_counts.get("email", 0) + j.scrub_counts.get("phone", 0) for j in jobs
-    )
+    scrubbed = sum(pii_redaction_total(j.scrub_counts) for j in jobs)
     log.info("Total: %d jobs | PII items redacted: %d", len(jobs), scrubbed)
 
 

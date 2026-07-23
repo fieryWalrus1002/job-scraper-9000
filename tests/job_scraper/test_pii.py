@@ -1,4 +1,4 @@
-from job_scraper.pii import scrub
+from job_scraper.pii import pii_redaction_total, scrub
 
 
 def test_clean_text_unchanged():
@@ -69,3 +69,7 @@ def test_leading_trailing_whitespace_stripped():
     raw = "\n\nContent here\n\n"
     text, _ = scrub(raw)
     assert text == "Content here"
+
+
+def test_pii_redaction_total_sums_only_email_and_phone_counts():
+    assert pii_redaction_total({"email": 2, "phone": 3, "html_cleanup": 99}) == 5
