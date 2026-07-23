@@ -53,29 +53,47 @@ un-validated payload.
 
 ### 1. Typed search-provenance contract (the accountability fix)
 
-Replace the free-form `search_params: dict` with a validated model — a Pydantic
-`SearchProvenance`-shaped contract (or a dataclass with a validating `__post_init__`,
-matching the `posted_at` precedent) carrying **canonical** fields:
+Validate `search_params` **at construction** rather than by retyping the field. Shipped
+(#555/#556) as a `build_search_params(...)` constructor in `job_scraper/search_provenance.py`
+that every scraper calls; it returns a **flat `dict`** (not a Pydantic/dataclass field on
+`JobPosting`). Rationale: `search_params` is serialized with `dataclasses.asdict → json.dumps`
+and re-read downstream as a plain dict by four consumers (`prefilter/str_utils`,
+`pipeline/consolidation`, `review_ui`, `remote_filter/input_models`) — a Pydantic field breaks
+`asdict`, and a nested dataclass relocates opaque keys like `board_token`. Validating at
+construction gives the accountability without cross-consumer churn (same "keep churn additive"
+call this spec makes for `scrub_counts`). Canonical fields:
 
 - `workplace: Literal["remote","hybrid","onsite"] | None`
 - `keywords: str | None`
-- `job_type: Literal["fulltime","parttime","contract"] | None`
+- `job_type: Literal["fulltime","parttime","contract","internship"] | None` — `internship`
+  is a jobspy-native value accepted by the constructor for manual CLI runs. The **production**
+  contract (`user_config.models.EmploymentType`) is the narrower `["fulltime","parttime", "contract"]`; a test pins `EmploymentType ⊆ _JOB_TYPE` so the two can't silently drift.
 - `source_detail_location: str | None` (Workday-style structured location)
-- source-specific opaque fields (e.g. `board_token`, `workday_job_req_id`) allowed but
-  segregated, not mixed into the classifier-relevant namespace.
+- source-specific opaque fields via a closed allowlist (`_OPAQUE_ALLOWED`: `board_token`,
+  `company`, `experience`, `salary_floor`, `sites`, `location`, `source`,
+  `workday_job_req_id`) — segregated from the classifier-relevant namespace; an unknown key
+  raises.
 
-Each scraper is responsible for mapping its native fields into the canonical ones:
+Each scraper maps its native fields into the canonical ones:
 
 - **jobspy:** `is_remote=True → workplace="remote"`; `search_term → keywords`.
 - **ashby/greenhouse/lever:** legitimately have no workplace filter (they scrape a
-  company's whole board) — they emit `workplace=None` *explicitly*, which is correct and
-  now distinguishable from "forgot to set it."
+  company's whole board) — they simply **don't pass `workplace`**; the constructor drops
+  `None` for a clean flat dict, so "no workplace filter" is expressed by the key's
+  **absence**, and consumers treat absent == no-filter (`normalize_search_contexts` filters
+  `None` regardless). Distinguishing "no filter" from "forgot to set it" is guaranteed by the
+  **mandatory fail-loud constructor** — not by emitting an explicit `workplace=None`. (Option
+  B, ratified during #560 review: preserving an explicit `None` only for `workplace` would
+  asymmetrically special-case one field for a distinction nothing downstream consumes.)
 - **linkedin/sel:** already canonical; mechanical.
 
-**Fail-loud:** an unknown/unmapped key that looks classifier-relevant should raise at
-the scraper boundary, not pass through. This is the primary guard; the consumer-side
-`RemoteFilterInput` keeps a thin validating backstop (defense in depth, same as
-CLAUDE.md's "DB constraints are a backstop, not the primary guard").
+**Fail-loud:** an unknown/unmapped key that looks classifier-relevant raises at the scraper
+boundary via `build_search_params`, not pass through — this is the accountability mechanism.
+The consumer-side `RemoteFilterInput` keeps a thin validating backstop (defense in depth, same
+as CLAUDE.md's "DB constraints are a backstop, not the primary guard"). *Residual gap:* nothing
+yet forces a scraper to route through the constructor (a raw `search_params={...}` assignment
+still bypasses it); enforcing it in `JobPosting.__post_init__` (mirroring `posted_at`) is
+tracked as a follow-up.
 
 ### 2. Description hygiene at the source
 
@@ -215,3 +233,13 @@ independently of 3–5.
   `scrub_counts` note (the design is `clean_description` composing the existing pieces).
 - 2026-07-22 — Fixed a stale §2 cross-reference: the greenhouse fix is slice 0 / #551
   (was mislabeled "slice 3 / the standalone issue"). Post-merge follow-up to #552.
+- 2026-07-22 — **Amended §1 to match the shipped implementation** (#555/#556, PR #560):
+  validate at construction via `build_search_params` returning a flat dict (not a retyped
+  field — serialization + 4 consumers); `job_type` allows `internship` (jobspy-native) while
+  production `EmploymentType` stays the narrower subset, pinned by a drift-guard test; opaque
+  keys via a closed allowlist. Adopted **Option B** for board scrapers: no workplace filter =
+  key **absence** (constructor drops `None`), accountability from the mandatory fail-loud
+  constructor rather than an explicit `workplace=None`. Noted the residual
+  `__post_init__`-enforcement gap as a follow-up. Slices 3–4 shipped: `clean_description`
+  centralization (#557, PR #561) and the post-scrape quality gate + contract tests (#14,
+  PR #562).

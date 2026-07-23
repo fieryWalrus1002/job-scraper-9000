@@ -162,3 +162,7 @@ Order: 3 and 4 (eval red) before 5 (the fix). 1 and 2 are independent and can la
 - 2026-07-22 — **RATIFIED.** Added the gold-repair slice (normalize 22 stale greenhouse
   descriptions in place; re-fetch impossible). Corrected the Non-goal + slice 5 that
   still pointed HTML normalization at the prompt boundary — it's Phase 35's.
+- 2026-07-22 — §2's HTML-hygiene item is now **implemented by Phase 35** — the
+  `clean_description` (`html.unescape → html_to_markdown → pii.scrub`) centralization that
+  Phase 34 references as owner shipped as `scraper_output_contract.md` slice 3 (#557, PR #561).
+  Phase 34's gold-repair slice (#554) reuses that exact transform on the 22 stale records.
