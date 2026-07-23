@@ -29,9 +29,13 @@ def _make_job(**overrides) -> JobPosting:
         title="Engineer",
         company="Acme",
         location="Remote",
-        posted_at=None,
-        description="",
+        posted_at="2024-01-01",
+        description=(
+            "Build reliable systems for distributed remote teams with Python, "
+            "observability, robust operations, and clear ownership."
+        ),
         scraped_at="2024-01-01T00:00:00+00:00",
+        search_params={"workplace": "remote"},
     )
     return JobPosting(**{**defaults, **overrides})
 

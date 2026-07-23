@@ -361,10 +361,12 @@ def _add_sel(sub: argparse._SubParsersAction) -> None:
 
 
 def _cmd_run_config(args) -> None:
-    from job_scraper.config import load_config, ConfigError
+    from job_scraper.config import ConfigError, load_config, load_quality_gate_config
+    from job_scraper.quality_gate import ScrapeQualityError, check_scrape
 
     try:
         scrapers = load_config(args.config)
+        quality_config = load_quality_gate_config()
     except ConfigError as exc:
         log.error("Config error: %s", exc)
         sys.exit(1)
@@ -406,6 +408,11 @@ def _cmd_run_config(args) -> None:
             continue
         try:
             jobs = s.scrape()
+            check_scrape(
+                s.source_name,
+                jobs,
+                quality_config.thresholds_for(s.source_name),
+            )
             log.info("%s → %d jobs", s.source_name, len(jobs))
             if args.save:
                 info = s.describe()
@@ -427,6 +434,8 @@ def _cmd_run_config(args) -> None:
             _output(jobs, dest)
             total += len(jobs)
             total_scrubbed += sum(pii_redaction_total(j.scrub_counts) for j in jobs)
+        except ScrapeQualityError as exc:
+            log.exception("%s failed quality gate — skipping: %s", s.source_name, exc)
         except Exception as exc:
             log.error("%s failed — skipping: %s", s.source_name, exc)
             if is_permanent(exc):
