@@ -3,7 +3,10 @@
 > **Status: RATIFIED 2026-07-23.** Design and PR-slicing agreed; the §10 open
 > items are shipping gates that become filed issues (audit-first). Derived from
 > the spike findings in `notes/companies-prefilter/FINDINGS.md` +
-> `FINDINGS_SUPP_AIFIT.md` (local-only scratch). The spike branch
+> `notes/companies-prefilter/FINDINGS_SUPP_AIFIT.md`. **All
+> `notes/companies-prefilter/*` paths cited below are local-only working docs,
+> not committed to the repo** (see `notes/README.md`) — they record evidence
+> provenance, not in-repo links. The spike branch
 > `feat/companies-embedding-ranker-prototype` and its ranker script do **not**
 > graduate — this is a separate, slimmer production build; the spike's pure
 > functions are extracted into `src/prefilter/embedding/` as slice 0.
@@ -202,7 +205,8 @@ vibes."
 1. **Cohort data audit (now the critical path).** The variant bake-off ran on a
    2nd dataset (Magnus) and the result is that we *cannot* pick a variant from two
    datasets: they disagree and Magnus has only 24 good jobs (below any usable
-   density floor — see §6 and `FINDINGS_SUPP_AIFIT.md` Table D). Before committing
+   density floor — see §6 and `notes/companies-prefilter/FINDINGS_SUPP_AIFIT.md`
+   Table D). Before committing
    to a cut depth **or a reference mode**, run the read-only audit from
    `notes/companies-prefilter/ADAPTIVE_PER_USER_CALIBRATION.md`. **Decision
    (2026-07-23): the audit — like the veto and all its vectors — is local-only,
