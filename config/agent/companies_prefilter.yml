@@ -1,0 +1,11 @@
+# Companies-board embedding bottom-veto. This runs only for the queue source
+# named "companies"; linkedin and jobspy are deliberately never eligible.
+enabled: true
+cut_depth: 0.33
+reference_mode: blend
+provider: ollama
+base_url: http://localhost:8080/v1
+model: nomic-embed-text-v1.5
+prefix_scheme: nomic
+cache_path: data/cache/companies_prefilter_embeddings.jsonl
+embedding_batch_size: 100
