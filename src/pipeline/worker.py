@@ -473,17 +473,45 @@ def process_job(
     raw_jobs = list(scrape_fn(job["source"], job["query_payload"], conn))
     job_dicts = [_to_dict(j) for j in raw_jobs]
     filtered = _apply_title_filter(job_dicts, policies.prefilter.excluded_title_terms)
+    title_filtered_count = len(filtered)
+    veto_depth: float | None = None
+    if job["source"] == "companies":
+        veto_config = _load_embedding_veto_config(policies)
+        if veto_config.enabled:
+            filtered = _apply_embedding_veto(
+                filtered,
+                reference_text=_load_reference_texts(
+                    run_dir, veto_config.reference_mode
+                ),
+                config=veto_config,
+                cache=_load_embedding_cache(veto_config.cache_path),
+            )
+            veto_depth = veto_config.cut_depth
 
     dest = run_dir / "scrape" / f"{job['source']}.jsonl"
     count = _persist(filtered, dest)
-    log.info(
-        "%s/%s — scraped %d, kept %d after title filter → %s",
-        email,
-        job["source"],
-        len(job_dicts),
-        count,
-        dest,
-    )
+    if veto_depth is None:
+        log.info(
+            "%s/%s — scraped %d, kept %d after title filter → %s",
+            email,
+            job["source"],
+            len(job_dicts),
+            title_filtered_count,
+            dest,
+        )
+    else:
+        log.info(
+            "%s/%s — scraped %d, kept %d after title filter, kept %d after "
+            "embedding veto (dropped %d, depth=%s) → %s",
+            email,
+            job["source"],
+            len(job_dicts),
+            title_filtered_count,
+            count,
+            title_filtered_count - count,
+            veto_depth,
+            dest,
+        )
     return count
 
 

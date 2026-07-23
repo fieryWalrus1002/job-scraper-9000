@@ -85,6 +85,18 @@ def _materialize_user(
 
     search = SearchConfigInput.model_validate(search_payload)
     pipeline_search = search_config_to_pipeline_yaml(search)
+    # Keep the target-title contract in the materialized run artifact. The
+    # scraper ignores these metadata keys, while the companies embedding veto
+    # uses them to build the same per-user reference as calibration.
+    pipeline_search["roles"] = {
+        "target_titles": {
+            "preferred": list(search.roles.target_titles.preferred),
+            "exploratory": list(search.roles.target_titles.exploratory),
+        }
+    }
+    pipeline_search["search_profile"] = {
+        "goal_summary": search.search_profile.goal_summary,
+    }
     (run_dir / "search.yml").write_text(dump_yaml(pipeline_search))
     (run_dir / "policies.yml").write_text(dump_yaml(policies or {}))
 
