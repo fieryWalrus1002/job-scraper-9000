@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
+from .quality_gate import (
+    ScrapeQualityConfig,
+    ScrapeQualityThresholds,
+    merge_thresholds,
+)
 from .query import LinkedInSearchQuery, SALARY_FLOOR, SELSearchQuery
 from .scrapers.base import BaseScraper
 from .scrapers.ashby import AshbyScraper, AshbyQuery
@@ -129,6 +134,44 @@ def load_config(
     if not isinstance(raw, dict):
         raise ConfigError(f"Config must be a YAML mapping, got {type(raw).__name__}")
     return _build_scrapers(raw, conn=conn)
+
+
+def load_quality_gate_config(
+    path: str | Path = "config/quality_gate.yml",
+) -> ScrapeQualityConfig:
+    """Parse post-scrape quality-gate thresholds from YAML."""
+    raw = yaml.safe_load(Path(path).read_text())
+    if not isinstance(raw, dict):
+        raise ConfigError(
+            f"Quality gate config must be a YAML mapping, got {type(raw).__name__}"
+        )
+
+    global_raw = raw.get("global") or {}
+    if not isinstance(global_raw, dict):
+        raise ConfigError("quality_gate.global must be a mapping")
+
+    try:
+        global_defaults = merge_thresholds(ScrapeQualityThresholds(), global_raw)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+
+    sources_raw = raw.get("sources") or {}
+    if not isinstance(sources_raw, dict):
+        raise ConfigError("quality_gate.sources must be a mapping")
+
+    source_overrides: dict[str, ScrapeQualityThresholds] = {}
+    for source, overrides in sources_raw.items():
+        if not isinstance(overrides, dict):
+            raise ConfigError(f"quality_gate.sources.{source} must be a mapping")
+        try:
+            source_overrides[str(source)] = merge_thresholds(global_defaults, overrides)
+        except ValueError as exc:
+            raise ConfigError(f"quality_gate.sources.{source}: {exc}") from exc
+
+    return ScrapeQualityConfig(
+        global_defaults=global_defaults,
+        source_overrides=source_overrides,
+    )
 
 
 # ---------------------------------------------------------------------------
