@@ -15,15 +15,41 @@ from scripts.calibrate_companies_prefilter import (
 )
 
 
+class FakeEmbeddingClient:
+    """Deterministic OpenAI-compatible fake that never performs network I/O."""
+
+    def __init__(self) -> None:
+        self.requests: list[list[str]] = []
+
+    @property
+    def embeddings(self) -> FakeEmbeddingClient:
+        return self
+
+    def create(self, *, model: str, input: list[str]) -> SimpleNamespace:  # noqa: A002
+        self.requests.append(input)
+        return SimpleNamespace(
+            data=[SimpleNamespace(embedding=self.vector(text)) for text in input]
+        )
+
+    @staticmethod
+    def vector(text: str) -> list[float]:
+        text = text.lower()
+        if "junk job" in text:
+            return [0.0, 1.0]
+        if "good job" in text or "target job titles" in text:
+            return [1.0, 0.0]
+        return [0.5, 0.5]
+
+
 def write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
 
-def posting(dedup_hash: str) -> dict[str, object]:
+def posting(dedup_hash: str, *, title: str = "Data engineer") -> dict[str, object]:
     return {
         "dedup_hash": dedup_hash,
-        "title": "Data engineer",
+        "title": title,
         "company": "Example Co",
         "description": "Build data systems.",
     }
@@ -209,3 +235,103 @@ def test_cli_writes_json_and_prints_human_summary(
 
     assert json.loads(json_out.read_text(encoding="utf-8"))["totals"]["raw"] == 1
     assert "Per-run selection-bias coverage" in capsys.readouterr().out
+
+
+def scoring_args(tmp_path: Path, *, reference_mode: list[str]) -> SimpleNamespace:
+    profile = tmp_path / "profile.yml"
+    profile.write_text(
+        "summary: Data engineer\ncore_skills: [Python]\nadjacent_skills: []\npreferred_domains: []\n",
+        encoding="utf-8",
+    )
+    return SimpleNamespace(
+        runs_root=tmp_path / "runs",
+        user_slug="magnus",
+        json_out=tmp_path / "audit.json",
+        score=True,
+        reference_mode=reference_mode,
+        profile=profile,
+        target_title=["Data Engineer"],
+        goal_summary="",
+        provider="ollama",
+        model="fake-embed",
+        base_url="http://fake-ollama:11434/v1",
+        prefix_scheme="nomic",
+        cache=tmp_path / "cache.jsonl",
+        curve_output_dir=tmp_path / "curves",
+        cut_depths="10,15,20,25,30,35,40,45,50,55,60,65,70",
+        embedding_batch_size=100,
+        allow_ground_truth_reference=False,
+    )
+
+
+def make_eligible_scoring_run(tmp_path: Path) -> None:
+    good_hashes = [f"good-{index}" for index in range(100)]
+    junk_hashes = [f"junk-{index}" for index in range(200)]
+    make_run(
+        tmp_path / "runs",
+        "run-1",
+        [
+            *[posting(dedup_hash, title="Good Job") for dedup_hash in good_hashes],
+            *[posting(dedup_hash, title="Junk Job") for dedup_hash in junk_hashes],
+        ],
+        [
+            *[scored(dedup_hash, 4) for dedup_hash in good_hashes],
+            *[scored(dedup_hash, 1) for dedup_hash in junk_hashes],
+        ],
+    )
+
+
+def test_scoring_emits_independent_curves_and_reuses_cache(tmp_path: Path) -> None:
+    make_eligible_scoring_run(tmp_path)
+    args = scoring_args(tmp_path, reference_mode=["blend", "keywords"])
+
+    first = FakeEmbeddingClient()
+    report = run(args, embedding_client=first)
+
+    scoring = report["scoring"]
+    assert scoring["eligible_cohort_count"] == 1
+    curves = scoring["curves"]
+    assert {curve["reference_mode"] for curve in curves} == {"blend", "keywords"}
+    assert all(Path(curve["curve_csv"]).is_file() for curve in curves)
+    for curve in curves:
+        rows = curve["curve"]
+        assert [row["good_lost"] for row in rows] == sorted(
+            row["good_lost"] for row in rows
+        )
+    blend_rows = next(
+        curve["curve"] for curve in curves if curve["reference_mode"] == "blend"
+    )
+    assert blend_rows[0]["jobs_cut"] == 30
+    assert blend_rows[0]["dropped_purity"] == pytest.approx(1.0)
+    blend_summary = next(
+        summary
+        for summary in scoring["summaries"]
+        if summary["reference_mode"] == "blend"
+    )
+    assert blend_summary["max_cut_pct"] == 65
+    max_cut_row = next(
+        row
+        for row in blend_rows
+        if row["cut_depth_pct"] == blend_summary["max_cut_pct"]
+    )
+    next_row = next(
+        row
+        for row in blend_rows
+        if row["cut_depth_pct"] == blend_summary["max_cut_pct"] + 5
+    )
+    assert max_cut_row["good_lost_pct"] <= 0.07
+    assert next_row["good_lost_pct"] > 0.07
+    assert first.requests
+
+    second = FakeEmbeddingClient()
+    run(args, embedding_client=second)
+
+    assert second.requests == []
+
+
+def test_exemplar_mode_refuses_without_its_gate(tmp_path: Path) -> None:
+    make_eligible_scoring_run(tmp_path)
+    args = scoring_args(tmp_path, reference_mode=["exemplar"])
+
+    with pytest.raises(ValueError, match="allow-ground-truth-reference"):
+        run(args, embedding_client=FakeEmbeddingClient())
