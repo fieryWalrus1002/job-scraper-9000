@@ -13,6 +13,7 @@ from ..description_formatting import html_to_markdown
 from ..models import JobPosting
 from ..pii import scrub
 from ..query import LinkedInSearchQuery
+from ..search_provenance import build_search_params
 from .base import BaseScraper
 
 log = logging.getLogger(__name__)
@@ -154,13 +155,13 @@ _JOBTYPE_LABEL = {"F": "fulltime", "P": "parttime", "C": "contract"}
 
 
 def _search_params(query: LinkedInSearchQuery) -> dict:
-    return {
-        "keywords": query.keywords,
-        "workplace": _WORKPLACE_LABEL.get(query.workplace, query.workplace),
-        "job_type": _JOBTYPE_LABEL.get(query.job_type, query.job_type),
-        "experience": query.experience,
-        "salary_floor": query.salary_floor,
-    }
+    return build_search_params(
+        keywords=query.keywords,
+        workplace=_WORKPLACE_LABEL.get(query.workplace, query.workplace),
+        job_type=_JOBTYPE_LABEL.get(query.job_type, query.job_type),
+        experience=query.experience,
+        salary_floor=query.salary_floor,
+    )
 
 
 def _parse_card(card) -> dict:

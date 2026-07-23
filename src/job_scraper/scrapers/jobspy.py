@@ -8,6 +8,7 @@ from utils.salary import SalaryResult, annualise, extract_salary
 
 from ..models import JobPosting
 from ..pii import scrub
+from ..search_provenance import build_search_params
 from .base import BaseScraper
 
 log = logging.getLogger(__name__)
@@ -91,13 +92,13 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
                 description=description,
                 scraped_at=datetime.now(timezone.utc).isoformat(),
                 scrub_counts=scrub_counts,
-                search_params={
-                    "search_term": self.query.search_term,
-                    "sites": self.query.site_name,
-                    "location": self.query.location,
-                    "is_remote": self.query.is_remote,
-                    "job_type": self.query.job_type,
-                },
+                search_params=build_search_params(
+                    workplace="remote" if self.query.is_remote else None,
+                    keywords=self.query.search_term,
+                    job_type=self.query.job_type,
+                    sites=self.query.site_name,
+                    location=self.query.location,
+                ),
                 salary_min_usd=salary.salary_min_usd if salary else None,
                 salary_max_usd=salary.salary_max_usd if salary else None,
                 salary_period=salary.salary_period if salary else None,
