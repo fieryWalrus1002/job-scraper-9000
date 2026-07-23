@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 import pipeline.worker as worker
 from pipeline.worker import (
     EmbeddingVetoConfig,
@@ -119,3 +122,54 @@ def test_per_user_embedding_veto_overrides_replace_system_defaults(
 
     assert config.enabled is False
     assert config.cut_depth == 0.25
+
+
+def test_user_override_cannot_enable_a_system_gated_off_veto(
+    tmp_path: Path, monkeypatch
+):
+    # Critical safety gate: while the veto is gated off system-wide, an opt-in
+    # per-user policy must NOT be able to activate destructive live routing.
+    config_path = tmp_path / "companies_prefilter.yml"
+    config_path.write_text("enabled: false\ncut_depth: 0.33\n")
+    monkeypatch.setattr(worker, "_COMPANIES_PREFILTER_CONFIG_PATH", config_path)
+    policies = UserPolicies.model_validate(
+        {"prefilter": {"embedding_veto_enabled": True}}
+    )
+
+    config = _load_embedding_veto_config(policies)
+
+    assert config.enabled is False
+
+
+def test_boolean_cut_depth_in_system_config_is_rejected(tmp_path: Path, monkeypatch):
+    # Pydantic would coerce `true` -> 1.0 (full-pool veto). Fail loud instead.
+    config_path = tmp_path / "companies_prefilter.yml"
+    config_path.write_text("enabled: true\ncut_depth: true\n")
+    monkeypatch.setattr(worker, "_COMPANIES_PREFILTER_CONFIG_PATH", config_path)
+
+    with pytest.raises(ValidationError, match="boolean"):
+        _load_embedding_veto_config(UserPolicies())
+
+
+def test_user_policy_rejects_boolean_veto_depth():
+    with pytest.raises(ValidationError, match="boolean"):
+        UserPolicies.model_validate({"prefilter": {"embedding_veto_depth": True}})
+
+
+def test_embedding_veto_fails_loud_on_partial_embedding_fetch(
+    tmp_path: Path, monkeypatch
+):
+    # A partial provider response must raise with context, not KeyError later or
+    # (worse) silently rank against absent vectors and drop the wrong jobs.
+    monkeypatch.setattr(worker, "_embedding_client", lambda _config: object())
+    monkeypatch.setattr(
+        worker, "fetch_missing_embeddings", lambda *args, **kwargs: ({}, None, None)
+    )
+
+    with pytest.raises(RuntimeError, match="unresolved"):
+        _apply_embedding_veto(
+            _jobs(),
+            reference_text="Reference",
+            config=_config(tmp_path),
+            cache={},
+        )

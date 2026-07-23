@@ -36,7 +36,7 @@ from typing import Any, Callable, Iterable, Literal
 import psycopg
 import yaml
 from openai import OpenAI
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipeline.queue import claim_next, mark_failed, mark_succeeded
 from prefilter.embedding import (
@@ -89,7 +89,9 @@ class _EmbeddingVetoConfigFile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    enabled: bool = True
+    # Disabled by default — see config/agent/companies_prefilter.yml. The veto is
+    # opt-in until the calibration/HITL gates (#573, §10.3) are cleared.
+    enabled: bool = False
     cut_depth: float = Field(default=0.33, ge=0, le=1)
     reference_mode: ReferenceMode = "blend"
     provider: Literal["ollama"] = "ollama"
@@ -98,6 +100,15 @@ class _EmbeddingVetoConfigFile(BaseModel):
     prefix_scheme: Literal["none", "nomic"] = "nomic"
     cache_path: Path = Path("data/cache/companies_prefilter_embeddings.jsonl")
     embedding_batch_size: int = Field(default=100, ge=1)
+
+    @field_validator("cut_depth", mode="before")
+    @classmethod
+    def _reject_bool_cut_depth(cls, value: object) -> object:
+        # Pydantic coerces YAML `true`/`false` to 1.0/0.0; a boolean cut_depth
+        # would silently turn into a full-pool (or no-op) veto. Fail loud instead.
+        if isinstance(value, bool):
+            raise ValueError("cut_depth must be a number in [0, 1], not a boolean")
+        return value
 
 
 """``(source, query_payload, conn) -> iterable of scraped postings`` (either
@@ -226,8 +237,20 @@ def _load_embedding_veto_config(policies: UserPolicies) -> EmbeddingVetoConfig:
         cache_path=loaded.cache_path,
         embedding_batch_size=loaded.embedding_batch_size,
     )
+    # Apply per-user overrides. Safety invariant: while the veto is gated off at
+    # the system level, a per-user policy may DISABLE it but must never ENABLE it.
+    # An opt-in override cannot activate destructive live routing before the
+    # calibration/HITL gates (#573, spec §10.3) are cleared — it can only narrow.
     if policies.prefilter.embedding_veto_enabled is not None:
-        config = replace(config, enabled=policies.prefilter.embedding_veto_enabled)
+        requested = policies.prefilter.embedding_veto_enabled
+        if requested and not config.enabled:
+            log.warning(
+                "user policy requested embedding_veto_enabled=true but the "
+                "companies veto is gated off system-wide; ignoring the opt-in "
+                "(live routing is not ratified — see #573, spec §10.3)"
+            )
+        else:
+            config = replace(config, enabled=requested)
     if policies.prefilter.embedding_veto_depth is not None:
         config = replace(config, cut_depth=policies.prefilter.embedding_veto_depth)
     return config
@@ -396,6 +419,19 @@ def _apply_embedding_veto(
             misses,
             batch_size=config.embedding_batch_size,
         )
+        # Fail loud if the provider returned a partial batch: otherwise the
+        # cache[identity.key] lookups below raise a bare KeyError with no context,
+        # and — worse — a partial result would silently rank against stale/absent
+        # vectors and drop the wrong jobs.
+        unresolved = [
+            identity.key for identity in misses if identity.key not in fetched
+        ]
+        if unresolved:
+            raise RuntimeError(
+                f"embedding veto: provider resolved {len(fetched)} of {len(misses)} "
+                f"requested embeddings (endpoint={endpoint}, model={config.model}); "
+                f"{len(unresolved)} unresolved, first missing key={unresolved[0]}"
+            )
         cache.update(fetched)
         config.cache_path.parent.mkdir(parents=True, exist_ok=True)
         with config.cache_path.open("a", encoding="utf-8") as cache_file:
