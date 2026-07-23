@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 """Audit historical companies runs before calibrating an embedding veto.
 
-The command reads only local pipeline-run JSONL files. It deliberately does not score,
-rank, or route postings: it reports whether compatible pre-veto labels are dense enough
-for a later calibration decision.
+The command reads only local pipeline-run JSONL files. It deliberately does not route
+postings: it reports whether compatible pre-veto labels are dense enough for a later
+calibration decision, and (in ``score`` mode) emits exploratory bottom-drop curves.
+
+IMPORTANT — curve metrics are *labelled-subset exploratory* readings, NOT production
+measurements. The curves rank only the labelled intersection of each run, whereas the
+production hook ranks the full title-filtered raw companies pool. Do not use these
+numbers to justify a live cut depth until the raw-pool ranking and per-cohort reference
+provenance are implemented (tracked as #573 blockers). See ``CURVE_METRIC_SCOPE``.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import logging
 import math
@@ -52,6 +59,10 @@ SHADOW_GOOD_MINIMUM = 100
 AUTO_SWITCH_LABELED_MINIMUM = 1000
 AUTO_SWITCH_GOOD_MINIMUM = 300
 DEFAULT_CUT_DEPTHS = tuple(range(10, 71, 5))
+# Curves rank only the labelled intersection of each run, not the full raw pool the
+# production hook cuts. These are exploratory readings for triage, not production-veto
+# measurements — see the module docstring and the #573 blockers.
+CURVE_METRIC_SCOPE = "labeled_subset_exploratory"
 DEFAULT_CACHE_PATH = Path("data/cache/companies_prefilter_embeddings.jsonl")
 DEFAULT_CURVE_OUTPUT_DIR = Path("data/calibration/companies_prefilter_curves")
 REFERENCE_MODES = frozenset(
@@ -325,9 +336,20 @@ def audit_user_runs(runs_root: Path, user_slug: str) -> dict[str, object]:
             key=lambda item: (item[0].profile_version, item[0].provider, item[0].model),
         )
     ]
-    largest_cohort = max(
+    # Per-cohort verdict, so a smaller-but-eligible cohort stays visible even when
+    # a larger ineligible cohort dominates the labeled count.
+    for cohort in cohorts:
+        cohort["eligibility"] = eligibility_verdict(
+            int(cohort["labeled"]), int(cohort["good"])
+        )
+    # Top-line verdict reflects the *best eligible* cohort (auto_switch > shadow >
+    # larger labeled count), not merely the largest — otherwise a big ineligible
+    # cohort would mask a smaller cohort that actually clears the §6 thresholds.
+    verdict_cohort = max(
         cohorts,
         key=lambda cohort: (
+            bool(cohort["eligibility"]["auto_switch_candidate"]),
+            bool(cohort["eligibility"]["shadow_eligible"]),
             int(cohort["labeled"]),
             str(cohort["profile_version"]),
             str(cohort["provider"]),
@@ -340,13 +362,14 @@ def audit_user_runs(runs_root: Path, user_slug: str) -> dict[str, object]:
     total_good = sum(audit.good for audit in audits)
     total_junk = sum(audit.junk for audit in audits)
     total_failures = sum(audit.failures for audit in audits)
-    eligibility = eligibility_verdict(
-        int(largest_cohort["labeled"]) if largest_cohort else 0,
-        int(largest_cohort["good"]) if largest_cohort else 0,
+    eligibility = (
+        dict(verdict_cohort["eligibility"])
+        if verdict_cohort
+        else eligibility_verdict(0, 0)
     )
     eligibility["cohort"] = (
-        {key: largest_cohort[key] for key in ("profile_version", "provider", "model")}
-        if largest_cohort
+        {key: verdict_cohort[key] for key in ("profile_version", "provider", "model")}
+        if verdict_cohort
         else None
     )
     return {
@@ -532,6 +555,14 @@ def _curve_filename(cohort: CohortKey, reference_mode: str) -> str:
     def safe(value: str) -> str:
         return re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-") or "unknown"
 
+    # A short hash of the exact cohort keys + mode disambiguates cohorts whose
+    # sanitized names would otherwise collide (e.g. profile versions "v/a" and
+    # "v-a" both sanitize to "v-a"), which would silently overwrite one CSV.
+    digest = hashlib.sha1(
+        "\x00".join(
+            [cohort.profile_version, cohort.provider, cohort.model, reference_mode]
+        ).encode("utf-8")
+    ).hexdigest()[:8]
     return (
         "curve-"
         + "-".join(
@@ -542,7 +573,7 @@ def _curve_filename(cohort: CohortKey, reference_mode: str) -> str:
                 safe(reference_mode),
             ]
         )
-        + ".csv"
+        + f"-{digest}.csv"
     )
 
 
@@ -613,6 +644,7 @@ def score_eligible_cohorts(
         )
         return {
             "cache_path": str(cache_path),
+            "metric_scope": CURVE_METRIC_SCOPE,
             "eligible_cohort_count": 0,
             "curves": [],
             "summaries": [],
@@ -737,6 +769,7 @@ def score_eligible_cohorts(
             )
     return {
         "cache_path": str(cache_path),
+        "metric_scope": CURVE_METRIC_SCOPE,
         "eligible_cohort_count": len(eligible),
         "curves": curves,
         "summaries": summaries,
