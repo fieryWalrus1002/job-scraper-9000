@@ -4,6 +4,10 @@
 # (silent zeroes, empty/truncated descriptions, missing provenance) without making
 # normal portfolio runs brittle. Source names match either the scraper family
 # (e.g. jobspy, greenhouse) or an exact source_name (e.g. greenhouse:acme).
+#
+# Zero-jobs policy: when a source returns 0 jobs, only the min_jobs check fires
+# (percentage checks are skipped as meaningless). If a source legitimately returns
+# zero for a narrow query, set min_jobs: 0 under that source to opt out.
 global:
   enabled: true
   min_jobs: 1

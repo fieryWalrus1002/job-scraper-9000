@@ -119,3 +119,150 @@ def test_load_quality_gate_config_rejects_unknown_keys(tmp_path):
 
     with pytest.raises(ConfigError, match="unknown quality gate key"):
         load_quality_gate_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 — missing file → ConfigError, not FileNotFoundError
+# ---------------------------------------------------------------------------
+
+
+def test_load_quality_gate_config_missing_file_raises_config_error(tmp_path):
+    missing = tmp_path / "does_not_exist.yml"
+    with pytest.raises(ConfigError, match="Quality gate config not found"):
+        load_quality_gate_config(missing)
+
+
+# ---------------------------------------------------------------------------
+# Fix 2 — unknown top-level keys → ConfigError
+# ---------------------------------------------------------------------------
+
+
+def test_load_quality_gate_config_rejects_unknown_top_level_keys(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          min_jobs: 1
+        sources:
+          linkedin:
+            check_workplace: true
+        bad_key: true
+        another_bad: 42
+        """
+    )
+    with pytest.raises(ConfigError, match="unknown top-level key"):
+        load_quality_gate_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Fix 3 — null / wrong-type scalar → ConfigError
+# ---------------------------------------------------------------------------
+
+
+def test_load_quality_gate_config_null_scalar_raises_config_error(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          min_jobs: null
+        """
+    )
+    with pytest.raises(ConfigError, match="min_jobs must be a number"):
+        load_quality_gate_config(cfg)
+
+
+def test_load_quality_gate_config_string_for_int_raises_config_error(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          min_jobs: "not_a_number"
+        """
+    )
+    with pytest.raises(ConfigError, match="min_jobs must be a number"):
+        load_quality_gate_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Fix 4 — strict boolean coercion
+# ---------------------------------------------------------------------------
+
+
+def test_load_quality_gate_config_quoted_false_is_false(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          enabled: "false"
+          check_workplace: "FALSE"
+        """
+    )
+    loaded = load_quality_gate_config(cfg)
+    assert loaded.global_defaults.enabled is False
+    assert loaded.global_defaults.check_workplace is False
+
+
+def test_load_quality_gate_config_quoted_true_is_true(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          enabled: "true"
+          check_workplace: "True"
+        """
+    )
+    loaded = load_quality_gate_config(cfg)
+    assert loaded.global_defaults.enabled is True
+    assert loaded.global_defaults.check_workplace is True
+
+
+def test_load_quality_gate_config_bad_string_bool_raises(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          enabled: "yes"
+        """
+    )
+    with pytest.raises(ConfigError, match="enabled must be true/false"):
+        load_quality_gate_config(cfg)
+
+
+def test_load_quality_gate_config_int_for_bool_raises(tmp_path):
+    cfg = tmp_path / "quality_gate.yml"
+    cfg.write_text(
+        """
+        global:
+          enabled: 1
+        """
+    )
+    with pytest.raises(ConfigError, match="enabled must be a boolean"):
+        load_quality_gate_config(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Part 2 — zero-jobs policy: single min_jobs failure, not three
+# ---------------------------------------------------------------------------
+
+
+def test_check_scrape_zero_jobs_yields_single_min_jobs_failure():
+    thresholds = ScrapeQualityThresholds(
+        min_jobs=1,
+        min_complete_pct=0.5,
+        min_posted_at_pct=0.25,
+        check_workplace=True,
+        min_workplace_pct=0.9,
+    )
+    with pytest.raises(ScrapeQualityError) as exc_info:
+        check_scrape("linkedin", [], thresholds)
+
+    # Exactly one failure message (min_jobs), not three
+    failures = exc_info.value.args[0].split("; ")
+    assert len(failures) == 1
+    assert "min job count" in failures[0]
+
+
+def test_check_scrape_zero_jobs_with_min_jobs_zero_passes():
+    thresholds = ScrapeQualityThresholds(min_jobs=0)
+    # Should not raise — zero jobs is acceptable when min_jobs=0
+    check_scrape("narrow-source", [], thresholds)

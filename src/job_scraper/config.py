@@ -140,11 +140,19 @@ def load_quality_gate_config(
     path: str | Path = "config/quality_gate.yml",
 ) -> ScrapeQualityConfig:
     """Parse post-scrape quality-gate thresholds from YAML."""
-    raw = yaml.safe_load(Path(path).read_text())
+    try:
+        text = Path(path).read_text()
+    except FileNotFoundError as exc:
+        raise ConfigError(f"Quality gate config not found: {path}") from exc
+    raw = yaml.safe_load(text)
     if not isinstance(raw, dict):
         raise ConfigError(
             f"Quality gate config must be a YAML mapping, got {type(raw).__name__}"
         )
+
+    unknown = set(raw) - {"global", "sources"}
+    if unknown:
+        raise ConfigError(f"quality_gate: unknown top-level key(s): {sorted(unknown)}")
 
     global_raw = raw.get("global") or {}
     if not isinstance(global_raw, dict):
@@ -152,7 +160,7 @@ def load_quality_gate_config(
 
     try:
         global_defaults = merge_thresholds(ScrapeQualityThresholds(), global_raw)
-    except ValueError as exc:
+    except (ValueError, TypeError) as exc:
         raise ConfigError(str(exc)) from exc
 
     sources_raw = raw.get("sources") or {}
@@ -165,7 +173,7 @@ def load_quality_gate_config(
             raise ConfigError(f"quality_gate.sources.{source} must be a mapping")
         try:
             source_overrides[str(source)] = merge_thresholds(global_defaults, overrides)
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             raise ConfigError(f"quality_gate.sources.{source}: {exc}") from exc
 
     return ScrapeQualityConfig(

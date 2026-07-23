@@ -60,48 +60,102 @@ def check_scrape(
         failures=failures,
     )
 
-    complete_count = sum(
-        1
-        for job in jobs
-        if job.description and len(job.description.strip()) >= thresholds.min_desc_chars
-    )
-    complete_pct = _fraction(complete_count, total)
-    _check_minimum(
-        source=source,
-        metric="description completeness pct",
-        observed=complete_pct,
-        threshold=thresholds.min_complete_pct,
-        failures=failures,
-        fmt="pct",
-    )
-
-    posted_at_count = sum(1 for job in jobs if job.posted_at is not None)
-    posted_at_pct = _fraction(posted_at_count, total)
-    _check_minimum(
-        source=source,
-        metric="posted_at pct",
-        observed=posted_at_pct,
-        threshold=thresholds.min_posted_at_pct,
-        failures=failures,
-        fmt="pct",
-    )
-
-    if thresholds.check_workplace:
-        workplace_count = sum(1 for job in jobs if job.search_params.get("workplace"))
-        workplace_pct = _fraction(workplace_count, total)
+    # When total == 0 the percentage checks are meaningless (all report 0.0%)
+    # and would produce redundant failures. Report only the min_jobs failure
+    # as the single root cause. Sources expected to sometimes return zero
+    # should set min_jobs: 0 (per-source override) to opt out.
+    if total > 0:
+        complete_count = sum(
+            1
+            for job in jobs
+            if job.description
+            and len(job.description.strip()) >= thresholds.min_desc_chars
+        )
+        complete_pct = _fraction(complete_count, total)
         _check_minimum(
             source=source,
-            metric="workplace provenance pct",
-            observed=workplace_pct,
-            threshold=thresholds.min_workplace_pct,
+            metric="description completeness pct",
+            observed=complete_pct,
+            threshold=thresholds.min_complete_pct,
             failures=failures,
             fmt="pct",
         )
+
+        posted_at_count = sum(1 for job in jobs if job.posted_at is not None)
+        posted_at_pct = _fraction(posted_at_count, total)
+        _check_minimum(
+            source=source,
+            metric="posted_at pct",
+            observed=posted_at_pct,
+            threshold=thresholds.min_posted_at_pct,
+            failures=failures,
+            fmt="pct",
+        )
+
+        if thresholds.check_workplace:
+            workplace_count = sum(
+                1 for job in jobs if job.search_params.get("workplace")
+            )
+            workplace_pct = _fraction(workplace_count, total)
+            _check_minimum(
+                source=source,
+                metric="workplace provenance pct",
+                observed=workplace_pct,
+                threshold=thresholds.min_workplace_pct,
+                failures=failures,
+                fmt="pct",
+            )
+        else:
+            log.info("%s quality workplace provenance check disabled", source)
     else:
-        log.info("%s quality workplace provenance check disabled", source)
+        log.info("%s returned 0 jobs — skipping percentage checks", source)
 
     if failures:
         raise ScrapeQualityError("; ".join(failures))
+
+
+def _coerce_bool(key: str, value: Any) -> bool:
+    """Strict boolean coercion — no silent truthiness."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lower = value.lower()
+        if lower == "true":
+            return True
+        if lower == "false":
+            return False
+        raise ValueError(f"quality gate {key} must be true/false, got {value!r}")
+    raise ValueError(
+        f"quality gate {key} must be a boolean, got {type(value).__name__}"
+    )
+
+
+def _coerce_int(key: str, value: Any) -> int:
+    """Coerce to int, raising ValueError on null or wrong type."""
+    if value is None:
+        raise ValueError(f"quality gate {key} must be a number, got {value!r}")
+    if isinstance(value, bool):
+        raise ValueError(
+            f"quality gate {key} must be a number, got {type(value).__name__}"
+        )
+    try:
+        return int(value)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"quality gate {key} must be a number, got {value!r}") from exc
+
+
+def _coerce_float(key: str, value: Any) -> float:
+    """Coerce to float, raising ValueError on null or wrong type."""
+    if value is None:
+        raise ValueError(f"quality gate {key} must be a number, got {value!r}")
+    if isinstance(value, bool):
+        raise ValueError(
+            f"quality gate {key} must be a number, got {type(value).__name__}"
+        )
+    try:
+        return float(value)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"quality gate {key} must be a number, got {value!r}") from exc
 
 
 def merge_thresholds(
@@ -123,11 +177,11 @@ def merge_thresholds(
 
     for key, value in overrides.items():
         if key in {"enabled", "check_workplace"}:
-            values[key] = bool(value)
+            values[key] = _coerce_bool(key, value)
         elif key in {"min_jobs", "min_desc_chars"}:
-            values[key] = int(value)
+            values[key] = _coerce_int(key, value)
         else:
-            values[key] = float(value)
+            values[key] = _coerce_float(key, value)
 
     updated = replace(base, **values)
     _validate_thresholds(updated)
