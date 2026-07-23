@@ -6,9 +6,8 @@ import requests
 
 from utils.salary import extract_salary
 
-from ..description_formatting import html_to_markdown
+from ..description_formatting import clean_description
 from ..models import JobPosting
-from ..pii import scrub
 from ..search_provenance import build_search_params
 from .base import BaseScraper
 
@@ -49,10 +48,8 @@ class LeverScraper(BaseScraper["LeverQuery"]):
         for item in data:
             raw_desc = ""
             if self.query.fetch_descriptions:
-                raw_desc = item.get("descriptionPlain") or html_to_markdown(
-                    item.get("description") or ""
-                )
-            description, scrub_counts = scrub(raw_desc)
+                raw_desc = item.get("descriptionPlain") or item.get("description") or ""
+            description, scrub_counts = clean_description(raw_desc)
 
             location = (item.get("categories") or {}).get("location", "")
 

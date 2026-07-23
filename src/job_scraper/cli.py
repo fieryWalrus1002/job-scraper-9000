@@ -14,6 +14,7 @@ from jobs_cli._common import (
 )
 
 from ._maps import TIME_MAP, WORKPLACE_MAP, JOBTYPE_MAP
+from .pii import pii_redaction_total
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -425,10 +426,7 @@ def _cmd_run_config(args) -> None:
                 dest = None
             _output(jobs, dest)
             total += len(jobs)
-            total_scrubbed += sum(
-                j.scrub_counts.get("email", 0) + j.scrub_counts.get("phone", 0)
-                for j in jobs
-            )
+            total_scrubbed += sum(pii_redaction_total(j.scrub_counts) for j in jobs)
         except Exception as exc:
             log.error("%s failed — skipping: %s", s.source_name, exc)
             if is_permanent(exc):

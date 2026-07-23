@@ -15,3 +15,8 @@ def scrub(text: str) -> tuple[str, dict]:
     counts["phone"] = n
     text = _BLANK_LINES_RE.sub("\n\n", text).strip()
     return text, counts
+
+
+def pii_redaction_total(scrub_counts: dict) -> int:
+    """Return the total number of PII redactions represented by scrub_counts."""
+    return scrub_counts.get("email", 0) + scrub_counts.get("phone", 0)

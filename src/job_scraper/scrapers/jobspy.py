@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 from utils.salary import SalaryResult, annualise, extract_salary
 
+from ..description_formatting import clean_description
 from ..models import JobPosting
-from ..pii import scrub
 from ..search_provenance import build_search_params
 from .base import BaseScraper
 
@@ -73,8 +73,7 @@ class JobSpyScraper(BaseScraper["JobSpyQuery"]):
 
         jobs: list[JobPosting] = []
         for _, row in df.iterrows():
-            raw_desc = str(row.get("description") or "")
-            description, scrub_counts = scrub(raw_desc)
+            description, scrub_counts = clean_description(row.get("description"))
 
             salary = _salary_from_row(row) or extract_salary(description)
 

@@ -7,9 +7,8 @@ import requests
 
 from utils.salary import extract_salary
 
-from ..description_formatting import html_to_markdown
+from ..description_formatting import clean_description
 from ..models import JobPosting
-from ..pii import scrub
 from ..query import SELSearchQuery
 from ..search_provenance import build_search_params
 from .base import BaseScraper
@@ -156,8 +155,7 @@ class SELJobScraper(BaseScraper["SELSearchQuery"]):
                     if self.query.fetch_descriptions
                     else ""
                 )
-                description_raw = html_to_markdown(description_html)
-                description, scrub_counts = scrub(description_raw)
+                description, scrub_counts = clean_description(description_html)
 
                 bullet_fields = item.get("bulletFields") or []
                 source_job_id = (

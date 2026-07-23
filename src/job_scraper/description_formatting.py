@@ -1,6 +1,10 @@
 """Helpers for normalising scraped job description markup."""
 
+import html
+
 from markdownify import markdownify as _markdownify
+
+from .pii import scrub
 
 
 def html_to_markdown(html: object) -> str:
@@ -22,3 +26,17 @@ def html_to_markdown(html: object) -> str:
         heading_style="ATX",
         escape_misc=False,
     ).strip()
+
+
+def clean_description(raw: object) -> tuple[str, dict]:
+    """Single hygiene entry point for scraped descriptions.
+
+    Runs unescape HTML entities → convert to Markdown → redact PII.
+    Order matters: unescape first so markdownify parses real tags even on
+    double-encoded input; PII scrub last so phone punctuation survives
+    html_to_markdown's escape_misc=False (see #389).
+    """
+    if not raw:
+        return "", {"email": 0, "phone": 0}
+    markdown = html_to_markdown(html.unescape(str(raw)))
+    return scrub(markdown)
